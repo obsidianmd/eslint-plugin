@@ -1,0 +1,49 @@
+{
+  "name": "eslint-plugin-obsidian",
+  "version": "0.0.1",
+  "description": "test",
+  "license": "MIT",
+  "author": "Obsidian",
+  "homepage": "https://obsidian.md",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/obsidianmd/eslint-plugin.git"
+  },
+  "keywords": [
+    "eslint",
+    "eslintplugin",
+    "eslint-plugin"
+  ],
+  "main": "./dist/lib/index.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "mocha tests",
+    "update:eslint-docs": "eslint-doc-generator",
+    "link": "npm link",
+    "build:link": "tsc && npm link"
+  },
+  "bin": {
+    "eslint-plugin-obsidian": "./dist/lib/index.js"
+  },
+  "dependencies": {
+    "typescript": "5.3.3",
+    "eslint": "8.56.0",
+    "@typescript-eslint/utils": "7.0.1",
+    "@typescript-eslint/types": "7.0.1",
+    "@types/eslint": "8.56.2"
+  },
+  "devDependencies": {
+    "@typescript-eslint/rule-tester": "7.0.1",
+    "eslint-doc-generator": "1.6.2",
+    "mocha": "10.3.0",
+    "@types/mocha": "10.0.6",
+    "esbuild": "0.20.1",
+    "builtin-modules": "3.3.0"
+  },
+  "engines": {
+    "node": "^14.17.0 || ^16.0.0 || >= 18.0.0"
+  },
+  "peerDependencies": {
+    "eslint": ">=8"
+  }
+}
