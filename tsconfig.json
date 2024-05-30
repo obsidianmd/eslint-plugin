@@ -2,7 +2,7 @@
   "compilerOptions": {
     "moduleResolution": "nodenext",
     "module": "nodenext",
-    "target": "es2015",
+    "target": "es2016",
     "esModuleInterop": true,
     "outDir": "./dist"
   }

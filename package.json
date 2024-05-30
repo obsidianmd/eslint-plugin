@@ -14,7 +14,7 @@
     "eslintplugin",
     "eslint-plugin"
   ],
-  "main": "./dist/lib/index.js",
+  "main": "dist/lib/index.js",
   "scripts": {
     "build": "tsc",
     "test": "mocha tests",
@@ -23,14 +23,27 @@
     "build:link": "tsc && npm link"
   },
   "bin": {
-    "eslint-plugin-obsidian": "./dist/lib/index.js"
+    "eslint-plugin-obsidian": "dist/lib/index.js"
   },
+  "files": [
+    "dist/**"
+  ],
   "dependencies": {
     "typescript": "5.3.3",
     "eslint": "8.56.0",
     "@typescript-eslint/utils": "7.0.1",
     "@typescript-eslint/types": "7.0.1",
-    "@types/eslint": "8.56.2"
+    "@types/eslint": "8.56.2",
+    "@types/node": "20.12.12",
+    "typescript-eslint": "7.1.0",
+    "eslint-plugin-deprecation": "2.0.0",
+    "eslint-plugin-import": "2.29.1",
+    "eslint-plugin-security": "2.1.1",
+    "eslint-plugin-json-schema-validator": "5.1.0",
+    "@typescript-eslint/eslint-plugin": "5.29.0",
+    "@typescript-eslint/parser": "5.29.0",
+    "@microsoft/eslint-plugin-sdl": "0.2.2",
+    "globals": "14.0.0"
   },
   "devDependencies": {
     "@typescript-eslint/rule-tester": "7.0.1",
@@ -38,12 +51,17 @@
     "mocha": "10.3.0",
     "@types/mocha": "10.0.6",
     "esbuild": "0.20.1",
-    "builtin-modules": "3.3.0"
+    "builtin-modules": "3.3.0",
+    "eslint": "8.56.0",
+    "typescript-eslint": "7.1.0",
+    "@typescript-eslint/eslint-plugin": "5.29.0",
+    "@typescript-eslint/parser": "5.29.0",
+    "@microsoft/eslint-plugin-sdl": "0.2.2",
+    "globals": "14.0.0"
   },
   "engines": {
     "node": "^14.17.0 || ^16.0.0 || >= 18.0.0"
   },
   "peerDependencies": {
-    "eslint": ">=8"
   }
 }

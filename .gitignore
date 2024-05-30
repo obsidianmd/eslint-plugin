@@ -2,3 +2,5 @@ dist
 *.iml
 .idea
 node_modules
+*.js
+docs
