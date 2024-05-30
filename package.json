@@ -18,7 +18,7 @@
   "scripts": {
     "build": "tsc",
     "test": "mocha tests",
-    "update:eslint-docs": "eslint-doc-generator",
+    "update:eslint-docs": "eslint-doc-generator --init-rule-docs",
     "link": "npm link",
     "build:link": "tsc && npm link"
   },

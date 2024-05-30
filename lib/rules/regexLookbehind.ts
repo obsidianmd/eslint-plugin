@@ -4,7 +4,7 @@ export = {
     name: 'regex-lookbehind',
     meta: {
         docs: {
-            description: 'Using lookbehinds in Regex',
+            description: 'Using lookbehinds in Regex is not supported in some iOS versions',
             url: 'https://docs.obsidian.md/Plugins/Getting+started/Mobile+development#Lookbehind+in+regular+expressions'
         },
         type: 'problem',

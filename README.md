@@ -1,6 +1,7 @@
 # eslint-plugin-obsidian
 
-test
+> [!warning]
+> This is not ready to be used yet.
 
 ## Installation
 
@@ -44,7 +45,11 @@ Then configure the rules you want to use under the rules section.
 ## Configurations
 
 <!-- begin auto-generated configs list -->
-TODO: Run eslint-doc-generator to generate the configs list (or delete this section if no configs are offered).
+
+|    | Name          |
+| :- | :------------ |
+| ✅  | `recommended` |
+
 <!-- end auto-generated configs list -->
 
 
@@ -53,9 +58,19 @@ TODO: Run eslint-doc-generator to generate the configs list (or delete this sect
 
 <!-- begin auto-generated rules list -->
 
-| Name           | Description            |
-| :------------- | :--------------------- |
-| node-libraries | An example ESLint rule |
+💼 Configurations enabled in.\
+✅ Set in the `recommended` configuration.\
+🔧 Automatically fixable by the [`--fix` CLI option](https://eslint.org/docs/user-guide/command-line-interface#--fix).
+
+| Name                                               | Description                                     | 💼 | 🔧 |
+| :------------------------------------------------- | :---------------------------------------------- | :- | :- |
+| [commands](docs/rules/commands.md)                 | test                                            | ✅  |    |
+| [detach-leaves](docs/rules/detach-leaves.md)       | test                                            | ✅  | 🔧 |
+| [object-assign](docs/rules/object-assign.md)       | Object.assign with two parameters instead of 3. | ✅  |    |
+| [regex-lookbehind](docs/rules/regex-lookbehind.md) | Using lookbehinds in Regex                      | ✅  |    |
+| [sample-names](docs/rules/sample-names.md)         | Rename sample plugin class names                | ✅  |    |
+| [sentence-case](docs/rules/sentence-case.md)       | Use sentence case in UI                         | ✅  |    |
+| [settings-tab](docs/rules/settings-tab.md)         | Use sentence case in UI                         | ✅  |    |
 
 <!-- end auto-generated rules list -->
 
