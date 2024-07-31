@@ -1,4 +1,4 @@
-const sampleNames = ['MyPlugin', 'MyPluginSettings', 'SampleSettingTab', 'SampleModal'];
+const sampleNames = ['MyPlugin', 'MyPluginSettings', 'SampleSettingTab', 'SampleModal', 'mySetting'];
 
 export = {
     name: 'sample-names',
@@ -21,7 +21,7 @@ export = {
                     context.report({
                         node: node.id,
                         messageId: 'rename'
-                    })
+                    });
                 }
             },
             ClassDeclaration (node) {
@@ -29,7 +29,15 @@ export = {
                     context.report({
                         node: node.id,
                         messageId: 'rename'
-                    })
+                    });
+                }
+            },
+            PropertySignature (node) {
+                if(sampleNames.includes(node.id.name)) {
+                    context.report({
+                        node: node.id,
+                        messageId: 'rename'
+                    });
                 }
             }
         };

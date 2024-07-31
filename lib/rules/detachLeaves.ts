@@ -3,7 +3,7 @@ export = {
     name: 'detach-leaves',
     meta: {
         docs: {
-            description: 'test',
+            description: 'Don\'t detach leaves in onunload.',
             url: 'https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#Don\'t+detach+leaves+in+%60onunload%60'
         },
         type: 'problem',

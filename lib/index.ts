@@ -5,6 +5,7 @@ import sampleNames from "./rules/sampleNames";
 import commands from "./rules/commands";
 import sentenceCase from "./rules/sentenceCase";
 import settingsTab from "./rules/settingsTab";
+import hardcodedConfigPath from "./rules/hardcodedConfigPath";
 import {manifest} from "./readManifest";
 
 export = {
@@ -19,7 +20,8 @@ export = {
         "sample-names": sampleNames,
         "commands": commands,
         "sentence-case": sentenceCase,
-        "settings-tab": settingsTab
+        "settings-tab": settingsTab,
+        "hardcoded-config-path": hardcodedConfigPath,
 
     },
     configs: {
@@ -90,7 +92,7 @@ export = {
                 "obsidian/commands": "error",
                 "obsidian/sentence-case": "error",
                 "obsidian/settings-tab": "error",
-
+                "obsidian/hardcoded-config-path": "error",
 
                 "json-schema-validator/no-invalid": [
                     "error", {

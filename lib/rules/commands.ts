@@ -1,46 +1,74 @@
-import {
-    getParserServices
-} from "@typescript-eslint/utils/eslint-utils";
-import {context} from "esbuild";
-import {node} from "globals";
+import { ESLintUtils } from '@typescript-eslint/utils';
+import {manifest} from "../readManifest";
 
 export = {
     name: 'commands',
     meta: {
         docs: {
-            description: 'test',
+            description: 'Command guidelines',
             url: 'https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#Commands'
         },
         type: 'problem',
         messages: {
-            hotkeys: 'Avoid setting a default hotkey for commands'
+            hotkeys: 'We recommend against providing a default hotkey when possible. The reason being that it\'s easy to pick a hotkey that a user already has configured and they could get confused when that key doesn\'t do what they expect. Also, it\'s hard choosing a safe default hotkey that\'s available for all operating systems.',
+            commandInId: 'Adding `command` to the command ID is not necessary.',
+            commandInName: 'Adding `command` to the command name is not necessary.',
+            pluginName: 'The command name should not include the plugin name.',
+            pluginId: 'The command ID should not include the plugin ID.'
         },
         schema: [],
     },
     defaultOptions: [],
-    create: context => {
-        if(context.parserServices?.hasFullTypeInformation === false) {
-            return;
-        }
-        const services = getParserServices(context);
-        const checker = services.program.getTypeChecker();
+    create(context) {
         return {
-            Property(node) {
-                const tsNode = services.esTreeNodeToTSNodeMap.get(node);
-                const type = checker.getTypeAtLocation(tsNode);
-                if(!type.symbol) {
-                    return;
-                }
-                for (let declaration of type.symbol.declarations) {
-                }
-                if(type.symbol.escapedName === 'hotkeys') {
-                    context.report({
-                        node,
-                        messageId: 'hotkeys',
+            CallExpression(node) {
+                if (node.callee.type === 'MemberExpression' &&
+                    node.callee.property.name === 'addCommand' &&
+                    node.arguments.length > 0 &&
+                    node.arguments[0].type === 'ObjectExpression') {
+
+                    const argument = node.arguments[0];
+
+                    argument.properties.forEach(property => {
+                        if (property.key.type === 'Identifier') {
+                            if (property.key.name === 'id' && property.value.type === 'Literal') {
+                                if (property.value.value.toLowerCase().includes('command')) {
+                                    context.report({
+                                        node: property,
+                                        messageId: 'commandInId'
+                                    });
+                                }
+                                if (property.value.value.includes(manifest.id)) {
+                                    context.report({
+                                        node: property,
+                                        messageId: 'pluginId'
+                                    })
+                                }
+                            }
+                            if (property.key.name === 'name' && property.value.type === 'Literal') {
+                                if (property.value.value.toLowerCase().includes('command')) {
+                                    context.report({
+                                       node: property,
+                                       messageId: 'commandInName'
+                                    });
+                                }
+                                if (property.value.value.toLowerCase().includes(manifest.name.toLowerCase())) {
+                                    context.report({
+                                        node: property,
+                                        messageId: 'pluginName'
+                                    })
+                                }
+                            }
+                            if (property.key.name === 'hotkeys') {
+                                context.report({
+                                   node: property,
+                                   messageId: 'hotkeys'
+                                });
+                            }
+                        }
                     });
                 }
-
-            }
-        }
+            },
+        };
     }
 };
