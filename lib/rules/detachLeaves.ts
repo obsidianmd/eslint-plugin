@@ -20,13 +20,15 @@ export = {
                 if(node.key.type === 'Identifier' && node.key.name === 'onunload') {
                     node.value.body.body.forEach(statement => {
                         if (statement.type === 'ExpressionStatement' &&
-                            statement.expression.type === 'CallExpression' &&
-                            statement.expression.callee.property.name === 'detachLeavesOfType') {
-                            context.report({
-                                node,
-                                messageId: 'onunload',
-                                fix: fixer => fixer.remove(statement)
-                            })
+                            statement.expression.type === 'CallExpression'){
+
+                            if (statement.expression.callee.property.name === 'detachLeavesOfType') {
+                                context.report({
+                                    node,
+                                    messageId: 'onunload',
+                                    fix: fixer => fixer.remove(statement)
+                                })
+                            }
                         }
                     });
                 }

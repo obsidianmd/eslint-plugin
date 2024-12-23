@@ -1,4 +1,3 @@
-import { ESLintUtils } from '@typescript-eslint/utils';
 import {manifest} from "../readManifest";
 
 export = {
@@ -10,7 +9,7 @@ export = {
         },
         type: 'problem',
         messages: {
-            hotkeys: 'We recommend against providing a default hotkey when possible. The reason being that it\'s easy to pick a hotkey that a user already has configured and they could get confused when that key doesn\'t do what they expect. Also, it\'s hard choosing a safe default hotkey that\'s available for all operating systems.',
+            hotkeys: 'We recommend against providing a default hotkey when possible.',
             commandInId: 'Adding `command` to the command ID is not necessary.',
             commandInName: 'Adding `command` to the command name is not necessary.',
             pluginName: 'The command name should not include the plugin name.',

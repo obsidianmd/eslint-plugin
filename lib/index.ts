@@ -3,9 +3,10 @@ import objectAssign from "./rules/objectAssign";
 import regexLookbehind from "./rules/regexLookbehind";
 import sampleNames from "./rules/sampleNames";
 import commands from "./rules/commands";
-import sentenceCase from "./rules/sentenceCase";
+import platform from "./rules/platform";
 import settingsTab from "./rules/settingsTab";
 import hardcodedConfigPath from "./rules/hardcodedConfigPath";
+import vaultIterate from './rules/vault/iterate';
 import {manifest} from "./readManifest";
 
 export = {
@@ -19,9 +20,10 @@ export = {
         "regex-lookbehind": regexLookbehind,
         "sample-names": sampleNames,
         "commands": commands,
-        "sentence-case": sentenceCase,
+        "platform": platform,
         "settings-tab": settingsTab,
         "hardcoded-config-path": hardcodedConfigPath,
+        'vault-iterate': vaultIterate
 
     },
     configs: {
@@ -90,9 +92,10 @@ export = {
                 "obsidian/regex-lookbehind": "error",
                 "obsidian/sample-names": "error",
                 "obsidian/commands": "error",
-                "obsidian/sentence-case": "error",
+                "obsidian/platform": "error",
                 "obsidian/settings-tab": "error",
                 "obsidian/hardcoded-config-path": "error",
+                "obsidian/vault-iterate": "error",
 
                 "json-schema-validator/no-invalid": [
                     "error", {

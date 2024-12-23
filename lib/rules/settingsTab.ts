@@ -69,7 +69,7 @@ export = {
                             methods.includes('setName') &&
                             methods.includes('setHeading')) {
 
-                            if(text.toLowerCase().includes('settings')) {
+                            if(['settings', 'options', 'configuration', 'config'].some(str => text.toLowerCase().includes(str))) {
                                 context.report({
                                     node,
                                     messageId: 'settings',
