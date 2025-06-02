@@ -1,15 +1,15 @@
-import detachLeaves from "./rules/detachLeaves";
-import objectAssign from "./rules/objectAssign";
-import regexLookbehind from "./rules/regexLookbehind";
-import sampleNames from "./rules/sampleNames";
-import commands from "./rules/commands";
-import platform from "./rules/platform";
-import settingsTab from "./rules/settingsTab";
-import hardcodedConfigPath from "./rules/hardcodedConfigPath";
-import vaultIterate from './rules/vault/iterate';
-import {manifest} from "./readManifest";
+import detachLeaves from "./rules/detachLeaves.js";
+import objectAssign from "./rules/objectAssign.js";
+import regexLookbehind from "./rules/regexLookbehind.js";
+import sampleNames from "./rules/sampleNames.js";
+import commands from "./rules/commands.js";
+import platform from "./rules/platform.js";
+import settingsTab from "./rules/settingsTab.js";
+import hardcodedConfigPath from "./rules/hardcodedConfigPath.js";
+import vaultIterate from './rules/vault/iterate.js';
+import {manifest} from "./readManifest.js";
 
-export = {
+export default {
     meta: {
         name: 'eslint-plugin-obsidianmd',
         version: '0.0.2',

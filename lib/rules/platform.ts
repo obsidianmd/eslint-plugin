@@ -1,4 +1,4 @@
-export = {
+export default {
     name: 'platform',
     meta: {
         type: 'problem',
@@ -16,7 +16,7 @@ create(context) {
         MemberExpression(node) {
             if (
                 node.object &&
-                node.object.name == 'window' || node.object.name === 'navigator' &&
+                (node.object.name == 'window' || node.object.name === 'navigator') &&
                 ['userAgent', 'platform'].includes(node.property.name)
             ) {
                 context.report({

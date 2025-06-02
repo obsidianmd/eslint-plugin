@@ -2,7 +2,7 @@ import {
     getParserServices
 } from "@typescript-eslint/utils/eslint-utils";
 
-export = {
+export default {
     name: 'hardcoded-config-path',
     meta: {
         docs: {

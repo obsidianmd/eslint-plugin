@@ -1,6 +1,6 @@
 const sampleNames = ['MyPlugin', 'MyPluginSettings', 'SampleSettingTab', 'SampleModal', 'mySetting'];
 
-export = {
+export default {
     name: 'sample-names',
     meta: {
         docs: {

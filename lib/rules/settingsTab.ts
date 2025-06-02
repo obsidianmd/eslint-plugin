@@ -1,6 +1,6 @@
-import {manifest} from "../readManifest";
+import {manifest} from "../readManifest.js";
 
-export = {
+export default {
     name: 'settings-tab',
     meta: {
         docs: {

@@ -1,4 +1,1 @@
-import * as mocha from 'mocha';
-import { RuleTester } from '@typescript-eslint/rule-tester';
-
-RuleTester.afterAll = mocha.after;
+// ESLint 9: RuleTester.afterAll is no longer needed or supported. Remove this workaround.

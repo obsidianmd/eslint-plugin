@@ -1,4 +1,4 @@
-export = {
+export default {
     name: 'object-assign',
     meta: {
         docs: {

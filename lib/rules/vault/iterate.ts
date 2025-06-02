@@ -1,5 +1,4 @@
-
-export = {
+export default {
     name: 'vault-iterate',
     meta: {
         docs: {

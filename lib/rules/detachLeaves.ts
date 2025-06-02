@@ -1,5 +1,4 @@
-
-export = {
+export default {
     name: 'detach-leaves',
     meta: {
         docs: {
