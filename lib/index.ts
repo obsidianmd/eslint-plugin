@@ -87,15 +87,15 @@ export = {
                 "import/no-nodejs-modules": manifest.isDesktopOnly ? 'off' : 'error',
                 "import/no-extraneous-dependencies": "error",
 
-                "obsidian/detach-leaves": "error",
-                "obsidian/object-assign": "error",
-                "obsidian/regex-lookbehind": "error",
-                "obsidian/sample-names": "error",
-                "obsidian/commands": "error",
-                "obsidian/platform": "error",
-                "obsidian/settings-tab": "error",
-                "obsidian/hardcoded-config-path": "error",
-                "obsidian/vault-iterate": "error",
+                "obsidianmd/detach-leaves": "error",
+                "obsidianmd/object-assign": "error",
+                "obsidianmd/regex-lookbehind": "error",
+                "obsidianmd/sample-names": "error",
+                "obsidianmd/commands": "error",
+                "obsidianmd/platform": "error",
+                "obsidianmd/settings-tab": "error",
+                "obsidianmd/hardcoded-config-path": "error",
+                "obsidianmd/vault-iterate": "error",
             }
         }
     }
