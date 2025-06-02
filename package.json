@@ -1,9 +1,9 @@
 {
   "name": "eslint-plugin-obsidian",
   "version": "0.0.1",
-  "description": "test",
+  "description": "Testing",
   "license": "MIT",
-  "author": "Obsidian",
+  "author": "Dynalist Inc.",
   "homepage": "https://obsidian.md",
   "repository": {
     "type": "git",
