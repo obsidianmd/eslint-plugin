@@ -12,19 +12,23 @@ export default {
     },
 },
 create(context) {
-    return {
-        MemberExpression(node) {
-            if (
-                node.object &&
-                (node.object.name == 'window' || node.object.name === 'navigator') &&
-                ['userAgent', 'platform'].includes(node.property.name)
-            ) {
-                context.report({
-                    node,
-                    messageId: 'avoidNavigator',
-                });
-            }
-        },
-    };
-},
+        console.log('RULE CREATE CALLED: platform');
+        return {
+            MemberExpression(node) {
+                // Diagnostic: log every member expression
+                // eslint-disable-next-line no-console
+                console.log('PLATFORM MEMBER:', node.object && node.object.name, node.property && node.property.name);
+                if (
+                    node.object &&
+                    (node.object.name == 'window' || node.object.name === 'navigator') &&
+                    ['userAgent', 'platform'].includes(node.property.name)
+                ) {
+                    context.report({
+                        node,
+                        messageId: 'avoidNavigator',
+                    });
+                }
+            },
+        };
+    },
 };

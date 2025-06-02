@@ -3,3 +3,8 @@ dist
 .idea
 node_modules
 *.js
+!eslint.config.js
+.vscode
+
+# Ignore all log files
+*.log

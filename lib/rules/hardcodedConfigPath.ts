@@ -27,7 +27,7 @@ export default {
                 if (typeof node.value === 'string' && node.value.includes('.obsidian')) {
                     context.report({
                         node,
-                        messageid: 'configPath',
+                        messageId: 'configPath',
                     });
                 }
             },
