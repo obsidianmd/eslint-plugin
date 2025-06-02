@@ -1,5 +1,5 @@
 {
-  "name": "eslint-plugin-obsidian",
+  "name": "eslint-plugin-obsidianmd",
   "version": "0.0.1",
   "description": "Testing",
   "license": "MIT",
@@ -12,15 +12,15 @@
   "keywords": [
     "eslint",
     "eslintplugin",
-    "eslint-plugin"
+    "eslint-plugin",
+    "obsidian",
+    "obsdmd"
   ],
   "main": "dist/lib/index.js",
   "scripts": {
     "build": "tsc",
     "test": "mocha tests",
-    "update:eslint-docs": "eslint-doc-generator --init-rule-docs",
-    "link": "npm link",
-    "build:link": "tsc && npm link"
+    "update:eslint-docs": "eslint-doc-generator --init-rule-docs"
   },
   "bin": {
     "eslint-plugin-obsidian": "dist/lib/index.js"
@@ -63,5 +63,6 @@
     "node": "^14.17.0 || ^16.0.0 || >= 18.0.0"
   },
   "peerDependencies": {
+    "eslint": "8.56.0"
   }
 }

@@ -1,4 +1,4 @@
-# eslint-plugin-obsidian
+# obsidian-eslint-plugin
 
 > [!warning]
 > This is not ready to be used yet.
@@ -11,20 +11,20 @@ You'll first need to install [ESLint](https://eslint.org/):
 npm i eslint --save-dev
 ```
 
-Next, install `eslint-plugin-obsidian`:
+Next, install `eslint-plugin-obsidianmd`:
 
 ```sh
-npm install eslint-plugin-obsidian --save-dev
+npm install eslint-plugin-obsidianmd --save-dev
 ```
 
 ## Usage
 
-Add `obsidian` to the plugins section of your `.eslintrc` configuration file. You can omit the `eslint-plugin-` prefix:
+Add `obsidianmd` to the plugins section of your `.eslintrc` configuration file. You can omit the `eslint-plugin-` prefix:
 
 ```json
 {
     "plugins": [
-        "obsidian"
+        "obsidianmd"
     ]
 }
 ```
@@ -58,19 +58,19 @@ Then configure the rules you want to use under the rules section.
 
 <!-- begin auto-generated rules list -->
 
-💼 Configurations enabled in.\
-✅ Set in the `recommended` configuration.\
 🔧 Automatically fixable by the [`--fix` CLI option](https://eslint.org/docs/user-guide/command-line-interface#--fix).
 
-| Name                                               | Description                                     | 💼 | 🔧 |
-| :------------------------------------------------- | :---------------------------------------------- | :- | :- |
-| [commands](docs/rules/commands.md)                 | test                                            | ✅  |    |
-| [detach-leaves](docs/rules/detach-leaves.md)       | test                                            | ✅  | 🔧 |
-| [object-assign](docs/rules/object-assign.md)       | Object.assign with two parameters instead of 3. | ✅  |    |
-| [regex-lookbehind](docs/rules/regex-lookbehind.md) | Using lookbehinds in Regex                      | ✅  |    |
-| [sample-names](docs/rules/sample-names.md)         | Rename sample plugin class names                | ✅  |    |
-| [sentence-case](docs/rules/sentence-case.md)       | Use sentence case in UI                         | ✅  |    |
-| [settings-tab](docs/rules/settings-tab.md)         | Use sentence case in UI                         | ✅  |    |
+| Name                                                         | Description                                                      | 🔧 |
+| :----------------------------------------------------------- | :--------------------------------------------------------------- | :- |
+| [commands](docs/rules/commands.md)                           | Command guidelines                                               |    |
+| [detach-leaves](docs/rules/detach-leaves.md)                 | Don't detach leaves in onunload.                                 | 🔧 |
+| [hardcoded-config-path](docs/rules/hardcoded-config-path.md) | test                                                             |    |
+| [object-assign](docs/rules/object-assign.md)                 | Object.assign with two parameters instead of 3.                  |    |
+| [platform](docs/rules/platform.md)                           | Disallow use of navigator API for OS detection                   |    |
+| [regex-lookbehind](docs/rules/regex-lookbehind.md)           | Using lookbehinds in Regex is not supported in some iOS versions |    |
+| [sample-names](docs/rules/sample-names.md)                   | Rename sample plugin class names                                 |    |
+| [settings-tab](docs/rules/settings-tab.md)                   |                                                                  | 🔧 |
+| [vault-iterate](docs/rules/vault-iterate.md)                 | Avoid iterating all files to find a file by its path<br/>        | 🔧 |
 
 <!-- end auto-generated rules list -->
 
