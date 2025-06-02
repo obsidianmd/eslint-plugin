@@ -19,7 +19,7 @@
   "main": "dist/lib/index.js",
   "scripts": {
     "build": "tsc",
-    "test": "tsx tests/**/*.ts",
+    "test": "tsx tests/all-rules.test.ts",
     "update:eslint-docs": "eslint-doc-generator --init-rule-docs"
   },
   "bin": {

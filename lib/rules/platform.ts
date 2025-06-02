@@ -1,26 +1,26 @@
+import { TSESTree, TSESLint } from '@typescript-eslint/utils';
+
 export default {
     name: 'platform',
     meta: {
-        type: 'problem',
-    docs: {
-        description: 'Disallow use of navigator API for OS detection',
-        url: 'https://docs.obsidian.md/Plugins/Getting+started/Mobile+development#Platform-specific+features'
+        type: 'problem' as const,
+        docs: {
+            description: 'Disallow use of navigator API for OS detection',
+            url: 'https://docs.obsidian.md/Plugins/Getting+started/Mobile+development#Platform-specific+features'
+        },
+        schema: [],
+        messages: {
+            avoidNavigator: 'Avoid using the navigator API to detect the operating system. Use the Platform API instead.',
+        },
     },
-    schema: [],
-    messages: {
-        avoidNavigator: 'Avoid using the navigator API to detect the operating system. Use the Platform API instead.',
-    },
-},
-create(context) {
-        console.log('RULE CREATE CALLED: platform');
+    create(context: TSESLint.RuleContext<'avoidNavigator', []>) {
         return {
-            MemberExpression(node) {
-                // Diagnostic: log every member expression
-                // eslint-disable-next-line no-console
-                console.log('PLATFORM MEMBER:', node.object && node.object.name, node.property && node.property.name);
+            MemberExpression(node: TSESTree.MemberExpression) {
                 if (
                     node.object &&
+                    node.object.type === 'Identifier' &&
                     (node.object.name == 'window' || node.object.name === 'navigator') &&
+                    node.property.type === 'Identifier' &&
                     ['userAgent', 'platform'].includes(node.property.name)
                 ) {
                     context.report({

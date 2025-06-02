@@ -1,4 +1,5 @@
-import {manifest} from "../readManifest.js";
+import { TSESTree, TSESLint } from '@typescript-eslint/utils';
+import { manifest } from "../readManifest.js";
 
 export default {
     name: 'commands',
@@ -7,7 +8,7 @@ export default {
             description: 'Command guidelines',
             url: 'https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#Commands'
         },
-        type: 'problem',
+        type: 'problem' as const,
         messages: {
             hotkeys: 'We recommend against providing a default hotkey when possible.',
             commandInId: 'Adding `command` to the command ID is not necessary.',
@@ -18,44 +19,46 @@ export default {
         schema: [],
     },
     defaultOptions: [],
-    create(context) {
+    create(context: TSESLint.RuleContext<'hotkeys' | 'commandInId' | 'commandInName' | 'pluginName' | 'pluginId', []>) {
         return {
-            CallExpression(node) {
-                if (node.callee.type === 'MemberExpression' &&
+            CallExpression(node: TSESTree.CallExpression) {
+                if (
+                    node.callee.type === 'MemberExpression' &&
+                    node.callee.property.type === 'Identifier' &&
                     node.callee.property.name === 'addCommand' &&
                     node.arguments.length > 0 &&
-                    node.arguments[0].type === 'ObjectExpression') {
-
+                    node.arguments[0].type === 'ObjectExpression'
+                ) {
                     const argument = node.arguments[0];
 
                     argument.properties.forEach(property => {
-                        if (property.key.type === 'Identifier') {
-                            if (property.key.name === 'id' && property.value.type === 'Literal') {
+                        if (property.type === 'Property' && property.key.type === 'Identifier') {
+                            if (property.key.name === 'id' && property.value.type === 'Literal' && typeof property.value.value === 'string') {
                                 if (property.value.value.toLowerCase().includes('command')) {
                                     context.report({
                                         node: property,
                                         messageId: 'commandInId'
                                     });
                                 }
-                                if (property.value.value.includes(manifest.id)) {
+                                if (typeof manifest.id === 'string' && property.value.value.includes(manifest.id)) {
                                     context.report({
                                         node: property,
                                         messageId: 'pluginId'
-                                    })
+                                    });
                                 }
                             }
-                            if (property.key.name === 'name' && property.value.type === 'Literal') {
+                            if (property.key.name === 'name' && property.value.type === 'Literal' && typeof property.value.value === 'string') {
                                 if (property.value.value.toLowerCase().includes('command')) {
                                     context.report({
                                        node: property,
                                        messageId: 'commandInName'
                                     });
                                 }
-                                if (property.value.value.toLowerCase().includes(manifest.name.toLowerCase())) {
+                                if (typeof manifest.name === 'string' && property.value.value.toLowerCase().includes(manifest.name.toLowerCase())) {
                                     context.report({
                                         node: property,
                                         messageId: 'pluginName'
-                                    })
+                                    });
                                 }
                             }
                             if (property.key.name === 'hotkeys') {
@@ -69,5 +72,5 @@ export default {
                 }
             },
         };
-    }
+    },
 };

@@ -1,13 +1,20 @@
 import { RuleTester } from 'eslint';
-const detachLeavesRule = (await import('../lib/rules/detachLeaves.js')).default;
+import detachLeavesRule from '../lib/rules/detachLeaves.js';
+import parser from '@typescript-eslint/parser';
+
 const ruleTester = new RuleTester();
-const parser = (await import('@typescript-eslint/parser')).default;
 const languageOptions = { parser, ecmaVersion: 2020, sourceType: 'module' };
-ruleTester.run('detach-leaves', detachLeavesRule as any, {
+
+ruleTester.run('detach-leaves', detachLeavesRule, {
     valid: [
-        { code: 'class MyPlugin { onunload() { /* nothing */ } }', languageOptions } as any
+        { code: 'class MyPlugin { onunload() { /* nothing */ } }', languageOptions }
     ],
     invalid: [
-        { code: 'class MyPlugin { onunload() { this.detachLeavesOfType("foo"); } }', errors: [{ messageId: 'onunload' }], languageOptions } as any,
+        {
+            code: 'class MyPlugin { onunload() { this.detachLeavesOfType("foo"); } }',
+            errors: [{ messageId: 'onunload' }],
+            output: 'class MyPlugin { onunload() {  } }',
+            languageOptions
+        },
     ],
 });

@@ -1,4 +1,5 @@
 import {manifest} from "../readManifest.js";
+import { TSESTree, TSESLint } from '@typescript-eslint/utils';
 
 export default {
     name: 'settings-tab',
@@ -7,7 +8,7 @@ export default {
             description: '',
             url: 'https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#UI+text'
         },
-        type: 'problem',
+        type: 'problem' as const,
         messages: {
             settings: 'Avoid "settings" in settings headings',
             general: 'Don\'t use a "general" heading in your settings',
@@ -18,23 +19,23 @@ export default {
         fixable: 'code'
     },
     defaultOptions: [],
-    create(context) {
+    create(context: TSESLint.RuleContext<'settings' | 'general' | 'pluginName' | 'headingEl', []>) {
         let insidePluginSettingTab = false;
         return {
-            ClassDeclaration(node) {
+            ClassDeclaration(node: TSESTree.ClassDeclaration) {
                 // Check if the class extends `PluginSettingTab`
-                if(node.superClass && node.superClass.name === 'PluginSettingTab') {
+                if(node.superClass && node.superClass.type === 'Identifier' && node.superClass.name === 'PluginSettingTab') {
                     insidePluginSettingTab = true;
                 }
             },
-            'ClassDeclaration:exit'(node) {
+            'ClassDeclaration:exit'(node: TSESTree.ClassDeclaration) {
                 if(insidePluginSettingTab) {
                     insidePluginSettingTab = false;
                 }
             },
 
 
-            ExpressionStatement(node) {
+            ExpressionStatement(node: TSESTree.ExpressionStatement) {
                 if (insidePluginSettingTab && node.expression?.type === 'CallExpression') {
                     const methods = [];
                     let callExpr = node.expression;
@@ -95,7 +96,7 @@ export default {
                 }
             },
 
-            CallExpression(node) {
+            CallExpression(node: TSESTree.CallExpression) {
                 if (node.callee.type === 'MemberExpression') {
                     if (node.callee.property.name === 'createEl') {
                         const args = node.arguments;

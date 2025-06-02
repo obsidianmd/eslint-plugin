@@ -75,3 +75,14 @@ Then configure the rules you want to use under the rules section.
 <!-- end auto-generated rules list -->
 
 
+<!--
+TODO:
+objectAssign.test.ts: FAIL — "Should have 1 error but had 0"
+platform.test.ts: PASS
+regexLookbehind.test.ts: FAIL — "Should have 1 error but had 0"
+sampleNames.test.ts: PASS
+commands.test.ts: PASS
+detachLeaves.test.ts: PASS
+settingsTab.test.ts: PASS
+vaultIterate.test.ts: FAIL — "Should have 1 error but had 0"
+-->

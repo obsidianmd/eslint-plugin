@@ -1,7 +1,9 @@
+import { TSESTree, TSESLint } from '@typescript-eslint/utils';
+
 export default {
     name: 'object-assign',
     meta: {
-        type: 'problem',
+        type: 'problem' as const,
         docs: {
             description: 'Object.assign with two parameters instead of 3.',
             //TODO: Add url
@@ -11,15 +13,18 @@ export default {
             twoArgumentsDefault: 'Doing this will reassign the default.'
         },
     },
-    create(context) {
+    defaultOptions: [],
+    create(context: TSESLint.RuleContext<'twoArgumentsDefault', []>) {
         return {
-            CallExpression(node) {
+            CallExpression(node: TSESTree.CallExpression) {
                 if (
                     node.callee &&
                     node.callee.type === 'MemberExpression' &&
                     node.callee.object &&
+                    node.callee.object.type === 'Identifier' &&
                     node.callee.object.name === 'Object' &&
                     node.callee.property &&
+                    node.callee.property.type === 'Identifier' &&
                     node.callee.property.name === 'assign' &&
                     node.arguments.length === 2 &&
                     node.arguments[0].type === 'Identifier' &&

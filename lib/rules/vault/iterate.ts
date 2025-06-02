@@ -5,7 +5,7 @@ export default {
             description: 'Avoid iterating all files to find a file by its path\n',
             url: 'https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#Avoid+iterating+all+files+to+find+a+file+by+its+path'
         },
-        type: 'problem',
+        type: 'problem' as const,
         messages: {
             iterate: 'Avoid iterating all files to find a file by its path\n'
         },

@@ -1,13 +1,20 @@
 import { RuleTester } from 'eslint';
-const settingsTabRule = (await import('../lib/rules/settingsTab.js')).default;
+import settingsTabRule from '../lib/rules/settingsTab.js';
+import parser from '@typescript-eslint/parser';
+
 const ruleTester = new RuleTester();
-const parser = (await import('@typescript-eslint/parser')).default;
 const languageOptions = { parser, ecmaVersion: 2020, sourceType: 'module' };
-ruleTester.run('settings-tab', settingsTabRule as any, {
+
+ruleTester.run('settings-tab', settingsTabRule, {
     valid: [
-        { code: 'class MyTab extends PluginSettingTab {}', languageOptions } as any
+        { code: 'class MyTab extends PluginSettingTab {}', languageOptions }
     ],
     invalid: [
-        { code: 'class SampleSettingTab extends PluginSettingTab { constructor() { new Setting(this.containerEl).setName("settings").setHeading(); } }', errors: [{ messageId: 'settings' }], languageOptions } as any,
+        {
+            code: 'class SampleSettingTab extends PluginSettingTab { constructor() { new Setting(this.containerEl).setName("settings").setHeading(); } }',
+            errors: [{ messageId: 'settings' }],
+            output: 'class SampleSettingTab extends PluginSettingTab { constructor() {  } }',
+            languageOptions
+        },
     ],
 });

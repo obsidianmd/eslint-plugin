@@ -1,4 +1,5 @@
 import {manifest} from "../readManifest.js";
+import { TSESTree, TSESLint } from '@typescript-eslint/utils';
 
 export default {
     name: 'regex-lookbehind',
@@ -7,17 +8,17 @@ export default {
             description: 'Using lookbehinds in Regex is not supported in some iOS versions',
             url: 'https://docs.obsidian.md/Plugins/Getting+started/Mobile+development#Lookbehind+in+regular+expressions'
         },
-        type: 'problem',
+        type: 'problem' as const,
         messages: {
             lookbehind: 'Lookbehinds are not supported on iOS versions before 16.4.'
         },
         schema: [],
     },
     defaultOptions: [],
-    create(context) {
+    create(context: TSESLint.RuleContext<'lookbehind', []>) {
         return {
-            Literal(node) {
-                if(/(\?<=|\?<!)/.test(node.value)) {
+            Literal(node: TSESTree.Literal) {
+                if(typeof node.value === 'string' && /(\?<=|\?<!)/.test(node.value)) {
                     if(!manifest.isDesktopOnly) {
                         context.report({
                             node,
