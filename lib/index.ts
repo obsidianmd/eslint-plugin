@@ -11,8 +11,8 @@ import {manifest} from "./readManifest";
 
 export = {
     meta: {
-        name: 'eslint-plugin-obsidian',
-        version: '0.0.1',
+        name: 'eslint-plugin-obsidianmd',
+        version: '0.0.2',
     },
     rules: {
         "detach-leaves": detachLeaves,

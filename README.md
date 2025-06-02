@@ -1,7 +1,7 @@
-# obsidian-eslint-plugin
+# eslint-pluginmd
 
 > [!warning]
-> This is not ready to be used yet.
+> This is not ready to be used in production yet.
 
 ## Installation
 
