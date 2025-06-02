@@ -1,28 +1,40 @@
 import { RuleTester } from 'eslint';
 import platformRule from '../lib/rules/platform.js';
+
+const ruleTester = new RuleTester();
 const parser = (await import('@typescript-eslint/parser')).default;
-const ruleTester = new RuleTester({
+
+const languageOptions = {
     parser,
-    parserOptions: { ecmaVersion: 2020, sourceType: 'module' },
-});
+    ecmaVersion: 2020,
+    sourceType: 'module',
+};
+
 const patchedPlatformRule = {
     ...platformRule,
     meta: {
         ...platformRule.meta,
-        type: 'problem', // Ensure this is a valid value
+        type: 'problem',
     },
 };
 ruleTester.run('platform', patchedPlatformRule as any, {
-    valid: ['import {issues} from "./reviewIssues";'],
+    valid: [
+        {
+            code: 'import {issues} from "./reviewIssues";',
+            languageOptions,
+        } as any
+    ],
     invalid: [
         {
             code: 'import {promises as fsPromises} from "fs";',
             errors: [{ messageId: 'desktopOnly' }],
-        },
+            languageOptions,
+        } as any,
         {
             code: 'import path from "path";',
             errors: [{ messageId: 'desktopOnly' }],
-        },
+            languageOptions,
+        } as any,
     ],
 });
 
