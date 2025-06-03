@@ -1,4 +1,3 @@
-import './setupRuleTester.js';
 import { RuleTester } from '@typescript-eslint/rule-tester';
 import hardcodedConfigPathRule from '../lib/rules/hardcodedConfigPath.js';
 import parser from '@typescript-eslint/parser';
