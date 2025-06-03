@@ -1,6 +1,3 @@
-import {
-    getParserServices
-} from "@typescript-eslint/utils/eslint-utils";
 import { TSESTree, TSESLint } from '@typescript-eslint/utils';
 
 export default {
@@ -18,11 +15,6 @@ export default {
     },
     defaultOptions: [],
     create: (context: TSESLint.RuleContext<'configPath', []>) => {
-        if (!context.parserServices || !context.parserServices.program) {
-            return {};
-        }
-        const services = getParserServices(context);
-        const checker = services.program.getTypeChecker();
         return {
             Literal(node: TSESTree.Literal) {
                 if (typeof node.value === 'string' && node.value.includes('.obsidian')) {
