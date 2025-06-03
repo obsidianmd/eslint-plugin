@@ -1,3 +1,5 @@
+import { TSESTree, TSESLint } from '@typescript-eslint/utils';
+
 export default {
     name: 'vault-iterate',
     meta: {
@@ -13,37 +15,41 @@ export default {
         fixable: 'code' as const
     },
     defaultOptions: [],
-    create: context => {
+    create: (context: TSESLint.RuleContext<'iterate', []>) => {
         return {
-            MemberExpression(node) {
+            MemberExpression(node: TSESTree.MemberExpression) {
                 if (
+                    node.property.type === 'Identifier' &&
                     node.property.name === 'find' &&
                     node.object.type === 'CallExpression' &&
                     node.object.callee.type === 'MemberExpression' &&
+                    node.object.callee.property.type === 'Identifier' &&
                     node.object.callee.property.name === 'getFiles' &&
-                    node.object.callee.object.type === 'MemberExpression' &&
-                    node.object.callee.object.property.name === 'vault'
+                    node.object.callee.object.type === 'Identifier' &&
+                    node.object.callee.object.name === 'vault'
                 ) {
-                    context.report({
-                        node,
-                        messageId: 'iterate',
-                    });
-                    if (!node.arguments || node.arguments.length === 0) {
-                        return;
-                    }
-                    let findArgument = node.arguments[0];
                     if (
-                        findArgument.type === 'ArrowFunctionExpression' &&
-                        findArgument.body.type === 'BinaryExpression' &&
-                        findArgument.body.left.type === 'MemberExpression' &&
-                        findArgument.body.left.object.type === 'Identifier' &&
-                        findArgument.body.left.property.name === 'path' &&
-                        (findArgument.body.operator === '===' || findArgument.body.operator === '==')
+                        node.parent &&
+                        node.parent.type === 'CallExpression' &&
+                        node.parent.arguments &&
+                        node.parent.arguments.length > 0
                     ) {
-                        context.report({
-                            node,
-                            messageId: 'iterate',
-                        });
+                        let findArgument = node.parent.arguments[0];
+                        if (
+                            findArgument.type === 'ArrowFunctionExpression' &&
+                            findArgument.body.type === 'BinaryExpression' &&
+                            (findArgument.body.operator === '===' || findArgument.body.operator === '==') &&
+                            findArgument.body.left.type === 'MemberExpression' &&
+                            findArgument.body.left.object.type === 'Identifier' &&//
+                            findArgument.body.left.object.parent.type === 'MemberExpression' &&
+                            findArgument.body.left.object.parent.property.type === 'Identifier' &&
+                            findArgument.body.left.object.parent.property.name === 'path'
+                        ) {
+                            context.report({
+                                node,
+                                messageId: 'iterate',
+                            });
+                        }
                     }
                 }
             },
