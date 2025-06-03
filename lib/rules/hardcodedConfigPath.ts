@@ -18,7 +18,7 @@ export default {
     },
     defaultOptions: [],
     create: (context: TSESLint.RuleContext<'configPath', []>) => {
-        if(context.parserServices?.hasFullTypeInformation === false) {
+        if (!context.parserServices || !context.parserServices.program) {
             return {};
         }
         const services = getParserServices(context);

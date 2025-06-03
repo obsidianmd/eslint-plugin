@@ -10,7 +10,7 @@ export default {
             iterate: 'Avoid iterating all files to find a file by its path\n'
         },
         schema: [],
-        fixable: 'code'
+        fixable: 'code' as const
     },
     defaultOptions: [],
     create: context => {

@@ -18,8 +18,20 @@ export default {
     create(context: TSESLint.RuleContext<'lookbehind', []>) {
         return {
             Literal(node: TSESTree.Literal) {
-                if(typeof node.value === 'string' && /(\?<=|\?<!)/.test(node.value)) {
-                    if(!manifest.isDesktopOnly) {
+                // Check RegExp literals
+                if ('regex' in node && node.regex && typeof node.regex.pattern === 'string') {
+                    if (/\(\?<=|\(\?<!\)/.test(node.regex.pattern)) {
+                        if (!manifest.isDesktopOnly) {
+                            context.report({
+                                node,
+                                messageId: 'lookbehind'
+                            });
+                        }
+                    }
+                }
+                // Also check string literals (for RegExp constructor)
+                if (typeof node.value === 'string' && /(\?<=|\?<!)/.test(node.value)) {
+                    if (!manifest.isDesktopOnly) {
                         context.report({
                             node,
                             messageId: 'lookbehind'
