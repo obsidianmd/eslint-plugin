@@ -5,7 +5,7 @@ import './objectAssign.test.js';
 import './regexLookbehind.test.js';
 import './sampleNames.test.js';
 import './commands.test.js';
-//import './settingsTab.test.js';
+import './settingsTab.test.js';
 import './hardcodedConfigPath.test.js';
 //import './noDocumentWrite.test.js';
 //import './noInnerHtml.test.js';
