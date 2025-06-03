@@ -1,15 +1,20 @@
-import { RuleTester } from 'eslint';
+import { RuleTester } from '@typescript-eslint/rule-tester';
 import platformRule from '../lib/rules/platform.js';
 import parser from '@typescript-eslint/parser';
 
-const ruleTester = new RuleTester();
-const languageOptions = { parser, ecmaVersion: 2020, sourceType: 'module' };
+const ruleTester = new RuleTester({
+    languageOptions: {
+        parser,
+        ecmaVersion: 2020,
+        sourceType: 'module',
+    },
+});
 
 ruleTester.run('platform', platformRule, {
     valid: [
-        { code: 'const foo = 1;', languageOptions }
+        { code: 'const foo = 1;' }
     ],
     invalid: [
-        { code: 'navigator.userAgent;', errors: [{ messageId: 'avoidNavigator' }], languageOptions },
+        { code: 'navigator.userAgent;', errors: [{ messageId: 'avoidNavigator' }] },
     ],
 });

@@ -71,6 +71,8 @@ Then configure the rules you want to use under the rules section.
 | [sample-names](docs/rules/sample-names.md)                   | Rename sample plugin class names                                 |    |
 | [settings-tab](docs/rules/settings-tab.md)                   |                                                                  | 🔧 |
 | [vault-iterate](docs/rules/vault-iterate.md)                 | Avoid iterating all files to find a file by its path<br/>        | 🔧 |
+| [no-document-write](docs/rules/no-document-write.md)           | Disallow use of document.write or document.writeln                |    |
+| [no-inner-html](docs/rules/no-inner-html.md)                   | Disallow assignment to innerHTML/outerHTML or insertAdjacentHTML  |    |
 
 <!-- end auto-generated rules list -->
 

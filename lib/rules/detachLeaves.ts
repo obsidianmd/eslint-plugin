@@ -12,7 +12,7 @@ export default {
             onunload: 'Don\'t detach leaves in onunload.'
         },
         schema: [],
-        fixable: 'code'
+        fixable: 'code' as const
     },
     defaultOptions: [],
     create: (context: TSESLint.RuleContext<'onunload', []>) => {

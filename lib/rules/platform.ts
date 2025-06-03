@@ -13,6 +13,7 @@ export default {
             avoidNavigator: 'Avoid using the navigator API to detect the operating system. Use the Platform API instead.',
         },
     },
+    defaultOptions: [],
     create(context: TSESLint.RuleContext<'avoidNavigator', []>) {
         return {
             MemberExpression(node: TSESTree.MemberExpression) {

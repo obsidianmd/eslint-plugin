@@ -2,7 +2,7 @@ dist
 *.iml
 .idea
 node_modules
-*.js
+#*.js
 !eslint.config.js
 .vscode
 

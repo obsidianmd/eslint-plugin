@@ -7,6 +7,8 @@ import platform from "./rules/platform.js";
 import settingsTab from "./rules/settingsTab.js";
 import hardcodedConfigPath from "./rules/hardcodedConfigPath.js";
 import vaultIterate from './rules/vault/iterate.js';
+import noDocumentWrite from "./rules/noDocumentWrite.js";
+import noInnerHtml from "./rules/noInnerHtml.js";
 import {manifest} from "./readManifest.js";
 
 export default {
@@ -23,7 +25,9 @@ export default {
         "platform": platform,
         "settings-tab": settingsTab,
         "hardcoded-config-path": hardcodedConfigPath,
-        'vault-iterate': vaultIterate
+        'vault-iterate': vaultIterate,
+        'no-document-write': noDocumentWrite,
+        'no-inner-html': noInnerHtml
 
     },
     configs: {
@@ -36,7 +40,6 @@ export default {
             ],
             plugins: [
                 "@typescript-eslint",
-                "@microsoft/eslint-plugin-sdl",
                 "import",
                 "json-schema-validator"
             ],
@@ -90,9 +93,6 @@ export default {
                 "@typescript-eslint/no-empty-function": "off",
                 "@typescript-eslint/prefer-ts-expect-error": "error",
 
-                "@microsoft/sdl/no-document-write": "error",
-                "@microsoft/sdl/no-inner-html": "error",
-
                 "import/no-nodejs-modules": manifest.isDesktopOnly ? 'off' : 'error',
                 "import/no-extraneous-dependencies": "error",
 
@@ -105,6 +105,8 @@ export default {
                 "obsidianmd/settings-tab": "error",
                 "obsidianmd/hardcoded-config-path": "error",
                 "obsidianmd/vault-iterate": "error",
+                "obsidianmd/no-document-write": "error",
+                "obsidianmd/no-inner-html": "error",
             }
         }
     }

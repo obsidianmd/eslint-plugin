@@ -6,5 +6,5 @@
     "esModuleInterop": true,
     "outDir": "./dist"
   },
-  "include": ["**/*.ts", "**/*.js"]
+  "include": ["**/*.ts", "**/*.js", "lib/utils/ast-utils.mjs"]
 }

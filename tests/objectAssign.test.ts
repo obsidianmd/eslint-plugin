@@ -6,10 +6,9 @@ import parser from '@typescript-eslint/parser';
 const ruleTester = new RuleTester({
     languageOptions: {
         parser,
-        parserOptions: { project: './tsconfig.test.json' },
         ecmaVersion: 2020,
         sourceType: 'module',
-    }
+    },
 });
 
 ruleTester.run('object-assign', objectAssignRule, {
