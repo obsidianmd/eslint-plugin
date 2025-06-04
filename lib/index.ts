@@ -33,7 +33,12 @@ export default {
 				"plugin:deprecation/recommended",
 				"plugin:json-schema-validator/recommended",
 			],
-			plugins: ["@typescript-eslint", "import", "json-schema-validator"],
+			plugins: [
+				"@typescript-eslint",
+				"import",
+				"json-schema-validator",
+				"@microsoft/eslint-plugin-sdl",
+			],
 			rules: {
 				"no-unused-vars": "off",
 				"no-prototype-bultins": "off",
