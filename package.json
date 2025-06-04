@@ -20,7 +20,8 @@
 	"scripts": {
 		"build": "tsc",
 		"test": "tsx tests/all-rules.test.ts",
-		"update:eslint-docs": "eslint-doc-generator --init-rule-docs"
+		"init:eslint-docs": "eslint-doc-generator --init-rule-docs",
+		"update:eslint-docs": "eslint-doc-generator"
 	},
 	"bin": {
 		"eslint-plugin-obsidian": "dist/lib/index.js"
@@ -29,6 +30,7 @@
 		"dist/**"
 	],
 	"dependencies": {
+		"@microsoft/eslint-plugin-sdl": "^1.1.0",
 		"@types/eslint": "8.56.2",
 		"@types/node": "20.12.12",
 		"eslint": ">=9.0.0 <10.0.0",

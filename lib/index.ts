@@ -1,8 +1,6 @@
 import commands from "./rules/commands.js";
 import detachLeaves from "./rules/detachLeaves.js";
 import hardcodedConfigPath from "./rules/hardcodedConfigPath.js";
-import noDocumentWrite from "./rules/noDocumentWrite.js";
-import noInnerHtml from "./rules/noInnerHtml.js";
 import objectAssign from "./rules/objectAssign.js";
 import platform from "./rules/platform.js";
 import regexLookbehind from "./rules/regexLookbehind.js";
@@ -20,8 +18,6 @@ export default {
 		commands: commands,
 		"detach-leaves": detachLeaves,
 		"hardcoded-config-path": hardcodedConfigPath,
-		"no-document-write": noDocumentWrite,
-		"no-inner-html": noInnerHtml,
 		"object-assign": objectAssign,
 		platform: platform,
 		"regex-lookbehind": regexLookbehind,
@@ -89,6 +85,9 @@ export default {
 				"@typescript-eslint/no-unsafe-assignment": "off",
 				"@typescript-eslint/no-empty-function": "off",
 				"@typescript-eslint/prefer-ts-expect-error": "error",
+
+				"@microsoft/sdl/no-document-write": "error",
+				"@microsoft/sdl/no-inner-html": "error",
 
 				"import/no-nodejs-modules":
 					manifest && manifest.isDesktopOnly ? "off" : "error",
