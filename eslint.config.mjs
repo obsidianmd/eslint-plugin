@@ -11,45 +11,45 @@ import noInnerHtml from "./dist/lib/rules/noInnerHtml.js";
 import noDocumentWrite from "./dist/lib/rules/noDocumentWrite.js";
 
 export default [
-  {
-    files: ["**/*.ts"],
-    languageOptions: {
-      parser: (await import('@typescript-eslint/parser')).default,
-      ecmaVersion: 2020,
-      sourceType: "module",
-      parserOptions: {
-        project: "./tsconfig.json"
-      }
-    },
-    plugins: {
-      obsidianmd: {
-        rules: {
-          "commands": commands,
-          "detach-leaves": detachLeaves,
-          "hardcoded-config-path": hardcodedConfigPath,
-          "no-document-write": noDocumentWrite,
-          "no-inner-html": noInnerHtml,
-          "object-assign": objectAssign,
-          "platform": platform,
-          "regex-lookbehind": regexLookbehind,
-          "sample-names": sampleNames,
-          "settings-tab": settingsTab,
-          "vault-iterate": vaultIterate
-        }
-      }
-    },
-    rules: {
-      "obsidianmd/commands": "error",
-      "obsidianmd/detach-leaves": "error",
-      "obsidianmd/hardcoded-config-path": "error",
-      "obsidianmd/no-document-write": "error",
-      "obsidianmd/no-inner-html": "error",
-      "obsidianmd/object-assign": "error",
-      "obsidianmd/platform": "error",
-      "obsidianmd/regex-lookbehind": "error",
-      "obsidianmd/sample-names": "error",
-      "obsidianmd/settings-tab": "error",
-      "obsidianmd/vault-iterate": "error",
-    }
-  }
+	{
+		files: ["**/*.ts"],
+		languageOptions: {
+			parser: (await import("@typescript-eslint/parser")).default,
+			ecmaVersion: 2020,
+			sourceType: "module",
+			parserOptions: {
+				project: "./tsconfig.json",
+			},
+		},
+		plugins: {
+			obsidianmd: {
+				rules: {
+					commands: commands,
+					"detach-leaves": detachLeaves,
+					"hardcoded-config-path": hardcodedConfigPath,
+					"no-document-write": noDocumentWrite,
+					"no-inner-html": noInnerHtml,
+					"object-assign": objectAssign,
+					platform: platform,
+					"regex-lookbehind": regexLookbehind,
+					"sample-names": sampleNames,
+					"settings-tab": settingsTab,
+					"vault-iterate": vaultIterate,
+				},
+			},
+		},
+		rules: {
+			"obsidianmd/commands": "error",
+			"obsidianmd/detach-leaves": "error",
+			"obsidianmd/hardcoded-config-path": "error",
+			"obsidianmd/no-document-write": "error",
+			"obsidianmd/no-inner-html": "error",
+			"obsidianmd/object-assign": "error",
+			"obsidianmd/platform": "error",
+			"obsidianmd/regex-lookbehind": "error",
+			"obsidianmd/sample-names": "error",
+			"obsidianmd/settings-tab": "error",
+			"obsidianmd/vault-iterate": "error",
+		},
+	},
 ];

@@ -2,8 +2,7 @@ dist
 *.iml
 .idea
 node_modules
-#*.js
-!eslint.config.js
+*.js
 .vscode
 
 # Ignore all log files

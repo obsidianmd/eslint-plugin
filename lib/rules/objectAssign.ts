@@ -1,42 +1,42 @@
-import { TSESTree, TSESLint } from '@typescript-eslint/utils';
+import { TSESTree, TSESLint } from "@typescript-eslint/utils";
 
 export default {
-    name: 'object-assign',
-    meta: {
-        type: 'problem' as const,
-        docs: {
-            description: 'Object.assign with two parameters instead of 3.',
-            //TODO: Add url
-        },
-        schema: [],
-        messages: {
-            twoArgumentsDefault: 'Doing this will reassign the default.'
-        },
-    },
-    defaultOptions: [],
-    create(context: TSESLint.RuleContext<'twoArgumentsDefault', []>) {
-        return {
-            CallExpression(node: TSESTree.CallExpression) {
-                if (
-                    node.callee &&
-                    node.callee.type === 'MemberExpression' &&
-                    node.callee.object &&
-                    node.callee.object.type === 'Identifier' &&
-                    node.callee.object.name === 'Object' &&
-                    node.callee.property &&
-                    node.callee.property.type === 'Identifier' &&
-                    node.callee.property.name === 'assign' &&
-                    node.arguments.length === 2 &&
-                    node.arguments[0].type === 'Identifier' &&
-                    node.arguments[0].name.toLowerCase().includes('default') &&
-                    node.arguments[1].type !== 'ObjectExpression'
-                ) {
-                    context.report({
-                        node,
-                        messageId: 'twoArgumentsDefault'
-                    });
-                }
-            },
-        };
-    },
+	name: "object-assign",
+	meta: {
+		type: "problem" as const,
+		docs: {
+			description: "Object.assign with two parameters instead of 3.",
+			//TODO: Add url
+		},
+		schema: [],
+		messages: {
+			twoArgumentsDefault: "Doing this will reassign the default.",
+		},
+	},
+	defaultOptions: [],
+	create(context: TSESLint.RuleContext<"twoArgumentsDefault", []>) {
+		return {
+			CallExpression(node: TSESTree.CallExpression) {
+				if (
+					node.callee &&
+					node.callee.type === "MemberExpression" &&
+					node.callee.object &&
+					node.callee.object.type === "Identifier" &&
+					node.callee.object.name === "Object" &&
+					node.callee.property &&
+					node.callee.property.type === "Identifier" &&
+					node.callee.property.name === "assign" &&
+					node.arguments.length === 2 &&
+					node.arguments[0].type === "Identifier" &&
+					node.arguments[0].name.toLowerCase().includes("default") &&
+					node.arguments[1].type !== "ObjectExpression"
+				) {
+					context.report({
+						node,
+						messageId: "twoArgumentsDefault",
+					});
+				}
+			},
+		};
+	},
 };
