@@ -1,4 +1,4 @@
-# obsidianmd/settings-tab
+# Discourage common anti-patterns in plugin settings tabs (`obsidianmd/settings-tab`)
 
 💼 This rule is enabled in the ✅ `recommended` config.
 
