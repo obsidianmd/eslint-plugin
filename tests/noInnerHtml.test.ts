@@ -52,7 +52,6 @@ ruleTester.run("no-inner-html", noInnerHtmlRule, {
        `,
 			errors: [
 				{ messageId: "noInnerHtml", line: 4, column: 18 },
-				// Corrected column for parent.child.innerHTML
 				{ messageId: "noInnerHtml", line: 5, column: 23 },
 			],
 		},
@@ -65,7 +64,6 @@ ruleTester.run("no-inner-html", noInnerHtmlRule, {
        `,
 			errors: [
 				{ messageId: "noInnerHtml", line: 4, column: 18 },
-				// Corrected column for parent.child.outerHTML
 				{ messageId: "noInnerHtml", line: 5, column: 23 },
 			],
 		},

@@ -1,14 +1,14 @@
-import hardcodedConfigPath from "./dist/lib/rules/hardcodedConfigPath.js";
-import objectAssign from "./dist/lib/rules/objectAssign.js";
-import platform from "./dist/lib/rules/platform.js";
-import regexLookbehind from "./dist/lib/rules/regexLookbehind.js";
-import sampleNames from "./dist/lib/rules/sampleNames.js";
-import commands from "./dist/lib/rules/commands.js";
-import settingsTab from "./dist/lib/rules/settingsTab.js";
-import detachLeaves from "./dist/lib/rules/detachLeaves.js";
-import vaultIterate from "./dist/lib/rules/vault/iterate.js";
-import noInnerHtml from "./dist/lib/rules/noInnerHtml.js";
-import noDocumentWrite from "./dist/lib/rules/noDocumentWrite.js";
+import commands from "./lib/rules/commands.ts";
+import detachLeaves from "./lib/rules/detachLeaves.ts";
+import hardcodedConfigPath from "./lib/rules/hardcodedConfigPath.ts";
+import noDocumentWrite from "./lib/rules/noDocumentWrite.ts";
+import noInnerHtml from "./lib/rules/noInnerHtml.ts";
+import objectAssign from "./lib/rules/objectAssign.ts";
+import platform from "./lib/rules/platform.ts";
+import regexLookbehind from "./lib/rules/regexLookbehind.ts";
+import sampleNames from "./lib/rules/sampleNames.ts";
+import settingsTab from "./lib/rules/settingsTab.ts";
+import vaultIterate from "./lib/rules/vault/iterate.ts";
 
 export default [
 	{

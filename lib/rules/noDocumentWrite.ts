@@ -1,7 +1,5 @@
 import { TSESTree, TSESLint } from "@typescript-eslint/utils";
 
-("use strict");
-
 export default {
 	name: "no-document-write",
 	meta: {
@@ -46,7 +44,6 @@ export default {
 			expressionNode: TSESTree.Expression
 		): boolean {
 			const nodeText = context.getSourceCode().getText(expressionNode);
-			// console.log(`isDomDocumentObject for "${nodeText}" (useTypeInfo: ${useTypeInfo})`);
 
 			if (
 				useTypeInfo &&
@@ -65,11 +62,8 @@ export default {
 						if (typeString === "Document") {
 							return true;
 						}
-					} catch (e) {
-						console.error(
-							`[TYPE CHECK ERROR] Node: "${nodeText}", Error:`,
-							e
-						);
+					} catch (err) {
+						console.error(`Type: "${nodeText}", Error:`, err);
 					}
 				}
 				return false;

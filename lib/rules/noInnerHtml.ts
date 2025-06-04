@@ -1,5 +1,4 @@
 import { TSESTree, TSESLint } from "@typescript-eslint/utils";
-//import * as ts from "typescript"; // Not strictly needed if using checker methods directly
 
 export default {
 	name: "no-inner-html",
@@ -44,7 +43,7 @@ export default {
 				!parserServices.esTreeNodeToTSNodeMap ||
 				!parserServices.program
 			) {
-				//Parser services or TypeScript program not available.,
+				//Parser services or TypeScript program not available.
 				return false;
 			}
 

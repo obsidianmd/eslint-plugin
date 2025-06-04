@@ -1,4 +1,4 @@
-// Central test runner for all rule tests
+// Central test runner for all rule .
 import "./setupRuleTester";
 import "./platform.test";
 import "./objectAssign.test";

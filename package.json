@@ -47,7 +47,7 @@
 		"@typescript-eslint/utils": "^8.33.1",
 		"builtin-modules": "3.3.0",
 		"esbuild": "0.20.1",
-		"eslint-doc-generator": "1.6.2",
+		"eslint-doc-generator": "^2.1.2",
 		"mocha": "10.3.0",
 		"obsidian": "^1.8.7",
 		"ts-node": "^10.9.2",
