@@ -20,7 +20,6 @@
 	"scripts": {
 		"build": "tsc",
 		"test": "tsx tests/all-rules.test.ts",
-		"object": "tsx tests/objectAssign.test.ts",
 		"update:eslint-docs": "eslint-doc-generator --init-rule-docs"
 	},
 	"bin": {
@@ -55,7 +54,7 @@
 		"tsx": "^4.19.4"
 	},
 	"engines": {
-		"node": "^14.17.0 || ^16.0.0 || >= 18.0.0"
+		"node": ">= 18"
 	},
 	"peerDependencies": {
 		"eslint": ">=9.0.0 <10.0.0"
