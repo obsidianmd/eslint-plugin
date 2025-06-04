@@ -1,14 +1,14 @@
-import detachLeaves from "./rules/detachLeaves.js";
-import objectAssign from "./rules/objectAssign.js";
-import regexLookbehind from "./rules/regexLookbehind.js";
-import sampleNames from "./rules/sampleNames.js";
 import commands from "./rules/commands.js";
-import platform from "./rules/platform.js";
-import settingsTab from "./rules/settingsTab.js";
+import detachLeaves from "./rules/detachLeaves.js";
 import hardcodedConfigPath from "./rules/hardcodedConfigPath.js";
-import vaultIterate from './rules/vault/iterate.js';
 import noDocumentWrite from "./rules/noDocumentWrite.js";
 import noInnerHtml from "./rules/noInnerHtml.js";
+import objectAssign from "./rules/objectAssign.js";
+import platform from "./rules/platform.js";
+import regexLookbehind from "./rules/regexLookbehind.js";
+import sampleNames from "./rules/sampleNames.js";
+import settingsTab from "./rules/settingsTab.js";
+import vaultIterate from './rules/vault/iterate.js';
 import {manifest} from "./readManifest.js";
 
 export default {
@@ -17,18 +17,17 @@ export default {
         version: '0.0.2',
     },
     rules: {
+        "commands": commands,
         "detach-leaves": detachLeaves,
+        "hardcoded-config-path": hardcodedConfigPath,
+        'no-document-write': noDocumentWrite,
+        'no-inner-html': noInnerHtml,
         "object-assign": objectAssign,
+        "platform": platform,
         "regex-lookbehind": regexLookbehind,
         "sample-names": sampleNames,
-        "commands": commands,
-        "platform": platform,
         "settings-tab": settingsTab,
-        "hardcoded-config-path": hardcodedConfigPath,
-        'vault-iterate': vaultIterate,
-        'no-document-write': noDocumentWrite,
-        'no-inner-html': noInnerHtml
-
+        'vault-iterate': vaultIterate
     },
     configs: {
         recommended: {
@@ -96,17 +95,17 @@ export default {
                 "import/no-nodejs-modules": manifest.isDesktopOnly ? 'off' : 'error',
                 "import/no-extraneous-dependencies": "error",
 
-                "obsidianmd/detach-leaves": "error",
-                "obsidianmd/object-assign": "error",
-                "obsidianmd/regex-lookbehind": "error",
-                "obsidianmd/sample-names": "error",
                 "obsidianmd/commands": "error",
-                "obsidianmd/platform": "error",
-                "obsidianmd/settings-tab": "error",
+                "obsidianmd/detach-leaves": "error",
                 "obsidianmd/hardcoded-config-path": "error",
-                "obsidianmd/vault-iterate": "error",
                 "obsidianmd/no-document-write": "error",
                 "obsidianmd/no-inner-html": "error",
+                "obsidianmd/object-assign": "error",
+                "obsidianmd/platform": "error",
+                "obsidianmd/regex-lookbehind": "error",
+                "obsidianmd/sample-names": "error",
+                "obsidianmd/settings-tab": "error",
+                "obsidianmd/vault-iterate": "error",
             }
         }
     }
