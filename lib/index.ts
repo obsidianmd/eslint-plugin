@@ -92,7 +92,7 @@ export default {
                 "@typescript-eslint/no-empty-function": "off",
                 "@typescript-eslint/prefer-ts-expect-error": "error",
 
-                "import/no-nodejs-modules": manifest.isDesktopOnly ? 'off' : 'error',
+                "import/no-nodejs-modules": (manifest && manifest.isDesktopOnly) ? 'off' : 'error',
                 "import/no-extraneous-dependencies": "error",
 
                 "obsidianmd/commands": "error",

@@ -1,13 +1,13 @@
 // Central test runner for all rule tests
 import './setupRuleTester';
-import './platform.test.js';
-import './objectAssign.test.js';
-import './regexLookbehind.test.js';
-import './sampleNames.test.js';
-import './commands.test.js';
-import './settingsTab.test.js';
-import './hardcodedConfigPath.test.js';
-//import './noDocumentWrite.test.js';
-//import './noInnerHtml.test.js';
-import './vaultIterate.test.js';
-import './detachLeaves.test.js';
+import './platform.test';
+import './objectAssign.test';
+import './regexLookbehind.test';
+import './sampleNames.test';
+import './commands.test';
+import './settingsTab.test';
+import './hardcodedConfigPath.test';
+import './noDocumentWrite.test';
+import './noInnerHtml.test';
+import './vaultIterate.test';
+import './detachLeaves.test';

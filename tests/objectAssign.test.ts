@@ -1,14 +1,7 @@
 import { RuleTester } from '@typescript-eslint/rule-tester';
 import objectAssignRule from '../lib/rules/objectAssign.js';
-import parser from '@typescript-eslint/parser';
 
-const ruleTester = new RuleTester({
-    languageOptions: {
-        parser,
-        ecmaVersion: 2020,
-        sourceType: 'module',
-    },
-});
+const ruleTester = new RuleTester();
 
 ruleTester.run('object-assign', objectAssignRule, {
     valid: [

@@ -3,21 +3,10 @@
 
 import { RuleTester } from '@typescript-eslint/rule-tester';
 import noInnerHtmlRule from '../lib/rules/noInnerHtml.js';
-import parser from '@typescript-eslint/parser';
-import path from "path";
-const ruleId = path.parse(__filename).name;
-const rule = require(path.join("../../../lib/rules/", ruleId));
-const ruleTester = new RuleTester({
-    languageOptions: {
-        parser,
-        ecmaVersion: 2020,
-        sourceType: 'module',
-    },
-});
 
-// NOTE: Type-aware linting is skipped due to lack of support in ESLint v9+ and @typescript-eslint/rule-tester as of June 2025.
+const ruleTester = new RuleTester();
 
-ruleTester.run(ruleId, rule, {
+ruleTester.run("no-inner-html", noInnerHtmlRule, {
   valid: [
     "var test = element.innerHTML",
     "var test = element.outerHTML",
@@ -40,45 +29,52 @@ ruleTester.run(ruleId, rule, {
       `
     }
   ],
-   //Skipped invalid tests due to lack of type-aware linting support in ESLint v9+ and @typescript-eslint/rule-tester as of June 2025.
-   invalid: [
-     // TypeScript with full type information
+invalid: [
      {
        code: `
-         var element = document.getElementById(id);
+         var element = document.getElementById("someId");
          element.innerHTML = 'test';
          element.outerHTML = 'test';
          element.insertAdjacentHTML('beforebegin', 'foo');
        `,
        errors: [
-         { messageId: "noInnerHtml", line: 3 },
-         { messageId: "noInnerHtml", line: 4 },
-         { messageId: "noInsertAdjacentHTML", line: 5 }
+         { messageId: "noInnerHtml", line: 3, column: 18 },
+         { messageId: "noInnerHtml", line: 4, column: 18 },
+         { messageId: "noInsertAdjacentHTML", line: 5, column: 18 }
        ]
      },
      {
        code: `
+         declare var element: HTMLElement;
+         declare var parent: { child: HTMLElement };
          element.innerHTML = 'test';
          parent.child.innerHTML += 'test';
        `,
        errors: [
-         { messageId: "noInnerHtml", line: 2 },
-         { messageId: "noInnerHtml", line: 3 }
+         { messageId: "noInnerHtml", line: 4, column: 18 },
+         // Corrected column for parent.child.innerHTML
+         { messageId: "noInnerHtml", line: 5, column: 23 }
        ]
      },
      {
        code: `
+         declare var element: HTMLElement;
+         declare var parent: { child: HTMLElement };
          element.outerHTML = 'test';
          parent.child.outerHTML += 'test';
        `,
        errors: [
-         { messageId: "noInnerHtml", line: 2 },
-         { messageId: "noInnerHtml", line: 3 }
+         { messageId: "noInnerHtml", line: 4, column: 18 },
+         // Corrected column for parent.child.outerHTML
+         { messageId: "noInnerHtml", line: 5, column: 23 }
        ]
      },
     {
-       code: "element.insertAdjacentHTML('beforebegin', 'foo')",
-       errors: [{ messageId: "noInsertAdjacentHTML", line: 1 }]
+       code: `
+         declare var element: HTMLElement;
+         element.insertAdjacentHTML('beforebegin', 'foo')
+       `,
+       errors: [{ messageId: "noInsertAdjacentHTML", line: 3, column: 18 }]
      }
    ]
 });
