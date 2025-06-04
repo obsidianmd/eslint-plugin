@@ -62,18 +62,16 @@ Then configure the rules you want to use under the rules section.
 ✅ Set in the `recommended` configuration.\
 🔧 Automatically fixable by the [`--fix` CLI option](https://eslint.org/docs/user-guide/command-line-interface#--fix).
 
-| Name                                                         | Description                                                                                                                                                                  | 💼 | 🔧 |
-| :----------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :- | :- |
-| [commands](docs/rules/commands.md)                           | Command guidelines                                                                                                                                                           | ✅  |    |
-| [detach-leaves](docs/rules/detach-leaves.md)                 | Don't detach leaves in onunload.                                                                                                                                             | ✅  | 🔧 |
-| [hardcoded-config-path](docs/rules/hardcoded-config-path.md) | test                                                                                                                                                                         | ✅  |    |
-| [no-document-write](docs/rules/no-document-write.md)         | Calls to document.write or document.writeln manipulate DOM directly without any sanitization and should be avoided. Use document.createElement() or similar methods instead. | ✅  |    |
-| [no-inner-html](docs/rules/no-inner-html.md)                 | Disallow assignment to innerHTML/outerHTML or use of insertAdjacentHTML                                                                                                      | ✅  |    |
-| [object-assign](docs/rules/object-assign.md)                 | Object.assign with two parameters instead of 3.                                                                                                                              | ✅  |    |
-| [platform](docs/rules/platform.md)                           | Disallow use of navigator API for OS detection                                                                                                                               | ✅  |    |
-| [regex-lookbehind](docs/rules/regex-lookbehind.md)           | Using lookbehinds in Regex is not supported in some iOS versions                                                                                                             | ✅  |    |
-| [sample-names](docs/rules/sample-names.md)                   | Rename sample plugin class names                                                                                                                                             | ✅  |    |
-| [settings-tab](docs/rules/settings-tab.md)                   | Discourage common anti-patterns in plugin settings tabs.                                                                                                                     | ✅  | 🔧 |
-| [vault-iterate](docs/rules/vault-iterate.md)                 | Avoid iterating all files to find a file by its path<br/>                                                                                                                    | ✅  | 🔧 |
+| Name                                                         | Description                                                      | 💼 | 🔧 |
+| :----------------------------------------------------------- | :--------------------------------------------------------------- | :- | :- |
+| [commands](docs/rules/commands.md)                           | Command guidelines                                               | ✅  |    |
+| [detach-leaves](docs/rules/detach-leaves.md)                 | Don't detach leaves in onunload.                                 | ✅  | 🔧 |
+| [hardcoded-config-path](docs/rules/hardcoded-config-path.md) | test                                                             | ✅  |    |
+| [object-assign](docs/rules/object-assign.md)                 | Object.assign with two parameters instead of 3.                  | ✅  |    |
+| [platform](docs/rules/platform.md)                           | Disallow use of navigator API for OS detection                   | ✅  |    |
+| [regex-lookbehind](docs/rules/regex-lookbehind.md)           | Using lookbehinds in Regex is not supported in some iOS versions | ✅  |    |
+| [sample-names](docs/rules/sample-names.md)                   | Rename sample plugin class names                                 | ✅  |    |
+| [settings-tab](docs/rules/settings-tab.md)                   | Discourage common anti-patterns in plugin settings tabs.         | ✅  | 🔧 |
+| [vault-iterate](docs/rules/vault-iterate.md)                 | Avoid iterating all files to find a file by its path<br/>        | ✅  | 🔧 |
 
 <!-- end auto-generated rules list -->
