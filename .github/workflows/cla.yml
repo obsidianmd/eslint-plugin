@@ -21,7 +21,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          path-to-signatures: '/cla.json'
+          path-to-signatures: 'cla.json'
           path-to-document: 'https://github.com/obsidianmd/obsidian-releases/blob/master/cla.md'
           branch: 'master'
           allowlist: joethei,liamcain,lishid,tgrosinger
