@@ -1,68 +1,65 @@
 {
-  "name": "eslint-plugin-obsidianmd",
-  "version": "0.0.2",
-  "description": "Testing",
-  "license": "MIT",
-  "author": "Dynalist Inc.",
-  "homepage": "https://obsidian.md",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/obsidianmd/eslint-plugin.git"
-  },
-  "keywords": [
-    "eslint",
-    "eslintplugin",
-    "eslint-plugin",
-    "obsidian",
-    "obsdmd"
-  ],
-  "main": "dist/lib/index.js",
-  "scripts": {
-    "build": "tsc",
-    "test": "mocha tests",
-    "update:eslint-docs": "eslint-doc-generator --init-rule-docs"
-  },
-  "bin": {
-    "eslint-plugin-obsidian": "dist/lib/index.js"
-  },
-  "files": [
-    "dist/**"
-  ],
-  "dependencies": {
-    "typescript": "5.3.3",
-    "eslint": "8.56.0",
-    "@typescript-eslint/utils": "7.0.1",
-    "@typescript-eslint/types": "7.0.1",
-    "@types/eslint": "8.56.2",
-    "@types/node": "20.12.12",
-    "typescript-eslint": "7.1.0",
-    "eslint-plugin-deprecation": "2.0.0",
-    "eslint-plugin-import": "2.29.1",
-    "eslint-plugin-security": "2.1.1",
-    "eslint-plugin-json-schema-validator": "5.1.0",
-    "@typescript-eslint/eslint-plugin": "5.29.0",
-    "@typescript-eslint/parser": "5.29.0",
-    "@microsoft/eslint-plugin-sdl": "0.2.2",
-    "globals": "14.0.0"
-  },
-  "devDependencies": {
-    "@typescript-eslint/rule-tester": "7.0.1",
-    "eslint-doc-generator": "1.6.2",
-    "mocha": "10.3.0",
-    "@types/mocha": "10.0.6",
-    "esbuild": "0.20.1",
-    "builtin-modules": "3.3.0",
-    "eslint": "8.56.0",
-    "typescript-eslint": "7.1.0",
-    "@typescript-eslint/eslint-plugin": "5.29.0",
-    "@typescript-eslint/parser": "5.29.0",
-    "@microsoft/eslint-plugin-sdl": "0.2.2",
-    "globals": "14.0.0"
-  },
-  "engines": {
-    "node": "^14.17.0 || ^16.0.0 || >= 18.0.0"
-  },
-  "peerDependencies": {
-    "eslint": "8.56.0"
-  }
+	"name": "eslint-plugin-obsidianmd",
+	"version": "0.0.2",
+	"description": "Testing",
+	"license": "MIT",
+	"author": "Dynalist Inc.",
+	"homepage": "https://obsidian.md",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/obsidianmd/eslint-plugin.git"
+	},
+	"keywords": [
+		"eslint",
+		"eslintplugin",
+		"eslint-plugin",
+		"obsidian",
+		"obsdmd"
+	],
+	"main": "dist/lib/index.js",
+	"scripts": {
+		"build": "tsc",
+		"test": "tsx tests/all-rules.test.ts",
+		"init:eslint-docs": "eslint-doc-generator --init-rule-docs",
+		"update:eslint-docs": "eslint-doc-generator"
+	},
+	"bin": {
+		"eslint-plugin-obsidian": "dist/lib/index.js"
+	},
+	"files": [
+		"dist/**"
+	],
+	"dependencies": {
+		"@microsoft/eslint-plugin-sdl": "^1.1.0",
+		"@types/eslint": "8.56.2",
+		"@types/node": "20.12.12",
+		"eslint": ">=9.0.0 <10.0.0",
+		"eslint-plugin-import": "^2.31.0",
+		"eslint-plugin-json-schema-validator": "5.1.0",
+		"eslint-plugin-security": "2.1.1",
+		"globals": "14.0.0",
+		"typescript": "5.4.5"
+	},
+	"devDependencies": {
+		"@types/mocha": "10.0.6",
+		"@typescript-eslint/eslint-plugin": "^8.33.1",
+		"@typescript-eslint/parser": "^8.33.1",
+		"@typescript-eslint/rule-tester": "^8.33.1",
+		"@typescript-eslint/types": "^8.33.1",
+		"@typescript-eslint/utils": "^8.33.1",
+		"builtin-modules": "3.3.0",
+		"esbuild": "0.20.1",
+		"eslint-doc-generator": "^2.1.2",
+		"mocha": "10.3.0",
+		"obsidian": "^1.8.7",
+		"ts-node": "^10.9.2",
+		"tsx": "^4.19.4"
+	},
+	"engines": {
+		"node": ">= 18"
+	},
+	"peerDependencies": {
+		"eslint": ">=9.0.0 <10.0.0"
+	},
+	"type": "module"
 }

@@ -3,3 +3,7 @@ dist
 .idea
 node_modules
 *.js
+.vscode
+
+# Ignore all log files
+*.log
