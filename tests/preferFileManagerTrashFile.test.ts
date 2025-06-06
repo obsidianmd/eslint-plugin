@@ -1,9 +1,9 @@
 import { RuleTester } from "@typescript-eslint/rule-tester";
-import preferFileManagerTrashRule from "../lib/rules/preferFileManagerTrash.js";
+import preferFileManagerTrashRule from "../lib/rules/preferFileManagerTrashFile.js";
 
 const ruleTester = new RuleTester();
 
-ruleTester.run("prefer-file-manager-trash", preferFileManagerTrashRule, {
+ruleTester.run("prefer-file-manager-trash-file", preferFileManagerTrashRule, {
 	valid: [
 		// Correct usage
 		{
