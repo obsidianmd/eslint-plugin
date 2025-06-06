@@ -59,6 +59,8 @@ export default {
 			invalidFundingUrl:
 				"The 'fundingUrl' object must only contain string values.",
 			mustBeRootObject: "The manifest must be a single JSON object.",
+			noObsidianBranding:
+				"The word 'Obsidian' is not allowed in the manifest.",
 		},
 	},
 	defaultOptions: [],
@@ -68,7 +70,8 @@ export default {
 			| "invalidType"
 			| "disallowedKey"
 			| "invalidFundingUrl"
-			| "mustBeRootObject",
+			| "mustBeRootObject"
+			| "noObsidianBranding",
 			[]
 		>,
 	) {
@@ -155,6 +158,20 @@ export default {
 									});
 								}
 							}
+							// check for Obsidian branding
+						} else if (
+							actualType === "string" &&
+							valueNode.type === "Literal" &&
+							typeof valueNode.value === "string" &&
+							(valueNode.value as string)
+								.toLowerCase()
+								.includes("obsidian") &&
+							["name", "description"].includes(key as string)
+						) {
+							context.report({
+								node: valueNode,
+								messageId: "noObsidianBranding",
+							});
 						}
 					} else {
 						context.report({
