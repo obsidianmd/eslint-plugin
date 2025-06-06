@@ -6,7 +6,7 @@ import noViewReferencesInPlugin from "./lib/rules/noViewReferencesInPlugin.ts";
 import noStaticStylesAssignment from "./lib/rules/noStaticStylesAssignment.ts";
 import objectAssign from "./lib/rules/objectAssign.ts";
 import platform from "./lib/rules/platform.ts";
-import preferFileManagerTrash from "./lib/rules/preferFileManagerTrash.ts";
+import preferFileManagerTrashFile from "./lib/rules/preferFileManagerTrashFile.ts";
 import regexLookbehind from "./lib/rules/regexLookbehind.ts";
 import sampleNames from "./lib/rules/sampleNames.ts";
 import settingsTab from "./lib/rules/settingsTab.ts";
@@ -35,7 +35,7 @@ export default [
 					"no-static-styles-assignment": noStaticStylesAssignment,
 					"object-assign": objectAssign,
 					platform: platform,
-					"prefer-file-manager-trash": preferFileManagerTrash,
+					"prefer-file-manager-trash": preferFileManagerTrashFile,
 					"regex-lookbehind": regexLookbehind,
 					"sample-names": sampleNames,
 					"settings-tab": settingsTab,
@@ -53,7 +53,7 @@ export default [
 			"obsidianmd/no-static-styles-assignment": "error",
 			"obsidianmd/object-assign": "error",
 			"obsidianmd/platform": "error",
-			"obsidianmd/prefer-file-manager-trash": "error",
+			"obsidianmd/prefer-file-manager-trash-file": "error",
 			"obsidianmd/regex-lookbehind": "error",
 			"obsidianmd/sample-names": "error",
 			"obsidianmd/settings-tab": "error",
