@@ -9,4 +9,4 @@ import "./settingsTab.test";
 import "./hardcodedConfigPath.test";
 import "./vaultIterate.test";
 import "./detachLeaves.test";
-import "./preferFileManagerTrash.test";
+import "./preferFileManagerTrashFile.test";

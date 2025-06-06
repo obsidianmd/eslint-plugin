@@ -4,7 +4,7 @@ import { getParserServices } from "@typescript-eslint/utils/eslint-utils";
 const BANNED_METHODS = new Set(["trash", "delete"]);
 
 export default {
-	name: "prefer-file-manager-trash",
+	name: "prefer-file-manager-trash-file",
 	meta: {
 		type: "suggestion" as const,
 		docs: {
