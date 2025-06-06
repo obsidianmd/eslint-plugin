@@ -1,17 +1,11 @@
 import { TSESLint, TSESTree } from "@typescript-eslint/utils";
-import fs from "node:fs";
 import path from "node:path";
-
-// --- Schema Definitions ---
 
 const BASE_SCHEMA = {
 	author: "string",
 	minAppVersion: "string",
 	name: "string",
 	version: "string",
-};
-
-const PLUGIN_ONLY_SCHEMA = {
 	id: "string",
 	description: "string",
 	isDesktopOnly: "boolean",
@@ -21,11 +15,6 @@ const OPTIONAL_SCHEMA = {
 	authorUrl: "string",
 	fundingUrl: "string|object",
 };
-
-const THEME_SCHEMA = { ...BASE_SCHEMA };
-const PLUGIN_SCHEMA = { ...BASE_SCHEMA, ...PLUGIN_ONLY_SCHEMA };
-
-// --- Helper Functions ---
 
 function getAstNodeType(node: TSESTree.Node): string {
 	if (node.type === "Literal") {
@@ -37,14 +26,13 @@ function getAstNodeType(node: TSESTree.Node): string {
 	return "unknown";
 }
 
-// --- Rule Definition ---
 export default {
 	name: "validate-manifest",
 	meta: {
 		type: "problem" as const,
 		docs: {
 			description:
-				"Validate the structure of manifest.json for Obsidian plugins and themes",
+				"Validate the structure of manifest.json for Obsidian plugins.",
 			recommended: true,
 			url: "https://docs.obsidian.md/Reference/Manifest",
 		},
@@ -55,7 +43,7 @@ export default {
 			invalidType:
 				"The '{{key}}' property must be of type '{{expectedType}}', but was '{{actualType}}'.",
 			disallowedKey:
-				"The '{{key}}' property is not allowed in a theme manifest.",
+				"The '{{key}}' property is not allowed in the manifest.",
 			invalidFundingUrl:
 				"The 'fundingUrl' object must only contain string values.",
 			mustBeRootObject: "The manifest must be a single JSON object.",
@@ -80,11 +68,7 @@ export default {
 			return {};
 		}
 
-		const projectRoot = context.cwd;
-		const themeCssPath = path.join(projectRoot, "theme.css");
-		const isTheme = fs.existsSync(themeCssPath);
-
-		const requiredKeys = isTheme ? THEME_SCHEMA : PLUGIN_SCHEMA;
+		const requiredKeys = BASE_SCHEMA;
 		const allAllowedKeys = { ...requiredKeys, ...OPTIONAL_SCHEMA };
 
 		return {
@@ -124,11 +108,7 @@ export default {
 
 				// 2. Check types and disallowed keys
 				for (const [key, propNode] of presentKeys.entries()) {
-					if (
-						isTheme &&
-						key &&
-						(key as string) in PLUGIN_ONLY_SCHEMA
-					) {
+					if (key && !((key as string) in allAllowedKeys)) {
 						context.report({
 							node: propNode.key,
 							messageId: "disallowedKey",
