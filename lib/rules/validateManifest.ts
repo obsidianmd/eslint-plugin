@@ -158,15 +158,17 @@ export default {
 									});
 								}
 							}
-							// check for Obsidian branding
 						} else if (
+							// check for Obsidian branding
 							actualType === "string" &&
 							valueNode.type === "Literal" &&
 							typeof valueNode.value === "string" &&
-							(valueNode.value as string)
-								.toLowerCase()
-								.includes("obsidian") &&
-							["name", "description"].includes(key as string)
+							(valueNode.value as string).match(
+								/\bobsidian\b/i,
+							) &&
+							(key === "name" ||
+								key === "description" ||
+								key === "id")
 						) {
 							context.report({
 								node: valueNode,
