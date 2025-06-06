@@ -60,6 +60,35 @@ export default {
 						message:
 							"Avoid using the global app object. Instead use the reference provided by your plugin instance.",
 					},
+					"warn",
+					{
+						name: "fetch",
+						message:
+							"Use the built-in `requestUrl` function instead of `fetch` for network requests in Obsidian.",
+					},
+				],
+				"no-restricted-imports": [
+					"error",
+					{
+						name: "axios",
+						message:
+							"Use the built-in `requestUrl` function instead of `axios`.",
+					},
+					{
+						name: "superagent",
+						message:
+							"Use the built-in `requestUrl` function instead of `superagent`.",
+					},
+					{
+						name: "got",
+						message:
+							"Use the built-in `requestUrl` function instead of `got`.",
+					},
+					{
+						name: "node-fetch",
+						message:
+							"Use the built-in `requestUrl` function instead of `node-fetch`.",
+					},
 				],
 				"no-alert": "error",
 				"no-undef": "error",
