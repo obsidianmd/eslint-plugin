@@ -6,6 +6,7 @@ import platform from "./rules/platform.js";
 import regexLookbehind from "./rules/regexLookbehind.js";
 import sampleNames from "./rules/sampleNames.js";
 import settingsTab from "./rules/settingsTab.js";
+import validateManifest from "./rules/validateManifest.js";
 import vaultIterate from "./rules/vault/iterate.js";
 import { manifest } from "./readManifest.js";
 
@@ -23,6 +24,7 @@ export default {
 		"regex-lookbehind": regexLookbehind,
 		"sample-names": sampleNames,
 		"settings-tab": settingsTab,
+		"validate-manifest": validateManifest,
 		"vault-iterate": vaultIterate,
 	},
 	configs: {
@@ -108,6 +110,7 @@ export default {
 				"obsidianmd/regex-lookbehind": "error",
 				"obsidianmd/sample-names": "error",
 				"obsidianmd/settings-tab": "error",
+				"obsidianmd/validate-manifest": "error",
 				"obsidianmd/vault-iterate": "error",
 			},
 		},
