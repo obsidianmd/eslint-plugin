@@ -87,6 +87,21 @@ try {
                     "minAppVersion": "1.0.0"
                 }`,
 			},
+			{
+				// https://github.com/bennyxguo/Obsidian-Obsidianite/blob/main/manifest.json
+				// manifest.json for Obsidianite theme
+				// MIT license Copyright (c) 2020 Guo Xiang
+				// Checks "noObsidianBranding" rule against word that contains "Obsidian",
+				// but is not the exact word "Obsidian"
+				filename: "manifest.json",
+				code: `{
+					"name": "Obsidianite",
+					"version": "2.0.2",
+					"minAppVersion": "1.1.0",
+					"author": "@bennyxguo",
+					"authorUrl": "https://github.com/bennyxguo"
+				}`,
+			},
 		],
 		invalid: [
 			{
