@@ -47,6 +47,27 @@ try {
 				code: `[]`, // Test for invalid root type
 				errors: [{ messageId: "mustBeRootObject" }],
 			},
+			{
+				filename: "manifest.json",
+				// Use a raw string, not JSON.stringify()
+				code: `{
+                    "id": "my-plugin",
+                    "name": "My Obsidian Plugin",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "A great plugin for Obsidian.",
+                    "isDesktopOnly": false,
+                    "authorUrl": "https://example.com"
+                }`,
+				errors: [
+					{ messageId: "noObsidianBranding", data: { key: "name" } },
+					{
+						messageId: "noObsidianBranding",
+						data: { key: "description" },
+					},
+				],
+			},
 		],
 	});
 
