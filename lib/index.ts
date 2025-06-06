@@ -92,6 +92,13 @@ export default {
 				"@typescript-eslint/no-unsafe-assignment": "off",
 				"@typescript-eslint/no-empty-function": "off",
 				"@typescript-eslint/prefer-ts-expect-error": "error",
+				"@typescript-eslint/no-explicit-any": [
+					"error",
+					{
+						// A great option that suggests a safer alternative
+						fixToUnknown: true,
+					},
+				],
 
 				"@microsoft/sdl/no-document-write": "error",
 				"@microsoft/sdl/no-inner-html": "error",
