@@ -4,6 +4,7 @@ import hardcodedConfigPath from "./lib/rules/hardcodedConfigPath.ts";
 import noTFileTFolderCast from "./lib/rules/noTFileTFolderCast.ts";
 import objectAssign from "./lib/rules/objectAssign.ts";
 import platform from "./lib/rules/platform.ts";
+import preferFileManagerTrashFile from "./lib/rules/preferFileManagerTrashFile.ts";
 import regexLookbehind from "./lib/rules/regexLookbehind.ts";
 import sampleNames from "./lib/rules/sampleNames.ts";
 import settingsTab from "./lib/rules/settingsTab.ts";
@@ -29,6 +30,7 @@ export default [
 					"no-tfile-tfolder-cast": noTFileTFolderCast,
 					"object-assign": objectAssign,
 					platform: platform,
+					"prefer-file-manager-trash": preferFileManagerTrashFile,
 					"regex-lookbehind": regexLookbehind,
 					"sample-names": sampleNames,
 					"settings-tab": settingsTab,
@@ -43,6 +45,7 @@ export default [
 			"obsidianmd/no-tfile-tfolder-cast": "error",
 			"obsidianmd/object-assign": "error",
 			"obsidianmd/platform": "error",
+			"obsidianmd/prefer-file-manager-trash-file": "warn",
 			"obsidianmd/regex-lookbehind": "error",
 			"obsidianmd/sample-names": "error",
 			"obsidianmd/settings-tab": "error",
