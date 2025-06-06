@@ -9,6 +9,7 @@ import "./settingsTab.test";
 import "./hardcodedConfigPath.test";
 import "./vaultIterate.test";
 import "./detachLeaves.test";
+import "./preferFileManagerTrash.test";
 import "./noTFileTFolderCast.test";
 import "./noViewReferencesInPlugin.test";
 import "./noStaticStylesAssignment.test";
