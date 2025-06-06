@@ -1,6 +1,7 @@
 import commands from "./rules/commands.js";
 import detachLeaves from "./rules/detachLeaves.js";
 import hardcodedConfigPath from "./rules/hardcodedConfigPath.js";
+import noStaticStylesAssignment from "./rules/noStaticStylesAssignment.js";
 import noTFileTFolderCast from "./rules/noTFileTFolderCast.js";
 import noViewReferencesInPlugin from "./rules/noViewReferencesInPlugin.js";
 import objectAssign from "./rules/objectAssign.js";
@@ -23,6 +24,7 @@ export default {
 		"hardcoded-config-path": hardcodedConfigPath,
 		"no-tfile-tfolder-cast": noTFileTFolderCast,
 		"no-view-references-in-plugin": noViewReferencesInPlugin,
+		"no-static-styles-assignment": noStaticStylesAssignment,
 		"object-assign": objectAssign,
 		platform: platform,
 		"regex-lookbehind": regexLookbehind,
@@ -150,6 +152,9 @@ export default {
 				"obsidianmd/hardcoded-config-path": "error",
 				"obsidianmd/no-tfile-tfolder-cast": "error",
 				"obsidianmd/no-view-references-in-plugin": "error",
+				"obsidianmd/no-document-write": "error",
+				"obsidianmd/no-inner-html": "error",
+				"obsidianmd/no-static-styles-assignment": "error",
 				"obsidianmd/object-assign": "error",
 				"obsidianmd/platform": "error",
 				"obsidianmd/regex-lookbehind": "error",
