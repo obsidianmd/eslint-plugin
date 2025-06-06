@@ -10,7 +10,7 @@ import { TSESLint, TSESTree } from "@typescript-eslint/utils";
 // This rule will not flag:
 //
 // - element.style.width = myWidth; (assignment from a variable)
-// - element.style.transform = \translateX(${offset}px)`;` (assignment from a template literal with expressions)
+// - element.style.transform = `translateX(${offset}px)`; (assignment from a template literal with expressions)
 
 // Checks if a node is a MemberExpression accessing the 'style' property.
 // e.g., `el.style` or `this.containerEl.style`
