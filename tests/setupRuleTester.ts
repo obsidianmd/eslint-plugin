@@ -28,6 +28,7 @@ RuleTester.setDefaultConfig({
 		parserOptions: {
 			project: "./tsconfig.json",
 			tsconfigRootDir: process.cwd(),
+			extraFileExtensions: [".json"],
 		},
 	},
 });
