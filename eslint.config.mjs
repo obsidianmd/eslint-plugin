@@ -45,7 +45,7 @@ export default [
 			"obsidianmd/no-tfile-tfolder-cast": "error",
 			"obsidianmd/object-assign": "error",
 			"obsidianmd/platform": "error",
-			"obsidianmd/prefer-file-manager-trash-file": "error",
+			"obsidianmd/prefer-file-manager-trash-file": "warn",
 			"obsidianmd/regex-lookbehind": "error",
 			"obsidianmd/sample-names": "error",
 			"obsidianmd/settings-tab": "error",

@@ -93,6 +93,11 @@ export default {
 						message:
 							"Use the built-in `requestUrl` function instead of `node-fetch`.",
 					},
+					{
+						name: "moment",
+						message:
+							"The 'moment' package is bundled with Obsidian. Please import it from 'obsidian' instead.",
+					},
 				],
 				"no-alert": "error",
 				"no-undef": "error",
@@ -137,14 +142,6 @@ export default {
 				"import/no-nodejs-modules":
 					manifest && manifest.isDesktopOnly ? "off" : "error",
 				"import/no-extraneous-dependencies": "error",
-				"no-restricted-imports": [
-					"error",
-					{
-						name: "moment",
-						message:
-							"The 'moment' package is bundled with Obsidian. Please import it from 'obsidian' instead.",
-					},
-				],
 
 				"obsidianmd/commands": "error",
 				"obsidianmd/detach-leaves": "error",
@@ -152,7 +149,7 @@ export default {
 				"obsidianmd/no-tfile-tfolder-cast": "error",
 				"obsidianmd/object-assign": "error",
 				"obsidianmd/platform": "error",
-				"obsidianmd/prefer-file-manager-trash-file": "error",
+				"obsidianmd/prefer-file-manager-trash-file": "warn",
 				"obsidianmd/regex-lookbehind": "error",
 				"obsidianmd/sample-names": "error",
 				"obsidianmd/settings-tab": "error",
