@@ -1,6 +1,7 @@
 import commands from "./rules/commands.js";
 import detachLeaves from "./rules/detachLeaves.js";
 import hardcodedConfigPath from "./rules/hardcodedConfigPath.js";
+import noPluginAsComponent from "./rules/noPluginAsComponent.js";
 import noStaticStylesAssignment from "./rules/noStaticStylesAssignment.js";
 import noTFileTFolderCast from "./rules/noTFileTFolderCast.js";
 import noViewReferencesInPlugin from "./rules/noViewReferencesInPlugin.js";
@@ -23,6 +24,7 @@ export default {
 		commands: commands,
 		"detach-leaves": detachLeaves,
 		"hardcoded-config-path": hardcodedConfigPath,
+		"no-plugin-as-component": noPluginAsComponent,
 		"no-tfile-tfolder-cast": noTFileTFolderCast,
 		"no-view-references-in-plugin": noViewReferencesInPlugin,
 		"no-static-styles-assignment": noStaticStylesAssignment,
@@ -148,10 +150,19 @@ export default {
 				"import/no-nodejs-modules":
 					manifest && manifest.isDesktopOnly ? "off" : "error",
 				"import/no-extraneous-dependencies": "error",
+				"no-restricted-imports": [
+					"error",
+					{
+						name: "moment",
+						message:
+							"The 'moment' package is bundled with Obsidian. Please import it from 'obsidian' instead.",
+					},
+				],
 
 				"obsidianmd/commands": "error",
 				"obsidianmd/detach-leaves": "error",
 				"obsidianmd/hardcoded-config-path": "error",
+				"obsidianmd/no-plugin-as-component": "error",
 				"obsidianmd/no-tfile-tfolder-cast": "error",
 				"obsidianmd/no-view-references-in-plugin": "error",
 				"obsidianmd/no-document-write": "error",
