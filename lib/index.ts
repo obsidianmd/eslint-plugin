@@ -1,6 +1,7 @@
 import commands from "./rules/commands.js";
 import detachLeaves from "./rules/detachLeaves.js";
 import hardcodedConfigPath from "./rules/hardcodedConfigPath.js";
+import noStaticStylesAssignment from "./rules/noStaticStylesAssignment.js";
 import objectAssign from "./rules/objectAssign.js";
 import platform from "./rules/platform.js";
 import regexLookbehind from "./rules/regexLookbehind.js";
@@ -18,6 +19,7 @@ export default {
 		commands: commands,
 		"detach-leaves": detachLeaves,
 		"hardcoded-config-path": hardcodedConfigPath,
+		"no-static-styles-assignment": noStaticStylesAssignment,
 		"object-assign": objectAssign,
 		platform: platform,
 		"regex-lookbehind": regexLookbehind,
@@ -103,6 +105,7 @@ export default {
 				"obsidianmd/hardcoded-config-path": "error",
 				"obsidianmd/no-document-write": "error",
 				"obsidianmd/no-inner-html": "error",
+				"obsidianmd/no-static-styles-assignment": "error",
 				"obsidianmd/object-assign": "error",
 				"obsidianmd/platform": "error",
 				"obsidianmd/regex-lookbehind": "error",
