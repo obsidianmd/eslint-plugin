@@ -10,3 +10,4 @@ import "./hardcodedConfigPath.test";
 import "./vaultIterate.test";
 import "./detachLeaves.test";
 import "./validateManifest.test";
+import "./noTFileTFolderCast.test";
