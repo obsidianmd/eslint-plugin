@@ -1,6 +1,7 @@
 import commands from "./lib/rules/commands.ts";
 import detachLeaves from "./lib/rules/detachLeaves.ts";
 import hardcodedConfigPath from "./lib/rules/hardcodedConfigPath.ts";
+import noPluginAsComponent from "./lib/rules/noPluginAsComponent.ts";
 import noTFileTFolderCast from "./lib/rules/noTFileTFolderCast.ts";
 import noViewReferencesInPlugin from "./lib/rules/noViewReferencesInPlugin.ts";
 import noStaticStylesAssignment from "./lib/rules/noStaticStylesAssignment.ts";
@@ -30,6 +31,7 @@ export default [
 					commands: commands,
 					"detach-leaves": detachLeaves,
 					"hardcoded-config-path": hardcodedConfigPath,
+					"no-plugin-as-component": noPluginAsComponent,
 					"no-tfile-tfolder-cast": noTFileTFolderCast,
 					"no-view-references-in-plugin": noViewReferencesInPlugin,
 					"no-static-styles-assignment": noStaticStylesAssignment,
@@ -48,6 +50,7 @@ export default [
 			"obsidianmd/commands": "error",
 			"obsidianmd/detach-leaves": "error",
 			"obsidianmd/hardcoded-config-path": "error",
+			"obsidianmd/no-plugin-as-component": "error",
 			"obsidianmd/no-tfile-tfolder-cast": "error",
 			"obsidianmd/no-view-references-in-plugin": "error",
 			"obsidianmd/no-static-styles-assignment": "error",
