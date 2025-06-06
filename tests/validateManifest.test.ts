@@ -8,6 +8,21 @@ ruleTester.run("validate-manifest", manifestRule, {
 		{
 			filename: "manifest.json",
 			code: `{
+                    "id": "obsidianifier",
+                    "name": "Obsidianifier",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "A way to obsidianify your life.",
+                    "isDesktopOnly": false,
+                    "authorUrl": "https://example.com"
+                }`,
+		},
+	],
+	invalid: [
+		{
+			filename: "manifest.json",
+			code: `{
                     "id": "my-plugin",
                     "name": "My Plugin",
                     "author": "Me",
@@ -17,22 +32,21 @@ ruleTester.run("validate-manifest", manifestRule, {
                     "isDesktopOnly": false,
                     "authorUrl": "https://example.com"
                 }`,
+			errors: [
+				{
+					messageId: "noForbiddenWords",
+					data: { word: "plugin", key: "id" },
+				},
+				{
+					messageId: "noForbiddenWords",
+					data: { word: "plugin", key: "name" },
+				},
+				{
+					messageId: "noForbiddenWords",
+					data: { word: "plugin", key: "description" },
+				},
+			],
 		},
-		{
-			filename: "manifest.json",
-			code: `{
-                    "id": "obsidianifier",
-                    "name": "Obsidianifier Plugin",
-                    "author": "Me",
-                    "version": "1.0.0",
-                    "minAppVersion": "1.0.0",
-                    "description": "A plugin to obsidianify your life.",
-                    "isDesktopOnly": false,
-                    "authorUrl": "https://example.com"
-                }`,
-		},
-	],
-	invalid: [
 		{
 			filename: "manifest.json",
 			code: `{"name": "My Plugin"}`,
@@ -43,6 +57,10 @@ ruleTester.run("validate-manifest", manifestRule, {
 				{ messageId: "missingKey", data: { key: "id" } },
 				{ messageId: "missingKey", data: { key: "description" } },
 				{ messageId: "missingKey", data: { key: "isDesktopOnly" } },
+				{
+					messageId: "noForbiddenWords",
+					data: { word: "plugin", key: "name" },
+				},
 			],
 		},
 		{
@@ -58,15 +76,22 @@ ruleTester.run("validate-manifest", manifestRule, {
                     "author": "Me",
                     "version": "1.0.0",
                     "minAppVersion": "1.0.0",
-                    "description": "A great plugin for Obsidian.",
+                    "description": "A great plugin.",
                     "isDesktopOnly": false,
                     "authorUrl": "https://example.com"
                 }`,
 			errors: [
-				{ messageId: "noObsidianBranding", data: { key: "name" } },
 				{
-					messageId: "noObsidianBranding",
-					data: { key: "description" },
+					messageId: "noForbiddenWords",
+					data: { word: "plugin", key: "id" },
+				},
+				{
+					messageId: "noForbiddenWords",
+					data: { word: "obsidian", key: "name" },
+				},
+				{
+					messageId: "noForbiddenWords",
+					data: { word: "plugin", key: "description" },
 				},
 			],
 		},
@@ -78,16 +103,22 @@ ruleTester.run("validate-manifest", manifestRule, {
                     "author": "Me",
                     "version": "1.0.0",
                     "minAppVersion": "1.0.0",
-                    "description": "A great plugin for Obsidian.",
+                    "description": "A great tool for Obsidian.",
                     "isDesktopOnly": false,
                     "authorUrl": "https://example.com"
                 }`,
 			errors: [
-				{ messageId: "noObsidianBranding", data: { key: "id" } },
-				{ messageId: "noObsidianBranding", data: { key: "name" } },
 				{
-					messageId: "noObsidianBranding",
-					data: { key: "description" },
+					messageId: "noForbiddenWords",
+					data: { word: "obsidian", key: "id" },
+				},
+				{
+					messageId: "noForbiddenWords",
+					data: { word: "obsidian", key: "name" },
+				},
+				{
+					messageId: "noForbiddenWords",
+					data: { word: "obsidian", key: "description" },
 				},
 			],
 		},
