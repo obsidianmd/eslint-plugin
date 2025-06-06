@@ -16,6 +16,17 @@ const OPTIONAL_SCHEMA = {
 	fundingUrl: "string|object",
 };
 
+const FORBIDDEN_WORDS = ["obsidian", "plugin"];
+
+function hasForbiddenWords(str: string): [boolean, string] {
+	for (const word of FORBIDDEN_WORDS) {
+		if (str.match(new RegExp(`\\b${word}\\b`, "i"))) {
+			return [true, word];
+		}
+	}
+	return [false, ""];
+}
+
 function getAstNodeType(node: TSESTree.Node): string {
 	if (node.type === "Literal") {
 		if (node.value === null) return "null";
@@ -47,8 +58,8 @@ export default {
 			invalidFundingUrl:
 				"The 'fundingUrl' object must only contain string values.",
 			mustBeRootObject: "The manifest must be a single JSON object.",
-			noObsidianBranding:
-				"The word 'Obsidian' is not allowed in the manifest.",
+			noForbiddenWords:
+				"The '{{key}}' property cannot contain '{{word}}'.",
 		},
 	},
 	defaultOptions: [],
@@ -59,7 +70,7 @@ export default {
 			| "disallowedKey"
 			| "invalidFundingUrl"
 			| "mustBeRootObject"
-			| "noObsidianBranding",
+			| "noForbiddenWords",
 			[]
 		>,
 	) {
@@ -139,20 +150,22 @@ export default {
 								}
 							}
 						} else if (
-							// check for Obsidian branding
+							// check for forbidden words in specific string fields
 							actualType === "string" &&
 							valueNode.type === "Literal" &&
 							typeof valueNode.value === "string" &&
-							(valueNode.value as string).match(
-								/\bobsidian\b/i,
-							) &&
+							hasForbiddenWords(valueNode.value)[0] &&
 							(key === "name" ||
 								key === "description" ||
 								key === "id")
 						) {
 							context.report({
 								node: valueNode,
-								messageId: "noObsidianBranding",
+								messageId: "noForbiddenWords",
+								data: {
+									word: hasForbiddenWords(valueNode.value)[1],
+									key: key as string,
+								},
 							});
 						}
 					} else {
