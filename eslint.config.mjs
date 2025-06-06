@@ -8,6 +8,7 @@ import platform from "./lib/rules/platform.ts";
 import regexLookbehind from "./lib/rules/regexLookbehind.ts";
 import sampleNames from "./lib/rules/sampleNames.ts";
 import settingsTab from "./lib/rules/settingsTab.ts";
+import validateManifest from "./lib/rules/validateManifest.ts";
 import vaultIterate from "./lib/rules/vault/iterate.ts";
 
 export default [
@@ -34,6 +35,7 @@ export default [
 					"regex-lookbehind": regexLookbehind,
 					"sample-names": sampleNames,
 					"settings-tab": settingsTab,
+					"validate-manifest": validateManifest,
 					"vault-iterate": vaultIterate,
 				},
 			},
@@ -49,6 +51,7 @@ export default [
 			"obsidianmd/regex-lookbehind": "error",
 			"obsidianmd/sample-names": "error",
 			"obsidianmd/settings-tab": "error",
+			"obsidianmd/validate-manifest": "error",
 			"obsidianmd/vault-iterate": "error",
 		},
 	},
