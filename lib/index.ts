@@ -2,6 +2,7 @@ import commands from "./rules/commands.js";
 import detachLeaves from "./rules/detachLeaves.js";
 import hardcodedConfigPath from "./rules/hardcodedConfigPath.js";
 import noStaticStylesAssignment from "./rules/noStaticStylesAssignment.js";
+import noTFileTFolderCast from "./rules/noTFileTFolderCast.js";
 import objectAssign from "./rules/objectAssign.js";
 import platform from "./rules/platform.js";
 import regexLookbehind from "./rules/regexLookbehind.js";
@@ -20,6 +21,7 @@ export default {
 		"detach-leaves": detachLeaves,
 		"hardcoded-config-path": hardcodedConfigPath,
 		"no-static-styles-assignment": noStaticStylesAssignment,
+		"no-tfile-tfolder-cast": noTFileTFolderCast,
 		"object-assign": objectAssign,
 		platform: platform,
 		"regex-lookbehind": regexLookbehind,
@@ -62,6 +64,40 @@ export default {
 						message:
 							"Avoid using the global app object. Instead use the reference provided by your plugin instance.",
 					},
+					"warn",
+					{
+						name: "fetch",
+						message:
+							"Use the built-in `requestUrl` function instead of `fetch` for network requests in Obsidian.",
+					},
+				],
+				"no-restricted-imports": [
+					"error",
+					{
+						name: "axios",
+						message:
+							"Use the built-in `requestUrl` function instead of `axios`.",
+					},
+					{
+						name: "superagent",
+						message:
+							"Use the built-in `requestUrl` function instead of `superagent`.",
+					},
+					{
+						name: "got",
+						message:
+							"Use the built-in `requestUrl` function instead of `got`.",
+					},
+					{
+						name: "node-fetch",
+						message:
+							"Use the built-in `requestUrl` function instead of `node-fetch`.",
+					},
+					{
+						name: "moment",
+						message:
+							"The 'moment' package is bundled with Obsidian. Please import it from 'obsidian' instead.",
+					},
 				],
 				"no-alert": "error",
 				"no-undef": "error",
@@ -92,6 +128,13 @@ export default {
 				"@typescript-eslint/no-unsafe-assignment": "off",
 				"@typescript-eslint/no-empty-function": "off",
 				"@typescript-eslint/prefer-ts-expect-error": "error",
+				"@typescript-eslint/no-explicit-any": [
+					"error",
+					{
+						// A great option that suggests a safer alternative
+						fixToUnknown: true,
+					},
+				],
 
 				"@microsoft/sdl/no-document-write": "error",
 				"@microsoft/sdl/no-inner-html": "error",
@@ -103,9 +146,8 @@ export default {
 				"obsidianmd/commands": "error",
 				"obsidianmd/detach-leaves": "error",
 				"obsidianmd/hardcoded-config-path": "error",
-				"obsidianmd/no-document-write": "error",
-				"obsidianmd/no-inner-html": "error",
 				"obsidianmd/no-static-styles-assignment": "error",
+				"obsidianmd/no-tfile-tfolder-cast": "error",
 				"obsidianmd/object-assign": "error",
 				"obsidianmd/platform": "error",
 				"obsidianmd/regex-lookbehind": "error",
