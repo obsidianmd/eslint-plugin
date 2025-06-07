@@ -7,6 +7,7 @@ import platform from "./rules/platform.js";
 import regexLookbehind from "./rules/regexLookbehind.js";
 import sampleNames from "./rules/sampleNames.js";
 import settingsTab from "./rules/settingsTab.js";
+import validateManifest from "./rules/validateManifest.js";
 import vaultIterate from "./rules/vault/iterate.js";
 import { manifest } from "./readManifest.js";
 
@@ -25,6 +26,7 @@ export default {
 		"regex-lookbehind": regexLookbehind,
 		"sample-names": sampleNames,
 		"settings-tab": settingsTab,
+		"validate-manifest": validateManifest,
 		"vault-iterate": vaultIterate,
 	},
 	configs: {
@@ -91,6 +93,11 @@ export default {
 						message:
 							"Use the built-in `requestUrl` function instead of `node-fetch`.",
 					},
+					{
+						name: "moment",
+						message:
+							"The 'moment' package is bundled with Obsidian. Please import it from 'obsidian' instead.",
+					},
 				],
 				"no-alert": "error",
 				"no-undef": "error",
@@ -135,14 +142,6 @@ export default {
 				"import/no-nodejs-modules":
 					manifest && manifest.isDesktopOnly ? "off" : "error",
 				"import/no-extraneous-dependencies": "error",
-				"no-restricted-imports": [
-					"error",
-					{
-						name: "moment",
-						message:
-							"The 'moment' package is bundled with Obsidian. Please import it from 'obsidian' instead.",
-					},
-				],
 
 				"obsidianmd/commands": "error",
 				"obsidianmd/detach-leaves": "error",
@@ -153,6 +152,7 @@ export default {
 				"obsidianmd/regex-lookbehind": "error",
 				"obsidianmd/sample-names": "error",
 				"obsidianmd/settings-tab": "error",
+				"obsidianmd/validate-manifest": "error",
 				"obsidianmd/vault-iterate": "error",
 			},
 		},
