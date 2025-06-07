@@ -3,29 +3,6 @@ import noViewReferencesRule from "../lib/rules/noViewReferencesInPlugin.js";
 
 const ruleTester = new RuleTester();
 
-/*
-This case is too complex for a standard ESLint rule,
-and would require advanced inter-procedural control-flow analysis, which can be slow and brittle.
-
-This should probably added as a known limitation in the rule documentation.
-
-Assigning via a helper function: The rule will not detect if the assignment happens inside another method called from the factory.
-
-```ts
-// This is bad practice, but the rule will NOT catch it.
-class MyPlugin extends Plugin {
-    view: MyCustomView;
-    createView() {
-        return this.view = new MyCustomView();
-    }
-    onload() {
-        this.registerView('my-view', () => this.createView());
-    }
-}
-```
-
-*/
-
 const MOCK_API = `
     declare class WorkspaceLeaf {}
     type ViewCreator = (leaf: WorkspaceLeaf) => View;
@@ -49,7 +26,8 @@ ruleTester.run("no-view-references-in-plugin", noViewReferencesRule, {
                     }
                 }
             `,
-		}, // Using a function keyword instead of an arrow function.
+		},
+		// Using a function keyword instead of an arrow function.
 		{
 			code: `
 		        ${MOCK_API}
