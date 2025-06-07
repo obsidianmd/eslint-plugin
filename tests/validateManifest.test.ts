@@ -1,5 +1,4 @@
 import { RuleTester } from "@typescript-eslint/rule-tester";
-import { fundingUrl } from "types/manifest.js";
 import manifestRule from "../lib/rules/validateManifest.js";
 
 const ruleTester = new RuleTester();
@@ -56,6 +55,18 @@ ruleTester.run("validate-manifest", manifestRule, {
 					"version": "1.0.0",
 					"minAppVersion": "1.0.0",
 					"description": "This is a valid description.",
+					"isDesktopOnly": false
+				}`,
+		},
+		{
+			filename: "manifest.json",
+			code: `{
+					"id": "valid-description-with-periods",
+					"name": "Valid description with periods",
+					"author": "Me",
+					"version": "1.0.0",
+					"minAppVersion": "1.0.0",
+					"description": "This description ends with a period.",
 					"isDesktopOnly": false
 				}`,
 		},
