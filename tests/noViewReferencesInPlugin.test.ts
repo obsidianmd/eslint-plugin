@@ -3,6 +3,39 @@ import noViewReferencesRule from "../lib/rules/noViewReferencesInPlugin.js";
 
 const ruleTester = new RuleTester();
 
+/*
+These cases are too complex for a standard ESLint rule and would require advanced control-flow analysis, which can be slow and brittle.
+
+1. Assigning via a helper function: The rule will not detect if the assignment happens inside another method called from the factory.
+
+```ts
+// This is bad practice, but the rule will NOT catch it.
+class MyPlugin extends Plugin {
+    view: MyCustomView;
+    createView() {
+        return this.view = new MyCustomView();
+    }
+    onload() {
+        this.registerView('my-view', () => this.createView());
+    }
+}
+```
+
+2. Assigning to 'this' via an alias: The rule will not track aliases of 'this'.
+
+```ts
+// This is bad practice, but the rule will NOT catch it.
+class MyPlugin extends Plugin {
+    view: MyCustomView;
+    onload() {
+        const self = this;
+        this.registerView('my-view', () => self.view = new MyCustomView());
+    }
+}
+```
+
+*/
+
 const MOCK_API = `
     declare class WorkspaceLeaf {}
     type ViewCreator = (leaf: WorkspaceLeaf) => View;
@@ -16,6 +49,7 @@ const MOCK_API = `
 
 ruleTester.run("no-view-references-in-plugin", noViewReferencesRule, {
 	valid: [
+		// A valid case where a view is created and returned without storing it in the plugin.
 		{
 			code: `
                 ${MOCK_API}
@@ -25,9 +59,37 @@ ruleTester.run("no-view-references-in-plugin", noViewReferencesRule, {
                     }
                 }
             `,
+		}, // Using a function keyword instead of an arrow function.
+		{
+			code: `
+		        ${MOCK_API}
+		        class MyPlugin extends Plugin {
+		            onload() {
+		                this.registerView('my-view', function(leaf) {
+		                    return new MyCustomView();
+		                });
+		            }
+		        }
+		    `,
+		},
+		// Assigning a non-View property inside the factory. This is perfectly fine and should not be flagged.
+		{
+			code: `
+		        ${MOCK_API}
+		        class MyPlugin extends Plugin {
+		            someFlag = false;
+		            onload() {
+		                this.registerView('my-view', (leaf) => {
+		                    this.someFlag = true;
+		                    return new MyCustomView();
+						});
+					}
+		        }
+		    `,
 		},
 	],
 	invalid: [
+		// Invalid cases where a view is assigned to a property of the plugin, which can cause memory leaks.
 		{
 			code: `
                 ${MOCK_API}
@@ -40,6 +102,7 @@ ruleTester.run("no-view-references-in-plugin", noViewReferencesRule, {
             `,
 			errors: [{ messageId: "avoidViewReference" }],
 		},
+		// Invalid case where a view is assigned to a property of the plugin, but using an arrow function.
 		{
 			code: `
                 ${MOCK_API}
@@ -52,6 +115,22 @@ ruleTester.run("no-view-references-in-plugin", noViewReferencesRule, {
                     }
                 }
             `,
+			errors: [{ messageId: "avoidViewReference" }],
+		},
+		// Assigning on one line and returning on another.
+		{
+			code: `
+		        ${MOCK_API}
+ 		        class MyPlugin extends Plugin {
+ 		            view: MyCustomView;
+ 		            onload() {
+ 		                this.registerView('my-view', (leaf) => {
+ 		                    this.view = new MyCustomView(); // The bad assignment
+ 		                    return this.view;
+ 		                });
+ 		            }
+ 		        }
+ 		    `,
 			errors: [{ messageId: "avoidViewReference" }],
 		},
 	],
