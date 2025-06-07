@@ -19,10 +19,14 @@ const OPTIONAL_SCHEMA = {
 const FORBIDDEN_WORDS = ["obsidian", "plugin"];
 
 function hasForbiddenWords(str: string): [boolean, string] {
+	let forbiddenWordsFound = new Set<string>();
 	for (const word of FORBIDDEN_WORDS) {
 		if (str.match(new RegExp(`\\b${word}\\b`, "i"))) {
-			return [true, word];
+			forbiddenWordsFound.add(word);
 		}
+	}
+	if (forbiddenWordsFound.size > 0) {
+		return [true, Array.from(forbiddenWordsFound).sort().join("' or '")];
 	}
 	return [false, ""];
 }
@@ -39,6 +43,7 @@ function getAstNodeType(node: TSESTree.Node): string {
 
 export default {
 	name: "validate-manifest",
+	files: ["manifest.json"],
 	meta: {
 		type: "problem" as const,
 		docs: {
@@ -55,11 +60,16 @@ export default {
 				"The '{{key}}' property must be of type '{{expectedType}}', but was '{{actualType}}'.",
 			disallowedKey:
 				"The '{{key}}' property is not allowed in the manifest.",
+			duplicateKey:
+				"The '{{key}}' property is defined multiple times in the manifest.",
 			invalidFundingUrl:
 				"The 'fundingUrl' object must only contain string values.",
+			emptyFundingUrlObject: "The 'fundingUrl' cannot be empty.",
 			mustBeRootObject: "The manifest must be a single JSON object.",
 			noForbiddenWords:
 				"The '{{key}}' property cannot contain '{{word}}'.",
+			descriptionFormat:
+				"The 'description' property should be concise and follow the submission requirements.",
 		},
 	},
 	defaultOptions: [],
@@ -68,9 +78,12 @@ export default {
 			| "missingKey"
 			| "invalidType"
 			| "disallowedKey"
+			| "duplicateKey"
 			| "invalidFundingUrl"
+			| "emptyFundingUrlObject"
 			| "mustBeRootObject"
-			| "noForbiddenWords",
+			| "noForbiddenWords"
+			| "descriptionFormat",
 			[]
 		>,
 	) {
@@ -106,7 +119,25 @@ export default {
 					]),
 				);
 
-				// 1. Check for missing required keys
+				// 1. Check for duplicate keys
+				if (properties.length !== presentKeys.size) {
+					const seenKeys = new Set<string>();
+					for (const prop of properties) {
+						const key = (prop.key as TSESTree.Literal)
+							.value as string;
+						if (seenKeys.has(key)) {
+							context.report({
+								node: prop.key,
+								messageId: "duplicateKey",
+								data: { key },
+							});
+						} else {
+							seenKeys.add(key);
+						}
+					}
+				}
+
+				// 2. Check for missing required keys
 				for (const key of Object.keys(requiredKeys)) {
 					if (!presentKeys.has(key)) {
 						context.report({
@@ -117,7 +148,7 @@ export default {
 					}
 				}
 
-				// 2. Check types and disallowed keys
+				// 3. Check types and disallowed keys
 				for (const [key, propNode] of presentKeys.entries()) {
 					if (key && !((key as string) in allAllowedKeys)) {
 						context.report({
@@ -136,18 +167,80 @@ export default {
 					const actualType = getAstNodeType(valueNode);
 
 					if (expectedType.includes(actualType)) {
-						if (
-							key === "fundingUrl" &&
-							actualType === "object" &&
-							valueNode.type === "ObjectExpression"
-						) {
-							for (const prop of valueNode.properties as TSESTree.Property[]) {
-								if (getAstNodeType(prop.value) !== "string") {
+						if (key === "fundingUrl") {
+							if (
+								actualType === "object" &&
+								valueNode.type === "ObjectExpression"
+							) {
+								if (valueNode.properties.length > 0) {
+									// Check for duplicate keys in fundingUrl
+									const fundingKeys = new Set<string>();
+									for (const prop of valueNode.properties as TSESTree.Property[]) {
+										const propKey = (
+											prop.key as TSESTree.Literal
+										).value as string;
+
+										if (fundingKeys.has(propKey)) {
+											context.report({
+												node: prop.key,
+												messageId: "duplicateKey",
+												data: { key: propKey },
+											});
+										}
+
+										fundingKeys.add(propKey);
+
+										// Check if each property in fundingUrl is a string
+										if (
+											getAstNodeType(prop.value) !==
+											"string"
+										) {
+											context.report({
+												node: prop.value,
+												messageId: "invalidFundingUrl",
+												data: {
+													key: key as string,
+													expectedType: "string",
+													actualType: getAstNodeType(
+														prop.value,
+													),
+												},
+											});
+										}
+
+										// Check for empty string values
+										if (
+											prop.value.type === "Literal" &&
+											typeof prop.value.value ===
+												"string" &&
+											prop.value.value.length === 0
+										) {
+											context.report({
+												node: prop.value,
+												messageId:
+													"emptyFundingUrlObject",
+												data: { key: key as string },
+											});
+										}
+									}
+								} else {
+									// Check for empty fundingUrl object
 									context.report({
-										node: prop.value,
-										messageId: "invalidFundingUrl",
+										node: valueNode,
+										messageId: "emptyFundingUrlObject",
+										data: { key: key as string },
 									});
 								}
+							} else if (
+								actualType === "string" &&
+								valueNode.type === "Literal" &&
+								typeof valueNode.value === "string" &&
+								valueNode.value.length === 0
+							) {
+								context.report({
+									node: valueNode,
+									messageId: "emptyFundingUrlObject",
+								});
 							}
 						} else if (
 							// check for forbidden words in specific string fields
@@ -167,6 +260,31 @@ export default {
 									key: key as string,
 								},
 							});
+						} else if (
+							actualType === "string" &&
+							valueNode.type === "Literal" &&
+							typeof valueNode.value === "string" &&
+							key === "description"
+						) {
+							// Check description format
+							const description = valueNode.value as string;
+							if (
+								// 10 characters min
+								description.length < 10 ||
+								// 250 characters max
+								description.length > 250 ||
+								// Should start with a capital letter
+								!description.match(/^[A-Z]/) ||
+								// Should end with a period
+								!description.endsWith(".") ||
+								// Should not contain emoji or special characters
+								!description.match(/^[A-Za-z0-9\s.,!?'"-]+$/)
+							) {
+								context.report({
+									node: valueNode,
+									messageId: "descriptionFormat",
+								});
+							}
 						}
 					} else {
 						context.report({
