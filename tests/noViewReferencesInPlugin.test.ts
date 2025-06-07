@@ -4,9 +4,12 @@ import noViewReferencesRule from "../lib/rules/noViewReferencesInPlugin.js";
 const ruleTester = new RuleTester();
 
 /*
-These cases are too complex for a standard ESLint rule and would require advanced control-flow analysis, which can be slow and brittle.
+This case is too complex for a standard ESLint rule,
+and would require advanced inter-procedural control-flow analysis, which can be slow and brittle.
 
-1. Assigning via a helper function: The rule will not detect if the assignment happens inside another method called from the factory.
+This should probably added as a known limitation in the rule documentation.
+
+Assigning via a helper function: The rule will not detect if the assignment happens inside another method called from the factory.
 
 ```ts
 // This is bad practice, but the rule will NOT catch it.
@@ -17,19 +20,6 @@ class MyPlugin extends Plugin {
     }
     onload() {
         this.registerView('my-view', () => this.createView());
-    }
-}
-```
-
-2. Assigning to 'this' via an alias: The rule will not track aliases of 'this'.
-
-```ts
-// This is bad practice, but the rule will NOT catch it.
-class MyPlugin extends Plugin {
-    view: MyCustomView;
-    onload() {
-        const self = this;
-        this.registerView('my-view', () => self.view = new MyCustomView());
     }
 }
 ```
@@ -131,6 +121,20 @@ ruleTester.run("no-view-references-in-plugin", noViewReferencesRule, {
  		            }
  		        }
  		    `,
+			errors: [{ messageId: "avoidViewReference" }],
+		},
+		// Assignment via an Alias (const self = this;)
+		{
+			code: `
+		        ${MOCK_API}
+		        class MyPlugin extends Plugin {
+		            view: MyCustomView;
+		            onload() {
+		                const self = this;
+		                this.registerView('my-view', (leaf) => self.view = new MyCustomView());
+		            }
+		        }
+			`,
 			errors: [{ messageId: "avoidViewReference" }],
 		},
 	],
