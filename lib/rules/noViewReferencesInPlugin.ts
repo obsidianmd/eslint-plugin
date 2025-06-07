@@ -6,7 +6,7 @@ import {
 } from "@typescript-eslint/utils";
 import type ts from "typescript";
 
-// This rule disallows storing references to custom views directly in the plugin,
+// Check if a type is a subclass of a given class name.
 function isSubclassOf(
 	type: ts.Type,
 	className: string,
