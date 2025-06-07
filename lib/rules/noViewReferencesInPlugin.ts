@@ -6,7 +6,7 @@ import {
 } from "@typescript-eslint/utils";
 import type ts from "typescript";
 
-// isSubclassOf helper function remains the same...
+// This rule disallows storing references to custom views directly in the plugin,
 function isSubclassOf(
 	type: ts.Type,
 	className: string,
@@ -54,9 +54,7 @@ export default {
 		const services = ESLintUtils.getParserServices(context);
 		const sourceCode = context.sourceCode;
 
-		/**
-		 * Checks if an expression is `this` or an alias initialized with `this`.
-		 */
+		// Checks if an expression is `this` or an alias initialized with `this`.
 		const isThisOrThisAlias = (node: TSESTree.Node): boolean => {
 			if (node.type === "ThisExpression") {
 				return true;
@@ -74,7 +72,6 @@ export default {
 
 				const defNode = variable.defs[0].node;
 
-				// *** THE FIX IS HERE ***
 				// Add a type guard to ensure the definition node is a
 				// VariableDeclarator before accessing its `init` property.
 				if (
