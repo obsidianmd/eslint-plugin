@@ -1,5 +1,7 @@
 import { TSESTree, TSESLint } from "@typescript-eslint/utils";
 
+const BANNED_PROPERTIES = new Set(["userAgent", "platform"]);
+
 export default {
 	name: "platform",
 	meta: {
@@ -18,13 +20,35 @@ export default {
 	create(context: TSESLint.RuleContext<"avoidNavigator", []>) {
 		return {
 			MemberExpression(node: TSESTree.MemberExpression) {
+				const property = node.property;
 				if (
-					node.object &&
-					node.object.type === "Identifier" &&
-					(node.object.name == "window" ||
-						node.object.name === "navigator") &&
-					node.property.type === "Identifier" &&
-					["userAgent", "platform"].includes(node.property.name)
+					property.type !== "Identifier" ||
+					!BANNED_PROPERTIES.has(property.name)
+				) {
+					return;
+				}
+
+				const object = node.object;
+
+				// Case 1: `navigator.userAgent` or `navigator.platform`
+				if (
+					object.type === "Identifier" &&
+					object.name === "navigator"
+				) {
+					context.report({
+						node,
+						messageId: "avoidNavigator",
+					});
+					return;
+				}
+
+				// Case 2: `window.navigator.userAgent` or `window.navigator.platform`
+				if (
+					object.type === "MemberExpression" &&
+					object.object.type === "Identifier" &&
+					object.object.name === "window" &&
+					object.property.type === "Identifier" &&
+					object.property.name === "navigator"
 				) {
 					context.report({
 						node,
