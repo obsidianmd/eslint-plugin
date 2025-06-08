@@ -15,3 +15,4 @@ import "./noViewReferencesInPlugin.test";
 import "./noStaticStylesAssignment.test";
 import "./validateManifest.test";
 import "./noPluginAsComponent.test";
+import "./preferAbstractInputSuggest.test";
