@@ -11,13 +11,13 @@ export default {
 		},
 		schema: [],
 		messages: {
-			useAbstractInputSuggest:
+			preferAbstractInputSuggest:
 				"This appears to be a custom `TextInputSuggest` implementation. Please use the built-in `AbstractInputSuggest` API instead.",
 		},
 	},
 	defaultOptions: [],
 	create(
-		context: TSESLint.RuleContext<"useAbstractInputSuggest", []>,
+		context: TSESLint.RuleContext<"preferAbstractInputSuggest", []>,
 	): TSESLint.RuleListener {
 		return {
 			// We start by looking for any call to a function named `createPopper`.
@@ -26,7 +26,7 @@ export default {
 			) {
 				// The options object is the 3rd argument.
 				const options = node.arguments[2];
-				if (options?.type !== "ObjectExpression") {
+				if (!options || options.type !== "ObjectExpression") {
 					return;
 				}
 
@@ -52,7 +52,7 @@ export default {
 				// Check if any modifier in the array has the name "sameWidth".
 				const hasSameWidthModifier = modifiersProp.value.elements.some(
 					(element) => {
-						if (element?.type !== "ObjectExpression") {
+						if (!element || element.type !== "ObjectExpression") {
 							return false;
 						}
 						// Find the `name` property of the modifier object.
@@ -68,7 +68,8 @@ export default {
 						);
 						// Check if its value is the literal string "sameWidth".
 						return (
-							nameProp?.value.type === "Literal" &&
+							nameProp &&
+							nameProp.value.type === "Literal" &&
 							nameProp.value.value === "sameWidth"
 						);
 					},
@@ -77,7 +78,7 @@ export default {
 				if (hasSameWidthModifier) {
 					context.report({
 						node,
-						messageId: "useAbstractInputSuggest",
+						messageId: "preferAbstractInputSuggest",
 					});
 				}
 			},
