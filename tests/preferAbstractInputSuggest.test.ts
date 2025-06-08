@@ -46,7 +46,7 @@ ruleTester.run("no-deprecated-text-input-suggest", noDeprecatedSuggestRule, {
                     ],
                 });
             `,
-			errors: [{ messageId: "useAbstractInputSuggest" }],
+			errors: [{ messageId: "preferAbstractInputSuggest" }],
 		},
 	],
 });
