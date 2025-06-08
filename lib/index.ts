@@ -7,6 +7,7 @@ import noTFileTFolderCast from "./rules/noTFileTFolderCast.js";
 import noViewReferencesInPlugin from "./rules/noViewReferencesInPlugin.js";
 import objectAssign from "./rules/objectAssign.js";
 import platform from "./rules/platform.js";
+import preferAbstractInputSuggest from "./rules/preferAbstractInputSuggest.js";
 import preferFileManagerTrashFile from "./rules/preferFileManagerTrashFile.js";
 import regexLookbehind from "./rules/regexLookbehind.js";
 import sampleNames from "./rules/sampleNames.js";
@@ -30,6 +31,7 @@ export default {
 		"no-static-styles-assignment": noStaticStylesAssignment,
 		"object-assign": objectAssign,
 		platform: platform,
+		"prefer-abstract-input-suggest": preferAbstractInputSuggest,
 		"prefer-file-manager-trash": preferFileManagerTrashFile,
 		"regex-lookbehind": regexLookbehind,
 		"sample-names": sampleNames,
@@ -163,6 +165,7 @@ export default {
 				"obsidianmd/object-assign": "error",
 				"obsidianmd/platform": "error",
 				"obsidianmd/prefer-file-manager-trash-file": "warn",
+				"obsidianmd/prefer-abstract-input-suggest": "error",
 				"obsidianmd/regex-lookbehind": "error",
 				"obsidianmd/sample-names": "error",
 				"obsidianmd/settings-tab": "error",
