@@ -1,4 +1,4 @@
-import commands from "./rules/commands.js";
+import { commands } from "./rules/commands/index.js";
 import detachLeaves from "./rules/detachLeaves.js";
 import hardcodedConfigPath from "./rules/hardcodedConfigPath.js";
 import noSampleCode from "./rules/noSampleCode.js";
@@ -23,7 +23,12 @@ export default {
 		version: "0.0.2",
 	},
 	rules: {
-		commands: commands,
+		"commands/no-command-in-command-id": commands.noCommandInCommandId,
+		"commands/no-command-in-command-name": commands.noCommandInCommandName,
+		"commands/no-default-hotkeys": commands.noDefaultHotkeys,
+		"commands/no-plugin-id-in-command-id": commands.noPluginIdInCommandId,
+		"commands/no-plugin-name-in-command-name":
+			commands.noPluginNameInCommandName,
 		"detach-leaves": detachLeaves,
 		"hardcoded-config-path": hardcodedConfigPath,
 		"no-plugin-as-component": noPluginAsComponent,
@@ -155,7 +160,11 @@ export default {
 					manifest && manifest.isDesktopOnly ? "off" : "error",
 				"import/no-extraneous-dependencies": "error",
 
-				"obsidianmd/commands": "error",
+				"obsidianmd/commands/no-command-in-command-id": "error",
+				"obsidianmd/commands/no-command-in-command-name": "error",
+				"obsidianmd/commands/no-default-hotkeys": "error",
+				"obsidianmd/commands/no-plugin-id-in-command-id": "error",
+				"obsidianmd/commands/no-plugin-name-in-command-name": "error",
 				"obsidianmd/detach-leaves": "error",
 				"obsidianmd/hardcoded-config-path": "error",
 				"obsidianmd/no-plugin-as-component": "error",
