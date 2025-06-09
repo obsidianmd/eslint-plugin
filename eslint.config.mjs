@@ -1,5 +1,6 @@
 import { commands } from "./lib/rules/commands";
 import { settingsTab } from "./lib/rules/settingsTab";
+import { vault } from "./lib/rules/vault";
 import detachLeaves from "./lib/rules/detachLeaves.ts";
 import hardcodedConfigPath from "./lib/rules/hardcodedConfigPath.ts";
 import noTFileTFolderCast from "./lib/rules/noTFileTFolderCast.ts";
@@ -36,6 +37,7 @@ export default [
 						settingsTab.noManualHtmlHeadings,
 					"settings-tab/no-problematic-settings-headings":
 						settingsTab.noProblematicSettingsHeadings,
+					"vault/iterate": vault.iterate,
 					"detach-leaves": detachLeaves,
 					"hardcoded-config-path": hardcodedConfigPath,
 					"no-tfile-tfolder-cast": noTFileTFolderCast,
@@ -43,7 +45,6 @@ export default [
 					platform: platform,
 					"regex-lookbehind": regexLookbehind,
 					"sample-names": sampleNames,
-					"vault-iterate": vaultIterate,
 				},
 			},
 		},
@@ -55,6 +56,7 @@ export default [
 			"obsidianmd/commands/no-plugin-id-in-command-name": "error",
 			"obsidianmd/settings-tab/no-manual-html-headings": "error",
 			"obsidianmd/settings-tab/no-problematic-settings-headings": "error",
+			"obsidianmd/vault/iterate": "error",
 			"obsidianmd/detach-leaves": "error",
 			"obsidianmd/hardcoded-config-path": "error",
 			"obsidianmd/no-tfile-tfolder-cast": "error",
@@ -62,7 +64,6 @@ export default [
 			"obsidianmd/platform": "error",
 			"obsidianmd/regex-lookbehind": "error",
 			"obsidianmd/sample-names": "error",
-			"obsidianmd/vault-iterate": "error",
 		},
 	},
 ];

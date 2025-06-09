@@ -1,5 +1,6 @@
 import { commands } from "./rules/commands/index.js";
 import { settingsTab } from "./rules/settingsTab/index.js";
+import { vault } from "./rules/vault/index.js";
 import detachLeaves from "./rules/detachLeaves.js";
 import hardcodedConfigPath from "./rules/hardcodedConfigPath.js";
 import noTFileTFolderCast from "./rules/noTFileTFolderCast.js";
@@ -7,7 +8,6 @@ import objectAssign from "./rules/objectAssign.js";
 import platform from "./rules/platform.js";
 import regexLookbehind from "./rules/regexLookbehind.js";
 import sampleNames from "./rules/sampleNames.js";
-import vaultIterate from "./rules/vault/iterate.js";
 import { manifest } from "./readManifest.js";
 
 export default {
@@ -26,6 +26,7 @@ export default {
 			settingsTab.noManualHtmlHeadings,
 		"settings-tab/no-problematic-settings-headings":
 			settingsTab.noProblematicSettingsHeadings,
+		"vault/iterate": vault.iterate,
 		"detach-leaves": detachLeaves,
 		"hardcoded-config-path": hardcodedConfigPath,
 		"no-tfile-tfolder-cast": noTFileTFolderCast,
@@ -33,7 +34,6 @@ export default {
 		platform: platform,
 		"regex-lookbehind": regexLookbehind,
 		"sample-names": sampleNames,
-		"vault-iterate": vaultIterate,
 	},
 	configs: {
 		recommended: {
@@ -157,6 +157,7 @@ export default {
 				"obsidianmd/settings-tab/no-manual-html-headings": "error",
 				"obsidianmd/settings-tab/no-problematic-settings-headings":
 					"error",
+				"obsidianmd/vault/iterate": "error",
 				"obsidianmd/detach-leaves": "error",
 				"obsidianmd/hardcoded-config-path": "error",
 				"obsidianmd/no-tfile-tfolder-cast": "error",
@@ -164,7 +165,6 @@ export default {
 				"obsidianmd/platform": "error",
 				"obsidianmd/regex-lookbehind": "error",
 				"obsidianmd/sample-names": "error",
-				"obsidianmd/vault-iterate": "error",
 			},
 		},
 	},
