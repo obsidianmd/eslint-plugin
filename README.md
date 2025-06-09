@@ -67,6 +67,7 @@ Then configure the rules you want to use under the rules section.
 | [commands](docs/rules/commands.md)                           | Command guidelines                                                               | ✅  |    |
 | [detach-leaves](docs/rules/detach-leaves.md)                 | Don't detach leaves in onunload.                                                 | ✅  | 🔧 |
 | [hardcoded-config-path](docs/rules/hardcoded-config-path.md) | test                                                                             | ✅  |    |
+| [no-sample-code](docs/rules/no-sample-code.md)               | Disallow sample code snippets from the Obsidian plugin template.                 | ✅  | 🔧 |
 | [no-tfile-tfolder-cast](docs/rules/no-tfile-tfolder-cast.md) | Disallow type casting to TFile or TFolder, suggesting instanceof checks instead. | ✅  |    |
 | [object-assign](docs/rules/object-assign.md)                 | Object.assign with two parameters instead of 3.                                  | ✅  |    |
 | [platform](docs/rules/platform.md)                           | Disallow use of navigator API for OS detection                                   | ✅  |    |
