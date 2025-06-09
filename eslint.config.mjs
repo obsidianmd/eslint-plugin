@@ -1,4 +1,4 @@
-import commands from "./lib/rules/commands.ts";
+import { commands } from "./lib/rules/commands";
 import detachLeaves from "./lib/rules/detachLeaves.ts";
 import hardcodedConfigPath from "./lib/rules/hardcodedConfigPath.ts";
 import noSampleCode from "./lib/rules/noSampleCode.ts";
@@ -30,7 +30,15 @@ export default [
 		plugins: {
 			obsidianmd: {
 				rules: {
-					commands: commands,
+					"commands/no-command-in-command-id":
+						commands.noCommandInCommandId,
+					"commands/no-command-in-command-name":
+						commands.noCommandInCommandName,
+					"commands/no-default-hotkey": commands.noDefaultHotkeys,
+					"commands/no-plugin-id-in-command-id":
+						commands.noPluginIdInCommandId,
+					"commands/no-plugin-id-in-command-name":
+						commands.noPluginNameInCommandName,
 					"detach-leaves": detachLeaves,
 					"hardcoded-config-path": hardcodedConfigPath,
 					"no-sample-code": noSampleCode,
@@ -51,7 +59,11 @@ export default [
 			},
 		},
 		rules: {
-			"obsidianmd/commands": "error",
+			"obsidianmd/commands/no-command-in-command-id": "error",
+			"obsidianmd/commands/no-command-in-command-name": "error",
+			"obsidianmd/commands/no-default-hotkey": "error",
+			"obsidianmd/commands/no-plugin-id-in-command-id": "error",
+			"obsidianmd/commands/no-plugin-id-in-command-name": "error",
 			"obsidianmd/detach-leaves": "error",
 			"obsidianmd/hardcoded-config-path": "error",
 			"obsidianmd/no-plugin-as-component": "error",
