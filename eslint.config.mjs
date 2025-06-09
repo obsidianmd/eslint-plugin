@@ -1,4 +1,5 @@
 import { commands } from "./lib/rules/commands";
+import { settingsTab } from "./lib/rules/settingsTab";
 import detachLeaves from "./lib/rules/detachLeaves.ts";
 import hardcodedConfigPath from "./lib/rules/hardcodedConfigPath.ts";
 import noSampleCode from "./lib/rules/noSampleCode.ts";
@@ -39,6 +40,10 @@ export default [
 						commands.noPluginIdInCommandId,
 					"commands/no-plugin-id-in-command-name":
 						commands.noPluginNameInCommandName,
+					"settings-tab/no-manual-html-headings":
+						settingsTab.noManualHtmlHeadings,
+					"settings-tab/no-problematic-settings-headings":
+						settingsTab.noProblematicSettingsHeadings,
 					"detach-leaves": detachLeaves,
 					"hardcoded-config-path": hardcodedConfigPath,
 					"no-sample-code": noSampleCode,
@@ -64,6 +69,8 @@ export default [
 			"obsidianmd/commands/no-default-hotkey": "error",
 			"obsidianmd/commands/no-plugin-id-in-command-id": "error",
 			"obsidianmd/commands/no-plugin-id-in-command-name": "error",
+			"obsidianmd/settings-tab/no-manual-html-headings": "error",
+			"obsidianmd/settings-tab/no-problematic-settings-headings": "error",
 			"obsidianmd/detach-leaves": "error",
 			"obsidianmd/hardcoded-config-path": "error",
 			"obsidianmd/no-plugin-as-component": "error",
