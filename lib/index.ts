@@ -1,5 +1,6 @@
 import { commands } from "./rules/commands/index.js";
 import { settingsTab } from "./rules/settingsTab/index.js";
+import { vault } from "./rules/vault/index.js";
 import detachLeaves from "./rules/detachLeaves.js";
 import hardcodedConfigPath from "./rules/hardcodedConfigPath.js";
 import noSampleCode from "./rules/noSampleCode.js";
@@ -34,6 +35,7 @@ export default {
 			settingsTab.noManualHtmlHeadings,
 		"settings-tab/no-problematic-settings-headings":
 			settingsTab.noProblematicSettingsHeadings,
+		"vault/iterate": vault.iterate,
 		"detach-leaves": detachLeaves,
 		"hardcoded-config-path": hardcodedConfigPath,
 		"no-plugin-as-component": noPluginAsComponent,
@@ -173,6 +175,7 @@ export default {
 				"obsidianmd/settings-tab/no-manual-html-headings": "error",
 				"obsidianmd/settings-tab/no-problematic-settings-headings":
 					"error",
+				"obsidianmd/vault/iterate": "error",
 				"obsidianmd/detach-leaves": "error",
 				"obsidianmd/hardcoded-config-path": "error",
 				"obsidianmd/no-plugin-as-component": "error",

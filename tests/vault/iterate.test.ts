@@ -1,5 +1,5 @@
 import { RuleTester } from "@typescript-eslint/rule-tester";
-import vaultIterateRule from "../lib/rules/vault/iterate.js";
+import vaultIterateRule from "../../lib/rules/vault/iterate.js";
 
 const ruleTester = new RuleTester();
 
