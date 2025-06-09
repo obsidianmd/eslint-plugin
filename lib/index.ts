@@ -1,4 +1,5 @@
 import { commands } from "./rules/commands/index.js";
+import { settingsTab } from "./rules/settingsTab/index.js";
 import detachLeaves from "./rules/detachLeaves.js";
 import hardcodedConfigPath from "./rules/hardcodedConfigPath.js";
 import noSampleCode from "./rules/noSampleCode.js";
@@ -29,6 +30,10 @@ export default {
 		"commands/no-plugin-id-in-command-id": commands.noPluginIdInCommandId,
 		"commands/no-plugin-name-in-command-name":
 			commands.noPluginNameInCommandName,
+		"settings-tab/no-manual-html-headings":
+			settingsTab.noManualHtmlHeadings,
+		"settings-tab/no-problematic-settings-headings":
+			settingsTab.noProblematicSettingsHeadings,
 		"detach-leaves": detachLeaves,
 		"hardcoded-config-path": hardcodedConfigPath,
 		"no-plugin-as-component": noPluginAsComponent,
@@ -165,6 +170,9 @@ export default {
 				"obsidianmd/commands/no-default-hotkeys": "error",
 				"obsidianmd/commands/no-plugin-id-in-command-id": "error",
 				"obsidianmd/commands/no-plugin-name-in-command-name": "error",
+				"obsidianmd/settings-tab/no-manual-html-headings": "error",
+				"obsidianmd/settings-tab/no-problematic-settings-headings":
+					"error",
 				"obsidianmd/detach-leaves": "error",
 				"obsidianmd/hardcoded-config-path": "error",
 				"obsidianmd/no-plugin-as-component": "error",
