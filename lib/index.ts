@@ -5,6 +5,7 @@ import noTFileTFolderCast from "./rules/noTFileTFolderCast.js";
 import noViewReferencesInPlugin from "./rules/noViewReferencesInPlugin.js";
 import objectAssign from "./rules/objectAssign.js";
 import platform from "./rules/platform.js";
+import preferAbstractInputSuggest from "./rules/preferAbstractInputSuggest.js";
 import regexLookbehind from "./rules/regexLookbehind.js";
 import sampleNames from "./rules/sampleNames.js";
 import settingsTab from "./rules/settingsTab.js";
@@ -24,6 +25,7 @@ export default {
 		"no-view-references-in-plugin": noViewReferencesInPlugin,
 		"object-assign": objectAssign,
 		platform: platform,
+		"prefer-abstract-input-suggest": preferAbstractInputSuggest,
 		"regex-lookbehind": regexLookbehind,
 		"sample-names": sampleNames,
 		"settings-tab": settingsTab,
@@ -150,6 +152,7 @@ export default {
 				"obsidianmd/no-view-references-in-plugin": "error",
 				"obsidianmd/object-assign": "error",
 				"obsidianmd/platform": "error",
+				"obsidianmd/prefer-abstract-input-suggest": "error",
 				"obsidianmd/regex-lookbehind": "error",
 				"obsidianmd/sample-names": "error",
 				"obsidianmd/settings-tab": "error",
