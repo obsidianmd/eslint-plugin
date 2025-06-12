@@ -10,4 +10,5 @@ import "./hardcodedConfigPath.test";
 import "./vaultIterate.test";
 import "./detachLeaves.test";
 import "./noTFileTFolderCast.test";
+import "./noPluginAsComponent.test";
 import "./noViewReferencesInPlugin.test";
