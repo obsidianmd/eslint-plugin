@@ -9,7 +9,6 @@ import objectAssign from "./lib/rules/objectAssign.ts";
 import platform from "./lib/rules/platform.ts";
 import regexLookbehind from "./lib/rules/regexLookbehind.ts";
 import sampleNames from "./lib/rules/sampleNames.ts";
-import vaultIterate from "./lib/rules/vault/iterate.ts";
 
 export default [
 	{
