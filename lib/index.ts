@@ -4,6 +4,7 @@ import { vault } from "./rules/vault/index.js";
 import detachLeaves from "./rules/detachLeaves.js";
 import hardcodedConfigPath from "./rules/hardcodedConfigPath.js";
 import noTFileTFolderCast from "./rules/noTFileTFolderCast.js";
+import noViewReferencesInPlugin from "./rules/noViewReferencesInPlugin.js";
 import objectAssign from "./rules/objectAssign.js";
 import platform from "./rules/platform.js";
 import regexLookbehind from "./rules/regexLookbehind.js";
@@ -30,6 +31,7 @@ export default {
 		"detach-leaves": detachLeaves,
 		"hardcoded-config-path": hardcodedConfigPath,
 		"no-tfile-tfolder-cast": noTFileTFolderCast,
+		"no-view-references-in-plugin": noViewReferencesInPlugin,
 		"object-assign": objectAssign,
 		platform: platform,
 		"regex-lookbehind": regexLookbehind,
@@ -161,6 +163,7 @@ export default {
 				"obsidianmd/detach-leaves": "error",
 				"obsidianmd/hardcoded-config-path": "error",
 				"obsidianmd/no-tfile-tfolder-cast": "error",
+				"obsidianmd/no-view-references-in-plugin": "error",
 				"obsidianmd/object-assign": "error",
 				"obsidianmd/platform": "error",
 				"obsidianmd/regex-lookbehind": "error",

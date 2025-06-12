@@ -10,3 +10,4 @@ import "./sampleNames.test";
 import "./hardcodedConfigPath.test";
 import "./detachLeaves.test";
 import "./noTFileTFolderCast.test";
+import "./noViewReferencesInPlugin.test";
