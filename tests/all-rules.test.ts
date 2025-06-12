@@ -11,3 +11,4 @@ import "./vaultIterate.test";
 import "./detachLeaves.test";
 import "./noTFileTFolderCast.test";
 import "./noSampleCode.test";
+import "./noViewReferencesInPlugin.test";
