@@ -1,5 +1,4 @@
-# Avoid iterating all files to find a file by its path
- (`obsidianmd/vault-iterate`)
+# Discourage anti-patterns in settings headings (`obsidianmd/settings-tab/no-problematic-settings-headings`)
 
 💼 This rule is enabled in the ✅ `recommended` config.
 
