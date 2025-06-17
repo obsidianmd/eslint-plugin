@@ -1,4 +1,6 @@
-import commands from "./lib/rules/commands.ts";
+import { commands } from "./lib/rules/commands";
+import { settingsTab } from "./lib/rules/settingsTab";
+import { vault } from "./lib/rules/vault";
 import detachLeaves from "./lib/rules/detachLeaves.ts";
 import hardcodedConfigPath from "./lib/rules/hardcodedConfigPath.ts";
 import noTFileTFolderCast from "./lib/rules/noTFileTFolderCast.ts";
@@ -9,9 +11,7 @@ import platform from "./lib/rules/platform.ts";
 import preferFileManagerTrashFile from "./lib/rules/preferFileManagerTrashFile.ts";
 import regexLookbehind from "./lib/rules/regexLookbehind.ts";
 import sampleNames from "./lib/rules/sampleNames.ts";
-import settingsTab from "./lib/rules/settingsTab.ts";
 import validateManifest from "./lib/rules/validateManifest.ts";
-import vaultIterate from "./lib/rules/vault/iterate.ts";
 
 export default [
 	{
@@ -27,7 +27,20 @@ export default [
 		plugins: {
 			obsidianmd: {
 				rules: {
-					commands: commands,
+					"commands/no-command-in-command-id":
+						commands.noCommandInCommandId,
+					"commands/no-command-in-command-name":
+						commands.noCommandInCommandName,
+					"commands/no-default-hotkey": commands.noDefaultHotkeys,
+					"commands/no-plugin-id-in-command-id":
+						commands.noPluginIdInCommandId,
+					"commands/no-plugin-id-in-command-name":
+						commands.noPluginNameInCommandName,
+					"settings-tab/no-manual-html-headings":
+						settingsTab.noManualHtmlHeadings,
+					"settings-tab/no-problematic-settings-headings":
+						settingsTab.noProblematicSettingsHeadings,
+					"vault/iterate": vault.iterate,
 					"detach-leaves": detachLeaves,
 					"hardcoded-config-path": hardcodedConfigPath,
 					"no-tfile-tfolder-cast": noTFileTFolderCast,
@@ -38,14 +51,19 @@ export default [
 					"prefer-file-manager-trash": preferFileManagerTrashFile,
 					"regex-lookbehind": regexLookbehind,
 					"sample-names": sampleNames,
-					"settings-tab": settingsTab,
 					"validate-manifest": validateManifest,
-					"vault-iterate": vaultIterate,
 				},
 			},
 		},
 		rules: {
-			"obsidianmd/commands": "error",
+			"obsidianmd/commands/no-command-in-command-id": "error",
+			"obsidianmd/commands/no-command-in-command-name": "error",
+			"obsidianmd/commands/no-default-hotkey": "error",
+			"obsidianmd/commands/no-plugin-id-in-command-id": "error",
+			"obsidianmd/commands/no-plugin-id-in-command-name": "error",
+			"obsidianmd/settings-tab/no-manual-html-headings": "error",
+			"obsidianmd/settings-tab/no-problematic-settings-headings": "error",
+			"obsidianmd/vault/iterate": "error",
 			"obsidianmd/detach-leaves": "error",
 			"obsidianmd/hardcoded-config-path": "error",
 			"obsidianmd/no-tfile-tfolder-cast": "error",
@@ -56,9 +74,7 @@ export default [
 			"obsidianmd/prefer-file-manager-trash-file": "warn",
 			"obsidianmd/regex-lookbehind": "error",
 			"obsidianmd/sample-names": "error",
-			"obsidianmd/settings-tab": "error",
 			"obsidianmd/validate-manifest": "error",
-			"obsidianmd/vault-iterate": "error",
 		},
 	},
 ];

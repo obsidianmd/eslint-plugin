@@ -1,4 +1,6 @@
-import commands from "./rules/commands.js";
+import { commands } from "./rules/commands/index.js";
+import { settingsTab } from "./rules/settingsTab/index.js";
+import { vault } from "./rules/vault/index.js";
 import detachLeaves from "./rules/detachLeaves.js";
 import hardcodedConfigPath from "./rules/hardcodedConfigPath.js";
 import noStaticStylesAssignment from "./rules/noStaticStylesAssignment.js";
@@ -9,9 +11,7 @@ import platform from "./rules/platform.js";
 import preferFileManagerTrashFile from "./rules/preferFileManagerTrashFile.js";
 import regexLookbehind from "./rules/regexLookbehind.js";
 import sampleNames from "./rules/sampleNames.js";
-import settingsTab from "./rules/settingsTab.js";
 import validateManifest from "./rules/validateManifest.js";
-import vaultIterate from "./rules/vault/iterate.js";
 import { manifest } from "./readManifest.js";
 
 export default {
@@ -20,7 +20,17 @@ export default {
 		version: "0.0.2",
 	},
 	rules: {
-		commands: commands,
+		"commands/no-command-in-command-id": commands.noCommandInCommandId,
+		"commands/no-command-in-command-name": commands.noCommandInCommandName,
+		"commands/no-default-hotkeys": commands.noDefaultHotkeys,
+		"commands/no-plugin-id-in-command-id": commands.noPluginIdInCommandId,
+		"commands/no-plugin-name-in-command-name":
+			commands.noPluginNameInCommandName,
+		"settings-tab/no-manual-html-headings":
+			settingsTab.noManualHtmlHeadings,
+		"settings-tab/no-problematic-settings-headings":
+			settingsTab.noProblematicSettingsHeadings,
+		"vault/iterate": vault.iterate,
 		"detach-leaves": detachLeaves,
 		"hardcoded-config-path": hardcodedConfigPath,
 		"no-tfile-tfolder-cast": noTFileTFolderCast,
@@ -31,9 +41,7 @@ export default {
 		"prefer-file-manager-trash": preferFileManagerTrashFile,
 		"regex-lookbehind": regexLookbehind,
 		"sample-names": sampleNames,
-		"settings-tab": settingsTab,
 		"validate-manifest": validateManifest,
-		"vault-iterate": vaultIterate,
 	},
 	configs: {
 		recommended: {
@@ -149,7 +157,15 @@ export default {
 					manifest && manifest.isDesktopOnly ? "off" : "error",
 				"import/no-extraneous-dependencies": "error",
 
-				"obsidianmd/commands": "error",
+				"obsidianmd/commands/no-command-in-command-id": "error",
+				"obsidianmd/commands/no-command-in-command-name": "error",
+				"obsidianmd/commands/no-default-hotkeys": "error",
+				"obsidianmd/commands/no-plugin-id-in-command-id": "error",
+				"obsidianmd/commands/no-plugin-name-in-command-name": "error",
+				"obsidianmd/settings-tab/no-manual-html-headings": "error",
+				"obsidianmd/settings-tab/no-problematic-settings-headings":
+					"error",
+				"obsidianmd/vault/iterate": "error",
 				"obsidianmd/detach-leaves": "error",
 				"obsidianmd/hardcoded-config-path": "error",
 				"obsidianmd/no-tfile-tfolder-cast": "error",
@@ -162,9 +178,7 @@ export default {
 				"obsidianmd/prefer-file-manager-trash-file": "warn",
 				"obsidianmd/regex-lookbehind": "error",
 				"obsidianmd/sample-names": "error",
-				"obsidianmd/settings-tab": "error",
 				"obsidianmd/validate-manifest": "error",
-				"obsidianmd/vault-iterate": "error",
 			},
 		},
 	},

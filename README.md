@@ -23,24 +23,19 @@ Add `obsidianmd` to the plugins section of your `.eslintrc` configuration file. 
 
 ```json
 {
-    "plugins": [
-        "obsidianmd"
-    ]
+ "plugins": ["obsidianmd"]
 }
 ```
-
 
 Then configure the rules you want to use under the rules section.
 
 ```json
 {
-    "rules": {
-        "obsidian/rule-name": 2
-    }
+ "rules": {
+  "obsidian/rule-name": 2
+ }
 }
 ```
-
-
 
 ## Configurations
 
@@ -52,8 +47,6 @@ Then configure the rules you want to use under the rules section.
 
 <!-- end auto-generated configs list -->
 
-
-
 ## Rules
 
 <!-- begin auto-generated rules list -->
@@ -62,17 +55,26 @@ Then configure the rules you want to use under the rules section.
 ✅ Set in the `recommended` configuration.\
 🔧 Automatically fixable by the [`--fix` CLI option](https://eslint.org/docs/user-guide/command-line-interface#--fix).
 
-| Name                                                                 | Description                                                                                   | 💼 | 🔧 |
-| :------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------- | :- | :- |
-| [commands](docs/rules/commands.md)                                   | Command guidelines                                                                            | ✅  |    |
-| [detach-leaves](docs/rules/detach-leaves.md)                         | Don't detach leaves in onunload.                                                              | ✅  | 🔧 |
-| [hardcoded-config-path](docs/rules/hardcoded-config-path.md)         | test                                                                                          | ✅  |    |
-| [object-assign](docs/rules/object-assign.md)                         | Object.assign with two parameters instead of 3.                                               | ✅  |    |
-| [platform](docs/rules/platform.md)                                   | Disallow use of navigator API for OS detection                                                | ✅  |    |
-| [prefer-file-manager-trash](docs/rules/prefer-file-manager-trash.md) | Prefer FileManager.trashFile() over Vault.trash() or Vault.delete() to respect user settings. | ✅  |    |
-| [regex-lookbehind](docs/rules/regex-lookbehind.md)                   | Using lookbehinds in Regex is not supported in some iOS versions                              | ✅  |    |
-| [sample-names](docs/rules/sample-names.md)                           | Rename sample plugin class names                                                              | ✅  |    |
-| [settings-tab](docs/rules/settings-tab.md)                           | Discourage common anti-patterns in plugin settings tabs.                                      | ✅  | 🔧 |
-| [vault-iterate](docs/rules/vault-iterate.md)                         | Avoid iterating all files to find a file by its path<br/>                                     | ✅  | 🔧 |
+| Name                                                                                                         | Description                                                                                       | 💼 | 🔧 |
+| :----------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------ | :- | :- |
+| [commands/no-command-in-command-id](docs/rules/commands/no-command-in-command-id.md)                         | Disallow using the word 'command' in a command ID.                                                | ✅  |    |
+| [commands/no-command-in-command-name](docs/rules/commands/no-command-in-command-name.md)                     | Disallow using the word 'command' in a command name.                                              | ✅  |    |
+| [commands/no-default-hotkeys](docs/rules/commands/no-default-hotkeys.md)                                     | Discourage providing default hotkeys for commands.                                                | ✅  |    |
+| [commands/no-plugin-id-in-command-id](docs/rules/commands/no-plugin-id-in-command-id.md)                     | Disallow including the plugin ID in a command ID.                                                 | ✅  |    |
+| [commands/no-plugin-name-in-command-name](docs/rules/commands/no-plugin-name-in-command-name.md)             | Disallow including the plugin name in a command name.                                             | ✅  |    |
+| [detach-leaves](docs/rules/detach-leaves.md)                                                                 | Don't detach leaves in onunload.                                                                  | ✅  | 🔧 |
+| [hardcoded-config-path](docs/rules/hardcoded-config-path.md)                                                 | test                                                                                              | ✅  |    |
+| [no-static-styles-assignment](docs/rules/no-static-styles-assignment.md)                                     | Disallow setting styles directly on DOM elements, favoring CSS classes instead.                   | ✅  |    |
+| [no-tfile-tfolder-cast](docs/rules/no-tfile-tfolder-cast.md)                                                 | Disallow type casting to TFile or TFolder, suggesting instanceof checks instead.                  | ✅  |    |
+| [no-view-references-in-plugin](docs/rules/no-view-references-in-plugin.md)                                   | Disallow storing references to custom views directly in the plugin, which can cause memory leaks. | ✅  |    |
+| [object-assign](docs/rules/object-assign.md)                                                                 | Object.assign with two parameters instead of 3.                                                   | ✅  |    |
+| [platform](docs/rules/platform.md)                                                                           | Disallow use of navigator API for OS detection                                                    | ✅  |    |
+| [prefer-file-manager-trash](docs/rules/prefer-file-manager-trash.md)                                         | Prefer FileManager.trashFile() over Vault.trash() or Vault.delete() to respect user settings.     |    |    |
+| [regex-lookbehind](docs/rules/regex-lookbehind.md)                                                           | Using lookbehinds in Regex is not supported in some iOS versions                                  | ✅  |    |
+| [sample-names](docs/rules/sample-names.md)                                                                   | Rename sample plugin class names                                                                  | ✅  |    |
+| [settings-tab/no-manual-html-headings](docs/rules/settings-tab/no-manual-html-headings.md)                   | Disallow using HTML heading elements for settings headings.                                       | ✅  | 🔧 |
+| [settings-tab/no-problematic-settings-headings](docs/rules/settings-tab/no-problematic-settings-headings.md) | Discourage anti-patterns in settings headings.                                                    | ✅  | 🔧 |
+| [validate-manifest](docs/rules/validate-manifest.md)                                                         | Validate the structure of manifest.json for Obsidian plugins.                                     | ✅  |    |
+| [vault/iterate](docs/rules/vault/iterate.md)                                                                 | Avoid iterating all files to find a file by its path<br/>                                         | ✅  | 🔧 |
 
 <!-- end auto-generated rules list -->
