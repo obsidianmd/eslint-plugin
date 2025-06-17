@@ -1,11 +1,13 @@
-import { ParserServices, TSESLint, TSESTree } from "@typescript-eslint/utils";
-import { getParserServices } from "@typescript-eslint/utils/eslint-utils";
+import {
+	ParserServices,
+	ESLintUtils,
+	TSESLint,
+	TSESTree,
+} from "@typescript-eslint/utils";
 import ts from "typescript";
 
 // Recursively checks if a type is or extends the 'Plugin' class.
-// returns True if the type is a Plugin or a subclass of Plugin.
 function isPluginType(type: ts.Type, services: ParserServices): boolean {
-	// Use `getConstraint()` to resolve the `this` type to its class.
 	const constraint = type.getConstraint();
 	if (constraint) {
 		type = constraint;
@@ -34,53 +36,59 @@ export default {
 		type: "problem" as const,
 		docs: {
 			description:
-				"Disallow using the main plugin instance as a component for MarkdownRenderer.render to prevent memory leaks.",
+				"Disallow anti-patterns when passing a component to MarkdownRenderer.render to prevent memory leaks.",
 			recommended: true,
 		},
 		schema: [],
 		messages: {
 			avoidPluginComponent:
-				"Avoid using the main plugin instance as a component for `MarkdownRenderer.render`. Use a shorter-lived component (e.g., a View, Modal, or a new Component) to prevent memory leaks.",
+				"Avoid using the main plugin instance as a component. Its lifecycle is too long, which can cause memory leaks.",
+			avoidNewComponent:
+				"Do not pass a `new Component()` directly. Store it in a variable to ensure its `unload()` method can be called.",
 		},
 		requiresTypeChecking: true,
 	},
 	defaultOptions: [],
 	create(
-		context: TSESLint.RuleContext<"avoidPluginComponent", []>,
+		context: TSESLint.RuleContext<
+			"avoidPluginComponent" | "avoidNewComponent",
+			[]
+		>,
 	): TSESLint.RuleListener {
-		const services = getParserServices(context);
+		const services = ESLintUtils.getParserServices(context);
 
 		return {
 			CallExpression(node: TSESTree.CallExpression) {
-				// The call must have 5 arguments.
-				if (node.arguments.length < 5) {
-					return;
-				}
+				if (node.arguments.length < 5) return;
 
 				const callee = node.callee;
-				if (callee.type !== "MemberExpression") {
-					return;
-				}
+				if (callee.type !== "MemberExpression") return;
 
-				// Check if the method is `render`.
-				const property = callee.property;
 				if (
-					property.type !== "Identifier" ||
-					property.name !== "render"
+					callee.property.type !== "Identifier" ||
+					callee.property.name !== "render"
 				) {
 					return;
 				}
 
-				// Check if the object being called on is `MarkdownRenderer`.
 				const rendererType = services.getTypeAtLocation(callee.object);
 				if (rendererType.getSymbol()?.name !== "MarkdownRenderer") {
 					return;
 				}
 
-				// Get the 5th argument (the component).
 				const componentArg = node.arguments[4];
-				const componentType = services.getTypeAtLocation(componentArg);
 
+				// Check 1: Is the argument a `new Component()` expression?
+				if (componentArg.type === "NewExpression") {
+					context.report({
+						node: componentArg,
+						messageId: "avoidNewComponent",
+					});
+					return; // No need to check type if we already found this error
+				}
+
+				// Check 2: Is the type of the argument a `Plugin`?
+				const componentType = services.getTypeAtLocation(componentArg);
 				if (isPluginType(componentType, services)) {
 					context.report({
 						node: componentArg,
