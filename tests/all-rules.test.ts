@@ -9,6 +9,8 @@ import "./regexLookbehind.test";
 import "./sampleNames.test";
 import "./hardcodedConfigPath.test";
 import "./detachLeaves.test";
+import "./preferFileManagerTrashFile.test";
 import "./noTFileTFolderCast.test";
 import "./noViewReferencesInPlugin.test";
+import "./noStaticStylesAssignment.test";
 import "./validateManifest.test";
