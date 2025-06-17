@@ -2,10 +2,12 @@ import commands from "./rules/commands.js";
 import detachLeaves from "./rules/detachLeaves.js";
 import hardcodedConfigPath from "./rules/hardcodedConfigPath.js";
 import noSampleCode from "./rules/noSampleCode.js";
+import noStaticStylesAssignment from "./rules/noStaticStylesAssignment.js";
 import noTFileTFolderCast from "./rules/noTFileTFolderCast.js";
 import noViewReferencesInPlugin from "./rules/noViewReferencesInPlugin.js";
 import objectAssign from "./rules/objectAssign.js";
 import platform from "./rules/platform.js";
+import preferFileManagerTrashFile from "./rules/preferFileManagerTrashFile.js";
 import regexLookbehind from "./rules/regexLookbehind.js";
 import sampleNames from "./rules/sampleNames.js";
 import settingsTab from "./rules/settingsTab.js";
@@ -25,8 +27,10 @@ export default {
 		"no-sample-code": noSampleCode,
 		"no-tfile-tfolder-cast": noTFileTFolderCast,
 		"no-view-references-in-plugin": noViewReferencesInPlugin,
+		"no-static-styles-assignment": noStaticStylesAssignment,
 		"object-assign": objectAssign,
 		platform: platform,
+		"prefer-file-manager-trash": preferFileManagerTrashFile,
 		"regex-lookbehind": regexLookbehind,
 		"sample-names": sampleNames,
 		"settings-tab": settingsTab,
@@ -153,8 +157,12 @@ export default {
 				"obsidianmd/no-sample-code": "error",
 				"obsidianmd/no-tfile-tfolder-cast": "error",
 				"obsidianmd/no-view-references-in-plugin": "error",
+				"obsidianmd/no-document-write": "error",
+				"obsidianmd/no-inner-html": "error",
+				"obsidianmd/no-static-styles-assignment": "error",
 				"obsidianmd/object-assign": "error",
 				"obsidianmd/platform": "error",
+				"obsidianmd/prefer-file-manager-trash-file": "warn",
 				"obsidianmd/regex-lookbehind": "error",
 				"obsidianmd/sample-names": "error",
 				"obsidianmd/settings-tab": "error",
