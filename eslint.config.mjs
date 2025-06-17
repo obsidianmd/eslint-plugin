@@ -6,6 +6,7 @@ import noViewReferencesInPlugin from "./lib/rules/noViewReferencesInPlugin.ts";
 import noStaticStylesAssignment from "./lib/rules/noStaticStylesAssignment.ts";
 import objectAssign from "./lib/rules/objectAssign.ts";
 import platform from "./lib/rules/platform.ts";
+import preferAbstractInputSuggest from "./lib/rules/preferAbstractInputSuggest.ts";
 import preferFileManagerTrashFile from "./lib/rules/preferFileManagerTrashFile.ts";
 import regexLookbehind from "./lib/rules/regexLookbehind.ts";
 import sampleNames from "./lib/rules/sampleNames.ts";
@@ -35,6 +36,7 @@ export default [
 					"no-static-styles-assignment": noStaticStylesAssignment,
 					"object-assign": objectAssign,
 					platform: platform,
+					"prefer-abstract-input-suggest": preferAbstractInputSuggest,
 					"prefer-file-manager-trash": preferFileManagerTrashFile,
 					"regex-lookbehind": regexLookbehind,
 					"sample-names": sampleNames,
@@ -53,6 +55,7 @@ export default [
 			"obsidianmd/no-static-styles-assignment": "error",
 			"obsidianmd/object-assign": "error",
 			"obsidianmd/platform": "error",
+			"obsidianmd/prefer-abstract-input-suggest": "error",
 			"obsidianmd/prefer-file-manager-trash-file": "warn",
 			"obsidianmd/regex-lookbehind": "error",
 			"obsidianmd/sample-names": "error",

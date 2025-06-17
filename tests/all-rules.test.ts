@@ -11,6 +11,7 @@ import "./vaultIterate.test";
 import "./detachLeaves.test";
 import "./preferFileManagerTrashFile.test";
 import "./noTFileTFolderCast.test";
+import "./preferAbstractInputSuggest.test";
 import "./noViewReferencesInPlugin.test";
 import "./noStaticStylesAssignment.test";
 import "./validateManifest.test";
