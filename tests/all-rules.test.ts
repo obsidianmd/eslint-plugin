@@ -12,3 +12,4 @@ import "./detachLeaves.test";
 import "./noTFileTFolderCast.test";
 import "./noSampleCode.test";
 import "./noViewReferencesInPlugin.test";
+import "./validateManifest.test";
