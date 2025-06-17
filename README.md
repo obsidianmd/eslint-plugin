@@ -75,6 +75,7 @@ Then configure the rules you want to use under the rules section.
 | [regex-lookbehind](docs/rules/regex-lookbehind.md)                         | Using lookbehinds in Regex is not supported in some iOS versions                                  | ✅  |    |
 | [sample-names](docs/rules/sample-names.md)                                 | Rename sample plugin class names                                                                  | ✅  |    |
 | [settings-tab](docs/rules/settings-tab.md)                                 | Discourage common anti-patterns in plugin settings tabs.                                          | ✅  | 🔧 |
+| [validate-manifest](docs/rules/validate-manifest.md)                       | Validate the structure of manifest.json for Obsidian plugins.                                     | ✅  |    |
 | [vault-iterate](docs/rules/vault-iterate.md)                               | Avoid iterating all files to find a file by its path<br/>                                         | ✅  | 🔧 |
 
 <!-- end auto-generated rules list -->
