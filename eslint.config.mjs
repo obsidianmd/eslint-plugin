@@ -9,6 +9,7 @@ import objectAssign from "./lib/rules/objectAssign.ts";
 import platform from "./lib/rules/platform.ts";
 import regexLookbehind from "./lib/rules/regexLookbehind.ts";
 import sampleNames from "./lib/rules/sampleNames.ts";
+import validateManifest from "./lib/rules/validateManifest.ts";
 
 export default [
 	{
@@ -46,6 +47,7 @@ export default [
 					platform: platform,
 					"regex-lookbehind": regexLookbehind,
 					"sample-names": sampleNames,
+					"validate-manifest": validateManifest,
 				},
 			},
 		},
@@ -66,6 +68,7 @@ export default [
 			"obsidianmd/platform": "error",
 			"obsidianmd/regex-lookbehind": "error",
 			"obsidianmd/sample-names": "error",
+			"obsidianmd/validate-manifest": "error",
 		},
 	},
 ];

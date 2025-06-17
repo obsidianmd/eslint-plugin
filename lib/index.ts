@@ -9,6 +9,7 @@ import objectAssign from "./rules/objectAssign.js";
 import platform from "./rules/platform.js";
 import regexLookbehind from "./rules/regexLookbehind.js";
 import sampleNames from "./rules/sampleNames.js";
+import validateManifest from "./rules/validateManifest.js";
 import { manifest } from "./readManifest.js";
 
 export default {
@@ -36,6 +37,7 @@ export default {
 		platform: platform,
 		"regex-lookbehind": regexLookbehind,
 		"sample-names": sampleNames,
+		"validate-manifest": validateManifest,
 	},
 	configs: {
 		recommended: {
@@ -168,6 +170,7 @@ export default {
 				"obsidianmd/platform": "error",
 				"obsidianmd/regex-lookbehind": "error",
 				"obsidianmd/sample-names": "error",
+				"obsidianmd/validate-manifest": "error",
 			},
 		},
 	},
