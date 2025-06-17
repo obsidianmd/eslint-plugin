@@ -25,7 +25,7 @@ const MOCK_API = `
 
 ruleTester.run("no-plugin-as-component", noPluginAsComponentRule, {
 	valid: [
-		// Correct: Using a View component
+		// Correct: Using a View component instance (passed as a variable `this`)
 		{
 			code: `
                 ${MOCK_API}
@@ -38,7 +38,24 @@ ruleTester.run("no-plugin-as-component", noPluginAsComponentRule, {
                 }
             `,
 		},
-		// Correct: Using a new, temporary component
+		// Correct: Storing the component in a variable first
+		{
+			code: `
+                ${MOCK_API}
+                declare const app: App;
+                declare const el: HTMLElement;
+                class MyPlugin extends Plugin {
+                    myMethod() {
+                        const tempComponent = new Component();
+                        MarkdownRenderer.render(app, '', el, '', tempComponent);
+                        // Later, you could call tempComponent.unload()
+                    }
+                }
+            `,
+		},
+	],
+	invalid: [
+		// Invalid: Passing `new Component()` directly
 		{
 			code: `
                 ${MOCK_API}
@@ -50,9 +67,8 @@ ruleTester.run("no-plugin-as-component", noPluginAsComponentRule, {
                     }
                 }
             `,
+			errors: [{ messageId: "avoidNewComponent" }],
 		},
-	],
-	invalid: [
 		// Invalid: Passing `this` from within the Plugin class
 		{
 			code: `
