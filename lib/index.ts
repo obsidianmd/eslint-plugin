@@ -14,7 +14,6 @@ import preferAbstractInputSuggest from "./rules/preferAbstractInputSuggest.js";
 import preferFileManagerTrashFile from "./rules/preferFileManagerTrashFile.js";
 import regexLookbehind from "./rules/regexLookbehind.js";
 import sampleNames from "./rules/sampleNames.js";
-import settingsTab from "./rules/settingsTab.js";
 import validateManifest from "./rules/validateManifest.js";
 import vaultIterate from "./rules/vault/iterate.js";
 import { manifest } from "./readManifest.js";
