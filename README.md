@@ -19,28 +19,58 @@ npm install eslint-plugin-obsidianmd --save-dev
 
 ## Usage
 
-Add `obsidianmd` to the plugins section of your `.eslintrc` configuration file. You can omit the `eslint-plugin-` prefix:
+With the release of ESLint v9, the default configuration file is now `eslint.config.js`.
+
+### Flat Config (`eslint.config.js`) - Recommended for ESLint v9+
+
+To use the recommended configuration, add it to your `eslint.config.js` file. This will enable all the recommended rules.
+
+```javascript
+// eslint.config.js
+import obsidianmd from "eslint-plugin-obsidianmd";
+
+export default [
+  // The recommended configuration
+  obsidianmd.configs.recommended,
+
+  // You can add your own configuration to override or add rules
+  {
+    rules: {
+      // example: turn off a rule from the recommended set
+      "obsidianmd/sample-names": "off",
+      // example: add a rule not in the recommended set and set its severity
+      "obsidianmd/prefer-file-manager-trash": "error",
+    },
+  },
+];
+```
+
+### Legacy Config (`.eslintrc`)
+
+<details>
+<summary>Click here for ESLint v8 and older</summary>
+
+To use the recommended configuration, extend it in your `.eslintrc` file:
 
 ```json
 {
-    "plugins": [
-        "obsidianmd"
-    ]
+  "extends": ["plugin:obsidianmd/recommended"]
 }
 ```
 
-
-Then configure the rules you want to use under the rules section.
+You can also override or add rules:
 
 ```json
 {
-    "rules": {
-        "obsidian/rule-name": 2
-    }
+  "extends": ["plugin:obsidianmd/recommended"],
+  "rules": {
+    "obsidianmd/sample-names": "off",
+    "obsidianmd/prefer-file-manager-trash": "error"
+  }
 }
 ```
 
-
+</details>
 
 ## Configurations
 

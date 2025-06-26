@@ -1,0 +1,29 @@
+name: "Rebuild documentation"
+
+on:
+    push:
+        branches: ["master"]
+    # Allows manual run if needed
+    workflow_dispatch:
+
+jobs:
+    docs:
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+            - name: Use Node.js 22
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 22.x
+                  cache: "npm"
+            - run: npm ci
+            - run: npm run init:eslint-docs
+            - run: npm run update:eslint-docs
+            - run: npm run check:eslint-docs
+            - run: |
+                  git config --local user.name 'Obsidian Bot'
+                  git config --local user.email 'admin@obsidian.md'
+                  git add .
+                  git commit -m "chore: Update documentation"
+                  git push

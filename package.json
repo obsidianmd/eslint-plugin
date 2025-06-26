@@ -21,7 +21,8 @@
 		"build": "tsc",
 		"test": "tsx tests/all-rules.test.ts",
 		"init:eslint-docs": "eslint-doc-generator --init-rule-docs",
-		"update:eslint-docs": "eslint-doc-generator"
+		"update:eslint-docs": "eslint-doc-generator",
+		"check:eslint-docs": "eslint-doc-generator --check"
 	},
 	"bin": {
 		"eslint-plugin-obsidian": "dist/lib/index.js"
