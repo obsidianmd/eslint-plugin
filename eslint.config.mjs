@@ -32,14 +32,11 @@ export default [
 		plugins: {
 			obsidianmd: {
 				rules: {
-					"commands/no-command-in-command-id":
-						commands.noCommandInCommandId,
-					"commands/no-command-in-command-name":
-						commands.noCommandInCommandName,
-					"commands/no-default-hotkey": commands.noDefaultHotkeys,
-					"commands/no-plugin-id-in-command-id":
-						commands.noPluginIdInCommandId,
-					"commands/no-plugin-id-in-command-name":
+					"commands/no-command-in-command-id": commands.noCommandInCommandId,
+					"commands/no-command-in-command-name": commands.noCommandInCommandName,
+					"commands/no-default-hotkeys": commands.noDefaultHotkeys,
+					"commands/no-plugin-id-in-command-id": commands.noPluginIdInCommandId,
+					"commands/no-plugin-name-in-command-name":
 						commands.noPluginNameInCommandName,
 					"settings-tab/no-manual-html-headings":
 						settingsTab.noManualHtmlHeadings,
@@ -48,18 +45,17 @@ export default [
 					"vault/iterate": vault.iterate,
 					"detach-leaves": detachLeaves,
 					"hardcoded-config-path": hardcodedConfigPath,
-					"no-sample-code": noSampleCode,
 					"no-plugin-as-component": noPluginAsComponent,
+					"no-sample-code": noSampleCode,
 					"no-tfile-tfolder-cast": noTFileTFolderCast,
 					"no-view-references-in-plugin": noViewReferencesInPlugin,
 					"no-static-styles-assignment": noStaticStylesAssignment,
 					"object-assign": objectAssign,
 					platform: platform,
 					"prefer-abstract-input-suggest": preferAbstractInputSuggest,
-					"prefer-file-manager-trash": preferFileManagerTrashFile,
+					"prefer-file-manager-trash-file": preferFileManagerTrashFile,
 					"regex-lookbehind": regexLookbehind,
 					"sample-names": sampleNames,
-					"settings-tab": settingsTab,
 					"validate-manifest": validateManifest,
 					"vault-iterate": vaultIterate,
 				},
@@ -68,11 +64,12 @@ export default [
 		rules: {
 			"obsidianmd/commands/no-command-in-command-id": "error",
 			"obsidianmd/commands/no-command-in-command-name": "error",
-			"obsidianmd/commands/no-default-hotkey": "error",
+			"obsidianmd/commands/no-default-hotkeys": "error",
 			"obsidianmd/commands/no-plugin-id-in-command-id": "error",
-			"obsidianmd/commands/no-plugin-id-in-command-name": "error",
+			"obsidianmd/commands/no-plugin-name-in-command-name": "error",
 			"obsidianmd/settings-tab/no-manual-html-headings": "error",
-			"obsidianmd/settings-tab/no-problematic-settings-headings": "error",
+			"obsidianmd/settings-tab/no-problematic-settings-headings":
+				"error",
 			"obsidianmd/vault/iterate": "error",
 			"obsidianmd/detach-leaves": "error",
 			"obsidianmd/hardcoded-config-path": "error",
@@ -87,7 +84,6 @@ export default [
 			"obsidianmd/prefer-abstract-input-suggest": "error",
 			"obsidianmd/regex-lookbehind": "error",
 			"obsidianmd/sample-names": "error",
-			"obsidianmd/settings-tab": "error",
 			"obsidianmd/validate-manifest": "error",
 			"obsidianmd/vault-iterate": "error",
 		},
