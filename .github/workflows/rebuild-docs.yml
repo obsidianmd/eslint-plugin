@@ -18,6 +18,7 @@ jobs:
                   node-version: 22.x
                   cache: "npm"
             - run: npm ci
+            - run: npm run build --if-present
             - run: npm run init:eslint-docs
             - run: npm run update:eslint-docs
             - run: npm run check:eslint-docs
