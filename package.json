@@ -20,7 +20,7 @@
 	"scripts": {
 		"build": "tsc",
 		"test": "tsx tests/all-rules.test.ts",
-		"init:eslint-docs": "eslint-doc-generator --init-rule-docs",
+		"init:eslint-docs": "eslint-doc-generator --init-rule-docs || exit 0",
 		"update:eslint-docs": "eslint-doc-generator",
 		"check:eslint-docs": "eslint-doc-generator --check"
 	},
