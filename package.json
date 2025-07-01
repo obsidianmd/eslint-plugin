@@ -1,7 +1,7 @@
 {
 	"name": "eslint-plugin-obsidianmd",
-	"version": "0.0.2",
-	"description": "Testing",
+	"version": "0.1.0",
+	"description": "Validates guidelines for Obsidian plugins",
 	"license": "MIT",
 	"author": "Dynalist Inc.",
 	"homepage": "https://obsidian.md",

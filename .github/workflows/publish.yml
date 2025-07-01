@@ -21,6 +21,6 @@ jobs:
             - run: npm run build
             - run: npm test
             - run: npm run check:eslint-docs
-            - run: npm publish --dry-run --provenance --access public
+            - run: npm publish --provenance --access public
               env:
                   NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

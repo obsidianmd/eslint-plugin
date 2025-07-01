@@ -1,7 +1,7 @@
 # eslint-plugin-obsidianmd
 
 > [!warning]
-> This is not ready to be used in production yet.
+> This is not fully tested yet.
 
 ## Installation
 
