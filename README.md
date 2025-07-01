@@ -31,7 +31,7 @@ import obsidianmd from "eslint-plugin-obsidianmd";
 
 export default [
   // The recommended configuration
-  obsidianmd.configs.recommended,
+  ...obsidianmd.configs.recommended,
 
   // You can add your own configuration to override or add rules
   {
@@ -76,10 +76,9 @@ You can also override or add rules:
 
 <!-- begin auto-generated configs list -->
 
-|    | Name               |
-| :- | :----------------- |
-|    | `flat/recommended` |
-| ✅  | `recommended`      |
+|    | Name          |
+| :- | :------------ |
+| ✅  | `recommended` |
 
 <!-- end auto-generated configs list -->
 
