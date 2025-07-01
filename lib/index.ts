@@ -1,3 +1,5 @@
+// NEW: Import the ESLint type for explicit typing
+import type { ESLint } from "eslint";
 import { commands } from "./rules/commands/index.js";
 import { settingsTab } from "./rules/settingsTab/index.js";
 import { vault } from "./rules/vault/index.js";
@@ -18,7 +20,16 @@ import validateManifest from "./rules/validateManifest.js";
 import vaultIterate from "./rules/vault/iterate.js";
 import { manifest } from "./readManifest.js";
 
-export default {
+// --- Import plugins and configs for the recommended config ---
+import js from "@eslint/js";
+import tseslint from "typescript-eslint";
+import jsonSchemaValidator from "eslint-plugin-json-schema-validator";
+import sdl from "@microsoft/eslint-plugin-sdl";
+import importPlugin from "eslint-plugin-import";
+
+// NEW: Explicitly type the plugin object with ESLint.Plugin
+// This tells TypeScript that our object can have meta, rules, configs, etc.
+const plugin: ESLint.Plugin = {
 	meta: {
 		name: "eslint-plugin-obsidianmd",
 		version: "0.0.2",
@@ -50,21 +61,20 @@ export default {
 		"sample-names": sampleNames,
 		"validate-manifest": validateManifest,
 		"vault-iterate": vaultIterate,
-	},
-	configs: {
-		recommended: {
-			extends: [
-				"eslint:recommended",
-				"plugin:@typescript-eslint/recommended",
-				"plugin:deprecation/recommended",
-				"plugin:json-schema-validator/recommended",
-			],
-			plugins: [
-				"@typescript-eslint",
-				"import",
-				"json-schema-validator",
-				"@microsoft/eslint-plugin-sdl",
-			],
+	} as any,
+};
+
+plugin.configs = {
+	recommended: [
+		js.configs.recommended,
+		...tseslint.configs.recommended,
+		{
+			plugins: {
+				import: importPlugin,
+				"@microsoft/sdl": sdl,
+				obsidianmd: plugin,
+				"json-schema-validator": jsonSchemaValidator,
+			},
 			rules: {
 				"no-unused-vars": "off",
 				"no-prototype-bultins": "off",
@@ -73,12 +83,7 @@ export default {
 				"no-implied-eval": "error",
 				"prefer-const": "off",
 				"no-implicit-globals": "error",
-				"no-console": [
-					"warn",
-					{
-						allow: ["warn", "error", "debug"],
-					},
-				],
+				"no-console": ["warn", { allow: ["warn", "error", "debug"] }],
 				"no-restricted-globals": [
 					"error",
 					{
@@ -123,48 +128,18 @@ export default {
 				],
 				"no-alert": "error",
 				"no-undef": "error",
-
-				"@typescript/eslint-ban-ts-comment": [
-					"error",
-					{
-						"ts-check": false,
-						"ts-expect-error": "allow-with-description",
-						"ts-ignore": true,
-						"ts-nocheck": true,
-						minimumDescriptionLength: 10,
-					},
-				],
-				"@typescript-eslint/no-unused-vars": [
-					"warn",
-					{
-						args: "none",
-					},
-				],
 				"@typescript-eslint/ban-ts-comment": "off",
-				"@typescript-eslint/await-thenable": "warn",
-				"@typescript-eslint/no-invalid-this": "error",
-				"@typescript-eslint/no-require-imports": "warn",
-				"@typescript-eslint/no-var-requires": "off",
-				"@typescript-eslint/no-unnecessary-boolean-literal-compare":
-					"warn",
-				"@typescript-eslint/no-unsafe-assignment": "off",
-				"@typescript-eslint/no-empty-function": "off",
-				"@typescript-eslint/prefer-ts-expect-error": "error",
+				"@typescript-eslint/no-deprecated": "error",
+				"@typescript-eslint/no-unused-vars": ["warn", { args: "none" }],
 				"@typescript-eslint/no-explicit-any": [
 					"error",
-					{
-						// A great option that suggests a safer alternative
-						fixToUnknown: true,
-					},
+					{ fixToUnknown: true },
 				],
-
 				"@microsoft/sdl/no-document-write": "error",
 				"@microsoft/sdl/no-inner-html": "error",
-
 				"import/no-nodejs-modules":
 					manifest && manifest.isDesktopOnly ? "off" : "error",
 				"import/no-extraneous-dependencies": "error",
-
 				"obsidianmd/commands/no-command-in-command-id": "error",
 				"obsidianmd/commands/no-command-in-command-name": "error",
 				"obsidianmd/commands/no-default-hotkeys": "error",
@@ -191,5 +166,7 @@ export default {
 				"obsidianmd/vault-iterate": "error",
 			},
 		},
-	},
+	] as any,
 };
+
+export default plugin;

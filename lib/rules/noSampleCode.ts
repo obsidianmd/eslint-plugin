@@ -1,4 +1,9 @@
-import { TSESLint, TSESTree } from "@typescript-eslint/utils";
+import { TSESLint, TSESTree, ESLintUtils } from "@typescript-eslint/utils";
+
+const ruleCreator = ESLintUtils.RuleCreator(
+	(name) =>
+		`https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
+);
 
 /**
  * Checks if a node is the sample `registerInterval` call.
@@ -103,14 +108,13 @@ function isSampleDomEventCall(node: TSESTree.CallExpression): boolean {
 	return true;
 }
 
-export default {
+export default ruleCreator({
 	name: "no-sample-code",
 	meta: {
 		type: "problem" as const,
 		docs: {
 			description:
 				"Disallow sample code snippets from the Obsidian plugin template.",
-			recommended: true,
 		},
 		schema: [],
 		messages: {
@@ -122,12 +126,7 @@ export default {
 		fixable: "code" as const,
 	},
 	defaultOptions: [],
-	create(
-		context: TSESLint.RuleContext<
-			"removeSampleInterval" | "removeSampleDomEvent",
-			[]
-		>,
-	) {
+	create(context) {
 		return {
 			CallExpression(node: TSESTree.CallExpression) {
 				if (isSampleIntervalCall(node)) {
@@ -146,4 +145,4 @@ export default {
 			},
 		};
 	},
-};
+});

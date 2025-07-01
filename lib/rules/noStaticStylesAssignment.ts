@@ -1,4 +1,9 @@
-import { TSESLint, TSESTree } from "@typescript-eslint/utils";
+import { TSESLint, TSESTree, ESLintUtils } from "@typescript-eslint/utils";
+
+const ruleCreator = ESLintUtils.RuleCreator(
+	(name) =>
+		`https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
+);
 
 // This rule will flag:
 //
@@ -25,14 +30,13 @@ function isStyleMemberExpression(
 	);
 }
 
-export default {
+export default ruleCreator({
 	name: "no-static-styles-assignment",
 	meta: {
 		type: "suggestion" as const,
 		docs: {
 			description:
 				"Disallow setting styles directly on DOM elements, favoring CSS classes instead.",
-			recommended: true,
 		},
 		schema: [],
 		messages: {
@@ -41,9 +45,7 @@ export default {
 		},
 	},
 	defaultOptions: [],
-	create(
-		context: TSESLint.RuleContext<"avoidStyleAssignment", []>,
-	): TSESLint.RuleListener {
+	create(context) {
 		return {
 			// Catches `el.style.color = 'red'` and `el.style.cssText = '...'`
 			AssignmentExpression(node: TSESTree.AssignmentExpression) {
@@ -113,4 +115,4 @@ export default {
 			},
 		};
 	},
-};
+});

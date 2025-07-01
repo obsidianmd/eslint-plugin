@@ -1,13 +1,17 @@
-import { TSESLint, TSESTree } from "@typescript-eslint/utils";
+import { TSESLint, TSESTree, ESLintUtils } from "@typescript-eslint/utils";
 
-export default {
+const ruleCreator = ESLintUtils.RuleCreator(
+	(name) =>
+		`https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
+);
+
+export default ruleCreator({
 	name: "no-deprecated-text-input-suggest",
 	meta: {
 		type: "suggestion" as const,
 		docs: {
 			description:
 				"Disallow Liam's frequently copied `TextInputSuggest` implementation in favor of the built-in `AbstractInputSuggest`.",
-			recommended: true,
 		},
 		schema: [],
 		messages: {
@@ -84,4 +88,4 @@ export default {
 			},
 		};
 	},
-};
+});

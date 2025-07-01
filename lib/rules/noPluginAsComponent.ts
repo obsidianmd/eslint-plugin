@@ -6,9 +6,15 @@ import {
 } from "@typescript-eslint/utils";
 import ts from "typescript";
 
+const ruleCreator = ESLintUtils.RuleCreator(
+	(name) =>
+		`https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
+);
+
 // Recursively checks if a type is or extends the 'Plugin' class.
 function isPluginType(type: ts.Type, services: ParserServices): boolean {
 	const constraint = type.getConstraint();
+
 	if (constraint) {
 		type = constraint;
 	}
@@ -30,14 +36,13 @@ function isPluginType(type: ts.Type, services: ParserServices): boolean {
 	return false;
 }
 
-export default {
+export default ruleCreator({
 	name: "no-plugin-as-component",
 	meta: {
 		type: "problem" as const,
 		docs: {
 			description:
 				"Disallow anti-patterns when passing a component to MarkdownRenderer.render to prevent memory leaks.",
-			recommended: true,
 		},
 		schema: [],
 		messages: {
@@ -46,15 +51,9 @@ export default {
 			avoidNewComponent:
 				"Do not pass a `new Component()` directly. Store it in a variable to ensure its `unload()` method can be called.",
 		},
-		requiresTypeChecking: true,
 	},
 	defaultOptions: [],
-	create(
-		context: TSESLint.RuleContext<
-			"avoidPluginComponent" | "avoidNewComponent",
-			[]
-		>,
-	): TSESLint.RuleListener {
+	create(context) {
 		const services = ESLintUtils.getParserServices(context);
 
 		return {
@@ -98,4 +97,4 @@ export default {
 			},
 		};
 	},
-};
+});

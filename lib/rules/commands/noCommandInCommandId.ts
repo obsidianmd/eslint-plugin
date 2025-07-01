@@ -1,6 +1,11 @@
-import { TSESLint, TSESTree } from "@typescript-eslint/utils";
+import { TSESLint, TSESTree, ESLintUtils } from "@typescript-eslint/utils";
 
-export default {
+const ruleCreator = ESLintUtils.RuleCreator(
+	(name) =>
+		`https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/commands/${name}.md`,
+);
+
+export default ruleCreator({
 	name: "no-command-in-command-id",
 	meta: {
 		type: "suggestion" as const,
@@ -14,7 +19,7 @@ export default {
 		schema: [],
 	},
 	defaultOptions: [],
-	create(context: TSESLint.RuleContext<"commandInId", []>) {
+	create(context) {
 		return {
 			CallExpression(node: TSESTree.CallExpression) {
 				if (
@@ -45,4 +50,4 @@ export default {
 			},
 		};
 	},
-};
+});

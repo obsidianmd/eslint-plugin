@@ -1,6 +1,11 @@
-import { TSESTree, TSESLint } from "@typescript-eslint/utils";
+import { TSESTree, TSESLint, ESLintUtils } from "@typescript-eslint/utils";
 
-export default {
+const ruleCreator = ESLintUtils.RuleCreator(
+	(name) =>
+		`https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/vault/${name}.md`,
+);
+
+export default ruleCreator({
 	name: "vault-iterate",
 	meta: {
 		docs: {
@@ -16,7 +21,7 @@ export default {
 		fixable: "code" as const,
 	},
 	defaultOptions: [],
-	create: (context: TSESLint.RuleContext<"iterate", []>) => {
+	create: (context) => {
 		return {
 			MemberExpression(node: TSESTree.MemberExpression) {
 				if (
@@ -62,4 +67,4 @@ export default {
 			},
 		};
 	},
-};
+});

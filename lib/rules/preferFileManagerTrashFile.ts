@@ -1,25 +1,26 @@
-import { TSESLint, TSESTree } from "@typescript-eslint/utils";
+import { TSESLint, TSESTree, ESLintUtils } from "@typescript-eslint/utils";
 import { getParserServices } from "@typescript-eslint/utils/eslint-utils";
+
+const ruleCreator = ESLintUtils.RuleCreator(
+	(name) =>
+		`https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
+);
 
 const BANNED_METHODS = new Set(["trash", "delete"]);
 
-export default {
+export default ruleCreator({
 	name: "prefer-file-manager-trash-file",
 	meta: {
 		type: "suggestion" as const,
 		docs: {
 			description:
 				"Prefer FileManager.trashFile() over Vault.trash() or Vault.delete() to respect user settings.",
-			recommended: true,
 		},
 		schema: [],
 		messages: {
 			preferTrashFile:
 				"Use 'FileManager.trashFile()' instead of 'Vault.{{methodName}}()' to respect the user's file deletion preference.",
 		},
-		// This rule requires type information to identify Vault instances.
-		// The `.ts` extension is important for the parser to enable this.
-		requiresTypeChecking: true,
 	},
 	defaultOptions: [],
 	create(
@@ -60,4 +61,4 @@ export default {
 			},
 		};
 	},
-};
+});

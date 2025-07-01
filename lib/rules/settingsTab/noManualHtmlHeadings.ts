@@ -1,8 +1,13 @@
-import { TSESLint, TSESTree } from "@typescript-eslint/utils";
+import { TSESLint, TSESTree, ESLintUtils } from "@typescript-eslint/utils";
+
+const ruleCreator = ESLintUtils.RuleCreator(
+	(name) =>
+		`https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/settings-tab/${name}.md`,
+);
 
 const HEADING_TAGS = new Set(["h1", "h2", "h3", "h4", "h5", "h6"]);
 
-export default {
+export default ruleCreator({
 	name: "no-manual-html-headings",
 	meta: {
 		docs: {
@@ -19,7 +24,7 @@ export default {
 		fixable: "code" as const,
 	},
 	defaultOptions: [],
-	create(context: TSESLint.RuleContext<"headingEl", []>) {
+	create(context) {
 		let insidePluginSettingTab = false;
 
 		return {
@@ -88,4 +93,4 @@ export default {
 			},
 		};
 	},
-};
+});

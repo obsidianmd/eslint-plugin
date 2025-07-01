@@ -1,6 +1,11 @@
-import { TSESTree, TSESLint } from "@typescript-eslint/utils";
+import { TSESTree, TSESLint, ESLintUtils } from "@typescript-eslint/utils";
 
-export default {
+const ruleCreator = ESLintUtils.RuleCreator(
+	(name) =>
+		`https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
+);
+
+export default ruleCreator({
 	name: "object-assign",
 	meta: {
 		type: "problem" as const,
@@ -39,4 +44,4 @@ export default {
 			},
 		};
 	},
-};
+});
