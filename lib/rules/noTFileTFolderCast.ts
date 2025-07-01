@@ -1,15 +1,19 @@
-import { TSESLint, TSESTree } from "@typescript-eslint/utils";
+import { TSESLint, TSESTree, ESLintUtils } from "@typescript-eslint/utils";
+
+const ruleCreator = ESLintUtils.RuleCreator(
+	(name) =>
+		`https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
+);
 
 const BANNED_CAST_TYPES = new Set(["TFile", "TFolder"]);
 
-export default {
+export default ruleCreator({
 	name: "no-tfile-tfolder-cast",
 	meta: {
 		type: "suggestion" as const,
 		docs: {
 			description:
 				"Disallow type casting to TFile or TFolder, suggesting instanceof checks instead.",
-			recommended: true,
 		},
 		schema: [],
 		messages: {
@@ -21,9 +25,7 @@ export default {
 		// which is too complex and potentially breaking for an auto-fix.
 	},
 	defaultOptions: [],
-	create(
-		context: TSESLint.RuleContext<"avoidCast", []>,
-	): TSESLint.RuleListener {
+	create(context) {
 		// The handler for both TSAsExpression and TSTypeAssertion nodes.
 		// It checks if the type being cast to is TFile or TFolder.
 		const handler = (
@@ -56,4 +58,4 @@ export default {
 			TSTypeAssertion: handler,
 		};
 	},
-};
+});

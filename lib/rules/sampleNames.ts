@@ -1,4 +1,9 @@
-import { TSESTree, TSESLint } from "@typescript-eslint/utils";
+import { TSESTree, TSESLint, ESLintUtils } from "@typescript-eslint/utils";
+
+const ruleCreator = ESLintUtils.RuleCreator(
+	(name) =>
+		`https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
+);
 
 const sampleNames = [
 	"MyPlugin",
@@ -8,7 +13,7 @@ const sampleNames = [
 	"mySetting",
 ];
 
-export default {
+export default ruleCreator({
 	name: "sample-names",
 	meta: {
 		docs: {
@@ -53,4 +58,4 @@ export default {
 			},
 		};
 	},
-};
+});

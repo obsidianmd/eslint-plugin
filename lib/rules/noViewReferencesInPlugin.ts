@@ -1,10 +1,14 @@
 import {
 	ESLintUtils,
 	ParserServices,
-	TSESLint,
 	TSESTree,
 } from "@typescript-eslint/utils";
 import type ts from "typescript";
+
+const ruleCreator = ESLintUtils.RuleCreator(
+	(name) =>
+		`https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
+);
 
 // Check if a type is a subclass of a given class name.
 function isSubclassOf(
@@ -31,26 +35,22 @@ function isSubclassOf(
 	return false;
 }
 
-export default {
+export default ruleCreator({
 	name: "no-view-references-in-plugin",
 	meta: {
 		type: "problem" as const,
 		docs: {
 			description:
 				"Disallow storing references to custom views directly in the plugin, which can cause memory leaks.",
-			recommended: true,
 		},
 		schema: [],
 		messages: {
 			avoidViewReference:
 				"Do not assign a view instance to a plugin property within `registerView`. This can cause memory leaks. Create and return the view directly.",
 		},
-		requiresTypeChecking: true,
 	},
 	defaultOptions: [],
-	create(
-		context: TSESLint.RuleContext<"avoidViewReference", []>,
-	): TSESLint.RuleListener {
+	create(context) {
 		const services = ESLintUtils.getParserServices(context);
 		const sourceCode = context.sourceCode;
 
@@ -138,4 +138,4 @@ export default {
 			},
 		};
 	},
-};
+});

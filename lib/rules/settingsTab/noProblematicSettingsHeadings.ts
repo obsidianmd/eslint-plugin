@@ -1,7 +1,12 @@
-import { TSESLint, TSESTree } from "@typescript-eslint/utils";
+import { TSESLint, TSESTree, ESLintUtils } from "@typescript-eslint/utils";
 import { manifest } from "../../readManifest.js";
 
-export default {
+const ruleCreator = ESLintUtils.RuleCreator(
+	(name) =>
+		`https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/settings-tab/${name}.md`,
+);
+
+export default ruleCreator({
 	name: "no-problematic-settings-headings",
 	meta: {
 		docs: {
@@ -18,12 +23,7 @@ export default {
 		fixable: "code" as const,
 	},
 	defaultOptions: [],
-	create(
-		context: TSESLint.RuleContext<
-			"settings" | "general" | "pluginName",
-			[]
-		>,
-	) {
+	create(context) {
 		let insidePluginSettingTab = false;
 
 		return {
@@ -96,4 +96,4 @@ export default {
 			},
 		};
 	},
-};
+});

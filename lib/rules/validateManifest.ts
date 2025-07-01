@@ -1,5 +1,10 @@
-import { TSESLint, TSESTree } from "@typescript-eslint/utils";
+import { TSESLint, TSESTree, ESLintUtils } from "@typescript-eslint/utils";
 import path from "node:path";
+
+const ruleCreator = ESLintUtils.RuleCreator(
+	(name) =>
+		`https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
+);
 
 const BASE_SCHEMA = {
 	author: "string",
@@ -41,15 +46,13 @@ function getAstNodeType(node: TSESTree.Node): string {
 	return "unknown";
 }
 
-export default {
+export default ruleCreator({
 	name: "validate-manifest",
-	files: ["manifest.json"],
 	meta: {
 		type: "problem" as const,
 		docs: {
 			description:
 				"Validate the structure of manifest.json for Obsidian plugins.",
-			recommended: true,
 			url: "https://docs.obsidian.md/Reference/Manifest",
 		},
 		schema: [],
@@ -301,4 +304,4 @@ export default {
 			},
 		};
 	},
-};
+});
