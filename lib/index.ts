@@ -29,7 +29,7 @@ import importPlugin from "eslint-plugin-import";
 const plugin: ESLint.Plugin = {
 	meta: {
 		name: "eslint-plugin-obsidianmd",
-		version: "0.0.2",
+		version: "0.1.1",
 	},
 	rules: {
 		"commands/no-command-in-command-id": commands.noCommandInCommandId,
