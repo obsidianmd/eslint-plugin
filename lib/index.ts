@@ -61,10 +61,7 @@ const plugin: ESLint.Plugin = {
 	} as any,
 };
 
-// --- CONFIG FOR TOOLING ---
-// A simple, statically analyzable object for eslint-doc-generator.
-// It looks for a config named "recommended".
-const recommendedConfig = {
+const recommendedRulesConfig = {
 	plugins: ["obsidianmd"], // Helps tools associate rules with the plugin
 	rules: {
 		"obsidianmd/commands/no-command-in-command-id": "error",
@@ -93,7 +90,7 @@ const recommendedConfig = {
 	} as const,
 };
 
-const recommendedFlatConfig = [
+const flatRecommendedConfig = [
 	js.configs.recommended,
 	...tseslint.configs.recommended,
 	{
@@ -169,14 +166,23 @@ const recommendedFlatConfig = [
 				manifest && manifest.isDesktopOnly ? "off" : "error",
 			"import/no-extraneous-dependencies": "error",
 
-			...recommendedConfig.rules,
+			...recommendedRulesConfig.rules,
 		},
 	},
 ] as any;
 
+const hybridRecommendedConfig = {
+	// Properties for eslint-doc-generator to read
+	...recommendedRulesConfig,
+
+	// Make the object iterable for the ESLint 9 runtime
+	[Symbol.iterator]: function* () {
+		yield* flatRecommendedConfig;
+	},
+};
+
 plugin.configs = {
-	recommended: recommendedConfig,
-	"flat/recommended": recommendedFlatConfig,
+	recommended: hybridRecommendedConfig,
 } as any;
 
 export default plugin;
