@@ -1,4 +1,4 @@
-import { TSESLint, TSESTree, ESLintUtils } from "@typescript-eslint/utils";
+import { TSESTree, ESLintUtils } from "@typescript-eslint/utils";
 
 const ruleCreator = ESLintUtils.RuleCreator(
 	(name) =>

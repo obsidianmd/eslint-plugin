@@ -1,4 +1,4 @@
-import { TSESLint, TSESTree, ESLintUtils } from "@typescript-eslint/utils";
+import { TSESTree, ESLintUtils } from "@typescript-eslint/utils";
 import path from "node:path";
 
 const ruleCreator = ESLintUtils.RuleCreator(
@@ -76,20 +76,7 @@ export default ruleCreator({
 		},
 	},
 	defaultOptions: [],
-	create(
-		context: TSESLint.RuleContext<
-			| "missingKey"
-			| "invalidType"
-			| "disallowedKey"
-			| "duplicateKey"
-			| "invalidFundingUrl"
-			| "emptyFundingUrlObject"
-			| "mustBeRootObject"
-			| "noForbiddenWords"
-			| "descriptionFormat",
-			[]
-		>,
-	) {
+	create(context) {
 		const filename = context.physicalFilename;
 		if (!path.basename(filename).endsWith("manifest.json")) {
 			return {};

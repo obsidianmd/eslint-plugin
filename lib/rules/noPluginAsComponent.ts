@@ -1,7 +1,6 @@
 import {
 	ParserServices,
 	ESLintUtils,
-	TSESLint,
 	TSESTree,
 } from "@typescript-eslint/utils";
 import ts from "typescript";

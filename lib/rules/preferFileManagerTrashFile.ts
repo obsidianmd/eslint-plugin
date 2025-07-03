@@ -1,4 +1,4 @@
-import { TSESLint, TSESTree, ESLintUtils } from "@typescript-eslint/utils";
+import { TSESTree, ESLintUtils } from "@typescript-eslint/utils";
 import { getParserServices } from "@typescript-eslint/utils/eslint-utils";
 
 const ruleCreator = ESLintUtils.RuleCreator(
@@ -23,9 +23,7 @@ export default ruleCreator({
 		},
 	},
 	defaultOptions: [],
-	create(
-		context: TSESLint.RuleContext<"preferTrashFile", []>,
-	): TSESLint.RuleListener {
+	create(context) {
 		const services = getParserServices(context);
 
 		return {

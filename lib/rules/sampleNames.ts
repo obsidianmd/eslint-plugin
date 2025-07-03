@@ -1,4 +1,4 @@
-import { TSESTree, TSESLint, ESLintUtils } from "@typescript-eslint/utils";
+import { TSESTree, ESLintUtils } from "@typescript-eslint/utils";
 
 const ruleCreator = ESLintUtils.RuleCreator(
 	(name) =>
@@ -27,7 +27,7 @@ export default ruleCreator({
 		schema: [],
 	},
 	defaultOptions: [],
-	create(context: TSESLint.RuleContext<"rename", []>) {
+	create(context) {
 		return {
 			TSInterfaceDeclaration(node: TSESTree.TSInterfaceDeclaration) {
 				if (sampleNames.includes(node.id.name)) {
