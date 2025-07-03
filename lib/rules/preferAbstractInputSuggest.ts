@@ -1,4 +1,4 @@
-import { TSESLint, TSESTree, ESLintUtils } from "@typescript-eslint/utils";
+import { TSESTree, ESLintUtils } from "@typescript-eslint/utils";
 
 const ruleCreator = ESLintUtils.RuleCreator(
 	(name) =>
@@ -20,9 +20,7 @@ export default ruleCreator({
 		},
 	},
 	defaultOptions: [],
-	create(
-		context: TSESLint.RuleContext<"preferAbstractInputSuggest", []>,
-	): TSESLint.RuleListener {
+	create(context) {
 		return {
 			// We start by looking for any call to a function named `createPopper`.
 			"CallExpression[callee.name='createPopper']"(

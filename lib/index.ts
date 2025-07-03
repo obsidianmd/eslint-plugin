@@ -16,7 +16,6 @@ import preferFileManagerTrashFile from "./rules/preferFileManagerTrashFile.js";
 import regexLookbehind from "./rules/regexLookbehind.js";
 import sampleNames from "./rules/sampleNames.js";
 import validateManifest from "./rules/validateManifest.js";
-import vaultIterate from "./rules/vault/iterate.js";
 import { manifest } from "./readManifest.js";
 
 // --- Import plugins and configs for the recommended config ---
@@ -57,7 +56,6 @@ const plugin: ESLint.Plugin = {
 		"regex-lookbehind": regexLookbehind,
 		"sample-names": sampleNames,
 		"validate-manifest": validateManifest,
-		"vault-iterate": vaultIterate,
 	} as any,
 };
 
@@ -86,7 +84,6 @@ const recommendedRulesConfig = {
 		"obsidianmd/regex-lookbehind": "error",
 		"obsidianmd/sample-names": "error",
 		"obsidianmd/validate-manifest": "error",
-		"obsidianmd/vault-iterate": "error",
 	} as const,
 };
 
@@ -98,8 +95,8 @@ const flatRecommendedConfig = [
 			import: importPlugin,
 			"@microsoft/sdl": sdl,
 			obsidianmd: plugin,
-			"json-schema-validator": jsonSchemaValidator,
 		},
+		files: ["**/*.ts", "**/*.js"],
 		rules: {
 			"no-unused-vars": "off",
 			"no-prototype-bultins": "off",
@@ -167,6 +164,19 @@ const flatRecommendedConfig = [
 			"import/no-extraneous-dependencies": "error",
 
 			...recommendedRulesConfig.rules,
+		},
+	},
+	{
+		// manifest.json validation
+		plugins: {
+			"json-schema-validator": jsonSchemaValidator,
+			obsidianmd: plugin,
+		},
+		files: ["manifest.json"],
+		rules: {
+			"@typescript-eslint/no-unused-expressions": "off",
+			"json-schema-validator/no-invalid": "error",
+			"obsidianmd/validate-manifest": "error",
 		},
 	},
 ] as any;

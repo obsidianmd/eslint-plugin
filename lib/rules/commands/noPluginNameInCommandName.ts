@@ -1,4 +1,4 @@
-import { TSESLint, TSESTree, ESLintUtils } from "@typescript-eslint/utils";
+import { TSESTree, ESLintUtils } from "@typescript-eslint/utils";
 import { manifest } from "../../readManifest.js";
 
 const ruleCreator = ESLintUtils.RuleCreator(

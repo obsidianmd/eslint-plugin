@@ -1,4 +1,4 @@
-import { TSESTree, TSESLint, ESLintUtils } from "@typescript-eslint/utils";
+import { TSESTree, ESLintUtils } from "@typescript-eslint/utils";
 
 const ruleCreator = ESLintUtils.RuleCreator(
 	(name) =>
@@ -19,7 +19,7 @@ export default ruleCreator({
 		},
 	},
 	defaultOptions: [],
-	create(context: TSESLint.RuleContext<"twoArgumentsDefault", []>) {
+	create(context) {
 		return {
 			CallExpression(node: TSESTree.CallExpression) {
 				if (

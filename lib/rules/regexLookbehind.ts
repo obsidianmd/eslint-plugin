@@ -1,5 +1,5 @@
 import { manifest } from "../readManifest.js";
-import { TSESTree, TSESLint, ESLintUtils } from "@typescript-eslint/utils";
+import { TSESTree, ESLintUtils } from "@typescript-eslint/utils";
 
 const ruleCreator = ESLintUtils.RuleCreator(
 	(name) =>
@@ -22,7 +22,7 @@ export default ruleCreator({
 		schema: [],
 	},
 	defaultOptions: [],
-	create(context: TSESLint.RuleContext<"lookbehind", []>) {
+	create(context) {
 		return {
 			Literal(node: TSESTree.Literal) {
 				// Check RegExp literals

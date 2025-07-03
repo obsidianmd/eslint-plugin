@@ -116,7 +116,6 @@ You can also override or add rules:
 | [settings-tab/no-manual-html-headings](docs/rules/settings-tab/no-manual-html-headings.md)                   | Disallow using HTML heading elements for settings headings.                                                          | ✅  |    | 🔧 |
 | [settings-tab/no-problematic-settings-headings](docs/rules/settings-tab/no-problematic-settings-headings.md) | Discourage anti-patterns in settings headings.                                                                       | ✅  |    | 🔧 |
 | [validate-manifest](docs/rules/validate-manifest.md)                                                         | Validate the structure of manifest.json for Obsidian plugins.                                                        | ✅  |    |    |
-| [vault-iterate](docs/rules/vault-iterate.md)                                                                 | Avoid iterating all files to find a file by its path<br/>                                                            | ✅  |    | 🔧 |
 | [vault/iterate](docs/rules/vault/iterate.md)                                                                 | Avoid iterating all files to find a file by its path<br/>                                                            | ✅  |    | 🔧 |
 
 <!-- end auto-generated rules list -->
