@@ -119,7 +119,6 @@ const flatRecommendedConfig = [
 					message:
 						"Use the built-in `requestUrl` function instead of `fetch` for network requests in Obsidian.",
 				},
-				"warn",
 				{
 					name: "localStorage",
 					message: "Prefer `App#saveLocalStorage` / `App#loadLocalStorage` functions to write / read localStorage data that's unique to a vault."
