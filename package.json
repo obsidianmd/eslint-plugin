@@ -1,6 +1,6 @@
 {
 	"name": "eslint-plugin-obsidianmd",
-	"version": "0.1.3",
+	"version": "0.1.4",
 	"description": "Validates guidelines for Obsidian plugins",
 	"license": "MIT",
 	"author": "Dynalist Inc.",
