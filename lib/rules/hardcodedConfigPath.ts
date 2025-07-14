@@ -25,7 +25,7 @@ export default ruleCreator({
 			Literal(node: TSESTree.Literal) {
 				if (
 					typeof node.value === "string" &&
-					node.value.includes(".obsidian")
+					node.value.match(/\.obsidian(?![a-zA-Z_-])/)
 				) {
 					context.report({
 						node,
