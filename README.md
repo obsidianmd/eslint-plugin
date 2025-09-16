@@ -119,3 +119,48 @@ You can also override or add rules:
 | [vault/iterate](docs/rules/vault/iterate.md)                                                                 | Avoid iterating all files to find a file by its path<br/>                                                            | ✅  |    | 🔧 |
 
 <!-- end auto-generated rules list -->
+
+
+## UI sentence case
+
+Checks UI strings for sentence case. The rule reports warnings but doesn't change text unless you run ESLint with `--fix` and enable `allowAutoFix`.
+
+- Included at warn level in `recommended` config
+- Extended locale checks available via `recommendedWithLocalesEn`
+- By default allows CamelCase words like `AutoReveal`
+- Set `enforceCamelCaseLower: true` to flag CamelCase as incorrect
+
+### Usage (flat config)
+
+```js
+// eslint.config.js
+import obsidianmd from 'eslint-plugin-obsidianmd';
+
+export default [
+  // Base Obsidian rules
+  ...obsidianmd.configs.recommended,
+
+  // Or include English locale files (JSON and TS/JS modules)
+  // ...obsidianmd.configs.recommendedWithLocalesEn,
+
+  // Optional project overrides
+  {
+    rules: {
+      'obsidianmd/ui/sentence-case': ['warn', {
+        brands: ['YourBrand'],
+        acronyms: ['OK'],
+        enforceCamelCaseLower: true,
+      }],
+    },
+  },
+];
+```
+
+### Notes
+
+- Hyphenated words: `Auto-Reveal` becomes `auto-reveal`
+- Locale file patterns in `recommendedWithLocalesEn`: `en*.json`, `en*.ts`, `en*.js`, `en/**/*`
+
+### Known limitations
+
+Sentence detection may incorrectly split on abbreviations (Dr., Inc., etc.). Use single sentences or adjust rule options when needed.

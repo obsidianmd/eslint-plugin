@@ -17,3 +17,6 @@ import "./validateManifest.test";
 import "./noPluginAsComponent.test";
 import "./preferAbstractInputSuggest.test";
 import "./noSampleCode.test";
+import "./ui/sentenceCaseJson.test";
+import "./ui/sentenceCase.test";
+import "./ui/sentenceCaseLocaleModule.test";

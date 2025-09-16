@@ -1,5 +1,6 @@
 import { RuleTester } from "@typescript-eslint/rule-tester";
 import parser from "@typescript-eslint/parser";
+import type { RuleTesterConfig } from "@typescript-eslint/rule-tester";
 
 declare global {
 	// Extend NodeJS.Global with afterAll for type safety
@@ -20,7 +21,7 @@ RuleTester.describe = (text, fn) => fn();
 RuleTester.it = (text, fn) => fn();
 
 // Set up RuleTester to use @typescript-eslint/parser globally
-RuleTester.setDefaultConfig({
+export const typedRuleTesterConfig: RuleTesterConfig = {
 	languageOptions: {
 		parser,
 		ecmaVersion: 2022,
@@ -31,4 +32,6 @@ RuleTester.setDefaultConfig({
 			extraFileExtensions: [".json"],
 		},
 	},
-});
+};
+
+RuleTester.setDefaultConfig(typedRuleTesterConfig);
