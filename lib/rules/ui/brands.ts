@@ -41,6 +41,7 @@ export const DEFAULT_BRANDS: string[] = [
   "pnpm",
   "Yarn",
   "Git",
+  "GitHub",
   // Other tools
   "GitLab",
   "Notion",

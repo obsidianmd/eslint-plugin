@@ -34,6 +34,7 @@ export default ruleCreator({
       description: "Enforce sentence case for English JSON locale strings",
       url: "https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/ui/sentence-case-json.md",
     },
+    fixable: "code",
     hasSuggestions: false,
     schema: [
       {

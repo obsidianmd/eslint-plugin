@@ -50,6 +50,61 @@ function getPropertyKeyName(prop: TSESTree.Property): string | null {
 function normalizeAttributeName(name: string): string {
   return name.replace(/_/g, "-").replace(/[A-Z]/g, (ch) => `-${ch.toLowerCase()}`).toLowerCase();
 }
+
+// Encodes a JavaScript string literal with proper escape sequences and quote handling
+function encodeStringLiteral(value: string, quote: "'" | "\""): string {
+  let result = quote;
+  for (let i = 0; i < value.length; i++) {
+    const ch = value[i];
+    switch (ch) {
+      case quote:
+        result += `\\${quote}`;
+        break;
+      case "\\":
+        result += "\\\\";
+        break;
+      case "\n":
+        result += "\\n";
+        break;
+      case "\r":
+        result += "\\r";
+        break;
+      case "\t":
+        result += "\\t";
+        break;
+      case "\b":
+        result += "\\b";
+        break;
+      case "\f":
+        result += "\\f";
+        break;
+      case "\v":
+        result += "\\v";
+        break;
+      case "\0": {
+        const next = value.charCodeAt(i + 1);
+        if (Number.isFinite(next) && next >= 48 && next <= 57) {
+          result += "\\x00";
+        } else {
+          result += "\\0";
+        }
+        break;
+      }
+      default: {
+        const code = ch.charCodeAt(0);
+        if (code === 0x2028 || code === 0x2029) {
+          result += `\\u${code.toString(16).padStart(4, "0")}`;
+        } else if (code < 0x20) {
+          result += `\\x${code.toString(16).padStart(2, "0")}`;
+        } else {
+          result += ch;
+        }
+      }
+    }
+  }
+  result += quote;
+  return result;
+}
 // Maps method names to the position of their text argument
 const METHOD_STRING_ARG_POS: Record<string, number> = {
   setName: 0,
@@ -194,11 +249,7 @@ export default ruleCreator({
         if (node.type === "Literal" && typeof node.value === "string" && typeof node.raw === "string") {
           const quoteChar = node.raw[0];
           if (quoteChar === "'" || quoteChar === '"') {
-            const escapedBackslashes = suggestion.replace(/\\/g, "\\\\");
-            const escaped = quoteChar === "'"
-              ? escapedBackslashes.replace(/'/g, "\\'")
-              : escapedBackslashes.replace(/"/g, '\\"');
-            return `${quoteChar}${escaped}${quoteChar}`;
+            return encodeStringLiteral(suggestion, quoteChar);
           }
         }
         return null;

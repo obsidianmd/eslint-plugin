@@ -47,6 +47,13 @@ try {
         errors: [{ messageId: "useSentenceCase" }],
       },
       {
+        filename: "en.json",
+        code: '{"label":"Enable Auto-Reveal"}',
+        output: '{"label":"Enable auto-reveal"}',
+        options: [{ allowAutoFix: true }],
+        errors: [{ messageId: "useSentenceCase" }],
+      },
+      {
         filename: "en-US.json",
         code: '{"save":"Save To Google Drive"}',
         errors: [{ messageId: "useSentenceCase" }],
