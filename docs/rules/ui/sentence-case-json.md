@@ -1,6 +1,6 @@
 # Enforce sentence case for English JSON locale strings (`obsidianmd/ui/sentence-case-json`)
 
-💼 This rule is enabled at warn in the `recommendedWithLocalesEn` config.
+🔧 This rule is automatically fixable by the [`--fix` CLI option](https://eslint.org/docs/latest/user-guide/command-line-interface#--fix).
 
 <!-- end auto-generated rule header -->
 
