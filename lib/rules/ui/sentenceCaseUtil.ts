@@ -238,19 +238,29 @@ function shouldIgnoreByRegex(text: string, regexes: readonly RegExp[]): boolean 
   return false;
 }
 
-// Finds all occurrences of a brand name in text and returns their character ranges
-function indexRangesOfBrand(sentence: string, brand: string): number[][] {
-  const ranges: number[][] = [];
-  // Matches brand as whole word: start of string OR non-alphanumeric, brand, end OR non-alphanumeric
-  // Examples: "Use GitHub", "GitHub is great", "fork-GitHub-repo" but NOT "MyGitHub" or "GitHubby"
-  const pattern = new RegExp(`(^|[^A-Za-z0-9])(${escapeRegExp(brand)})(?=$|[^A-Za-z0-9])`, "g");
-  let m: RegExpExecArray | null;
-  while ((m = pattern.exec(sentence))) {
-    const start = m.index + m[1].length;
-    const end = start + brand.length;
-    ranges.push([start, end]);
+interface BrandMatch {
+  start: number;
+  end: number;
+  canonical: string;
+}
+
+// Finds all occurrences of a brand name (case-insensitive) and records their ranges and canonical casing
+function collectBrandMatches(sentence: string, brands: readonly string[]): BrandMatch[] {
+  const matches: BrandMatch[] = [];
+  for (const brand of brands) {
+    const pattern = new RegExp(`(^|[^A-Za-z0-9])(${escapeRegExp(brand)})(?=$|[^A-Za-z0-9])`, "gi");
+    let m: RegExpExecArray | null;
+    while ((m = pattern.exec(sentence))) {
+      const start = m.index + m[1].length;
+      const end = start + brand.length;
+      if (matches.some((existing) => !(end <= existing.start || start >= existing.end))) {
+        continue;
+      }
+      matches.push({ start, end, canonical: brand });
+    }
   }
-  return ranges;
+  matches.sort((a, b) => a.start - b.start);
+  return matches;
 }
 
 // Merges overlapping or adjacent character ranges into single ranges
@@ -292,11 +302,8 @@ function writeToken(chars: string[], start: number, replacement: string, length:
 // Applies sentence case transformation to a single sentence
 function transformSentence(sentence: string, opts: ReturnType<typeof normalizeOptions>): string {
   // Find all brand occurrences to preserve their casing
-  let brandRanges: number[][] = [];
-  for (const brand of opts.brands) {
-    brandRanges.push(...indexRangesOfBrand(sentence, brand));
-  }
-  brandRanges = mergeRanges(brandRanges);
+  const brandMatches = collectBrandMatches(sentence, opts.brands);
+  const brandRanges = mergeRanges(brandMatches.map((match) => [match.start, match.end]));
 
   const chars = sentence.split("");
 
@@ -326,8 +333,15 @@ function transformSentence(sentence: string, opts: ReturnType<typeof normalizeOp
 
     const firstToken = sentence.slice(tokenStart, tokenEnd);
     const upperToken = firstToken.toUpperCase();
+    const hasLeadingContent = sentence.slice(0, firstAlpha).trim().length > 0;
     if (opts.acronyms.has(upperToken)) {
       writeToken(chars, tokenStart, upperToken, firstToken.length);
+    } else if (!opts.enforceCamelCaseLower && opts.mode === "loose" && isCamelOrPascal(firstToken)) {
+      // Preserve camelCase/PascalCase tokens when loose mode allows it
+    } else if (hasLeadingContent) {
+      for (let j = tokenStart; j < tokenEnd; j++) {
+        chars[j] = firstToken[j - tokenStart].toLowerCase();
+      }
     } else {
       chars[firstAlpha] = chars[firstAlpha].toUpperCase();
       for (let j = firstAlpha + 1; j < tokenEnd; j++) {
@@ -345,7 +359,7 @@ function transformSentence(sentence: string, opts: ReturnType<typeof normalizeOp
     const end = start + token.length;
 
     // Skip if token overlaps brand
-    if (brandRanges.some((r) => !(end <= r[0] || start >= r[1]))) continue;
+    if (brandMatches.some((match) => !(end <= match.start || start >= match.end))) continue;
 
     // Skip first token if it's the first alpha token (already handled above)
     if (firstAlpha >= 0 && start <= firstAlpha && firstAlpha < end) continue;
@@ -354,6 +368,19 @@ function transformSentence(sentence: string, opts: ReturnType<typeof normalizeOp
     if (opts.acronyms.has(upperToken)) {
       writeToken(chars, start, upperToken, token.length);
       continue;
+    }
+
+    const dottedMatch = token.match(/^([A-Za-z](?:\.[A-Za-z])+)(\.)?$/);
+    if (dottedMatch) {
+      const base = dottedMatch[1];
+      const trailingDot = dottedMatch[2] ?? "";
+      const parts = base.split(".");
+      const allUpper = parts.every((part) => part === part.toUpperCase());
+      if (allUpper) {
+        const canonical = parts.map((part) => part.toUpperCase()).join(".") + trailingDot;
+        writeToken(chars, start, canonical, token.length);
+        continue;
+      }
     }
 
     // Ignore configured words
@@ -394,6 +421,11 @@ function transformSentence(sentence: string, opts: ReturnType<typeof normalizeOp
     }
   }
 
+  // Restore canonical brand casing
+  for (const match of brandMatches) {
+    writeToken(chars, match.start, match.canonical, match.canonical.length);
+  }
+
   return chars.join("");
 }
 
@@ -405,26 +437,37 @@ function sentenceCaseSuggestionWithOptions(
   if (!text.trim()) return text;
   if (shouldIgnoreByRegex(text, opts.ignoreRegex)) return text;
 
-  // Split text into sentences
-  const parts: string[] = [];
-  let lastIndex = 0;
-  const re = /([.?!]+)\s+/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text))) {
-    const segment = text.slice(lastIndex, m.index + m[1].length);
-    parts.push(segment);
-    lastIndex = m.index + m[0].length; // include trailing space(s)
+  interface Segment {
+    core: string;
+    punct: string;
+    whitespace: string;
   }
-  parts.push(text.slice(lastIndex));
 
-  const transformed = parts
-    .map((seg) => {
-      // Break into core sentence and trailing punctuation
-      const match = seg.match(/^(.*?)([.?!]+)?$/);
-      const core = match ? match[1] : seg;
-      const punct = match && match[2] ? match[2] : "";
+  const segments: Segment[] = [];
+  let lastIndex = 0;
+  const delimiterRe = /([.?!]+)(\s+|$)/g;
+  let match: RegExpExecArray | null;
+  while ((match = delimiterRe.exec(text))) {
+    const punctStart = match.index;
+    const punct = match[1];
+    const whitespace = match[2] ?? "";
+    const core = text.slice(lastIndex, punctStart);
+    segments.push({ core, punct, whitespace });
+    lastIndex = delimiterRe.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    const remainder = text.slice(lastIndex);
+    const trailingWhitespaceMatch = remainder.match(/\s+$/);
+    const whitespace = trailingWhitespaceMatch ? trailingWhitespaceMatch[0] : "";
+    const core = whitespace ? remainder.slice(0, -whitespace.length) : remainder;
+    segments.push({ core, punct: "", whitespace });
+  }
+
+  const transformed = segments
+    .map(({ core, punct, whitespace }) => {
       const out = transformSentence(core, opts);
-      return out + punct + (seg.endsWith(" ") ? " " : "");
+      return out + punct + whitespace;
     })
     .join("");
 

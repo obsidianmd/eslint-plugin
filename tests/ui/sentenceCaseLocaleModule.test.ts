@@ -57,6 +57,13 @@ try {
       },
       {
         filename: "en.ts",
+        code: "export default { label: \"Enable Auto Reveal\" };",
+        output: "export default { label: \"Enable auto reveal\" };",
+        options: [{ allowAutoFix: true }],
+        errors: [{ messageId: "useSentenceCase" }],
+      },
+      {
+        filename: "en.ts",
         code: `const strings = {
           autoReveal: "Enable Auto Reveal",
         } as const;
