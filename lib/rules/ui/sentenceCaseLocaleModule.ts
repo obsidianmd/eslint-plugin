@@ -1,57 +1,40 @@
-import { TSESTree, ESLintUtils } from "@typescript-eslint/utils";
-import { evaluateSentenceCase, EvaluatorOptions } from "./sentenceCaseUtil.js";
+import { TSESTree, ESLintUtils, TSESLint } from "@typescript-eslint/utils";
+import {
+  createSentenceCaseReporter,
+  getContextFilename,
+  isEnglishLocalePath,
+  resolveSentenceCaseConfig,
+  SentenceCaseRuleOptions,
+  unwrapExpression,
+} from "./sentenceCaseUtil.js";
+
+type MessageId = "useSentenceCase";
 
 const ruleCreator = ESLintUtils.RuleCreator(
   (name) =>
     `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/ui/${name}.md`,
 );
 
-type Options = [
-  Partial<
-    EvaluatorOptions & {
-      allowAutoFix?: boolean;
-    }
-  >,
-];
+// Default configuration with no custom options specified
+const defaultOptions: SentenceCaseRuleOptions = [{}] as const;
 
-function isEnglishLocaleModule(context: any): boolean {
-  const file = context.physicalFilename ?? context.getFilename?.();
-  if (typeof file !== "string") return false;
-  const normalized = file.replace(/\\/g, "/");
-  if (/(?:^|\/)en([._-].*)?\.(ts|js|cjs|mjs)$/i.test(normalized)) return true;
-  if (/(?:^|\/)en\/.+\.(ts|js|cjs|mjs)$/i.test(normalized)) return true;
-  return false;
+// Checks if the current file is an English locale TypeScript or JavaScript module
+function isEnglishLocaleModule(
+  context: TSESLint.RuleContext<MessageId, SentenceCaseRuleOptions>,
+): boolean {
+  const file = getContextFilename(context);
+  return file != null && isEnglishLocalePath(file, ["ts", "js", "cjs", "mjs"]);
 }
 
-type ExpressionOrPattern = TSESTree.Property["value"] | TSESTree.Expression;
-
-function isExpressionNode(node: ExpressionOrPattern): node is TSESTree.Expression {
-  return (
-    node.type !== "ObjectPattern" &&
-    node.type !== "ArrayPattern" &&
-    node.type !== "AssignmentPattern"
-  );
-}
-
-function unwrapExpression(expression: ExpressionOrPattern): TSESTree.Expression | null {
-  let current: ExpressionOrPattern = expression;
-  while (
-    current.type === "TSAsExpression" ||
-    current.type === "TSSatisfiesExpression" ||
-    current.type === "TSNonNullExpression"
-  ) {
-    current = current.expression;
-  }
-  return isExpressionNode(current) ? current : null;
-}
-
+// Recursively collects all string literals from nested objects and arrays
 function collectStringLiterals(
   root: TSESTree.Expression,
   cb: (node: TSESTree.Node, value: string) => void,
 ) {
-  const stack: ExpressionOrPattern[] = [root];
+  const stack: TSESTree.Node[] = [root];
   while (stack.length > 0) {
-    const popped = stack.pop()!;
+    const popped = stack.pop();
+    if (!popped) continue;
     const current = unwrapExpression(popped);
     if (!current) continue;
     if (current.type === "Literal") {
@@ -91,6 +74,7 @@ export default ruleCreator({
     type: "suggestion" as const,
     docs: {
       description: "Enforce sentence case for English TS/JS locale module strings",
+      url: "https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/ui/sentence-case-locale-module.md",
     },
     hasSuggestions: false,
     schema: [
@@ -112,28 +96,18 @@ export default ruleCreator({
       useSentenceCase: "Use sentence case for UI text.",
     },
   },
-  defaultOptions: [{}],
-  create(context) {
+  defaultOptions,
+  create(context: TSESLint.RuleContext<MessageId, SentenceCaseRuleOptions>) {
     if (!isEnglishLocaleModule(context)) return {};
-    const options = (context.options?.[0] as any) ?? {};
-    const evalOpts: EvaluatorOptions = options;
-    const allowAutoFix = options.allowAutoFix === true;
+    const { evaluatorOptions, allowAutoFix } = resolveSentenceCaseConfig(context.options);
     const varObjects = new Map<string, TSESTree.ObjectExpression>();
-    const cache = new Map<string, ReturnType<typeof evaluateSentenceCase>>();
-
-    function reportIfNeeded(node: TSESTree.Node, value: string) {
-      const res = cache.get(value) ?? evaluateSentenceCase(value, evalOpts);
-      cache.set(value, res);
-      if (!res.ok && res.suggestion) {
-        const fix = (fixer: any) => fixer.replaceText(node, JSON.stringify(res.suggestion));
-        const report: any = {
-          node,
-          messageId: "useSentenceCase",
-        };
-        if (allowAutoFix) report.fix = fix;
-        context.report(report);
-      }
-    }
+    const reportIfNeeded = createSentenceCaseReporter({
+      context,
+      evaluatorOptions,
+      allowAutoFix,
+      messageId: "useSentenceCase",
+      debugLabel: "ui/sentence-case-locale-module",
+    });
 
     return {
       Program(program: TSESTree.Program) {
