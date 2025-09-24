@@ -1,19 +1,22 @@
-import { TSESTree, ESLintUtils } from "@typescript-eslint/utils";
-import { evaluateSentenceCase, EvaluatorOptions } from "./sentenceCaseUtil.js";
+import { TSESTree, ESLintUtils, TSESLint } from "@typescript-eslint/utils";
+import {
+  createSentenceCaseReporter,
+  resolveSentenceCaseConfig,
+  SentenceCaseRuleOptions,
+  unwrapExpression,
+} from "./sentenceCaseUtil.js";
+
+type MessageId = "useSentenceCase";
 
 const ruleCreator = ESLintUtils.RuleCreator(
   (name) =>
     `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/ui/${name}.md`,
 );
 
-type Options = [
-  Partial<
-    EvaluatorOptions & {
-      allowAutoFix?: boolean;
-    }
-  >,
-];
+// Default configuration with no custom options specified
+const defaultOptions: SentenceCaseRuleOptions = [{}] as const;
 
+// Extracts string value from AST nodes, unwrapping TypeScript type assertions
 function getStringFromNode(node: TSESTree.Node): string | null {
   if (
     node.type === "TSAsExpression" ||
@@ -29,44 +32,25 @@ function getStringFromNode(node: TSESTree.Node): string | null {
   return null;
 }
 
+// Checks if an object property has a specific key name
 function isPropertyWithKey(prop: TSESTree.Property, keyName: string): boolean {
   if (prop.key.type === "Identifier") return prop.key.name === keyName;
   if (prop.key.type === "Literal") return prop.key.value === keyName;
   return false;
 }
 
+// Retrieves the key name from an object property node
 function getPropertyKeyName(prop: TSESTree.Property): string | null {
   if (prop.key.type === "Identifier") return prop.key.name;
   if (prop.key.type === "Literal" && typeof prop.key.value === "string") return prop.key.value;
   return null;
 }
 
+// Converts attribute names to kebab-case (e.g., "ariaLabel" -> "aria-label")
 function normalizeAttributeName(name: string): string {
   return name.replace(/_/g, "-").replace(/[A-Z]/g, (ch) => `-${ch.toLowerCase()}`).toLowerCase();
 }
-
-type ExpressionOrPattern = TSESTree.Property["value"];
-
-function isExpressionNode(node: ExpressionOrPattern): node is TSESTree.Expression {
-  return (
-    node.type !== "ObjectPattern" &&
-    node.type !== "ArrayPattern" &&
-    node.type !== "AssignmentPattern"
-  );
-}
-
-function unwrapExpressionNode(node: ExpressionOrPattern): TSESTree.Expression | null {
-  let current: ExpressionOrPattern = node;
-  while (
-    current.type === "TSAsExpression" ||
-    current.type === "TSSatisfiesExpression" ||
-    current.type === "TSNonNullExpression"
-  ) {
-    current = current.expression;
-  }
-  return isExpressionNode(current) ? current : null;
-}
-
+// Maps method names to the position of their text argument
 const METHOD_STRING_ARG_POS: Record<string, number> = {
   setName: 0,
   setDesc: 0,
@@ -75,17 +59,19 @@ const METHOD_STRING_ARG_POS: Record<string, number> = {
   setPlaceholder: 0,
   setText: 0,
   setTitle: 0,
-  addRibbonIcon: 1, // tooltip
-  addOption: 1, // DropdownComponent.addOption(value, label)
+  addRibbonIcon: 1, // tooltip is second argument
+  addOption: 1, // DropdownComponent.addOption(value, label) - label is second
 };
 
+// HTML attributes that contain user-facing text
 const ATTR_TEXT_KEYS = new Set(["aria-label", "aria-description", "title", "placeholder"]);
 
+// Recursively inspects createEl options object for text properties
 function inspectCreateElOptions(
   node: TSESTree.Expression,
   report: (target: TSESTree.Node, text: string) => void,
 ) {
-  const unwrapped = unwrapExpressionNode(node);
+  const unwrapped = unwrapExpression(node);
   if (!unwrapped || unwrapped.type !== "ObjectExpression") return;
   for (const prop of unwrapped.properties) {
     if (prop.type !== "Property") continue;
@@ -96,7 +82,7 @@ function inspectCreateElOptions(
       if (str != null) report(prop.value, str);
       continue;
     }
-    const valueNode = unwrapExpressionNode(prop.value);
+    const valueNode = unwrapExpression(prop.value);
     if (!valueNode) continue;
     if (keyName === "attr" && valueNode.type === "ObjectExpression") {
       for (const attrProp of valueNode.properties) {
@@ -116,6 +102,7 @@ function inspectCreateElOptions(
   }
 }
 
+// Traverses statement trees to find return statements with string values
 function visitStatementTree(
   statement: TSESTree.Statement | TSESTree.BlockStatement | null | undefined,
   handleReturn: (node: TSESTree.Expression, value: string) => void,
@@ -170,7 +157,9 @@ export default ruleCreator({
     docs: {
       description:
         "Enforce sentence case for UI strings",
+      url: "https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/ui/sentence-case.md",
     },
+    fixable: "code", // Allows ESLint to automatically fix violations
     hasSuggestions: false,
     schema: [
       {
@@ -191,28 +180,32 @@ export default ruleCreator({
       useSentenceCase: "Use sentence case for UI text.",
     },
   },
-  defaultOptions: [{}],
-  create(context) {
-    const options = (context.options?.[0] as any) ?? {};
-    const evalOpts: EvaluatorOptions = options;
-    const allowAutoFix = options.allowAutoFix === true;
-    const cache = new Map<string, ReturnType<typeof evaluateSentenceCase>>();
+  defaultOptions,
+  create(context: TSESLint.RuleContext<MessageId, SentenceCaseRuleOptions>) {
+    const { evaluatorOptions, allowAutoFix } = resolveSentenceCaseConfig(context.options);
 
-    function reportIfNeeded(node: TSESTree.Node, value: string) {
-      const res = cache.get(value) ?? evaluateSentenceCase(value, evalOpts);
-      cache.set(value, res);
-      if (!res.ok && res.suggestion) {
-        const fix = (fixer: any) => fixer.replaceText(node, JSON.stringify(res.suggestion));
-        if (process.env.OBSIDIANMD_DEBUG_SENTENCE_CASE === "1") console.debug("ui/sentence-case:", { value, suggestion: res.suggestion });
-        const report: any = {
-          node,
-          messageId: "useSentenceCase",
-        };
-        if (allowAutoFix) report.fix = fix;
-        context.report(report);
-      }
-    }
+    const reportIfNeeded = createSentenceCaseReporter({
+      context,
+      evaluatorOptions,
+      allowAutoFix,
+      messageId: "useSentenceCase",
+      debugLabel: "ui/sentence-case",
+      formatReplacement: (node, suggestion) => {
+        if (node.type === "Literal" && typeof node.value === "string" && typeof node.raw === "string") {
+          const quoteChar = node.raw[0];
+          if (quoteChar === "'" || quoteChar === '"') {
+            const escapedBackslashes = suggestion.replace(/\\/g, "\\\\");
+            const escaped = quoteChar === "'"
+              ? escapedBackslashes.replace(/'/g, "\\'")
+              : escapedBackslashes.replace(/"/g, '\\"');
+            return `${quoteChar}${escaped}${quoteChar}`;
+          }
+        }
+        return null;
+      },
+    });
 
+    // Checks createEl calls for text properties in options object
     function checkCreateEl(node: TSESTree.CallExpression) {
       // createEl(tag, { text: "...", title: "..." })
       if (node.arguments.length < 2) return;
@@ -221,6 +214,7 @@ export default ruleCreator({
       inspectCreateElOptions(arg, reportIfNeeded);
     }
 
+    // Checks setAttribute calls for text-containing attributes
     function checkSetAttribute(node: TSESTree.CallExpression) {
       // setAttribute("aria-label", "...")
       if (node.arguments.length < 2) return;
@@ -235,6 +229,7 @@ export default ruleCreator({
       }
     }
 
+    // Checks addCommand calls for command name property
     function checkAddCommand(node: TSESTree.CallExpression) {
       // this.addCommand({ name: "..." })
       if (node.arguments.length < 1) return;
@@ -248,6 +243,7 @@ export default ruleCreator({
       }
     }
 
+    // Checks various method calls for UI text arguments
     function checkMethodCall(node: TSESTree.CallExpression) {
       const callee = node.callee;
       // Handle bare calls like createEl(...)
@@ -272,6 +268,7 @@ export default ruleCreator({
       if (name === "addCommand") checkAddCommand(node);
     }
 
+    // Checks getDisplayText method implementations for returned strings
     function checkGetDisplayTextReturns(node: TSESTree.MethodDefinition) {
       if (node.key.type !== "Identifier" || node.key.name !== "getDisplayText") return;
       const fn = node.value;

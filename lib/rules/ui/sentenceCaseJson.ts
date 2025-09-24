@@ -1,27 +1,30 @@
-import { TSESTree, ESLintUtils } from "@typescript-eslint/utils";
-import { evaluateSentenceCase, EvaluatorOptions } from "./sentenceCaseUtil.js";
+import { ESLintUtils, TSESLint, TSESTree } from "@typescript-eslint/utils";
+import {
+  createSentenceCaseReporter,
+  getContextFilename,
+  isEnglishLocalePath,
+  resolveSentenceCaseConfig,
+  SentenceCaseRuleOptions,
+} from "./sentenceCaseUtil.js";
+
+type MessageId = "useSentenceCase";
 
 const ruleCreator = ESLintUtils.RuleCreator(
   (name) =>
     `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/ui/${name}.md`,
 );
 
-type Options = [
-  Partial<
-    EvaluatorOptions & {
-      allowAutoFix?: boolean;
-    }
-  >,
-];
+// Default configuration with no custom options specified
+const defaultOptions: SentenceCaseRuleOptions = [{}] as const;
 
-function isInJsonFile(context: any): boolean {
-  const file = context.physicalFilename ?? context.getFilename?.();
-  if (typeof file !== "string") return false;
-  const normalized = file.replace(/\\/g, "/");
-  if (/(?:^|\/)en([._-].*)?\.json$/i.test(normalized)) return true;
-  if (/(?:^|\/)en\/.+\.json$/i.test(normalized)) return true;
-  return false;
+// Checks if the current file is an English locale JSON file
+function isInJsonFile(
+  context: TSESLint.RuleContext<MessageId, SentenceCaseRuleOptions>,
+): boolean {
+  const file = getContextFilename(context);
+  return file != null && isEnglishLocalePath(file, ["json"]);
 }
+
 
 export default ruleCreator({
   name: "sentence-case-json",
@@ -29,6 +32,7 @@ export default ruleCreator({
     type: "suggestion" as const,
     docs: {
       description: "Enforce sentence case for English JSON locale strings",
+      url: "https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/ui/sentence-case-json.md",
     },
     hasSuggestions: false,
     schema: [
@@ -50,35 +54,24 @@ export default ruleCreator({
       useSentenceCase: "Use sentence case for UI text.",
     },
   },
-  defaultOptions: [{}],
-  create(context) {
-    if (!isInJsonFile(context)) return {} as any;
-    const options = (context.options?.[0] as any) ?? {};
-    const evalOpts: EvaluatorOptions = options;
-    const allowAutoFix = options.allowAutoFix === true;
-    const cache = new Map<string, ReturnType<typeof evaluateSentenceCase>>();
+  defaultOptions,
+  create(context: TSESLint.RuleContext<MessageId, SentenceCaseRuleOptions>) {
+    if (!isInJsonFile(context)) return {};
+    const { evaluatorOptions, allowAutoFix } = resolveSentenceCaseConfig(context.options);
 
-    function reportIfNeeded(node: TSESTree.Node, value: string) {
-      const res = cache.get(value) ?? evaluateSentenceCase(value, evalOpts);
-      cache.set(value, res);
-      if (!res.ok && res.suggestion) {
-        const fix = (fixer: any) => fixer.replaceText(node, JSON.stringify(res.suggestion));
-        if (process.env.OBSIDIANMD_DEBUG_SENTENCE_CASE === "1") console.debug("ui/sentence-case-json:", { value, suggestion: res.suggestion });
-        const report: any = {
-          node,
-          messageId: "useSentenceCase",
-        };
-        if (allowAutoFix) report.fix = fix;
-        context.report(report);
-      }
-    }
+    const reportIfNeeded = createSentenceCaseReporter({
+      context,
+      evaluatorOptions,
+      allowAutoFix,
+      messageId: "useSentenceCase",
+      debugLabel: "ui/sentence-case-json",
+    });
 
     return {
       // Check string literals in JSON files
       Literal(node: TSESTree.Literal) {
         if (typeof node.value !== "string") return;
-        // Check if this literal is a property value
-        const parent = node.parent as TSESTree.Node | undefined;
+        const parent = node.parent;
         if (!parent) return;
         if (parent.type === "Property" && parent.value === node) {
           reportIfNeeded(node, node.value);
