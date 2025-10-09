@@ -1,5 +1,5 @@
 import { AST_NODE_TYPES, AST_TOKEN_TYPES } from "@typescript-eslint/types";
-import { Parser } from "@typescript-eslint/utils/ts-eslint";
+import type { Parser } from "@typescript-eslint/utils/ts-eslint";
 
 /**
  * A plain text parser for ESLint.
