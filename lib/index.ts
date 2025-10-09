@@ -17,8 +17,10 @@ import preferFileManagerTrashFile from "./rules/preferFileManagerTrashFile.js";
 import regexLookbehind from "./rules/regexLookbehind.js";
 import sampleNames from "./rules/sampleNames.js";
 import validateManifest from "./rules/validateManifest.js";
+import validateLicense from "./rules/validateLicense.js";
 import { manifest } from "./readManifest.js";
 import { ui } from "./rules/ui/index.js";
+import { PlainTextParser } from "./plainTextParser.js";
 
 // --- Import plugins and configs for the recommended config ---
 import js from "@eslint/js";
@@ -59,6 +61,7 @@ const plugin: ESLint.Plugin = {
 		"regex-lookbehind": regexLookbehind,
 		"sample-names": sampleNames,
 		"validate-manifest": validateManifest,
+		"validate-license": validateLicense,
 		"ui/sentence-case": ui.sentenceCase,
 		"ui/sentence-case-json": ui.sentenceCaseJson,
 		"ui/sentence-case-locale-module": ui.sentenceCaseLocaleModule,
@@ -189,6 +192,20 @@ const flatRecommendedConfig = [
 			"@typescript-eslint/no-unused-expressions": "off",
 			"json-schema-validator/no-invalid": "error",
 			"obsidianmd/validate-manifest": "error",
+		},
+	},
+	{
+		// LICENSE validation
+		plugins: {
+			obsidianmd: plugin,
+		},
+		parserOptions: {
+			parser: PlainTextParser,
+			extraFileExtensions: [""],
+		},
+		files: ["LICENSE"],
+		rules: {
+			"obsidianmd/validate-license": "error",
 		},
 	},
 ] as any;
