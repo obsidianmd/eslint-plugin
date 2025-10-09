@@ -1,6 +1,5 @@
-import { AST_NODE_TYPES } from "@typescript-eslint/types";
+import { AST_NODE_TYPES, AST_TOKEN_TYPES } from "@typescript-eslint/types";
 import { Parser } from "@typescript-eslint/utils/ts-eslint";
-import { AST_TOKEN_TYPES, Token } from "node_modules/@typescript-eslint/types/dist/generated/ast-spec.js";
 
 /**
  * A plain text parser for ESLint.
@@ -15,7 +14,7 @@ export const PlainTextParser: Parser.ParserModule = {
     parseForESLint(text: string): Parser.ParseResult {
         const lines = text.split("\n");
 
-        const tokens: Token[] = [];
+        const tokens: Parser.ParseResult["ast"]["tokens"] = [];
 
         let index = 0;
         for (let i = 0; i < lines.length; i++) {
