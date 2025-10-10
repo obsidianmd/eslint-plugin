@@ -14,6 +14,7 @@ import "./noTFileTFolderCast.test";
 import "./noViewReferencesInPlugin.test";
 import "./noStaticStylesAssignment.test";
 import "./validateManifest.test";
+import "./validateLicense.test";
 import "./noPluginAsComponent.test";
 import "./preferAbstractInputSuggest.test";
 import "./noSampleCode.test";
