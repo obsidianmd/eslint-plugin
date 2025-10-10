@@ -14,14 +14,32 @@ export default ruleCreator({
             description: "Validate the structure of copyright notices in LICENSE files for Obsidian plugins.",
             url: "???",
         },
-        schema: [],
+        schema: [
+            {
+                type: "object",
+                properties: {
+                    currentYear: {
+                        type: "number",
+                        description: "The current year to validate against.",
+                    },
+                    disableUnchangedYear: {
+                        type: "boolean",
+                        description: "If true, do not report errors for unchanged years.",
+                        default: false,
+                    }
+                }
+            }
+        ],
         messages: {
             unchangedCopyright: "Please change the copyright holder from \"Dynalist Inc.\" to your name.",
             unchangedYear: "Please change the copyright year from {{actual}} to the current year ({{expected}}).",
         },
     },
-    defaultOptions: [],
-    create(context) {
+    defaultOptions: [{
+        currentYear: new Date().getFullYear(),
+        disableUnchangedYear: false,
+    }],
+    create(context, [options]) {
         const filename = context.physicalFilename;
         if (!path.basename(filename).endsWith("LICENSE")) {
             return {};
@@ -33,7 +51,6 @@ export default ruleCreator({
                 // We should check that the year is current and the holder is not "Dynalist Inc."
 
                 const copyrightRegex = /^(?: |\t)*Copyright \(C\) (\d{4})(?:-(\d{4}))? by (.+)$/;
-                const currentYear = new Date().getFullYear();
 
                 // we rely on our plain text parser to give us tokens as Line tokens
                 for (const token of programNode.tokens ?? []) {
@@ -45,12 +62,12 @@ export default ruleCreator({
                         const endYear = match[2] ? parseInt(match[2], 10) : startYear;
                         const holder = match[3].trim();
 
-                        if (endYear < currentYear) {
+                        if (!options.disableUnchangedYear && endYear < options.currentYear) {
                             context.report({
                                 messageId: "unchangedYear",
                                 loc: token.loc,
                                 data: {
-                                    expected: currentYear.toString(),
+                                    expected: options.currentYear.toString(),
                                     actual: endYear.toString(),
                                 }
                             });

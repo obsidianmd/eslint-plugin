@@ -25,6 +25,25 @@ ruleTester.run("validate-license", licenseRule, {
         },
         {
             filename: "LICENSE",
+            code: `Copyright (C) ${currentYear + 1} by John Doe`,
+        },
+        {
+            filename: "LICENSE",
+            code: `Copyright (C) 2000 by John Doe`,
+            options: [{ currentYear: 2000, disableUnchangedYear: false }],
+        },
+        {
+            filename: "LICENSE",
+            code: `Copyright (C) 2001 by John Doe`,
+            options: [{ currentYear: 2000, disableUnchangedYear: false }],
+        },
+        {
+            filename: "LICENSE",
+            code: `Copyright (C) 2001 by John Doe`,
+            options: [{ currentYear: currentYear, disableUnchangedYear: true }],
+        },
+        {
+            filename: "LICENSE",
             code: `foo\nCopyright (C) 2020-${currentYear} by John Doe\nbar`,
         },
         {
@@ -75,6 +94,14 @@ ruleTester.run("validate-license", licenseRule, {
             code: `bar\nCopyright (C) 2020-${currentYear} by Dynalist Inc.\nbaz`,
             errors: [
                 { messageId: "unchangedCopyright" }
+            ],
+        },
+        {
+            filename: "LICENSE",
+            code: `Copyright (C) 1999 by John Doe`,
+            options: [{ currentYear: 2000, disableUnchangedYear: false }],
+            errors: [
+                { messageId: "unchangedYear", data: { expected: "2000", actual: "1999" } }
             ],
         },
     ],
