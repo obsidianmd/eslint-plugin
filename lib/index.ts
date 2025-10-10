@@ -4,6 +4,7 @@ import { settingsTab } from "./rules/settingsTab/index.js";
 import { vault } from "./rules/vault/index.js";
 import detachLeaves from "./rules/detachLeaves.js";
 import hardcodedConfigPath from "./rules/hardcodedConfigPath.js";
+import noForbiddenElements from "./rules/noForbiddenElements.js";
 import noSampleCode from "./rules/noSampleCode.js";
 import noPluginAsComponent from "./rules/noPluginAsComponent.js";
 import noStaticStylesAssignment from "./rules/noStaticStylesAssignment.js";
@@ -45,6 +46,7 @@ const plugin: ESLint.Plugin = {
 		"vault/iterate": vault.iterate,
 		"detach-leaves": detachLeaves,
 		"hardcoded-config-path": hardcodedConfigPath,
+		"no-forbidden-elements": noForbiddenElements,
 		"no-plugin-as-component": noPluginAsComponent,
 		"no-sample-code": noSampleCode,
 		"no-tfile-tfolder-cast": noTFileTFolderCast,
@@ -76,6 +78,7 @@ const recommendedRulesConfig = {
 		"obsidianmd/vault/iterate": "error",
 		"obsidianmd/detach-leaves": "error",
 		"obsidianmd/hardcoded-config-path": "error",
+		"obsidianmd/no-forbidden-elements": "error",
 		"obsidianmd/no-plugin-as-component": "error",
 		"obsidianmd/no-sample-code": "error",
 		"obsidianmd/no-tfile-tfolder-cast": "error",
@@ -88,7 +91,7 @@ const recommendedRulesConfig = {
 		"obsidianmd/regex-lookbehind": "error",
 		"obsidianmd/sample-names": "error",
 		"obsidianmd/validate-manifest": "error",
-    "obsidianmd/ui/sentence-case": ["warn", { enforceCamelCaseLower: true }],
+    	"obsidianmd/ui/sentence-case": ["warn", { enforceCamelCaseLower: true }],
 	} as const,
 };
 
