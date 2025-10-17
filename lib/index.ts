@@ -89,7 +89,7 @@ const recommendedRulesConfig = {
 
 const flatRecommendedConfig = [
 	js.configs.recommended,
-	...tseslint.configs.recommended,
+	...tseslint.configs.recommendedTypeChecked,
 	{
 		plugins: {
 			import: importPlugin,
