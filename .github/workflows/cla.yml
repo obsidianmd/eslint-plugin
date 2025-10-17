@@ -24,4 +24,4 @@ jobs:
                   path-to-signatures: "cla.json"
                   path-to-document: "https://github.com/obsidianmd/obsidian-releases/blob/master/cla.md"
                   branch: "master"
-                  allowlist: joethei,liamcain,lishid,tgrosinger
+                  allowlist: joethei,liamcain,lishid,tgrosinger,dependabot[bot]

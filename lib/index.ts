@@ -17,6 +17,7 @@ import regexLookbehind from "./rules/regexLookbehind.js";
 import sampleNames from "./rules/sampleNames.js";
 import validateManifest from "./rules/validateManifest.js";
 import { manifest } from "./readManifest.js";
+import { ui } from "./rules/ui/index.js";
 
 // --- Import plugins and configs for the recommended config ---
 import js from "@eslint/js";
@@ -56,6 +57,9 @@ const plugin: ESLint.Plugin = {
 		"regex-lookbehind": regexLookbehind,
 		"sample-names": sampleNames,
 		"validate-manifest": validateManifest,
+		"ui/sentence-case": ui.sentenceCase,
+		"ui/sentence-case-json": ui.sentenceCaseJson,
+		"ui/sentence-case-locale-module": ui.sentenceCaseLocaleModule,
 	} as any,
 };
 
@@ -84,6 +88,7 @@ const recommendedRulesConfig = {
 		"obsidianmd/regex-lookbehind": "error",
 		"obsidianmd/sample-names": "error",
 		"obsidianmd/validate-manifest": "error",
+    "obsidianmd/ui/sentence-case": ["warn", { enforceCamelCaseLower: true }],
 	} as const,
 };
 
@@ -197,6 +202,54 @@ const hybridRecommendedConfig = {
 
 plugin.configs = {
 	recommended: hybridRecommendedConfig,
+	recommendedWithLocalesEn: {
+		...recommendedRulesConfig,
+		[Symbol.iterator]: function* () {
+			yield* flatRecommendedConfig;
+			// JSON English locales
+			yield {
+				plugins: { obsidianmd: plugin },
+				files: [
+					"**/en.json",
+					"**/en*.json",
+					"**/en/*.json",
+					"**/en/**/*.json",
+				],
+				rules: {
+					"obsidianmd/ui/sentence-case-json": "warn",
+				},
+			} as any;
+			// TS/JS English locale modules
+			yield {
+				plugins: { obsidianmd: plugin },
+				files: [
+					"**/en.ts",
+					"**/en.js",
+					"**/en.cjs",
+					"**/en.mjs",
+					"**/en-*.ts",
+					"**/en-*.js",
+					"**/en-*.cjs",
+					"**/en-*.mjs",
+					"**/en_*.ts",
+					"**/en_*.js",
+					"**/en_*.cjs",
+					"**/en_*.mjs",
+					"**/en/*.ts",
+					"**/en/*.js",
+					"**/en/*.cjs",
+					"**/en/*.mjs",
+					"**/en/**/*.ts",
+					"**/en/**/*.js",
+					"**/en/**/*.cjs",
+					"**/en/**/*.mjs",
+				],
+				rules: {
+					"obsidianmd/ui/sentence-case-locale-module": "warn",
+				},
+			} as any;
+		},
+	} as any,
 } as any;
 
 export default plugin;
