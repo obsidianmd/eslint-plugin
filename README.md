@@ -79,7 +79,6 @@ You can also override or add rules:
 |      | Name                       |
 | :--- | :------------------------- |
 | ✅    | `recommended`              |
-| 🟦   | `recommendedTypeChecked`   |
 | 🇬🇧 | `recommendedWithLocalesEn` |
 
 <!-- end auto-generated configs list -->
@@ -90,42 +89,37 @@ You can also override or add rules:
 
 <!-- begin auto-generated rules list -->
 
-💼 Configurations enabled in.\
-⚠️ Configurations set to warn in.\
-✅ Set in the `recommended` configuration.\
-🟦 Set in the `recommendedTypeChecked` configuration.\
-🇬🇧 Set in the `recommendedWithLocalesEn` configuration.\
 🔧 Automatically fixable by the [`--fix` CLI option](https://eslint.org/docs/user-guide/command-line-interface#--fix).
 
-| Name                                                                                                         | Description                                                                                                          | 💼        | ⚠️        | 🔧 |
-| :----------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------- | :-------- | :-------- | :- |
-| [commands/no-command-in-command-id](docs/rules/commands/no-command-in-command-id.md)                         | Disallow using the word 'command' in a command ID.                                                                   | ✅ 🟦 🇬🇧 |           |    |
-| [commands/no-command-in-command-name](docs/rules/commands/no-command-in-command-name.md)                     | Disallow using the word 'command' in a command name.                                                                 | ✅ 🟦 🇬🇧 |           |    |
-| [commands/no-default-hotkeys](docs/rules/commands/no-default-hotkeys.md)                                     | Discourage providing default hotkeys for commands.                                                                   | ✅ 🟦 🇬🇧 |           |    |
-| [commands/no-plugin-id-in-command-id](docs/rules/commands/no-plugin-id-in-command-id.md)                     | Disallow including the plugin ID in a command ID.                                                                    | ✅ 🟦 🇬🇧 |           |    |
-| [commands/no-plugin-name-in-command-name](docs/rules/commands/no-plugin-name-in-command-name.md)             | Disallow including the plugin name in a command name.                                                                | ✅ 🟦 🇬🇧 |           |    |
-| [detach-leaves](docs/rules/detach-leaves.md)                                                                 | Don't detach leaves in onunload.                                                                                     | ✅ 🟦 🇬🇧 |           | 🔧 |
-| [hardcoded-config-path](docs/rules/hardcoded-config-path.md)                                                 | test                                                                                                                 | ✅ 🟦 🇬🇧 |           |    |
-| [no-forbidden-elements](docs/rules/no-forbidden-elements.md)                                                 | Disallow attachment of forbidden elements to the DOM in Obsidian plugins.                                            | ✅ 🟦 🇬🇧 |           |    |
-| [no-plugin-as-component](docs/rules/no-plugin-as-component.md)                                               | Disallow anti-patterns when passing a component to MarkdownRenderer.render to prevent memory leaks.                  | ✅ 🟦 🇬🇧 |           |    |
-| [no-sample-code](docs/rules/no-sample-code.md)                                                               | Disallow sample code snippets from the Obsidian plugin template.                                                     | ✅ 🟦 🇬🇧 |           | 🔧 |
-| [no-static-styles-assignment](docs/rules/no-static-styles-assignment.md)                                     | Disallow setting styles directly on DOM elements, favoring CSS classes instead.                                      | ✅ 🟦 🇬🇧 |           |    |
-| [no-tfile-tfolder-cast](docs/rules/no-tfile-tfolder-cast.md)                                                 | Disallow type casting to TFile or TFolder, suggesting instanceof checks instead.                                     | ✅ 🟦 🇬🇧 |           |    |
-| [no-view-references-in-plugin](docs/rules/no-view-references-in-plugin.md)                                   | Disallow storing references to custom views directly in the plugin, which can cause memory leaks.                    | ✅ 🟦 🇬🇧 |           |    |
-| [object-assign](docs/rules/object-assign.md)                                                                 | Object.assign with two parameters instead of 3.                                                                      | ✅ 🟦 🇬🇧 |           |    |
-| [platform](docs/rules/platform.md)                                                                           | Disallow use of navigator API for OS detection                                                                       | ✅ 🟦 🇬🇧 |           |    |
-| [prefer-abstract-input-suggest](docs/rules/prefer-abstract-input-suggest.md)                                 | Disallow Liam's frequently copied `TextInputSuggest` implementation in favor of the built-in `AbstractInputSuggest`. | ✅ 🟦 🇬🇧 |           |    |
-| [prefer-file-manager-trash-file](docs/rules/prefer-file-manager-trash-file.md)                               | Prefer FileManager.trashFile() over Vault.trash() or Vault.delete() to respect user settings.                        |           | ✅ 🟦 🇬🇧 |    |
-| [regex-lookbehind](docs/rules/regex-lookbehind.md)                                                           | Using lookbehinds in Regex is not supported in some iOS versions                                                     | ✅ 🟦 🇬🇧 |           |    |
-| [sample-names](docs/rules/sample-names.md)                                                                   | Rename sample plugin class names                                                                                     | ✅ 🟦 🇬🇧 |           |    |
-| [settings-tab/no-manual-html-headings](docs/rules/settings-tab/no-manual-html-headings.md)                   | Disallow using HTML heading elements for settings headings.                                                          | ✅ 🟦 🇬🇧 |           | 🔧 |
-| [settings-tab/no-problematic-settings-headings](docs/rules/settings-tab/no-problematic-settings-headings.md) | Discourage anti-patterns in settings headings.                                                                       | ✅ 🟦 🇬🇧 |           | 🔧 |
-| [ui/sentence-case](docs/rules/ui/sentence-case.md)                                                           | Enforce sentence case for UI strings                                                                                 | ✅ 🟦 🇬🇧 |           | 🔧 |
-| [ui/sentence-case-json](docs/rules/ui/sentence-case-json.md)                                                 | Enforce sentence case for English JSON locale strings                                                                |           |           | 🔧 |
-| [ui/sentence-case-locale-module](docs/rules/ui/sentence-case-locale-module.md)                               | Enforce sentence case for English TS/JS locale module strings                                                        |           |           | 🔧 |
-| [validate-license](docs/rules/validate-license.md)                                                           | Validate the structure of copyright notices in LICENSE files for Obsidian plugins.                                   |           |           |    |
-| [validate-manifest](docs/rules/validate-manifest.md)                                                         | Validate the structure of manifest.json for Obsidian plugins.                                                        | ✅ 🟦 🇬🇧 |           |    |
-| [vault/iterate](docs/rules/vault/iterate.md)                                                                 | Avoid iterating all files to find a file by its path<br/>                                                            | ✅ 🟦 🇬🇧 |           | 🔧 |
+| Name                                                                                                         | Description                                                                                                          | 🔧 |
+| :----------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------- | :- |
+| [commands/no-command-in-command-id](docs/rules/commands/no-command-in-command-id.md)                         | Disallow using the word 'command' in a command ID.                                                                   |    |
+| [commands/no-command-in-command-name](docs/rules/commands/no-command-in-command-name.md)                     | Disallow using the word 'command' in a command name.                                                                 |    |
+| [commands/no-default-hotkeys](docs/rules/commands/no-default-hotkeys.md)                                     | Discourage providing default hotkeys for commands.                                                                   |    |
+| [commands/no-plugin-id-in-command-id](docs/rules/commands/no-plugin-id-in-command-id.md)                     | Disallow including the plugin ID in a command ID.                                                                    |    |
+| [commands/no-plugin-name-in-command-name](docs/rules/commands/no-plugin-name-in-command-name.md)             | Disallow including the plugin name in a command name.                                                                |    |
+| [detach-leaves](docs/rules/detach-leaves.md)                                                                 | Don't detach leaves in onunload.                                                                                     | 🔧 |
+| [hardcoded-config-path](docs/rules/hardcoded-config-path.md)                                                 | test                                                                                                                 |    |
+| [no-forbidden-elements](docs/rules/no-forbidden-elements.md)                                                 | Disallow attachment of forbidden elements to the DOM in Obsidian plugins.                                            |    |
+| [no-plugin-as-component](docs/rules/no-plugin-as-component.md)                                               | Disallow anti-patterns when passing a component to MarkdownRenderer.render to prevent memory leaks.                  |    |
+| [no-sample-code](docs/rules/no-sample-code.md)                                                               | Disallow sample code snippets from the Obsidian plugin template.                                                     | 🔧 |
+| [no-static-styles-assignment](docs/rules/no-static-styles-assignment.md)                                     | Disallow setting styles directly on DOM elements, favoring CSS classes instead.                                      |    |
+| [no-tfile-tfolder-cast](docs/rules/no-tfile-tfolder-cast.md)                                                 | Disallow type casting to TFile or TFolder, suggesting instanceof checks instead.                                     |    |
+| [no-view-references-in-plugin](docs/rules/no-view-references-in-plugin.md)                                   | Disallow storing references to custom views directly in the plugin, which can cause memory leaks.                    |    |
+| [object-assign](docs/rules/object-assign.md)                                                                 | Object.assign with two parameters instead of 3.                                                                      |    |
+| [platform](docs/rules/platform.md)                                                                           | Disallow use of navigator API for OS detection                                                                       |    |
+| [prefer-abstract-input-suggest](docs/rules/prefer-abstract-input-suggest.md)                                 | Disallow Liam's frequently copied `TextInputSuggest` implementation in favor of the built-in `AbstractInputSuggest`. |    |
+| [prefer-file-manager-trash-file](docs/rules/prefer-file-manager-trash-file.md)                               | Prefer FileManager.trashFile() over Vault.trash() or Vault.delete() to respect user settings.                        |    |
+| [regex-lookbehind](docs/rules/regex-lookbehind.md)                                                           | Using lookbehinds in Regex is not supported in some iOS versions                                                     |    |
+| [sample-names](docs/rules/sample-names.md)                                                                   | Rename sample plugin class names                                                                                     |    |
+| [settings-tab/no-manual-html-headings](docs/rules/settings-tab/no-manual-html-headings.md)                   | Disallow using HTML heading elements for settings headings.                                                          | 🔧 |
+| [settings-tab/no-problematic-settings-headings](docs/rules/settings-tab/no-problematic-settings-headings.md) | Discourage anti-patterns in settings headings.                                                                       | 🔧 |
+| [ui/sentence-case](docs/rules/ui/sentence-case.md)                                                           | Enforce sentence case for UI strings                                                                                 | 🔧 |
+| [ui/sentence-case-json](docs/rules/ui/sentence-case-json.md)                                                 | Enforce sentence case for English JSON locale strings                                                                | 🔧 |
+| [ui/sentence-case-locale-module](docs/rules/ui/sentence-case-locale-module.md)                               | Enforce sentence case for English TS/JS locale module strings                                                        | 🔧 |
+| [validate-license](docs/rules/validate-license.md)                                                           | Validate the structure of copyright notices in LICENSE files for Obsidian plugins.                                   |    |
+| [validate-manifest](docs/rules/validate-manifest.md)                                                         | Validate the structure of manifest.json for Obsidian plugins.                                                        |    |
+| [vault/iterate](docs/rules/vault/iterate.md)                                                                 | Avoid iterating all files to find a file by its path<br/>                                                            | 🔧 |
 
 <!-- end auto-generated rules list -->
 
