@@ -1,6 +1,6 @@
 {
 	"name": "eslint-plugin-obsidianmd",
-	"version": "0.1.5",
+	"version": "0.1.6",
 	"description": "Validates guidelines for Obsidian plugins",
 	"license": "MIT",
 	"author": "Dynalist Inc.",
@@ -42,20 +42,20 @@
 		"typescript": "5.4.5"
 	},
 	"devDependencies": {
-		"@eslint/compat": "^1.3.1",
+		"@eslint/compat": "1.3.1",
 		"@types/mocha": "10.0.6",
-		"@typescript-eslint/eslint-plugin": "^8.33.1",
-		"@typescript-eslint/parser": "^8.33.1",
-		"@typescript-eslint/rule-tester": "^8.33.1",
-		"@typescript-eslint/types": "^8.33.1",
-		"@typescript-eslint/utils": "^8.33.1",
+		"@typescript-eslint/eslint-plugin": "8.33.1",
+		"@typescript-eslint/parser": "8.33.1",
+		"@typescript-eslint/rule-tester": "8.33.1",
+		"@typescript-eslint/types": "8.33.1",
+		"@typescript-eslint/utils": "8.33.1",
 		"builtin-modules": "3.3.0",
 		"esbuild": "0.20.1",
-		"eslint-doc-generator": "^2.1.2",
+		"eslint-doc-generator": "2.1.2",
 		"mocha": "10.3.0",
-		"obsidian": "^1.8.7",
-		"ts-node": "^10.9.2",
-		"tsx": "^4.19.4",
+		"obsidian": "1.8.7",
+		"ts-node": "10.9.2",
+		"tsx": "4.19.4",
 		"typescript-eslint": "^8.35.1"
 	},
 	"engines": {
@@ -69,7 +69,6 @@
 	"type": "module",
 	"eslint-doc-generator": {
 		"configEmoji": [
-			["recommendedTypeChecked", "🟦"],
 			["recommendedWithLocalesEn", "🇬🇧"]
 		]
 	}
