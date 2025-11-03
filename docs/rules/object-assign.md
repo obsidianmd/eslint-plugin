@@ -1,3 +1,3 @@
-# Object.assign with two parameters instead of 3 (`obsidianmd/object-assign`)
+# Discourage using `Object.assign` with two arguments (`obsidianmd/object-assign`)
 
 <!-- end auto-generated rule header -->
