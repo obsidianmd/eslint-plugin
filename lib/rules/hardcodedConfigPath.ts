@@ -15,7 +15,7 @@ export default ruleCreator({
 		type: "problem" as const,
 		messages: {
 			configPath:
-				"Obsidian's configuration folder is not necessarily `.obsidian`, it can be configured by the user.",
+				"Obsidian's configuration folder is not necessarily `.obsidian`, it can be configured by the user. Use `Vault#configDir` to get the current value",
 		},
 		schema: [],
 	},

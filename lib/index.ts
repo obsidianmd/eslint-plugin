@@ -92,6 +92,7 @@ const recommendedPluginRulesConfig = {
 	"obsidianmd/regex-lookbehind": "error",
 	"obsidianmd/sample-names": "error",
 	"obsidianmd/validate-manifest": "error",
+	"obsidianmd/validate-license": ["error"],
     "obsidianmd/ui/sentence-case": ["error", { enforceCamelCaseLower: true }],
 }
 

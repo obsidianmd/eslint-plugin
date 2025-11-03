@@ -41,7 +41,7 @@ export default ruleCreator({
 		schema: [],
 		messages: {
 			avoidStyleAssignment:
-				"Avoid setting styles directly via `{{property}}`. Use CSS classes for better theming and maintainability.",
+				"Avoid setting styles directly via `{{property}}`. Use CSS classes for better theming and maintainability. Use the `setCssProps` function to change CSS properties.",
 		},
 	},
 	defaultOptions: [],

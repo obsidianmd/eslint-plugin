@@ -15,7 +15,7 @@ export default ruleCreator({
 			url: "https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#Commands",
 		},
 		messages: {
-			pluginId: "The command ID should not include the plugin ID.",
+			pluginId: "The command ID should not include the plugin ID. Obsidian will make sure that there are no conflicts with other plugins.",
 		},
 		schema: [],
 	},

@@ -10,12 +10,12 @@ export default ruleCreator({
 	meta: {
 		type: "problem" as const,
 		docs: {
-			description: "Object.assign with two parameters instead of 3.",
+			description: "Discourage using `Object.assign` with two arguments",
 			//TODO: Add url
 		},
 		schema: [],
 		messages: {
-			twoArgumentsDefault: "Doing this will reassign the default.",
+			twoArgumentsDefault: "Using `Object.assign` with an non-empty target object can lead to unexpected behaviour as it will overwrite the  target object.",
 		},
 	},
 	defaultOptions: [],

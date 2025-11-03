@@ -85,13 +85,17 @@ export default ruleCreator({
 					context.report({ node, messageId: "settings" });
 				}
 				if (text.includes("general")) {
-					context.report({ node, messageId: "general" });
+					context.report({ node, messageId: "general", fix: (fixer) => {
+						return fixer.remove(node);
+					} });
 				}
 				if (
 					manifest.name &&
 					text.includes(manifest.name.toLowerCase())
 				) {
-					context.report({ node, messageId: "pluginName" });
+					context.report({ node, messageId: "pluginName", fix: (fixer) => {
+						return fixer.remove(node);
+					} });
 				}
 			},
 		};

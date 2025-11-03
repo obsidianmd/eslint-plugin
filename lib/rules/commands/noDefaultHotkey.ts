@@ -15,7 +15,7 @@ export default ruleCreator({
 		},
 		messages: {
 			hotkeys:
-				"Avoid providing a default hotkey. Users should set their own.",
+				"Don't provide a default hotkey, as they might conflict with other hotkeys the user has already set, or that are included with Obsidian by default.",
 		},
 		schema: [],
 	},

@@ -18,7 +18,7 @@ export default ruleCreator({
 		type: "problem" as const,
 		messages: {
 			headingEl:
-				"Use `new Setting(containerEl).setName(...).setHeading()` instead of creating HTML heading elements directly.",
+				"For a consistent UI use `new Setting(containerEl).setName(...).setHeading()` instead of creating HTML heading elements directly.",
 		},
 		schema: [],
 		fixable: "code" as const,

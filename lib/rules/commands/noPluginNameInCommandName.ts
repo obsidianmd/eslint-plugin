@@ -16,7 +16,7 @@ export default ruleCreator({
 			url: "https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#Commands",
 		},
 		messages: {
-			pluginName: "The command name should not include the plugin name.",
+			pluginName: "The command name should not include the plugin name, the plugin name is already shown next to the command name in the UI.",
 		},
 		schema: [],
 	},

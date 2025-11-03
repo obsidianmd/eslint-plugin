@@ -14,7 +14,7 @@ export default ruleCreator({
 		},
 		type: "problem" as const,
 		messages: {
-			onunload: "Don't detach leaves in onunload.",
+			onunload: "Don't detach leaves in onunload, as that will reset the leaf to it's default location when the plugin is loaded, even if the user has moved it to a different location.",
 		},
 		schema: [],
 		fixable: "code" as const,

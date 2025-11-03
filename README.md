@@ -1,8 +1,5 @@
 # eslint-plugin-obsidianmd
 
-> [!warning]
-> This is not fully tested yet.
-
 ## Installation
 
 You'll first need to install [ESLint](https://eslint.org/):
