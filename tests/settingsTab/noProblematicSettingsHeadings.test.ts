@@ -55,6 +55,14 @@ const MOCK_CLASS = `
 						{ messageId: "settings" },
 						{ messageId: "general" },
 					],
+					output: `
+                        ${MOCK_CLASS}
+                        class MyTab extends PluginSettingTab {
+                            display() {
+                                ;
+                            }
+                        }
+                    `,
 				},
 				{
 					code: `
@@ -66,6 +74,14 @@ const MOCK_CLASS = `
 						}
 					`,
 					errors: [{ messageId: "general" }],
+					output: `
+						${MOCK_CLASS}
+						class MyTab extends PluginSettingTab {
+							display() {
+								;
+							}
+						}
+					`,
 				},
 				{
 					code: `
@@ -77,6 +93,14 @@ const MOCK_CLASS = `
                         }
                     `,
 					errors: [{ messageId: "pluginName" }],
+					output: `
+                        ${MOCK_CLASS}
+                        class MyTab extends PluginSettingTab {
+                            display() {
+                                ;
+                            }
+                        }
+                    `,
 				},
 			],
 		});
