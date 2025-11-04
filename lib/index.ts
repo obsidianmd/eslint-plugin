@@ -20,12 +20,10 @@ import validateManifest from "./rules/validateManifest.js";
 import validateLicense from "./rules/validateLicense.js";
 import { manifest } from "./readManifest.js";
 import { ui } from "./rules/ui/index.js";
-import { PlainTextParser } from "./plainTextParser.js";
 
 // --- Import plugins and configs for the recommended config ---
 import js from "@eslint/js";
 import tseslint from "typescript-eslint";
-import jsonSchemaValidator from "eslint-plugin-json-schema-validator";
 import sdl from "@microsoft/eslint-plugin-sdl";
 import importPlugin from "eslint-plugin-import";
 
@@ -160,6 +158,7 @@ const flatRecommendedGeneralRules = {
 	"@typescript-eslint/ban-ts-comment": "off",
 	"@typescript-eslint/no-deprecated": "error",
 	"@typescript-eslint/no-unused-vars": ["warn", { args: "none" }],
+	"@typescript-eslint/require-await": "off",
 	"@typescript-eslint/no-explicit-any": [
 		"error",
 		{ fixToUnknown: true },
