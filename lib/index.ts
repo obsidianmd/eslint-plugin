@@ -66,6 +66,10 @@ const plugin: ESLint.Plugin = {
 		"ui/sentence-case-json": ui.sentenceCaseJson,
 		"ui/sentence-case-locale-module": ui.sentenceCaseLocaleModule,
 	} as any,
+	configs: {
+		recommended: {},
+		recommendedWithLocalesEn: {}
+	}
 };
 
 const recommendedPluginRulesConfig = {
