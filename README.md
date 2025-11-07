@@ -29,22 +29,22 @@ import { defineConfig } from "eslint/config";
 import obsidianmd from "eslint-plugin-obsidianmd";
 
 export default defineConfig([
-	...obsidianmd.configs.recommended,
-	{
-		files: ["**/*.ts"],
-		languageOptions: {
-			parser: tsparser,
-			parserOptions: { project: "./tsconfig.json" },
-		},
+  ...obsidianmd.configs.recommended,
+  {
+    files: ["**/*.ts"],
+    languageOptions: {
+      parser: tsparser,
+      parserOptions: { project: "./tsconfig.json" },
+    },
 
-		// You can add your own configuration to override or add rules
-		rules: {
-			// example: turn off a rule from the recommended set
-			"obsidianmd/sample-names": "off",
-			// example: add a rule not in the recommended set and set its severity
-			"obsidianmd/prefer-file-manager-trash": "error",
-		},
-	},
+    // You can add your own configuration to override or add rules
+    rules: {
+      // example: turn off a rule from the recommended set
+      "obsidianmd/sample-names": "off",
+      // example: add a rule not in the recommended set and set its severity
+      "obsidianmd/prefer-file-manager-trash": "error",
+    },
+  },
 ]);
 
 ```
@@ -146,29 +146,29 @@ import { defineConfig } from "eslint/config";
 import obsidianmd from "eslint-plugin-obsidianmd";
 
 export default defineConfig([
-	...obsidianmd.configs.recommended,
-	// Or include English locale files (JSON and TS/JS modules)
-	// ...obsidianmd.configs.recommendedWithLocalesEn,
+  ...obsidianmd.configs.recommended,
+  // Or include English locale files (JSON and TS/JS modules)
+  // ...obsidianmd.configs.recommendedWithLocalesEn,
 
-	{
-		files: ["**/*.ts"],
-		languageOptions: {
-			parser: tsparser,
-			parserOptions: { project: "./tsconfig.json" },
-		},
+  {
+    files: ["**/*.ts"],
+    languageOptions: {
+      parser: tsparser,
+      parserOptions: { project: "./tsconfig.json" },
+    },
 
-		// Optional project overrides
-		rules: {
-			"obsidianmd/ui/sentence-case": [
-				"warn",
-				{
-					brands: ["YourBrand"],
-					acronyms: ["OK"],
-					enforceCamelCaseLower: true,
-				},
-			],
-		},
-	},
+    // Optional project overrides
+    rules: {
+      "obsidianmd/ui/sentence-case": [
+        "warn",
+        {
+          brands: ["YourBrand"],
+          acronyms: ["OK"],
+          enforceCamelCaseLower: true,
+        },
+      ],
+    },
+  },
 ]);
 ```
 
