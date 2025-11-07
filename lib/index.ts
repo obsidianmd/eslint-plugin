@@ -260,6 +260,7 @@ plugin.configs = {
 			} as any;
 		},
 	} as any,
+	recommendedPluginRulesOnly: recommendedPluginRulesConfig,
 } as any;
 
 export default plugin;
