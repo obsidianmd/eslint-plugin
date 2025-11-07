@@ -23,23 +23,30 @@ With the release of ESLint v9, the default configuration file is now `eslint.con
 To use the recommended configuration, add it to your `eslint.config.js` file. This will enable all the recommended rules.
 
 ```javascript
-// eslint.config.js
+// eslint.config.mjs
+import tsparser from "@typescript-eslint/parser";
+import { defineConfig } from "eslint/config";
 import obsidianmd from "eslint-plugin-obsidianmd";
 
-export default [
-  // The recommended configuration
-  ...obsidianmd.configs.recommended,
+export default defineConfig([
+	...obsidianmd.configs.recommended,
+	{
+		files: ["**/*.ts"],
+		languageOptions: {
+			parser: tsparser,
+			parserOptions: { project: "./tsconfig.json" },
+		},
 
-  // You can add your own configuration to override or add rules
-  {
-    rules: {
-      // example: turn off a rule from the recommended set
-      "obsidianmd/sample-names": "off",
-      // example: add a rule not in the recommended set and set its severity
-      "obsidianmd/prefer-file-manager-trash": "error",
-    },
-  },
-];
+		// You can add your own configuration to override or add rules
+		rules: {
+			// example: turn off a rule from the recommended set
+			"obsidianmd/sample-names": "off",
+			// example: add a rule not in the recommended set and set its severity
+			"obsidianmd/prefer-file-manager-trash": "error",
+		},
+	},
+]);
+
 ```
 
 ### Legacy Config (`.eslintrc`)
@@ -133,27 +140,36 @@ Checks UI strings for sentence case. The rule reports warnings but doesn't chang
 ### Usage (flat config)
 
 ```js
-// eslint.config.js
-import obsidianmd from 'eslint-plugin-obsidianmd';
+// eslint.config.mjs
+import tsparser from "@typescript-eslint/parser";
+import { defineConfig } from "eslint/config";
+import obsidianmd from "eslint-plugin-obsidianmd";
 
-export default [
-  // Base Obsidian rules
-  ...obsidianmd.configs.recommended,
+export default defineConfig([
+	...obsidianmd.configs.recommended,
+	// Or include English locale files (JSON and TS/JS modules)
+	// ...obsidianmd.configs.recommendedWithLocalesEn,
 
-  // Or include English locale files (JSON and TS/JS modules)
-  // ...obsidianmd.configs.recommendedWithLocalesEn,
+	{
+		files: ["**/*.ts"],
+		languageOptions: {
+			parser: tsparser,
+			parserOptions: { project: "./tsconfig.json" },
+		},
 
-  // Optional project overrides
-  {
-    rules: {
-      'obsidianmd/ui/sentence-case': ['warn', {
-        brands: ['YourBrand'],
-        acronyms: ['OK'],
-        enforceCamelCaseLower: true,
-      }],
-    },
-  },
-];
+		// Optional project overrides
+		rules: {
+			"obsidianmd/ui/sentence-case": [
+				"warn",
+				{
+					brands: ["YourBrand"],
+					acronyms: ["OK"],
+					enforceCamelCaseLower: true,
+				},
+			],
+		},
+	},
+]);
 ```
 
 ### Notes
