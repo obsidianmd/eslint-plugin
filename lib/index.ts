@@ -23,9 +23,11 @@ import { ui } from "./rules/ui/index.js";
 
 // --- Import plugins and configs for the recommended config ---
 import js from "@eslint/js";
+import json from "@eslint/json";
 import tseslint from "typescript-eslint";
 import sdl from "@microsoft/eslint-plugin-sdl";
 import importPlugin from "eslint-plugin-import";
+import depend from 'eslint-plugin-depend';
 
 const plugin: ESLint.Plugin = {
 	meta: {
@@ -143,6 +145,16 @@ const flatRecommendedGeneralRules = {
 				"Use the built-in `requestUrl` function instead of `got`.",
 		},
 		{
+			name: "ofetch",
+			message:
+				"Use the built-in `requestUrl` function instead of `ofetch`.",
+		},
+		{
+			name: "ky",
+			message:
+				"Use the built-in `requestUrl` function instead of `ky`.",
+		},
+		{
 			name: "node-fetch",
 			message:
 				"Use the built-in `requestUrl` function instead of `node-fetch`.",
@@ -177,6 +189,7 @@ const flatRecommendedConfig = [
 			import: importPlugin,
 			"@microsoft/sdl": sdl,
 			obsidianmd: plugin,
+			depend
 		},
 		files: ['**/*.js', "**/*.jsx"],
 		extends: [tseslint.configs.recommended],
@@ -190,6 +203,7 @@ const flatRecommendedConfig = [
 			import: importPlugin,
 			"@microsoft/sdl": sdl,
 			obsidianmd: plugin,
+			depend
 		},
 		files: ['**/*.ts', "**/*.tsx"],
 		extends: [tseslint.configs.recommendedTypeChecked],
@@ -197,6 +211,22 @@ const flatRecommendedConfig = [
 			...flatRecommendedGeneralRules,
 			...recommendedPluginRulesConfig
 		},
+	},
+	{
+		files: ['package.json'],
+		language: 'json/json',
+		plugins: {
+			depend,
+			json
+		},
+		rules: {
+			"no-irregular-whitespace": "off",
+			"depend/ban-dependencies": [
+				"error", {
+					"presets": ["native", "microutilities", "preferred"]
+				}
+				]
+		}
 	}
 	]
 
