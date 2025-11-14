@@ -9,7 +9,8 @@
 		"forceConsistentCasingInFileNames": true,
 		"outDir": "dist",
 		"rootDir": "./",
-		"baseUrl": "."
+		"baseUrl": ".",
+		"declaration": true
 	},
 	"include": ["lib/**/*.ts", "tests/**/*.ts", "*.ts", "manifest.json"],
 	"exclude": ["node_modules", "dist"]
