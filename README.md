@@ -76,6 +76,31 @@ You can also override or add rules:
 
 </details>
 
+### Using only Obsidian-specific rules
+
+If you use a linter other than ESLint, you may want to only enable Obsidian-specific rules, without all the General ESLint rules. To do so, use this configuration:
+
+```javascript
+// eslint.config.mjs
+import tsparser from "@typescript-eslint/parser";
+import { defineConfig } from "eslint/config";
+import obsidianmd from "eslint-plugin-obsidianmd";
+
+export default defineConfig([
+  {
+    files: ["**/*.ts"],
+    languageOptions: {
+      parser: tsparser,
+      parserOptions: { project: "./tsconfig.json" },
+    },
+    plugins: {
+      obsidianmd: obsidianmd,
+    },
+    rules: obsidianmd.configs.recommendedPluginRulesOnly,
+  },
+]);
+```
+
 ## Configurations
 
 <!-- begin auto-generated configs list -->
