@@ -2,8 +2,8 @@ import { RuleTester } from "@typescript-eslint/rule-tester";
 import noManualHeadingsRule from "../../lib/rules/settingsTab/noManualHtmlHeadings.js";
 
 const MOCK_CLASS = `
-    declare class Setting { constructor(el: any); setName(name: string): this; setHeading(): this; }
-    declare class PluginSettingTab { containerEl: { createEl(tag: string, options?: any): HTMLElement; }; }
+    declare class Setting { constructor(el: unknown); setName(name: string): this; setHeading(): this; }
+    declare class PluginSettingTab { containerEl: { createEl(tag: string, options?: unknown): HTMLElement; }; }
 `;
 
 const ruleTester = new RuleTester();
