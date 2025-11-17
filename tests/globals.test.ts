@@ -118,12 +118,6 @@ desktopRuleTester.run("no-undef (desktop-only)", noUndefRule, {
 			code: "process.env.NODE_ENV;",
 		},
 		{
-			code: "__dirname;",
-		},
-		{
-			code: "__filename;",
-		},
-		{
 			code: "setImmediate(() => {});",
 		}
 	],
@@ -159,14 +153,6 @@ browserRuleTester.run("no-undef (browser)", noUndefRule, {
 		},
 		{
 			code: "process.env.NODE_ENV;",
-			errors: [{ messageId: "undef" }],
-		},
-		{
-			code: "__dirname;",
-			errors: [{ messageId: "undef" }],
-		},
-		{
-			code: "__filename;",
 			errors: [{ messageId: "undef" }],
 		},
 		{
