@@ -23,3 +23,4 @@ import "./globals.test";
 import "./ui/sentenceCaseJson.test";
 import "./ui/sentenceCase.test";
 import "./ui/sentenceCaseLocaleModule.test";
+import "./ruleCustomMessage.test";
