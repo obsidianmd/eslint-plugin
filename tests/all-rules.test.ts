@@ -19,6 +19,7 @@ import "./noPluginAsComponent.test";
 import "./preferAbstractInputSuggest.test";
 import "./noSampleCode.test";
 import "./noForbiddenElements.test";
+import "./globals.test";
 import "./ui/sentenceCaseJson.test";
 import "./ui/sentenceCase.test";
 import "./ui/sentenceCaseLocaleModule.test";
