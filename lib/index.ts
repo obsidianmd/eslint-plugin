@@ -28,6 +28,7 @@ import tseslint from "typescript-eslint";
 import sdl from "@microsoft/eslint-plugin-sdl";
 import importPlugin from "eslint-plugin-import";
 import depend from 'eslint-plugin-depend';
+import globals from "globals";
 
 const plugin: ESLint.Plugin = {
 	meta: {
@@ -227,8 +228,34 @@ const flatRecommendedConfig = [
 				}
 				]
 		}
+	}, {
+		languageOptions: {
+			globals: {
+				...globals.browser,
+				...(manifest?.isDesktopOnly ? {
+					...globals.node,
+					NodeJS: "readonly"
+				} : {}),
+				DomElementInfo: "readonly",
+				activeDocument: "readonly",
+				activeWindow: "readonly",
+				ajax: "readonly",
+				ajaxPromise: "readonly",
+				createDiv: "readonly",
+				createEl: "readonly",
+				createFragment: "readonly",
+				createSpan: "readonly",
+				createSvg: "readonly",
+				fish: "readonly",
+				fishAll: "readonly",
+				isBoolean: "readonly",
+				nextFrame: "readonly",
+				ready: "readonly",
+				sleep: "readonly"
+			}
+		},
 	}
-	]
+];
 
 const hybridRecommendedConfig = {
 	// Properties for eslint-doc-generator to read
