@@ -18,7 +18,7 @@ ruleTester.run("object-assign", objectAssignRule, {
 		{
 			code: `
 				class MyPlugin {
-					settings: any;
+					settings: unknown;
 
 					async loadSettings() {
 						this.settings = Object.assign(DEFAULT_SETTINGS, await this.loadData());

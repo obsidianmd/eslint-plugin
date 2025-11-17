@@ -8,7 +8,7 @@ ruleTester.run("prefer-file-manager-trash-file", preferFileManagerTrashRule, {
 		// Correct usage
 		{
 			code: `
-                declare class FileManager { trashFile(file: any): void; }
+                declare class FileManager { trashFile(file: unknown): void; }
                 declare const fileManager: FileManager;
                 fileManager.trashFile(someFile);
             `,
@@ -33,7 +33,7 @@ ruleTester.run("prefer-file-manager-trash-file", preferFileManagerTrashRule, {
 		// Basic invalid cases
 		{
 			code: `
-                declare class Vault { trash(file: any): void; }
+                declare class Vault { trash(file: unknown): void; }
                 declare const vault: Vault;
                 vault.trash(someFile);
             `,
@@ -46,7 +46,7 @@ ruleTester.run("prefer-file-manager-trash-file", preferFileManagerTrashRule, {
 		},
 		{
 			code: `
-                declare class Vault { delete(file: any): void; }
+                declare class Vault { delete(file: unknown): void; }
                 declare const vault: Vault;
                 vault.delete(someFile);
             `,
@@ -60,7 +60,7 @@ ruleTester.run("prefer-file-manager-trash-file", preferFileManagerTrashRule, {
 		// A more realistic plugin scenario
 		{
 			code: `
-                declare class Vault { trash(file: any): void; }
+                declare class Vault { trash(file: unknown): void; }
                 declare class App { vault: Vault; }
                 declare const app: App;
                 app.vault.trash(someFile);
@@ -75,7 +75,7 @@ ruleTester.run("prefer-file-manager-trash-file", preferFileManagerTrashRule, {
 		// Test with an intermediate variable
 		{
 			code: `
-                declare class Vault { delete(file: any): void; }
+                declare class Vault { delete(file: unknown): void; }
                 declare const myVault: Vault;
                 const v = myVault;
                 v.delete(someFile);
