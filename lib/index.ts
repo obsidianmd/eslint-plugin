@@ -18,6 +18,7 @@ import regexLookbehind from "./rules/regexLookbehind.js";
 import sampleNames from "./rules/sampleNames.js";
 import validateManifest from "./rules/validateManifest.js";
 import validateLicense from "./rules/validateLicense.js";
+import ruleCustomMessage from "./rules/ruleCustomMessage.js";
 import { manifest } from "./readManifest.js";
 import { ui } from "./rules/ui/index.js";
 
@@ -74,6 +75,7 @@ const plugin = {
 		"sample-names": sampleNames,
 		"validate-manifest": validateManifest,
 		"validate-license": validateLicense,
+		"rule-custom-message": ruleCustomMessage,
 		"ui/sentence-case": ui.sentenceCase,
 		"ui/sentence-case-json": ui.sentenceCaseJson,
 		"ui/sentence-case-locale-module": ui.sentenceCaseLocaleModule,
@@ -120,7 +122,7 @@ const flatRecommendedGeneralRules: RulesConfig = {
 	"no-implied-eval": "error",
 	"prefer-const": "off",
 	"no-implicit-globals": "error",
-	"no-console": ["error", { allow: ["warn", "error", "debug"] }],
+	"no-console": "off", // overridden by obsidianmd/rule-custom-message
 	"no-restricted-globals": [
 		"error",
 		{
@@ -192,7 +194,18 @@ const flatRecommendedGeneralRules: RulesConfig = {
 	"import/no-nodejs-modules":
 		manifest && manifest.isDesktopOnly ? "off" : "error",
 	"import/no-extraneous-dependencies": "error",
-}
+	"obsidianmd/rule-custom-message": [
+		"error",
+		{
+			"no-console": {
+				messages: {
+					"Unexpected console statement. Only these console methods are allowed: warn, error, debug.": "Avoid unnecessary logging to console. See https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#Avoid+unnecessary+logging+to+console",
+				},
+				options: [{ allow: ["warn", "error", "debug"] }],
+			}
+		}
+	]
+};
 
 const flatRecommendedConfig: Config[] = defineConfig([
 	js.configs.recommended,
