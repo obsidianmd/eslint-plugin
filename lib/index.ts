@@ -162,7 +162,8 @@ const flatRecommendedGeneralRules = {
 		{
 			name: "moment",
 			message:
-				"The 'moment' package is bundled with Obsidian. Please import it from 'obsidian' instead.",
+				"The 'moment' package is bundled with Obsidian. Please import it from 'obsidian' instead. Type-only imports are allowed.",
+			allowTypeImports: true
 		},
 	],
 	"no-alert": "error",
