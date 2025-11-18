@@ -29,13 +29,22 @@ import sdl from "@microsoft/eslint-plugin-sdl";
 import importPlugin from "eslint-plugin-import";
 import depend from 'eslint-plugin-depend';
 import globals from "globals";
+import fs from "node:fs";
+import path from "node:path";
 import { Config, defineConfig, globalIgnores } from "eslint/config";
 import type { RuleDefinition, RuleDefinitionTypeOptions, RulesConfig } from "@eslint/core";
 
+interface PackageJson {
+	name: string;
+	version: string;
+}
+
+const packageJson = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, "../../package.json"), "utf8")) as PackageJson;
+
 const plugin = {
 	meta: {
-		name: "eslint-plugin-obsidianmd",
-		version: "0.1.2",
+		name: packageJson.name,
+		version: packageJson.version,
 	},
 	rules: {
 		"commands/no-command-in-command-id": commands.noCommandInCommandId,
