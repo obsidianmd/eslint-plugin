@@ -49,6 +49,33 @@ export default defineConfig([
 
 ```
 
+### `package.json` lint rules
+
+The package exposes special configuration `packageJson` to lint `package.json` file.
+
+Due to `ESLint` configuration limitation, it's hard to make it working together with other TypeScript rules.
+
+So it's recommended to extract it into a separate config file, e.g. `eslint.config.package.json.mjs`
+
+```javascript
+// eslint.config.package.json.mjs
+import { defineConfig, globalIgnores } from "eslint/config";
+
+export default defineConfig([
+  globalIgnores([
+    '**/*.*',
+    '!package.json'
+  ]),
+  obsidianmd.configs.packageJson
+]);
+```
+
+And then you can run it via
+
+```bash
+npx eslint --config eslint.config.package.json.mjs
+```
+
 ### Legacy Config (`.eslintrc`)
 
 <details>
