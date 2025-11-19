@@ -29,12 +29,8 @@ import sdl from "@microsoft/eslint-plugin-sdl";
 import importPlugin from "eslint-plugin-import";
 import depend from 'eslint-plugin-depend';
 import globals from "globals";
-
+import { Config, defineConfig, globalIgnores } from "eslint/config";
 import type { RuleDefinition, RuleDefinitionTypeOptions, RulesConfig } from "@eslint/core";
-
-interface ConfigWithIterator extends Linter.Config {
-	[Symbol.iterator]: () => Generator<Linter.Config>;
-}
 
 const plugin = {
 	meta: {
@@ -74,8 +70,8 @@ const plugin = {
 		"ui/sentence-case-locale-module": ui.sentenceCaseLocaleModule,
 	} as unknown as Record<string, RuleDefinition<RuleDefinitionTypeOptions>>,
 	configs: {
-		recommended: <Linter.Config<RulesConfig>>{},
-		recommendedWithLocalesEn: <Linter.Config<RulesConfig>>{}
+		recommended: [] as Config[],
+		recommendedWithLocalesEn: [] as Config[]
 	}
 } satisfies ESLint.Plugin;
 
@@ -104,7 +100,7 @@ const recommendedPluginRulesConfig: RulesConfig = {
 	"obsidianmd/sample-names": "error",
 	"obsidianmd/validate-manifest": "error",
 	"obsidianmd/validate-license": ["error"],
-    "obsidianmd/ui/sentence-case": ["error", { enforceCamelCaseLower: true }],
+	"obsidianmd/ui/sentence-case": ["error", { enforceCamelCaseLower: true }],
 }
 
 const flatRecommendedGeneralRules: RulesConfig = {
@@ -189,31 +185,34 @@ const flatRecommendedGeneralRules: RulesConfig = {
 	"import/no-extraneous-dependencies": "error",
 }
 
-const flatRecommendedConfig: Linter.Config[] = [
+const flatRecommendedConfig: Config[] = defineConfig([
 	js.configs.recommended,
 	{
-		...tseslint.configs.recommended,
+		plugins: {
+			obsidianmd: plugin
+		}
+	},
+	{
 		plugins: {
 			import: importPlugin,
 			"@microsoft/sdl": sdl,
-			obsidianmd: plugin,
 			depend
 		},
 		files: ['**/*.js', "**/*.jsx"],
+		extends: tseslint.configs.recommended as Config[],
 		rules: {
 			...flatRecommendedGeneralRules,
 			...recommendedPluginRulesConfig
 		}
 	},
 	{
-		...tseslint.configs.recommendedTypeChecked,
 		plugins: {
 			import: importPlugin,
 			"@microsoft/sdl": sdl,
-			obsidianmd: plugin,
 			depend
 		},
 		files: ['**/*.ts', "**/*.tsx"],
+		extends: tseslint.configs.recommendedTypeChecked as Config[],
 		rules: {
 			...flatRecommendedGeneralRules,
 			...recommendedPluginRulesConfig
@@ -222,6 +221,7 @@ const flatRecommendedConfig: Linter.Config[] = [
 	{
 		files: ['package.json'],
 		language: 'json/json',
+		extends: [tseslint.configs.disableTypeChecked as Config],
 		plugins: {
 			depend,
 			json
@@ -232,9 +232,10 @@ const flatRecommendedConfig: Linter.Config[] = [
 				"error", {
 					"presets": ["native", "microutilities", "preferred"]
 				}
-				]
+			]
 		}
-	}, {
+	},
+	{
 		languageOptions: {
 			globals: {
 				...globals.browser,
@@ -261,68 +262,66 @@ const flatRecommendedConfig: Linter.Config[] = [
 			}
 		},
 	}
-];
+]);
 
-const hybridRecommendedConfig: ConfigWithIterator = {
-	// Properties for eslint-doc-generator to read
-	...recommendedPluginRulesConfig,
+const hybridRecommendedConfig: Config[] = defineConfig({
+	rules: recommendedPluginRulesConfig,
+	extends: flatRecommendedConfig
+});
 
-	// Make the object iterable for the ESLint 9 runtime
-	[Symbol.iterator]: function* () {
-		yield* flatRecommendedConfig
+const recommendedWithLocalesEnBase: Config[] = defineConfig([
+	...flatRecommendedConfig,
+	{
+		plugins: { obsidianmd: plugin },
+		files: [
+			"**/en.json",
+			"**/en*.json",
+			"**/en/*.json",
+			"**/en/**/*.json",
+		],
+		rules: {
+			"obsidianmd/ui/sentence-case-json": "warn",
+		},
 	},
-};
+	// TS/JS English locale modules
+	{
+		plugins: { obsidianmd: plugin },
+		files: [
+			"**/en.ts",
+			"**/en.js",
+			"**/en.cjs",
+			"**/en.mjs",
+			"**/en-*.ts",
+			"**/en-*.js",
+			"**/en-*.cjs",
+			"**/en-*.mjs",
+			"**/en_*.ts",
+			"**/en_*.js",
+			"**/en_*.cjs",
+			"**/en_*.mjs",
+			"**/en/*.ts",
+			"**/en/*.js",
+			"**/en/*.cjs",
+			"**/en/*.mjs",
+			"**/en/**/*.ts",
+			"**/en/**/*.js",
+			"**/en/**/*.cjs",
+			"**/en/**/*.mjs",
+		],
+		rules: {
+			"obsidianmd/ui/sentence-case-locale-module": "warn",
+		},
+	}
+]);
+
+const recommendedWithLocalesEn: Config[] = defineConfig({
+	rules: recommendedPluginRulesConfig,
+	extends: recommendedWithLocalesEnBase
+});
 
 plugin.configs = {
 	recommended: hybridRecommendedConfig,
-	recommendedWithLocalesEn: <ConfigWithIterator>{
-		...recommendedPluginRulesConfig,
-		[Symbol.iterator]: function* () {
-			yield* flatRecommendedConfig;
-			// JSON English locales
-			yield {
-				plugins: { obsidianmd: plugin },
-				files: [
-					"**/en.json",
-					"**/en*.json",
-					"**/en/*.json",
-					"**/en/**/*.json",
-				],
-				rules: {
-					"obsidianmd/ui/sentence-case-json": "warn",
-				},
-			};
-			// TS/JS English locale modules
-			yield {
-				plugins: { obsidianmd: plugin },
-				files: [
-					"**/en.ts",
-					"**/en.js",
-					"**/en.cjs",
-					"**/en.mjs",
-					"**/en-*.ts",
-					"**/en-*.js",
-					"**/en-*.cjs",
-					"**/en-*.mjs",
-					"**/en_*.ts",
-					"**/en_*.js",
-					"**/en_*.cjs",
-					"**/en_*.mjs",
-					"**/en/*.ts",
-					"**/en/*.js",
-					"**/en/*.cjs",
-					"**/en/*.mjs",
-					"**/en/**/*.ts",
-					"**/en/**/*.js",
-					"**/en/**/*.cjs",
-					"**/en/**/*.mjs",
-				],
-				rules: {
-					"obsidianmd/ui/sentence-case-locale-module": "warn",
-				},
-			};
-		},
-	},
+	recommendedWithLocalesEn
 };
 
 export default plugin;
