@@ -1,4 +1,6 @@
-# Customize error messages from other ESLint rules (`obsidianmd/rule-custom-message`)
+# Allows redefining error messages from other ESLint rules that don't provide this functionality natively (`obsidianmd/rule-custom-message`)
+
+<!-- end auto-generated rule header -->
 
 Allows redefining error messages from other ESLint rules that don't provide this functionality natively.
 
