@@ -17,8 +17,22 @@ if (typeof (global as NodeJS.Global).afterAll !== "function") {
 }
 
 RuleTester.afterAll = () => {};
-RuleTester.describe = (text, fn) => fn();
-RuleTester.it = (text, fn) => fn();
+RuleTester.describe = (text, fn) => {
+	try {
+		fn();
+	} catch (error) {
+		console.error(`\ndescribe: ${text}`);
+		throw error;
+	}
+};
+RuleTester.it = (text, fn) => {
+	try {
+		fn();
+	} catch (error) {
+		console.error(`  it: ${text}`);
+		throw error;
+	}
+};
 
 // Set up RuleTester to use @typescript-eslint/parser globally
 export const typedRuleTesterConfig: RuleTesterConfig = {
