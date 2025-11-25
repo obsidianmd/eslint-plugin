@@ -1,12 +1,14 @@
 import { TSESTree, ESLintUtils } from "@typescript-eslint/utils";
-import { manifest } from "../../readManifest.js";
+import { getManifest } from "../../manifest.js";
 
 const ruleCreator = ESLintUtils.RuleCreator(
 	(name) =>
 		`https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/settings-tab/${name}.md`,
 );
 
-export default ruleCreator({
+type Options = [{ pluginName?: string }?];
+
+export default ruleCreator<Options, "settings" | "general" | "pluginName">({
 	name: "no-problematic-settings-headings",
 	meta: {
 		docs: {
@@ -19,11 +21,24 @@ export default ruleCreator({
 			general: 'Avoid using a "General" heading in settings.',
 			pluginName: "Avoid including the plugin name in settings headings.",
 		},
-		schema: [],
+		schema: [
+			{
+				type: "object",
+				properties: {
+					pluginName: {
+						type: "string",
+						description: "The plugin name to check against. Defaults to manifest.json name.",
+					},
+				},
+				additionalProperties: false,
+			},
+		],
 		fixable: "code" as const,
 	},
-	defaultOptions: [],
+	defaultOptions: [{}],
 	create(context) {
+		const options = context.options[0] || {};
+		const pluginName = options.pluginName ?? getManifest()?.name;
 		let insidePluginSettingTab = false;
 
 		return {
@@ -90,8 +105,8 @@ export default ruleCreator({
 					} });
 				}
 				if (
-					manifest.name &&
-					text.includes(manifest.name.toLowerCase())
+					pluginName &&
+					text.includes(pluginName.toLowerCase())
 				) {
 					context.report({ node, messageId: "pluginName", fix: (fixer) => {
 						return fixer.remove(node);
