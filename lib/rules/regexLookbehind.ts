@@ -1,4 +1,4 @@
-import { manifest } from "../readManifest.js";
+import { getManifest } from "../manifest.js";
 import { TSESTree, ESLintUtils } from "@typescript-eslint/utils";
 
 const ruleCreator = ESLintUtils.RuleCreator(
@@ -6,7 +6,9 @@ const ruleCreator = ESLintUtils.RuleCreator(
 		`https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
 );
 
-export default ruleCreator({
+type Options = [{ isDesktopOnly?: boolean }?];
+
+export default ruleCreator<Options, "lookbehind">({
 	name: "regex-lookbehind",
 	meta: {
 		docs: {
@@ -19,10 +21,23 @@ export default ruleCreator({
 			lookbehind:
 				"Lookbehinds are not supported on iOS versions before 16.4.",
 		},
-		schema: [],
+		schema: [
+			{
+				type: "object",
+				properties: {
+					isDesktopOnly: {
+						type: "boolean",
+						description: "Whether the plugin is desktop-only. Defaults to manifest.json isDesktopOnly.",
+					},
+				},
+				additionalProperties: false,
+			},
+		],
 	},
-	defaultOptions: [],
+	defaultOptions: [{}],
 	create(context) {
+		const options = context.options[0] || {};
+		const isDesktopOnly = options.isDesktopOnly ?? getManifest()?.isDesktopOnly;
 		return {
 			Literal(node: TSESTree.Literal) {
 				// Check RegExp literals
@@ -32,7 +47,7 @@ export default ruleCreator({
 					typeof node.regex.pattern === "string"
 				) {
 					if (/\(\?<=|\(\?<!\)/.test(node.regex.pattern)) {
-						if (!manifest.isDesktopOnly) {
+						if (!isDesktopOnly) {
 							context.report({
 								node,
 								messageId: "lookbehind",
@@ -45,7 +60,7 @@ export default ruleCreator({
 					typeof node.value === "string" &&
 					/(\?<=|\?<!)/.test(node.value)
 				) {
-					if (!manifest.isDesktopOnly) {
+					if (!isDesktopOnly) {
 						context.report({
 							node,
 							messageId: "lookbehind",
