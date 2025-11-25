@@ -1,12 +1,14 @@
 import { TSESTree, ESLintUtils } from "@typescript-eslint/utils";
-import { manifest } from "../../readManifest.js";
+import { getManifest } from "../../manifest.js";
 
 const ruleCreator = ESLintUtils.RuleCreator(
 	(name) =>
 		`https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/commands/${name}.md`,
 );
 
-export default ruleCreator({
+type Options = [{ pluginId?: string }?];
+
+export default ruleCreator<Options, "pluginId">({
 	name: "no-plugin-id-in-command-id",
 	meta: {
 		type: "suggestion" as const,
@@ -17,10 +19,23 @@ export default ruleCreator({
 		messages: {
 			pluginId: "The command ID should not include the plugin ID. Obsidian will make sure that there are no conflicts with other plugins.",
 		},
-		schema: [],
+		schema: [
+			{
+				type: "object",
+				properties: {
+					pluginId: {
+						type: "string",
+						description: "The plugin ID to check against. Defaults to manifest.json id.",
+					},
+				},
+				additionalProperties: false,
+			},
+		],
 	},
-	defaultOptions: [],
+	defaultOptions: [{}],
 	create(context) {
+		const options = context.options[0] || {};
+		const pluginId = options.pluginId ?? getManifest()?.id;
 		return {
 			CallExpression(node: TSESTree.CallExpression) {
 				if (
@@ -35,7 +50,7 @@ export default ruleCreator({
 				const commandObject = node.arguments[0];
 				for (const property of commandObject.properties) {
 					if (
-						typeof manifest.id === "string" &&
+						typeof pluginId === "string" &&
 						property.type === "Property" &&
 						property.key.type === "Identifier" &&
 						property.key.name === "id" &&
@@ -43,7 +58,7 @@ export default ruleCreator({
 						typeof property.value.value === "string" &&
 						property.value.value
 							.toLowerCase()
-							.includes(manifest.id.toLowerCase())
+							.includes(pluginId.toLowerCase())
 					) {
 						context.report({
 							node: property,
