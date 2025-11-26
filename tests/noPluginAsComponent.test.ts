@@ -24,10 +24,10 @@ const MOCK_API = `
 `;
 
 ruleTester.run("no-plugin-as-component", noPluginAsComponentRule, {
-	valid: [
-		// Correct: Using a View component instance (passed as a variable `this`)
-		{
-			code: `
+    valid: [
+        // Correct: Using a View component instance (passed as a variable `this`)
+        {
+            code: `
                 ${MOCK_API}
                 declare const app: App;
                 declare const el: HTMLElement;
@@ -37,10 +37,10 @@ ruleTester.run("no-plugin-as-component", noPluginAsComponentRule, {
                     }
                 }
             `,
-		},
-		// Correct: Storing the component in a variable first
-		{
-			code: `
+        },
+        // Correct: Storing the component in a variable first
+        {
+            code: `
                 ${MOCK_API}
                 declare const app: App;
                 declare const el: HTMLElement;
@@ -52,12 +52,12 @@ ruleTester.run("no-plugin-as-component", noPluginAsComponentRule, {
                     }
                 }
             `,
-		},
-	],
-	invalid: [
-		// Invalid: Passing `new Component()` directly
-		{
-			code: `
+        },
+    ],
+    invalid: [
+        // Invalid: Passing `new Component()` directly
+        {
+            code: `
                 ${MOCK_API}
                 declare const app: App;
                 declare const el: HTMLElement;
@@ -67,11 +67,11 @@ ruleTester.run("no-plugin-as-component", noPluginAsComponentRule, {
                     }
                 }
             `,
-			errors: [{ messageId: "avoidNewComponent" }],
-		},
-		// Invalid: Passing `this` from within the Plugin class
-		{
-			code: `
+            errors: [{ messageId: "avoidNewComponent" }],
+        },
+        // Invalid: Passing `this` from within the Plugin class
+        {
+            code: `
                 ${MOCK_API}
                 declare const app: App;
                 declare const el: HTMLElement;
@@ -81,11 +81,11 @@ ruleTester.run("no-plugin-as-component", noPluginAsComponentRule, {
                     }
                 }
             `,
-			errors: [{ messageId: "avoidPluginComponent" }],
-		},
-		// Invalid: Passing a variable that holds the plugin instance
-		{
-			code: `
+            errors: [{ messageId: "avoidPluginComponent" }],
+        },
+        // Invalid: Passing a variable that holds the plugin instance
+        {
+            code: `
                 ${MOCK_API}
                 declare const app: App;
                 declare const el: HTMLElement;
@@ -96,7 +96,7 @@ ruleTester.run("no-plugin-as-component", noPluginAsComponentRule, {
                     }
                 }
             `,
-			errors: [{ messageId: "avoidPluginComponent" }],
-		},
-	],
+            errors: [{ messageId: "avoidPluginComponent" }],
+        },
+    ],
 });
