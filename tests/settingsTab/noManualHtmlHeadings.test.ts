@@ -9,9 +9,9 @@ const MOCK_CLASS = `
 const ruleTester = new RuleTester();
 
 ruleTester.run("no-manual-html-headings", noManualHeadingsRule, {
-	valid: [
-		{
-			code: `
+    valid: [
+        {
+            code: `
                 ${MOCK_CLASS}
                 class MyTab extends PluginSettingTab {
                     display() {
@@ -19,11 +19,11 @@ ruleTester.run("no-manual-html-headings", noManualHeadingsRule, {
                     }
                 }
             `,
-		},
-	],
-	invalid: [
-		{
-			code: `
+        },
+    ],
+    invalid: [
+        {
+            code: `
                 ${MOCK_CLASS}
                 class MyTab extends PluginSettingTab {
                     display() {
@@ -31,8 +31,8 @@ ruleTester.run("no-manual-html-headings", noManualHeadingsRule, {
                     }
                 }
             `,
-			errors: [{ messageId: "headingEl" }],
-			output: `
+            errors: [{ messageId: "headingEl" }],
+            output: `
                 ${MOCK_CLASS}
                 class MyTab extends PluginSettingTab {
                     display() {
@@ -40,9 +40,9 @@ ruleTester.run("no-manual-html-headings", noManualHeadingsRule, {
                     }
                 }
             `,
-		},
-		{
-			code: `
+        },
+        {
+            code: `
                 ${MOCK_CLASS}
                 class MyTab extends PluginSettingTab {
                     display() {
@@ -51,8 +51,8 @@ ruleTester.run("no-manual-html-headings", noManualHeadingsRule, {
                     }
                 }
             `,
-			errors: [{ messageId: "headingEl" }],
-			output: `
+            errors: [{ messageId: "headingEl" }],
+            output: `
                 ${MOCK_CLASS}
                 class MyTab extends PluginSettingTab {
                     display() {
@@ -61,6 +61,6 @@ ruleTester.run("no-manual-html-headings", noManualHeadingsRule, {
                     }
                 }
             `,
-		},
-	],
+        },
+    ],
 });
