@@ -2,13 +2,10 @@ import { RuleTester } from "@typescript-eslint/rule-tester";
 import parser from "@typescript-eslint/parser";
 import type { RuleTesterConfig } from "@typescript-eslint/rule-tester";
 
-// Configure RuleTester to use Mocha's global describe/it/after
-// In Mocha, these are available as globals when running tests
 RuleTester.afterAll = globalThis.after;
 RuleTester.describe = globalThis.describe;
 RuleTester.it = globalThis.it;
 
-// Set up RuleTester to use @typescript-eslint/parser globally
 export const typedRuleTesterConfig: RuleTesterConfig = {
     languageOptions: {
         parser,
