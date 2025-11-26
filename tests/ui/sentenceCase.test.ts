@@ -33,6 +33,33 @@ tester.run("ui-sentence-case", rule, {
         {
             code: "class V extends ItemView { getDisplayText() { if (true) { return 'Open settings'; } return 'Open settings'; } }",
         },
+        {
+            code: "new Notice('Desktop: Emulate mobile mode');",
+        },
+        {
+            code: "new Notice('Desktop: emulate mobile mode');",
+        },
+        {
+            code: "new Notice('✅ Text is good, nothing to change.');",
+        },
+        {
+            code: "new Notice('LLM by OpenAI');",
+        },
+        {
+            code: "new Notice('If there is a file \"Template.md\" at the root of the vault.');",
+        },
+        {
+            code: "new Notice('Separator used when exporting as .csv file.');",
+        },
+        {
+            code: "new Notice('Time for rest.');",
+        },
+        {
+            code: "new Notice('Switch to React');",
+        },
+        {
+            code: "new Notice('Switch to Svelte');",
+        }
     ],
     invalid: [
         {

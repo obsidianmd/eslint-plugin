@@ -187,8 +187,8 @@ function looksLikePath(text: string): boolean {
     // Examples: "./config.json", "../src/main.ts"
     if (/^\.{1,2}\//.test(text)) return true;
     // Check for paths with slashes and file extensions
-    // Examples: "src/main.ts", "C:\\Users\\file.txt", "/home/user/doc.pdf"
-    if (/[\\/]/.test(text) && /\.[a-z0-9]{1,4}(\b|$)/i.test(text)) return true;
+    // Examples: "src/main.ts", "C:\\Users\\file.txt", "/home/user/doc.pdf", "file.txt"
+    if (/\.[a-z0-9]{1,4}(['"\s]|$)/i.test(text)) return true;
     return false;
 }
 
@@ -301,14 +301,15 @@ function writeToken(chars: string[], start: number, replacement: string, length:
 }
 
 // Applies sentence case transformation to a single sentence
-function transformSentence(sentence: string, opts: ReturnType<typeof normalizeOptions>): string {
+function transformSentence(sentence: string, opts: ReturnType<typeof normalizeOptions>, prefixPunctuation: string): string {
     // Find all brand occurrences to preserve their casing
     const brandMatches = collectBrandMatches(sentence, opts.brands);
     const brandRanges = mergeRanges(brandMatches.map((match) => [match.start, match.end]));
+    const anyCasePunctuations = new Set([':', ';']);
 
     const chars = sentence.split("");
 
-    // Capitalize first letter of sentence unless it's in a brand
+    // Capitalize first letter of sentence unless it's in a brand, or preceded by punctuation that allows any case
     let firstAlpha = -1;
     for (let i = 0; i < chars.length; i++) {
         if (isAlpha(chars[i])) {
@@ -316,7 +317,7 @@ function transformSentence(sentence: string, opts: ReturnType<typeof normalizeOp
             break;
         }
     }
-    if (firstAlpha >= 0 && !rangeContains(brandRanges, firstAlpha)) {
+    if (firstAlpha >= 0 && !rangeContains(brandRanges, firstAlpha) && !anyCasePunctuations.has(prefixPunctuation)) {
         // Find the token containing firstAlpha
         const tokenRe = /[A-Za-z0-9][A-Za-z0-9.\-]*/g;
         let tokenStart = firstAlpha;
@@ -334,12 +335,14 @@ function transformSentence(sentence: string, opts: ReturnType<typeof normalizeOp
 
         const firstToken = sentence.slice(tokenStart, tokenEnd);
         const upperToken = firstToken.toUpperCase();
-        const hasLeadingContent = sentence.slice(0, firstAlpha).trim().length > 0;
+        const leadingContent = sentence.slice(0, firstAlpha)
+            .replace(/\p{Emoji}/gu, '')
+            .trim();
         if (opts.acronyms.has(upperToken)) {
             writeToken(chars, tokenStart, upperToken, firstToken.length);
         } else if (!opts.enforceCamelCaseLower && opts.mode === "loose" && isCamelOrPascal(firstToken)) {
             // Preserve camelCase/PascalCase tokens when loose mode allows it
-        } else if (hasLeadingContent) {
+        } else if (leadingContent) {
             for (let j = tokenStart; j < tokenEnd; j++) {
                 chars[j] = firstToken[j - tokenStart].toLowerCase();
             }
@@ -446,7 +449,7 @@ function sentenceCaseSuggestionWithOptions(
 
     const segments: Segment[] = [];
     let lastIndex = 0;
-    const delimiterRe = /([.?!]+)(\s+|$)/g;
+    const delimiterRe = /([.?!:;]+)(\s+|$)/g;
     let match: RegExpExecArray | null;
     while ((match = delimiterRe.exec(text))) {
         const punctStart = match.index;
@@ -466,8 +469,9 @@ function sentenceCaseSuggestionWithOptions(
     }
 
     const transformed = segments
-        .map(({ core, punct, whitespace }) => {
-            const out = transformSentence(core, opts);
+        .map(({ core, punct, whitespace }, index) => {
+            const prefixPunctuation = segments[index - 1]?.punct ?? "";
+            const out = transformSentence(core, opts, prefixPunctuation);
             return out + punct + whitespace;
         })
         .join("");

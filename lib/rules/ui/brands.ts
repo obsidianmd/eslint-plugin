@@ -55,4 +55,7 @@ export const DEFAULT_BRANDS: string[] = [
     "IntelliJ IDEA",
     "WebStorm",
     "PyCharm",
+    "React",
+    "Svelte",
+    "OpenAI"
 ];
