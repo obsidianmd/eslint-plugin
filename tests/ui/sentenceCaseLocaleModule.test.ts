@@ -1,7 +1,7 @@
 import { RuleTester } from "@typescript-eslint/rule-tester";
 import parser from "@typescript-eslint/parser";
 import rule from "../../lib/rules/ui/sentenceCaseLocaleModule.js";
-import { typedRuleTesterConfig } from "../setupRuleTester.js";
+import { typedRuleTesterConfig } from "../mocha-setup.js";
 import type { RuleTesterConfig } from "@typescript-eslint/rule-tester";
 
 const localeModuleRuleTesterConfig: RuleTesterConfig = {

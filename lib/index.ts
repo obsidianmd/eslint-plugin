@@ -19,7 +19,7 @@ import sampleNames from "./rules/sampleNames.js";
 import validateManifest from "./rules/validateManifest.js";
 import validateLicense from "./rules/validateLicense.js";
 import ruleCustomMessage from "./rules/ruleCustomMessage.js";
-import { manifest } from "./readManifest.js";
+import { getManifest } from "./manifest.js";
 import { ui } from "./rules/ui/index.js";
 
 // --- Import plugins and configs for the recommended config ---
@@ -40,6 +40,7 @@ interface PackageJson {
 	version: string;
 }
 
+const manifest = getManifest();
 const packageJson = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, "../../package.json"), "utf8")) as PackageJson;
 
 const plugin = {
