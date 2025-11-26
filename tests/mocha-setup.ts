@@ -2,9 +2,7 @@ import { RuleTester } from "@typescript-eslint/rule-tester";
 import parser from "@typescript-eslint/parser";
 import type { RuleTesterConfig } from "@typescript-eslint/rule-tester";
 
-RuleTester.afterAll = globalThis.after;
-RuleTester.describe = globalThis.describe;
-RuleTester.it = globalThis.it;
+import { after, describe, it } from "mocha";
 
 export const typedRuleTesterConfig: RuleTesterConfig = {
     languageOptions: {
@@ -19,4 +17,10 @@ export const typedRuleTesterConfig: RuleTesterConfig = {
     },
 };
 
-RuleTester.setDefaultConfig(typedRuleTesterConfig);
+export function mochaHooks() {
+    RuleTester.afterAll = after;
+    RuleTester.describe = describe;
+    RuleTester.it = it;
+
+    RuleTester.setDefaultConfig(typedRuleTesterConfig);
+}
