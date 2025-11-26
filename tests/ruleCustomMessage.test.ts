@@ -1,4 +1,3 @@
-import "./setupRuleTester";
 import { RuleTester } from "@typescript-eslint/rule-tester";
 import ruleCustomMessage from "lib/rules/ruleCustomMessage.js";
 
