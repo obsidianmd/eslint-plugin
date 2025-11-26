@@ -1,7 +1,7 @@
 import obsidianmd from "./dist/lib/index.js";
 
 export default [
-	obsidianmd.configs.all,
+	...obsidianmd.configs.recommended,
 	{
 		files: ["**/*.ts"],
 		languageOptions: {
