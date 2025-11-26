@@ -232,7 +232,7 @@ export default ruleCreator({
             },
         ],
         messages: {
-            useSentenceCase: "Use sentence case for UI text.",
+            useSentenceCase: "Use sentence case for UI text. Expected: '{{suggestion}}'",
         },
     },
     defaultOptions,
@@ -244,7 +244,6 @@ export default ruleCreator({
             evaluatorOptions,
             allowAutoFix,
             messageId: "useSentenceCase",
-            debugLabel: "ui/sentence-case",
             formatReplacement: (node, suggestion) => {
                 if (node.type === "Literal" && typeof node.value === "string" && typeof node.raw === "string") {
                     const quoteChar = node.raw[0];

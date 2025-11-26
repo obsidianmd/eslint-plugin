@@ -32,7 +32,6 @@ export interface SentenceCaseReporterParams<MessageId extends string> {
     evaluatorOptions: EvaluatorOptions;
     allowAutoFix: boolean;
     messageId: MessageId;
-    debugLabel: string;
     formatReplacement?: (node: TSESTree.Node, suggestion: string) => string | null;
 }
 
@@ -76,14 +75,13 @@ export function createSentenceCaseReporter<MessageId extends string>(
 
         const suggestion = result.suggestion;
 
-        if (process.env.OBSIDIANMD_DEBUG_SENTENCE_CASE === "1") {
-            console.debug(params.debugLabel, { value, suggestion });
-        }
-
         if (!params.allowAutoFix) {
             params.context.report({
                 node,
                 messageId: params.messageId,
+                data: {
+                    suggestion
+                },
             });
             return;
         }
@@ -91,6 +89,9 @@ export function createSentenceCaseReporter<MessageId extends string>(
         params.context.report({
             node,
             messageId: params.messageId,
+            data: {
+                suggestion,
+            },
             fix(fixer: TSESLint.RuleFixer) {
                 const customReplacement = params.formatReplacement?.(node, suggestion);
                 const replacement = customReplacement ?? JSON.stringify(suggestion);
