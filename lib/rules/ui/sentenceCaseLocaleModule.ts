@@ -106,8 +106,7 @@ export default ruleCreator({
             context,
             evaluatorOptions,
             allowAutoFix,
-            messageId: "useSentenceCase",
-            debugLabel: "ui/sentence-case-locale-module",
+            messageId: "useSentenceCase"
         });
 
         return {

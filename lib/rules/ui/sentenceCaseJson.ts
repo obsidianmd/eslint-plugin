@@ -64,8 +64,7 @@ export default ruleCreator({
             context,
             evaluatorOptions,
             allowAutoFix,
-            messageId: "useSentenceCase",
-            debugLabel: "ui/sentence-case-json",
+            messageId: "useSentenceCase"
         });
 
         return {
