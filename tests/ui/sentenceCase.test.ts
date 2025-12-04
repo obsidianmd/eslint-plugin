@@ -59,6 +59,9 @@ tester.run("ui-sentence-case", rule, {
         },
         {
             code: "new Notice('Switch to Svelte');",
+        },
+        {
+            code: "new Notice('This is a short sentence. (And this is another one.)');",
         }
     ],
     invalid: [
