@@ -41,7 +41,7 @@ export const DEFAULT_ACRONYMS: string[] = [
     "CLI",
     "GUI",
     "CRUD",
-    "REST",
+    // "REST", // Ignored to avoid confusion with normal word `rest`
     "SOAP",
     // Hardware
     "CPU",
@@ -71,4 +71,5 @@ export const DEFAULT_ACRONYMS: string[] = [
     "FAQ",
     "AI",
     "ML",
+    "LLM"
 ];
