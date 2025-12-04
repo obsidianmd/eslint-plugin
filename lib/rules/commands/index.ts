@@ -5,9 +5,9 @@ import noPluginIdInCommandId from "./noPluginIdInCommandId.js";
 import noPluginNameInCommandName from "./noPluginNameInCommandName.js";
 
 export const commands = {
-	noCommandInCommandId,
-	noCommandInCommandName,
-	noDefaultHotkeys,
-	noPluginIdInCommandId,
-	noPluginNameInCommandName,
+    noCommandInCommandId,
+    noCommandInCommandName,
+    noDefaultHotkeys,
+    noPluginIdInCommandId,
+    noPluginNameInCommandName,
 };

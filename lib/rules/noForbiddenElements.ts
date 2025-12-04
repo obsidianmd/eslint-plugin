@@ -35,7 +35,7 @@ function isForbiddenCreateElementCall(node: TSESTree.CallExpression): string | u
         return undefined;
     }
 
-    if (node.arguments.length === 0) { 
+    if (node.arguments.length === 0) {
         return undefined;
     }
     return isArgumentForbiddenElement(node.arguments[0]);
@@ -53,7 +53,7 @@ function isForbiddenCreateElCall(node: TSESTree.CallExpression): string | undefi
         return undefined;
     }
 
-    if (node.arguments.length === 0) { 
+    if (node.arguments.length === 0) {
         return undefined;
     }
     return isArgumentForbiddenElement(node.arguments[0]);

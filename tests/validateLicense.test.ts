@@ -81,7 +81,7 @@ ruleTester.run("validate-license", licenseRule, {
                 { messageId: "unchangedCopyright" }
             ],
         },
-            {
+        {
             filename: "LICENSE",
             code: `Copyright (C) 2020-2022 by John Doe\nCopyright (C) 2020-${currentYear} by Dynalist Inc.`,
             errors: [
