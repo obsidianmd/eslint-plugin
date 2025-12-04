@@ -9,9 +9,9 @@ const MOCK_CLASS = `
 const ruleTester = new RuleTester();
 
 ruleTester.run("no-problematic-settings-headings", rule, {
-	valid: [
-		{
-			code: `
+    valid: [
+        {
+            code: `
                 ${MOCK_CLASS}
                 class MyTab extends PluginSettingTab {
                     display() {
@@ -19,12 +19,12 @@ ruleTester.run("no-problematic-settings-headings", rule, {
                     }
                 }
             `,
-			options: [{ pluginName: "My Awesome Plugin" }],
-		},
-	],
-	invalid: [
-		{
-			code: `
+            options: [{ pluginName: "My Awesome Plugin" }],
+        },
+    ],
+    invalid: [
+        {
+            code: `
                 ${MOCK_CLASS}
                 class MyTab extends PluginSettingTab {
                     display() {
@@ -32,11 +32,11 @@ ruleTester.run("no-problematic-settings-headings", rule, {
                     }
                 }
             `,
-			options: [{ pluginName: "My Awesome Plugin" }],
-			errors: [{ messageId: "settings" }],
-		},
-		{
-			code: `
+            options: [{ pluginName: "My Awesome Plugin" }],
+            errors: [{ messageId: "settings" }],
+        },
+        {
+            code: `
                 ${MOCK_CLASS}
                 class MyTab extends PluginSettingTab {
                     display() {
@@ -44,12 +44,12 @@ ruleTester.run("no-problematic-settings-headings", rule, {
                     }
                 }
             `,
-			options: [{ pluginName: "My Awesome Plugin" }],
-			errors: [
-				{ messageId: "settings" },
-				{ messageId: "general" },
-			],
-			output: `
+            options: [{ pluginName: "My Awesome Plugin" }],
+            errors: [
+                { messageId: "settings" },
+                { messageId: "general" },
+            ],
+            output: `
                 ${MOCK_CLASS}
                 class MyTab extends PluginSettingTab {
                     display() {
@@ -57,29 +57,29 @@ ruleTester.run("no-problematic-settings-headings", rule, {
                     }
                 }
             `,
-		},
-		{
-			code: `
-				${MOCK_CLASS}
-				class MyTab extends PluginSettingTab {
-					display() {
-						new Setting(this.containerEl).setName("General").setHeading();
-					}
-				}
-			`,
-			options: [{ pluginName: "My Awesome Plugin" }],
-			errors: [{ messageId: "general" }],
-			output: `
-				${MOCK_CLASS}
-				class MyTab extends PluginSettingTab {
-					display() {
-						;
-					}
-				}
-			`,
-		},
-		{
-			code: `
+        },
+        {
+            code: `
+                ${MOCK_CLASS}
+                class MyTab extends PluginSettingTab {
+                    display() {
+                        new Setting(this.containerEl).setName("General").setHeading();
+                    }
+                }
+            `,
+            options: [{ pluginName: "My Awesome Plugin" }],
+            errors: [{ messageId: "general" }],
+            output: `
+                ${MOCK_CLASS}
+                class MyTab extends PluginSettingTab {
+                    display() {
+                        ;
+                    }
+                }
+            `,
+        },
+        {
+            code: `
                 ${MOCK_CLASS}
                 class MyTab extends PluginSettingTab {
                     display() {
@@ -87,9 +87,9 @@ ruleTester.run("no-problematic-settings-headings", rule, {
                     }
                 }
             `,
-			options: [{ pluginName: "My Awesome Plugin" }],
-			errors: [{ messageId: "pluginName" }],
-			output: `
+            options: [{ pluginName: "My Awesome Plugin" }],
+            errors: [{ messageId: "pluginName" }],
+            output: `
                 ${MOCK_CLASS}
                 class MyTab extends PluginSettingTab {
                     display() {
@@ -97,6 +97,6 @@ ruleTester.run("no-problematic-settings-headings", rule, {
                     }
                 }
             `,
-		},
-	],
+        },
+    ],
 });
