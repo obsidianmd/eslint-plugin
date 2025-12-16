@@ -337,6 +337,7 @@ function transformSentence(sentence: string, opts: ReturnType<typeof normalizeOp
         const upperToken = firstToken.toUpperCase();
         const leadingContent = sentence.slice(0, firstAlpha)
             .replace(/\p{Emoji}/gu, '')
+            .replaceAll('(', '')
             .trim();
         if (opts.acronyms.has(upperToken)) {
             writeToken(chars, tokenStart, upperToken, firstToken.length);
