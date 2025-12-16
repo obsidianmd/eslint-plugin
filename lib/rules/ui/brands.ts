@@ -69,5 +69,6 @@ export const DEFAULT_BRANDS: string[] = [
     "Svelte",
     "CalDAV",
     "CardDAV",
-    "WebDAV"
+    "WebDAV",
+    "Jekyll"
 ];
