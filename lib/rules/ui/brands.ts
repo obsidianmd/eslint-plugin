@@ -57,5 +57,6 @@ export const DEFAULT_BRANDS: string[] = [
     "PyCharm",
     "React",
     "Svelte",
-    "OpenAI"
+    "OpenAI",
+    "Jekyll"
 ];
