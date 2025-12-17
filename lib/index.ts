@@ -267,6 +267,7 @@ const flatRecommendedConfig: Config[] = defineConfig([
                     NodeJS: "readonly"
                 } : {}),
                 DomElementInfo: "readonly",
+                SvgElementInfo: "readonly",
                 activeDocument: "readonly",
                 activeWindow: "readonly",
                 ajax: "readonly",
