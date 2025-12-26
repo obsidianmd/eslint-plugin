@@ -27,7 +27,7 @@ export default ruleCreator({
             MemberExpression(node: TSESTree.MemberExpression) {
                 const property = node.property;
                 if (
-                    property.type !== "Identifier" ||
+                    property.type !== TSESTree.AST_NODE_TYPES.Identifier ||
                     !BANNED_PROPERTIES.has(property.name)
                 ) {
                     return;
@@ -37,7 +37,7 @@ export default ruleCreator({
 
                 // Case 1: `navigator.userAgent` or `navigator.platform`
                 if (
-                    object.type === "Identifier" &&
+                    object.type === TSESTree.AST_NODE_TYPES.Identifier &&
                     object.name === "navigator"
                 ) {
                     context.report({
@@ -49,10 +49,10 @@ export default ruleCreator({
 
                 // Case 2: `window.navigator.userAgent` or `window.navigator.platform`
                 if (
-                    object.type === "MemberExpression" &&
-                    object.object.type === "Identifier" &&
+                    object.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
+                    object.object.type === TSESTree.AST_NODE_TYPES.Identifier &&
                     object.object.name === "window" &&
-                    object.property.type === "Identifier" &&
+                    object.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
                     object.property.name === "navigator"
                 ) {
                     context.report({

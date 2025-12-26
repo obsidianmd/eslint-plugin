@@ -47,7 +47,7 @@ export default ruleCreator({
             },
             PropertySignature(node: TSESTree.TSPropertySignature) {
                 if (
-                    node.key.type === "Identifier" &&
+                    node.key.type === TSESTree.AST_NODE_TYPES.Identifier &&
                     sampleNames.includes(node.key.name)
                 ) {
                     context.report({

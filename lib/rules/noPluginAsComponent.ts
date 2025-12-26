@@ -60,10 +60,10 @@ export default ruleCreator({
                 if (node.arguments.length < 5) return;
 
                 const callee = node.callee;
-                if (callee.type !== "MemberExpression") return;
+                if (callee.type !== TSESTree.AST_NODE_TYPES.MemberExpression) return;
 
                 if (
-                    callee.property.type !== "Identifier" ||
+                    callee.property.type !== TSESTree.AST_NODE_TYPES.Identifier ||
                     callee.property.name !== "render"
                 ) {
                     return;
@@ -77,7 +77,7 @@ export default ruleCreator({
                 const componentArg = node.arguments[4];
 
                 // Check 1: Is the argument a `new Component()` expression?
-                if (componentArg.type === "NewExpression") {
+                if (componentArg.type === TSESTree.AST_NODE_TYPES.NewExpression) {
                     context.report({
                         node: componentArg,
                         messageId: "avoidNewComponent",

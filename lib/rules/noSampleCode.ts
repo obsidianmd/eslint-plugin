@@ -12,9 +12,9 @@ const ruleCreator = ESLintUtils.RuleCreator(
 function isSampleIntervalCall(node: TSESTree.CallExpression): boolean {
     // Check for `this.registerInterval(...)`
     if (
-        node.callee.type !== "MemberExpression" ||
-        node.callee.object.type !== "ThisExpression" ||
-        node.callee.property.type !== "Identifier" ||
+        node.callee.type !== TSESTree.AST_NODE_TYPES.MemberExpression ||
+        node.callee.object.type !== TSESTree.AST_NODE_TYPES.ThisExpression ||
+        node.callee.property.type !== TSESTree.AST_NODE_TYPES.Identifier ||
         node.callee.property.name !== "registerInterval"
     ) {
         return false;
@@ -24,8 +24,8 @@ function isSampleIntervalCall(node: TSESTree.CallExpression): boolean {
     const setIntervalCall = node.arguments[0];
     if (
         !setIntervalCall ||
-        setIntervalCall.type !== "CallExpression" ||
-        setIntervalCall.callee.type !== "MemberExpression" ||
+        setIntervalCall.type !== TSESTree.AST_NODE_TYPES.CallExpression ||
+        setIntervalCall.callee.type !== TSESTree.AST_NODE_TYPES.MemberExpression ||
         (setIntervalCall.callee.object as TSESTree.Identifier)?.name !==
         "window" ||
         (setIntervalCall.callee.property as TSESTree.Identifier)?.name !==
@@ -38,10 +38,10 @@ function isSampleIntervalCall(node: TSESTree.CallExpression): boolean {
     const callback = setIntervalCall.arguments[0];
     if (
         !callback ||
-        callback.type !== "ArrowFunctionExpression" ||
-        callback.body.type !== "CallExpression" ||
+        callback.type !== TSESTree.AST_NODE_TYPES.ArrowFunctionExpression ||
+        callback.body.type !== TSESTree.AST_NODE_TYPES.CallExpression ||
         (callback.body.callee as TSESTree.MemberExpression)?.property.type !==
-        "Identifier" ||
+        TSESTree.AST_NODE_TYPES.Identifier ||
         (
             (callback.body.callee as TSESTree.MemberExpression)
                 ?.property as TSESTree.Identifier
@@ -62,9 +62,9 @@ function isSampleIntervalCall(node: TSESTree.CallExpression): boolean {
 function isSampleDomEventCall(node: TSESTree.CallExpression): boolean {
     // Check for `this.registerDomEvent(...)`
     if (
-        node.callee.type !== "MemberExpression" ||
-        node.callee.object.type !== "ThisExpression" ||
-        node.callee.property.type !== "Identifier" ||
+        node.callee.type !== TSESTree.AST_NODE_TYPES.MemberExpression ||
+        node.callee.object.type !== TSESTree.AST_NODE_TYPES.ThisExpression ||
+        node.callee.property.type !== TSESTree.AST_NODE_TYPES.Identifier ||
         node.callee.property.name !== "registerDomEvent"
     ) {
         return false;
@@ -82,8 +82,8 @@ function isSampleDomEventCall(node: TSESTree.CallExpression): boolean {
     const callback = node.arguments[2];
     if (
         !callback ||
-        callback.type !== "ArrowFunctionExpression" ||
-        callback.body.type !== "BlockStatement"
+        callback.type !== TSESTree.AST_NODE_TYPES.ArrowFunctionExpression ||
+        callback.body.type !== TSESTree.AST_NODE_TYPES.BlockStatement
     ) {
         return false;
     }
@@ -91,10 +91,10 @@ function isSampleDomEventCall(node: TSESTree.CallExpression): boolean {
     const firstStatement = callback.body.body[0];
     if (
         !firstStatement ||
-        firstStatement.type !== "ExpressionStatement" ||
-        firstStatement.expression.type !== "CallExpression" ||
+        firstStatement.type !== TSESTree.AST_NODE_TYPES.ExpressionStatement ||
+        firstStatement.expression.type !== TSESTree.AST_NODE_TYPES.CallExpression ||
         (firstStatement.expression.callee as TSESTree.MemberExpression)
-            ?.property.type !== "Identifier" ||
+            ?.property.type !== TSESTree.AST_NODE_TYPES.Identifier ||
         (
             (firstStatement.expression.callee as TSESTree.MemberExpression)
                 ?.property as TSESTree.Identifier

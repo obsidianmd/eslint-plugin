@@ -73,9 +73,9 @@ export default ruleCreator({
                 if (typeof node.value !== "string") return;
                 const parent = node.parent;
                 if (!parent) return;
-                if (parent.type === "Property" && parent.value === node) {
+                if (parent.type === TSESTree.AST_NODE_TYPES.Property && parent.value === node) {
                     reportIfNeeded(node, node.value);
-                } else if (parent.type === "ArrayExpression") {
+                } else if (parent.type === TSESTree.AST_NODE_TYPES.ArrayExpression) {
                     // Skip array elements for now
                     return;
                 }
