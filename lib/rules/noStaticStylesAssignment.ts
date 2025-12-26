@@ -112,6 +112,38 @@ export default ruleCreator({
                         });
                     }
                 }
+
+                // Case 3: `el.style.setCssProps({ 'color': 'blue' })`
+                if (
+                    propertyName === "setCssProps" && node.arguments[0].type === TSESTree.AST_NODE_TYPES.ObjectExpression
+                ) {
+                    for (const property of node.arguments[0].properties) {
+                        if (property.type === TSESTree.AST_NODE_TYPES.Property && property.key.type === TSESTree.AST_NODE_TYPES.Literal && typeof property.key.value === 'string' && !property.key.value.startsWith('--')) {
+                            context.report({
+                                node,
+                                messageId: "avoidStyleAssignment",
+                                data: { property: "el.setCssProps" },
+                            });
+                            break;
+                        }
+                    }
+                }
+
+                // Case 4: `el.style.setCssStyles({ 'color': 'blue' })`
+                if (
+                    propertyName === "setCssStyles" && node.arguments[0].type === TSESTree.AST_NODE_TYPES.ObjectExpression
+                ) {
+                    for (const property of node.arguments[0].properties) {
+                        if (property.type === TSESTree.AST_NODE_TYPES.Property && property.key.type === TSESTree.AST_NODE_TYPES.Literal && typeof property.key.value === 'string' && !property.key.value.startsWith('--')) {
+                            context.report({
+                                node,
+                                messageId: "avoidStyleAssignment",
+                                data: { property: "el.setCssStyles" },
+                            });
+                            break;
+                        }
+                    }
+                }
             },
         };
     },
