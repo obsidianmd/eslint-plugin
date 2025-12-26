@@ -159,9 +159,9 @@ export function unwrapExpression(
     let current: TSESTree.Node | null | undefined = node;
     while (current) {
         if (
-            current.type === "TSAsExpression" ||
-            current.type === "TSSatisfiesExpression" ||
-            current.type === "TSNonNullExpression"
+            current.type === TSESTree.AST_NODE_TYPES.TSAsExpression ||
+            current.type === TSESTree.AST_NODE_TYPES.TSSatisfiesExpression ||
+            current.type === TSESTree.AST_NODE_TYPES.TSNonNullExpression
         ) {
             current = current.expression;
             continue;

@@ -39,10 +39,10 @@ export default ruleCreator<Options, "pluginId">({
         return {
             CallExpression(node: TSESTree.CallExpression) {
                 if (
-                    node.callee.type !== "MemberExpression" ||
-                    node.callee.property.type !== "Identifier" ||
+                    node.callee.type !== TSESTree.AST_NODE_TYPES.MemberExpression ||
+                    node.callee.property.type !== TSESTree.AST_NODE_TYPES.Identifier ||
                     node.callee.property.name !== "addCommand" ||
-                    node.arguments[0]?.type !== "ObjectExpression"
+                    node.arguments[0]?.type !== TSESTree.AST_NODE_TYPES.ObjectExpression
                 ) {
                     return;
                 }
@@ -51,10 +51,10 @@ export default ruleCreator<Options, "pluginId">({
                 for (const property of commandObject.properties) {
                     if (
                         typeof pluginId === "string" &&
-                        property.type === "Property" &&
-                        property.key.type === "Identifier" &&
+                        property.type === TSESTree.AST_NODE_TYPES.Property &&
+                        property.key.type === TSESTree.AST_NODE_TYPES.Identifier &&
                         property.key.name === "id" &&
-                        property.value.type === "Literal" &&
+                        property.value.type === TSESTree.AST_NODE_TYPES.Literal &&
                         typeof property.value.value === "string" &&
                         property.value.value
                             .toLowerCase()

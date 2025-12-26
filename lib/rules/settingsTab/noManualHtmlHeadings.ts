@@ -30,7 +30,7 @@ export default ruleCreator({
         return {
             ClassDeclaration(node: TSESTree.ClassDeclaration) {
                 if (
-                    node.superClass?.type === "Identifier" &&
+                    node.superClass?.type === TSESTree.AST_NODE_TYPES.Identifier &&
                     node.superClass.name === "PluginSettingTab"
                 ) {
                     insidePluginSettingTab = true;
@@ -44,8 +44,8 @@ export default ruleCreator({
 
                 const callee = node.callee;
                 if (
-                    callee.type !== "MemberExpression" ||
-                    callee.property.type !== "Identifier" ||
+                    callee.type !== TSESTree.AST_NODE_TYPES.MemberExpression ||
+                    callee.property.type !== TSESTree.AST_NODE_TYPES.Identifier ||
                     callee.property.name !== "createEl"
                 ) {
                     return;
@@ -54,7 +54,7 @@ export default ruleCreator({
                 const tagArg = node.arguments[0];
                 if (
                     !tagArg ||
-                    tagArg.type !== "Literal" ||
+                    tagArg.type !== TSESTree.AST_NODE_TYPES.Literal ||
                     typeof tagArg.value !== "string" ||
                     !HEADING_TAGS.has(tagArg.value)
                 ) {
@@ -67,15 +67,15 @@ export default ruleCreator({
                     fix: (fixer) => {
                         const optionsArg = node.arguments[1];
                         let textValue = "";
-                        if (optionsArg?.type === "ObjectExpression") {
+                        if (optionsArg?.type === TSESTree.AST_NODE_TYPES.ObjectExpression) {
                             const textProp = optionsArg.properties.find(
                                 (p): p is TSESTree.Property =>
-                                    p.type === "Property" &&
+                                    p.type === TSESTree.AST_NODE_TYPES.Property &&
                                     (p.key as TSESTree.Identifier).name ===
                                     "text",
                             );
                             if (
-                                textProp?.value.type === "Literal" &&
+                                textProp?.value.type === TSESTree.AST_NODE_TYPES.Literal &&
                                 typeof textProp.value.value === "string"
                             ) {
                                 textValue = textProp.value.value;

@@ -19,14 +19,14 @@ const defaultOptions: SentenceCaseRuleOptions = [{}] as const;
 // Extracts string value from AST nodes, unwrapping TypeScript type assertions
 function getStringFromNode(node: TSESTree.Node): string | null {
     if (
-        node.type === "TSAsExpression" ||
-        node.type === "TSSatisfiesExpression" ||
-        node.type === "TSNonNullExpression"
+        node.type === TSESTree.AST_NODE_TYPES.TSAsExpression ||
+        node.type === TSESTree.AST_NODE_TYPES.TSSatisfiesExpression ||
+        node.type === TSESTree.AST_NODE_TYPES.TSNonNullExpression
     ) {
         return getStringFromNode(node.expression);
     }
-    if (node.type === "Literal" && typeof node.value === "string") return node.value;
-    if (node.type === "TemplateLiteral" && node.expressions.length === 0) {
+    if (node.type === TSESTree.AST_NODE_TYPES.Literal && typeof node.value === "string") return node.value;
+    if (node.type === TSESTree.AST_NODE_TYPES.TemplateLiteral && node.expressions.length === 0) {
         return node.quasis[0]?.value.raw ?? null;
     }
     return null;
@@ -34,15 +34,15 @@ function getStringFromNode(node: TSESTree.Node): string | null {
 
 // Checks if an object property has a specific key name
 function isPropertyWithKey(prop: TSESTree.Property, keyName: string): boolean {
-    if (prop.key.type === "Identifier") return prop.key.name === keyName;
-    if (prop.key.type === "Literal") return prop.key.value === keyName;
+    if (prop.key.type === TSESTree.AST_NODE_TYPES.Identifier) return prop.key.name === keyName;
+    if (prop.key.type === TSESTree.AST_NODE_TYPES.Literal) return prop.key.value === keyName;
     return false;
 }
 
 // Retrieves the key name from an object property node
 function getPropertyKeyName(prop: TSESTree.Property): string | null {
-    if (prop.key.type === "Identifier") return prop.key.name;
-    if (prop.key.type === "Literal" && typeof prop.key.value === "string") return prop.key.value;
+    if (prop.key.type === TSESTree.AST_NODE_TYPES.Identifier) return prop.key.name;
+    if (prop.key.type === TSESTree.AST_NODE_TYPES.Literal && typeof prop.key.value === "string") return prop.key.value;
     return null;
 }
 
@@ -127,9 +127,9 @@ function inspectCreateElOptions(
     report: (target: TSESTree.Node, text: string) => void,
 ) {
     const unwrapped = unwrapExpression(node);
-    if (!unwrapped || unwrapped.type !== "ObjectExpression") return;
+    if (!unwrapped || unwrapped.type !== TSESTree.AST_NODE_TYPES.ObjectExpression) return;
     for (const prop of unwrapped.properties) {
-        if (prop.type !== "Property") continue;
+        if (prop.type !== TSESTree.AST_NODE_TYPES.Property) continue;
         const keyName = getPropertyKeyName(prop);
         if (!keyName) continue;
         if (keyName === "text" || keyName === "title") {
@@ -139,9 +139,9 @@ function inspectCreateElOptions(
         }
         const valueNode = unwrapExpression(prop.value);
         if (!valueNode) continue;
-        if (keyName === "attr" && valueNode.type === "ObjectExpression") {
+        if (keyName === "attr" && valueNode.type === TSESTree.AST_NODE_TYPES.ObjectExpression) {
             for (const attrProp of valueNode.properties) {
-                if (attrProp.type !== "Property") continue;
+                if (attrProp.type !== TSESTree.AST_NODE_TYPES.Property) continue;
                 const attrName = getPropertyKeyName(attrProp);
                 if (!attrName) continue;
                 const normalized = normalizeAttributeName(attrName);
@@ -151,7 +151,7 @@ function inspectCreateElOptions(
             }
             continue;
         }
-        if (valueNode.type === "ObjectExpression") {
+        if (valueNode.type === TSESTree.AST_NODE_TYPES.ObjectExpression) {
             inspectCreateElOptions(valueNode, report);
         }
     }
@@ -163,22 +163,22 @@ function visitStatementTree(
     handleReturn: (node: TSESTree.Expression, value: string) => void,
 ) {
     if (!statement) return;
-    if (statement.type === "BlockStatement") {
+    if (statement.type === TSESTree.AST_NODE_TYPES.BlockStatement) {
         for (const inner of statement.body) visitStatementTree(inner, handleReturn);
         return;
     }
-    if (statement.type === "ReturnStatement") {
+    if (statement.type === TSESTree.AST_NODE_TYPES.ReturnStatement) {
         if (!statement.argument) return;
         const str = getStringFromNode(statement.argument);
         if (str != null) handleReturn(statement.argument, str);
         return;
     }
-    if (statement.type === "IfStatement") {
+    if (statement.type === TSESTree.AST_NODE_TYPES.IfStatement) {
         visitStatementTree(statement.consequent, handleReturn);
         visitStatementTree(statement.alternate, handleReturn);
         return;
     }
-    if (statement.type === "SwitchStatement") {
+    if (statement.type === TSESTree.AST_NODE_TYPES.SwitchStatement) {
         for (const switchCase of statement.cases) {
             for (const consequent of switchCase.consequent) {
                 visitStatementTree(consequent, handleReturn);
@@ -187,18 +187,18 @@ function visitStatementTree(
         return;
     }
     if (
-        statement.type === "ForStatement" ||
-        statement.type === "ForInStatement" ||
-        statement.type === "ForOfStatement" ||
-        statement.type === "WhileStatement" ||
-        statement.type === "DoWhileStatement" ||
-        statement.type === "LabeledStatement" ||
-        statement.type === "WithStatement"
+        statement.type === TSESTree.AST_NODE_TYPES.ForStatement ||
+        statement.type === TSESTree.AST_NODE_TYPES.ForInStatement ||
+        statement.type === TSESTree.AST_NODE_TYPES.ForOfStatement ||
+        statement.type === TSESTree.AST_NODE_TYPES.WhileStatement ||
+        statement.type === TSESTree.AST_NODE_TYPES.DoWhileStatement ||
+        statement.type === TSESTree.AST_NODE_TYPES.LabeledStatement ||
+        statement.type === TSESTree.AST_NODE_TYPES.WithStatement
     ) {
         visitStatementTree(statement.body, handleReturn);
         return;
     }
-    if (statement.type === "TryStatement") {
+    if (statement.type === TSESTree.AST_NODE_TYPES.TryStatement) {
         visitStatementTree(statement.block, handleReturn);
         if (statement.handler) visitStatementTree(statement.handler.body, handleReturn);
         if (statement.finalizer) visitStatementTree(statement.finalizer, handleReturn);
@@ -245,7 +245,7 @@ export default ruleCreator({
             allowAutoFix,
             messageId: "useSentenceCase",
             formatReplacement: (node, suggestion) => {
-                if (node.type === "Literal" && typeof node.value === "string" && typeof node.raw === "string") {
+                if (node.type === TSESTree.AST_NODE_TYPES.Literal && typeof node.value === "string" && typeof node.raw === "string") {
                     const quoteChar = node.raw[0];
                     if (quoteChar === "'" || quoteChar === '"') {
                         return encodeStringLiteral(suggestion, quoteChar);
@@ -260,7 +260,7 @@ export default ruleCreator({
             // createEl(tag, { text: "...", title: "..." })
             if (node.arguments.length < 2) return;
             const arg = node.arguments[1];
-            if (arg.type === "SpreadElement") return;
+            if (arg.type === TSESTree.AST_NODE_TYPES.SpreadElement) return;
             inspectCreateElOptions(arg, reportIfNeeded);
         }
 
@@ -284,9 +284,9 @@ export default ruleCreator({
             // this.addCommand({ name: "..." })
             if (node.arguments.length < 1) return;
             const arg = node.arguments[0];
-            if (arg.type !== "ObjectExpression") return;
+            if (arg.type !== TSESTree.AST_NODE_TYPES.ObjectExpression) return;
             for (const prop of arg.properties) {
-                if (prop.type !== "Property") continue;
+                if (prop.type !== TSESTree.AST_NODE_TYPES.Property) continue;
                 if (!isPropertyWithKey(prop, "name")) continue;
                 const str = getStringFromNode(prop.value);
                 if (str != null) reportIfNeeded(prop.value, str);
@@ -297,18 +297,18 @@ export default ruleCreator({
         function checkMethodCall(node: TSESTree.CallExpression) {
             const callee = node.callee;
             // Handle bare calls like createEl(...)
-            if (callee.type === "Identifier") {
+            if (callee.type === TSESTree.AST_NODE_TYPES.Identifier) {
                 if (callee.name === "createEl") checkCreateEl(node);
                 if (callee.name === "addCommand") checkAddCommand(node);
                 return;
             }
-            if (callee.type !== "MemberExpression") return;
-            if (callee.property.type !== "Identifier") return;
+            if (callee.type !== TSESTree.AST_NODE_TYPES.MemberExpression) return;
+            if (callee.property.type !== TSESTree.AST_NODE_TYPES.Identifier) return;
             const name = callee.property.name;
             if (name in METHOD_STRING_ARG_POS) {
                 const idx = METHOD_STRING_ARG_POS[name];
                 const arg = node.arguments[idx];
-                if (!arg || arg.type === "SpreadElement") return;
+                if (!arg || arg.type === TSESTree.AST_NODE_TYPES.SpreadElement) return;
                 const str = getStringFromNode(arg);
                 if (str != null) reportIfNeeded(arg, str);
             }
@@ -320,16 +320,16 @@ export default ruleCreator({
 
         // Checks getDisplayText method implementations for returned strings
         function checkGetDisplayTextReturns(node: TSESTree.MethodDefinition) {
-            if (node.key.type !== "Identifier" || node.key.name !== "getDisplayText") return;
+            if (node.key.type !== TSESTree.AST_NODE_TYPES.Identifier || node.key.name !== "getDisplayText") return;
             const fn = node.value;
-            if (!fn || fn.type !== "FunctionExpression" || !fn.body) return;
+            if (!fn || fn.type !== TSESTree.AST_NODE_TYPES.FunctionExpression || !fn.body) return;
             visitStatementTree(fn.body, (target, text) => reportIfNeeded(target, text));
         }
 
         return {
             // new Notice("...")
             NewExpression(node: TSESTree.NewExpression) {
-                if (node.callee.type === "Identifier" && node.callee.name === "Notice") {
+                if (node.callee.type === TSESTree.AST_NODE_TYPES.Identifier && node.callee.name === "Notice") {
                     const first = node.arguments?.[0];
                     if (!first) return;
                     const str = getStringFromNode(first);
@@ -340,7 +340,7 @@ export default ruleCreator({
             CallExpression: checkMethodCall,
             // Direct property assignments: textContent, innerText, title
             AssignmentExpression(node: TSESTree.AssignmentExpression) {
-                if (node.left.type !== "MemberExpression" || node.left.property.type !== "Identifier") return;
+                if (node.left.type !== TSESTree.AST_NODE_TYPES.MemberExpression || node.left.property.type !== TSESTree.AST_NODE_TYPES.Identifier) return;
                 const prop = node.left.property.name;
                 const normalized = normalizeAttributeName(prop);
                 if (

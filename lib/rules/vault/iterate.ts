@@ -25,35 +25,35 @@ export default ruleCreator({
         return {
             MemberExpression(node: TSESTree.MemberExpression) {
                 if (
-                    node.property.type === "Identifier" &&
+                    node.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
                     node.property.name === "find" &&
-                    node.object.type === "CallExpression" &&
-                    node.object.callee.type === "MemberExpression" &&
-                    node.object.callee.property.type === "Identifier" &&
+                    node.object.type === TSESTree.AST_NODE_TYPES.CallExpression &&
+                    node.object.callee.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
+                    node.object.callee.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
                     node.object.callee.property.name === "getFiles" &&
-                    node.object.callee.object.type === "Identifier" &&
+                    node.object.callee.object.type === TSESTree.AST_NODE_TYPES.Identifier &&
                     node.object.callee.object.name === "vault"
                 ) {
                     if (
                         node.parent &&
-                        node.parent.type === "CallExpression" &&
+                        node.parent.type === TSESTree.AST_NODE_TYPES.CallExpression &&
                         node.parent.arguments &&
                         node.parent.arguments.length > 0
                     ) {
                         let findArgument = node.parent.arguments[0];
                         if (
-                            findArgument.type === "ArrowFunctionExpression" &&
-                            findArgument.body.type === "BinaryExpression" &&
+                            findArgument.type === TSESTree.AST_NODE_TYPES.ArrowFunctionExpression &&
+                            findArgument.body.type === TSESTree.AST_NODE_TYPES.BinaryExpression &&
                             (findArgument.body.operator === "===" ||
                                 findArgument.body.operator === "==") &&
                             findArgument.body.left.type ===
-                            "MemberExpression" &&
+                            TSESTree.AST_NODE_TYPES.MemberExpression &&
                             findArgument.body.left.object.type ===
-                            "Identifier" && //
+                            TSESTree.AST_NODE_TYPES.Identifier && //
                             findArgument.body.left.object.parent.type ===
-                            "MemberExpression" &&
+                            TSESTree.AST_NODE_TYPES.MemberExpression &&
                             findArgument.body.left.object.parent.property
-                                .type === "Identifier" &&
+                                .type === TSESTree.AST_NODE_TYPES.Identifier &&
                             findArgument.body.left.object.parent.property
                                 .name === "path"
                         ) {
