@@ -37,12 +37,12 @@ function hasForbiddenWords(str: string): [boolean, string] {
 }
 
 function getAstNodeType(node: TSESTree.Node): string {
-    if (node.type === "Literal") {
+    if (node.type === TSESTree.AST_NODE_TYPES.Literal) {
         if (node.value === null) return "null";
         return typeof node.value;
     }
-    if (node.type === "ObjectExpression") return "object";
-    if (node.type === "ArrayExpression") return "array";
+    if (node.type === TSESTree.AST_NODE_TYPES.ObjectExpression) return "object";
+    if (node.type === TSESTree.AST_NODE_TYPES.ArrayExpression) return "array";
     return "unknown";
 }
 
@@ -90,8 +90,8 @@ export default ruleCreator({
                 const body = programNode.body[0];
                 if (
                     programNode.body.length !== 1 ||
-                    body.type !== "ExpressionStatement" ||
-                    body.expression.type !== "ObjectExpression"
+                    body.type !== TSESTree.AST_NODE_TYPES.ExpressionStatement ||
+                    body.expression.type !== TSESTree.AST_NODE_TYPES.ObjectExpression
                 ) {
                     context.report({
                         node: programNode,
@@ -160,7 +160,7 @@ export default ruleCreator({
                         if (key === "fundingUrl") {
                             if (
                                 actualType === "object" &&
-                                valueNode.type === "ObjectExpression"
+                                valueNode.type === TSESTree.AST_NODE_TYPES.ObjectExpression
                             ) {
                                 if (valueNode.properties.length > 0) {
                                     // Check for duplicate keys in fundingUrl
@@ -200,7 +200,7 @@ export default ruleCreator({
 
                                         // Check for empty string values
                                         if (
-                                            prop.value.type === "Literal" &&
+                                            prop.value.type === TSESTree.AST_NODE_TYPES.Literal &&
                                             typeof prop.value.value ===
                                             "string" &&
                                             prop.value.value.length === 0
@@ -223,7 +223,7 @@ export default ruleCreator({
                                 }
                             } else if (
                                 actualType === "string" &&
-                                valueNode.type === "Literal" &&
+                                valueNode.type === TSESTree.AST_NODE_TYPES.Literal &&
                                 typeof valueNode.value === "string" &&
                                 valueNode.value.length === 0
                             ) {
@@ -235,7 +235,7 @@ export default ruleCreator({
                         } else if (
                             // check for forbidden words in specific string fields
                             actualType === "string" &&
-                            valueNode.type === "Literal" &&
+                            valueNode.type === TSESTree.AST_NODE_TYPES.Literal &&
                             typeof valueNode.value === "string" &&
                             hasForbiddenWords(valueNode.value)[0] &&
                             (key === "name" ||
@@ -252,7 +252,7 @@ export default ruleCreator({
                             });
                         } else if (
                             actualType === "string" &&
-                            valueNode.type === "Literal" &&
+                            valueNode.type === TSESTree.AST_NODE_TYPES.Literal &&
                             typeof valueNode.value === "string" &&
                             key === "description"
                         ) {

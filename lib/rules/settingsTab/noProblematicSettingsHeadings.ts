@@ -44,7 +44,7 @@ export default ruleCreator<Options, "settings" | "general" | "pluginName">({
         return {
             ClassDeclaration(node: TSESTree.ClassDeclaration) {
                 if (
-                    node.superClass?.type === "Identifier" &&
+                    node.superClass?.type === TSESTree.AST_NODE_TYPES.Identifier &&
                     node.superClass.name === "PluginSettingTab"
                 ) {
                     insidePluginSettingTab = true;
@@ -64,11 +64,11 @@ export default ruleCreator<Options, "settings" | "general" | "pluginName">({
                 let current = node.callee as TSESTree.MemberExpression;
 
                 // Traverse the call chain to find setName and the constructor
-                while (current.object.type === "CallExpression") {
+                while (current.object.type === TSESTree.AST_NODE_TYPES.CallExpression) {
                     const innerCall = current.object;
                     if (
-                        innerCall.callee.type === "MemberExpression" &&
-                        innerCall.callee.property.type === "Identifier" &&
+                        innerCall.callee.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
+                        innerCall.callee.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
                         innerCall.callee.property.name === "setName"
                     ) {
                         setNameCall = innerCall;
@@ -77,7 +77,7 @@ export default ruleCreator<Options, "settings" | "general" | "pluginName">({
                 }
 
                 if (
-                    current.object.type === "NewExpression" &&
+                    current.object.type === TSESTree.AST_NODE_TYPES.NewExpression &&
                     (current.object.callee as TSESTree.Identifier).name ===
                     "Setting"
                 ) {
@@ -88,7 +88,7 @@ export default ruleCreator<Options, "settings" | "general" | "pluginName">({
 
                 const textArg = setNameCall.arguments[0];
                 if (
-                    textArg?.type !== "Literal" ||
+                    textArg?.type !== TSESTree.AST_NODE_TYPES.Literal ||
                     typeof textArg.value !== "string"
                 ) {
                     return;

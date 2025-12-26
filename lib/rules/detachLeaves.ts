@@ -24,23 +24,23 @@ export default ruleCreator({
         return {
             MethodDefinition(node: TSESTree.MethodDefinition) {
                 if (
-                    node.key.type === "Identifier" &&
+                    node.key.type === TSESTree.AST_NODE_TYPES.Identifier &&
                     node.key.name === "onunload"
                 ) {
                     if (
-                        node.value.type === "FunctionExpression" &&
+                        node.value.type === TSESTree.AST_NODE_TYPES.FunctionExpression &&
                         node.value.body &&
-                        node.value.body.type === "BlockStatement"
+                        node.value.body.type === TSESTree.AST_NODE_TYPES.BlockStatement
                     ) {
                         node.value.body.body.forEach((statement) => {
                             if (
-                                statement.type === "ExpressionStatement" &&
+                                statement.type === TSESTree.AST_NODE_TYPES.ExpressionStatement &&
                                 statement.expression.type ===
-                                "CallExpression" &&
+                                TSESTree.AST_NODE_TYPES.CallExpression &&
                                 statement.expression.callee.type ===
-                                "MemberExpression" &&
+                                TSESTree.AST_NODE_TYPES.MemberExpression &&
                                 statement.expression.callee.property.type ===
-                                "Identifier" &&
+                                TSESTree.AST_NODE_TYPES.Identifier &&
                                 statement.expression.callee.property.name ===
                                 "detachLeavesOfType"
                             ) {

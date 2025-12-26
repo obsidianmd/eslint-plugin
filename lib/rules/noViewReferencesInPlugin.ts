@@ -56,10 +56,10 @@ export default ruleCreator({
 
         // Checks if an expression is `this` or an alias initialized with `this`.
         const isThisOrThisAlias = (node: TSESTree.Node): boolean => {
-            if (node.type === "ThisExpression") {
+            if (node.type === TSESTree.AST_NODE_TYPES.ThisExpression) {
                 return true;
             }
-            if (node.type === "Identifier") {
+            if (node.type === TSESTree.AST_NODE_TYPES.Identifier) {
                 const scope = sourceCode.getScope(node);
                 const reference = scope.references.find(
                     (ref) => ref.identifier === node,
@@ -75,8 +75,8 @@ export default ruleCreator({
                 // Add a type guard to ensure the definition node is a
                 // VariableDeclarator before accessing its `init` property.
                 if (
-                    defNode.type === "VariableDeclarator" &&
-                    defNode.init?.type === "ThisExpression"
+                    defNode.type === TSESTree.AST_NODE_TYPES.VariableDeclarator &&
+                    defNode.init?.type === TSESTree.AST_NODE_TYPES.ThisExpression
                 ) {
                     return true;
                 }
@@ -88,10 +88,10 @@ export default ruleCreator({
             node: TSESTree.Node | null | undefined,
         ) => {
             if (
-                node?.type === "AssignmentExpression" &&
-                node.left.type === "MemberExpression" &&
+                node?.type === TSESTree.AST_NODE_TYPES.AssignmentExpression &&
+                node.left.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
                 isThisOrThisAlias(node.left.object) &&
-                node.right.type === "NewExpression"
+                node.right.type === TSESTree.AST_NODE_TYPES.NewExpression
             ) {
                 const newInstanceType = services.getTypeAtLocation(node.right);
                 if (isSubclassOf(newInstanceType, "View", services)) {
@@ -108,7 +108,7 @@ export default ruleCreator({
                 callNode: TSESTree.CallExpression,
             ) {
                 const callee = callNode.callee;
-                if (callee.type !== "MemberExpression") return;
+                if (callee.type !== TSESTree.AST_NODE_TYPES.MemberExpression) return;
 
                 const callerType = services.getTypeAtLocation(callee.object);
                 if (!isSubclassOf(callerType, "Plugin", services)) return;
@@ -116,21 +116,21 @@ export default ruleCreator({
                 const factory = callNode.arguments[1];
                 if (
                     !factory ||
-                    (factory.type !== "ArrowFunctionExpression" &&
-                        factory.type !== "FunctionExpression")
+                    (factory.type !== TSESTree.AST_NODE_TYPES.ArrowFunctionExpression &&
+                        factory.type !== TSESTree.AST_NODE_TYPES.FunctionExpression)
                 ) {
                     return;
                 }
 
                 const factoryBody = factory.body;
 
-                if (factoryBody.type === "AssignmentExpression") {
+                if (factoryBody.type === TSESTree.AST_NODE_TYPES.AssignmentExpression) {
                     checkForBadAssignment(factoryBody);
-                } else if (factoryBody.type === "BlockStatement") {
+                } else if (factoryBody.type === TSESTree.AST_NODE_TYPES.BlockStatement) {
                     for (const statement of factoryBody.body) {
-                        if (statement.type === "ExpressionStatement") {
+                        if (statement.type === TSESTree.AST_NODE_TYPES.ExpressionStatement) {
                             checkForBadAssignment(statement.expression);
-                        } else if (statement.type === "ReturnStatement") {
+                        } else if (statement.type === TSESTree.AST_NODE_TYPES.ReturnStatement) {
                             checkForBadAssignment(statement.argument);
                         }
                     }

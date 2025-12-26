@@ -23,9 +23,9 @@ function isStyleMemberExpression(
     node: TSESTree.Node,
 ): node is TSESTree.MemberExpression {
     return (
-        node.type === "MemberExpression" &&
+        node.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
         !node.computed &&
-        node.property.type === "Identifier" &&
+        node.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
         node.property.name === "style"
     );
 }
@@ -51,12 +51,12 @@ export default ruleCreator({
             AssignmentExpression(node: TSESTree.AssignmentExpression) {
                 const left = node.left;
                 // We only care about static assignments (literals)
-                if (node.right.type !== "Literal") {
+                if (node.right.type !== TSESTree.AST_NODE_TYPES.Literal) {
                     return;
                 }
 
                 if (
-                    left.type === "MemberExpression" &&
+                    left.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
                     isStyleMemberExpression(left.object)
                 ) {
                     context.report({
@@ -72,7 +72,7 @@ export default ruleCreator({
             // Catches `el.style.setProperty(...)` and `el.setAttribute('style', ...)`
             CallExpression(node: TSESTree.CallExpression) {
                 const callee = node.callee;
-                if (callee.type !== "MemberExpression") {
+                if (callee.type !== TSESTree.AST_NODE_TYPES.MemberExpression) {
                     return;
                 }
 
@@ -87,7 +87,7 @@ export default ruleCreator({
                     // Check if the second argument is a literal
                     if (
                         node.arguments.length > 1 &&
-                        node.arguments[1].type === "Literal"
+                        node.arguments[1].type === TSESTree.AST_NODE_TYPES.Literal
                     ) {
                         context.report({
                             node,
@@ -101,9 +101,9 @@ export default ruleCreator({
                 if (propertyName === "setAttribute") {
                     if (
                         node.arguments.length > 1 &&
-                        node.arguments[0].type === "Literal" &&
+                        node.arguments[0].type === TSESTree.AST_NODE_TYPES.Literal &&
                         node.arguments[0].value === "style" &&
-                        node.arguments[1].type === "Literal"
+                        node.arguments[1].type === TSESTree.AST_NODE_TYPES.Literal
                     ) {
                         context.report({
                             node,

@@ -35,8 +35,8 @@ export default ruleCreator({
 
             // We only care about simple type references like `as TFile`
             if (
-                typeAnnotation.type === "TSTypeReference" &&
-                typeAnnotation.typeName.type === "Identifier"
+                typeAnnotation.type === TSESTree.AST_NODE_TYPES.TSTypeReference &&
+                typeAnnotation.typeName.type === TSESTree.AST_NODE_TYPES.Identifier
             ) {
                 const typeName = typeAnnotation.typeName.name;
                 if (BANNED_CAST_TYPES.has(typeName)) {
