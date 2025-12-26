@@ -17,6 +17,10 @@ ruleTester.run("no-static-styles-assignment", noInlineStylesRule, {
         { code: "el.setAttribute('data-id', '123');" },
         // Allowed: Reading a style is fine
         { code: "const color = el.style.color;" },
+        // Allowed: setting CSS variable
+        { code: "el.setCssProps({ '--some-var': 'blue' });" },
+        // Allowed: Dynamic/computed keys are not statically analyzable
+        { code: "el.setCssProps({ [someKey]: someValue });" },
     ],
     invalid: [
         // Invalid: Direct property assignment with a literal
@@ -69,5 +73,25 @@ ruleTester.run("no-static-styles-assignment", noInlineStylesRule, {
                 },
             ],
         },
+        // Invalid: setting CSS non-variable property
+        {
+            code: "el.setCssProps({ 'color': 'blue' });",
+            errors: [
+                {
+                    messageId: "avoidStyleAssignment",
+                    data: { property: "el.setCssProps" },
+                }
+            ]
+        },
+        // Invalid: setting CSS non-variable property
+        {
+            code: "el.setCssStyles({ 'color': 'blue' });",
+            errors: [
+                {
+                    messageId: "avoidStyleAssignment",
+                    data: { property: "el.setCssStyles" },
+                }
+            ]
+        }
     ],
 });
