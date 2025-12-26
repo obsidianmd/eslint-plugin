@@ -10,7 +10,7 @@ export default ruleCreator({
     meta: {
         docs: {
             description:
-                "Avoid iterating all files to find a file by its path\n",
+                "Avoid iterating all files to find a file by its path",
             url: "https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#Avoid+iterating+all+files+to+find+a+file+by+its+path",
         },
         type: "problem" as const,
