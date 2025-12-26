@@ -28,7 +28,7 @@ export default ruleCreator({
             ) {
                 // The options object is the 3rd argument.
                 const options = node.arguments[2];
-                if (!options || options.type !== "ObjectExpression") {
+                if (!options || options.type !== TSESTree.AST_NODE_TYPES.ObjectExpression) {
                     return;
                 }
 
@@ -39,14 +39,14 @@ export default ruleCreator({
                     ): prop is TSESTree.Property & {
                         key: TSESTree.Identifier;
                     } =>
-                        prop.type === "Property" &&
-                        prop.key.type === "Identifier" &&
+                        prop.type === TSESTree.AST_NODE_TYPES.Property &&
+                        prop.key.type === TSESTree.AST_NODE_TYPES.Identifier &&
                         prop.key.name === "modifiers",
                 );
 
                 if (
                     !modifiersProp ||
-                    modifiersProp.value.type !== "ArrayExpression"
+                    modifiersProp.value.type !== TSESTree.AST_NODE_TYPES.ArrayExpression
                 ) {
                     return;
                 }
@@ -54,7 +54,7 @@ export default ruleCreator({
                 // Check if any modifier in the array has the name "sameWidth".
                 const hasSameWidthModifier = modifiersProp.value.elements.some(
                     (element) => {
-                        if (!element || element.type !== "ObjectExpression") {
+                        if (!element || element.type !== TSESTree.AST_NODE_TYPES.ObjectExpression) {
                             return false;
                         }
                         // Find the `name` property of the modifier object.
@@ -64,14 +64,14 @@ export default ruleCreator({
                             ): prop is TSESTree.Property & {
                                 key: TSESTree.Identifier;
                             } =>
-                                prop.type === "Property" &&
-                                prop.key.type === "Identifier" &&
+                                prop.type === TSESTree.AST_NODE_TYPES.Property &&
+                                prop.key.type === TSESTree.AST_NODE_TYPES.Identifier &&
                                 prop.key.name === "name",
                         );
                         // Check if its value is the literal string "sameWidth".
                         return (
                             nameProp &&
-                            nameProp.value.type === "Literal" &&
+                            nameProp.value.type === TSESTree.AST_NODE_TYPES.Literal &&
                             nameProp.value.value === "sameWidth"
                         );
                     },

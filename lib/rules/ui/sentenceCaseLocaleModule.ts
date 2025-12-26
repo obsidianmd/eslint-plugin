@@ -37,31 +37,31 @@ function collectStringLiterals(
         if (!popped) continue;
         const current = unwrapExpression(popped);
         if (!current) continue;
-        if (current.type === "Literal") {
+        if (current.type === TSESTree.AST_NODE_TYPES.Literal) {
             if (typeof current.value === "string") cb(current, current.value);
             continue;
         }
-        if (current.type === "TemplateLiteral") {
+        if (current.type === TSESTree.AST_NODE_TYPES.TemplateLiteral) {
             if (current.expressions.length === 0) {
                 const raw = current.quasis.map((q) => q.value.raw).join("");
                 cb(current, raw);
             }
             continue;
         }
-        if (current.type === "ObjectExpression") {
+        if (current.type === TSESTree.AST_NODE_TYPES.ObjectExpression) {
             for (const property of current.properties) {
-                if (property.type === "Property") {
+                if (property.type === TSESTree.AST_NODE_TYPES.Property) {
                     const value = property.value;
                     stack.push(value);
-                } else if (property.type === "SpreadElement") {
+                } else if (property.type === TSESTree.AST_NODE_TYPES.SpreadElement) {
                     stack.push(property.argument);
                 }
             }
             continue;
         }
-        if (current.type === "ArrayExpression") {
+        if (current.type === TSESTree.AST_NODE_TYPES.ArrayExpression) {
             for (const element of current.elements) {
-                if (!element || element.type === "SpreadElement") continue;
+                if (!element || element.type === TSESTree.AST_NODE_TYPES.SpreadElement) continue;
                 stack.push(element);
             }
         }
@@ -113,14 +113,14 @@ export default ruleCreator({
             Program(program: TSESTree.Program) {
                 // Track top-level variable declarations that are objects
                 for (const stmt of program.body) {
-                    if (stmt.type === "VariableDeclaration") {
+                    if (stmt.type === TSESTree.AST_NODE_TYPES.VariableDeclaration) {
                         for (const d of stmt.declarations) {
                             if (
-                                d.id.type === "Identifier" &&
+                                d.id.type === TSESTree.AST_NODE_TYPES.Identifier &&
                                 d.init
                             ) {
                                 const unwrapped = unwrapExpression(d.init);
-                                if (unwrapped && unwrapped.type === "ObjectExpression") {
+                                if (unwrapped && unwrapped.type === TSESTree.AST_NODE_TYPES.ObjectExpression) {
                                     varObjects.set(d.id.name, unwrapped);
                                 }
                             }
@@ -130,28 +130,28 @@ export default ruleCreator({
             },
             ExportDefaultDeclaration(node: TSESTree.ExportDefaultDeclaration) {
                 if (!node.declaration) return;
-                if (node.declaration.type === "ObjectExpression") {
+                if (node.declaration.type === TSESTree.AST_NODE_TYPES.ObjectExpression) {
                     collectStringLiterals(node.declaration, (n, v) => reportIfNeeded(n, v));
-                } else if (node.declaration.type === "Identifier") {
+                } else if (node.declaration.type === TSESTree.AST_NODE_TYPES.Identifier) {
                     const obj = varObjects.get(node.declaration.name);
                     if (obj) collectStringLiterals(obj, (n, v) => reportIfNeeded(n, v));
                 }
             },
             ExportNamedDeclaration(node: TSESTree.ExportNamedDeclaration) {
-                if (node.declaration && node.declaration.type === "VariableDeclaration") {
+                if (node.declaration && node.declaration.type === TSESTree.AST_NODE_TYPES.VariableDeclaration) {
                     for (const decl of node.declaration.declarations) {
                         if (
                             decl.init
                         ) {
                             const unwrapped = unwrapExpression(decl.init);
-                            if (unwrapped && unwrapped.type === "ObjectExpression") {
+                            if (unwrapped && unwrapped.type === TSESTree.AST_NODE_TYPES.ObjectExpression) {
                                 collectStringLiterals(unwrapped, (n, v) => reportIfNeeded(n, v));
                             }
                         }
                     }
                 } else if (!node.source && node.specifiers && node.specifiers.length > 0) {
                     for (const spec of node.specifiers) {
-                        if (spec.type === "ExportSpecifier" && spec.local.type === "Identifier") {
+                        if (spec.type === TSESTree.AST_NODE_TYPES.ExportSpecifier && spec.local.type === TSESTree.AST_NODE_TYPES.Identifier) {
                             const obj = varObjects.get(spec.local.name);
                             if (obj) collectStringLiterals(obj, (n, v) => reportIfNeeded(n, v));
                         }

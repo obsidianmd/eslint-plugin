@@ -29,13 +29,13 @@ export default ruleCreator({
         return {
             CallExpression(node: TSESTree.CallExpression) {
                 const callee = node.callee;
-                if (callee.type !== "MemberExpression") {
+                if (callee.type !== TSESTree.AST_NODE_TYPES.MemberExpression) {
                     return;
                 }
 
                 const property = callee.property;
                 if (
-                    property.type !== "Identifier" ||
+                    property.type !== TSESTree.AST_NODE_TYPES.Identifier ||
                     !BANNED_METHODS.has(property.name)
                 ) {
                     return;
