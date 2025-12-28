@@ -19,6 +19,19 @@ import sampleNames from "./rules/sampleNames.js";
 import validateManifest from "./rules/validateManifest.js";
 import validateLicense from "./rules/validateLicense.js";
 import ruleCustomMessage from "./rules/ruleCustomMessage.js";
+import noEmptyCatch from "./rules/noEmptyCatch.js";
+import noObjectToString from "./rules/noObjectToString.js";
+import preferWindowTimers from "./rules/preferWindowTimers.js";
+import preferObsidianDebounce from "./rules/preferObsidianDebounce.js";
+import preferActiveViewOfType from "./rules/preferActiveViewOfType.js";
+import preferProcessFrontMatter from "./rules/preferProcessFrontMatter.js";
+import preferStringifyYaml from "./rules/preferStringifyYaml.js";
+import useNormalizePath from "./rules/useNormalizePath.js";
+import preferEditorApi from "./rules/preferEditorApi.js";
+import noObsidianBranding from "./rules/noObsidianBranding.js";
+import preferActiveWindow from "./rules/preferActiveWindow.js";
+import preferInstanceOf from "./rules/preferInstanceOf.js";
+import editorEventPreventDefault from "./rules/editorEventPreventDefault.js";
 import { getManifest } from "./manifest.js";
 import { ui } from "./rules/ui/index.js";
 
@@ -60,6 +73,7 @@ const plugin = {
         "settings-tab/no-problematic-settings-headings":
             settingsTab.noProblematicSettingsHeadings,
         "vault/iterate": vault.iterate,
+        "vault/prefer-cached-read": vault.preferCachedRead,
         "detach-leaves": detachLeaves,
         "hardcoded-config-path": hardcodedConfigPath,
         "no-forbidden-elements": noForbiddenElements,
@@ -80,6 +94,19 @@ const plugin = {
         "ui/sentence-case": ui.sentenceCase,
         "ui/sentence-case-json": ui.sentenceCaseJson,
         "ui/sentence-case-locale-module": ui.sentenceCaseLocaleModule,
+        "no-empty-catch": noEmptyCatch,
+        "no-object-to-string": noObjectToString,
+        "prefer-window-timers": preferWindowTimers,
+        "prefer-obsidian-debounce": preferObsidianDebounce,
+        "prefer-active-view-of-type": preferActiveViewOfType,
+        "prefer-process-front-matter": preferProcessFrontMatter,
+        "prefer-stringify-yaml": preferStringifyYaml,
+        "use-normalize-path": useNormalizePath,
+        "prefer-editor-api": preferEditorApi,
+        "no-obsidian-branding": noObsidianBranding,
+        "prefer-active-window": preferActiveWindow,
+        "prefer-instance-of": preferInstanceOf,
+        "editor-event-prevent-default": editorEventPreventDefault,
     } as unknown as Record<string, RuleDefinition<RuleDefinitionTypeOptions>>,
     configs: {
         recommended: [] as Config[],
@@ -96,6 +123,7 @@ const recommendedPluginRulesConfig: RulesConfig = {
     "obsidianmd/settings-tab/no-manual-html-headings": "error",
     "obsidianmd/settings-tab/no-problematic-settings-headings": "error",
     "obsidianmd/vault/iterate": "error",
+    "obsidianmd/vault/prefer-cached-read": "warn",
     "obsidianmd/detach-leaves": "error",
     "obsidianmd/hardcoded-config-path": "error",
     "obsidianmd/no-forbidden-elements": "error",
@@ -113,6 +141,19 @@ const recommendedPluginRulesConfig: RulesConfig = {
     "obsidianmd/validate-manifest": "error",
     "obsidianmd/validate-license": ["error"],
     "obsidianmd/ui/sentence-case": ["error", { enforceCamelCaseLower: true }],
+    "obsidianmd/no-empty-catch": "error",
+    "obsidianmd/no-object-to-string": "error",
+    "obsidianmd/prefer-window-timers": "warn",
+    "obsidianmd/prefer-obsidian-debounce": "warn",
+    "obsidianmd/prefer-active-view-of-type": "warn",
+    "obsidianmd/prefer-process-front-matter": "warn",
+    "obsidianmd/prefer-stringify-yaml": "warn",
+    "obsidianmd/use-normalize-path": "warn",
+    "obsidianmd/prefer-editor-api": "warn",
+    "obsidianmd/no-obsidian-branding": "error",
+    "obsidianmd/prefer-active-window": "warn",
+    "obsidianmd/prefer-instance-of": "warn",
+    "obsidianmd/editor-event-prevent-default": "warn",
 }
 
 const flatRecommendedGeneralRules: RulesConfig = {
@@ -123,6 +164,12 @@ const flatRecommendedGeneralRules: RulesConfig = {
     "no-implied-eval": "error",
     "prefer-const": "off",
     "no-implicit-globals": "error",
+    "no-var": "error",
+    "prefer-object-has-own": "error",
+    "@typescript-eslint/no-require-imports": "error",
+    "@typescript-eslint/no-floating-promises": "error",
+    "@typescript-eslint/no-this-alias": "error",
+    "@typescript-eslint/unbound-method": ["warn", { ignoreStatic: true }],
     "no-console": "off", // overridden by obsidianmd/rule-custom-message
     "no-restricted-globals": [
         "error",
@@ -130,6 +177,21 @@ const flatRecommendedGeneralRules: RulesConfig = {
             name: "app",
             message:
                 "Avoid using the global app object. Instead use the reference provided by your plugin instance.",
+        },
+        {
+            name: "alert",
+            message:
+                "Don't use native dialogs. Use Obsidian's Modal API or Notice instead.",
+        },
+        {
+            name: "confirm",
+            message:
+                "Don't use native dialogs. Use Obsidian's Modal API instead.",
+        },
+        {
+            name: "prompt",
+            message:
+                "Don't use native dialogs. Use Obsidian's Modal API instead.",
         },
         "warn",
         {
@@ -185,7 +247,7 @@ const flatRecommendedGeneralRules: RulesConfig = {
     "@typescript-eslint/ban-ts-comment": "off",
     "@typescript-eslint/no-deprecated": "error",
     "@typescript-eslint/no-unused-vars": ["warn", { args: "none" }],
-    "@typescript-eslint/require-await": "off",
+    "@typescript-eslint/require-await": "warn",
     "@typescript-eslint/no-explicit-any": [
         "error",
         { fixToUnknown: true },
