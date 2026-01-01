@@ -11,6 +11,15 @@ export const DEFAULT_BRANDS: string[] = [
     "Obsidian",
     "Obsidian Sync",
     "Obsidian Publish",
+    // Common APIs and services
+    "Google",
+    "Gemini",
+    "Vertex AI", // Enterprise AI for Gemini and Claude
+    "OpenAI",
+    "GPT",
+    "Anthropic",
+    "Claude",
+    "Microsoft",
     // Cloud storage
     "Google Drive",
     "Dropbox",
@@ -56,6 +65,5 @@ export const DEFAULT_BRANDS: string[] = [
     "WebStorm",
     "PyCharm",
     "React",
-    "Svelte",
-    "OpenAI"
+    "Svelte"
 ];
