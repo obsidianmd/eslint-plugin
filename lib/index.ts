@@ -32,6 +32,7 @@ import depend from 'eslint-plugin-depend';
 import globals from "globals";
 import fs from "node:fs";
 import path from "node:path";
+import { cwd } from "node:process";
 import { Config, defineConfig, globalIgnores } from "eslint/config";
 import type { RuleDefinition, RuleDefinitionTypeOptions, RulesConfig } from "@eslint/core";
 
@@ -222,7 +223,12 @@ const flatRecommendedConfig: Config[] = defineConfig([
             "@microsoft/sdl": sdl,
             depend
         },
-        files: ['**/*.js', "**/*.jsx"],
+        files: [
+            '**/*.js',
+            "**/*.jsx",
+            '**/*.cjs',
+            '**/*.mjs',
+        ],
         extends: tseslint.configs.recommended as Config[],
         rules: {
             ...flatRecommendedGeneralRules,
@@ -235,7 +241,12 @@ const flatRecommendedConfig: Config[] = defineConfig([
             "@microsoft/sdl": sdl,
             depend
         },
-        files: ['**/*.ts', "**/*.tsx"],
+        files: [
+            '**/*.ts',
+            '**/*.tsx',
+            '**/*.cts',
+            '**/*.mts',
+        ],
         extends: tseslint.configs.recommendedTypeChecked as Config[],
         rules: {
             ...flatRecommendedGeneralRules,
@@ -269,8 +280,41 @@ const flatRecommendedConfig: Config[] = defineConfig([
                 sleep: "readonly"
             }
         },
-    }
+    },
+    {
+        languageOptions: {
+            parserOptions: {
+                ecmaFeatures: {
+                    jsx: true
+                },
+                projectService: {
+                    allowDefaultProject: [
+                        '*.js',
+                        '*.jsx',
+                        '*.cjs',
+                        '*.mjs',
+                    ],
+                },
+                tsconfigRootDir: getRootFolder() ?? ''
+            },
+        }
+    },
+    globalIgnores([
+        'node_modules',
+    ])
 ]);
+
+function getRootFolder(): string | null {
+    let currentFolder = cwd();
+    while (currentFolder !== '.' && currentFolder !== '/') {
+        if (fs.existsSync(path.join(currentFolder, 'package.json'))) {
+            return currentFolder;
+        }
+        currentFolder = path.dirname(currentFolder);
+    }
+
+    return null;
+}
 
 const hybridRecommendedConfig: Config[] = defineConfig({
     rules: recommendedPluginRulesConfig,

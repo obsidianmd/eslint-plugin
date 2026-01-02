@@ -24,29 +24,35 @@ To use the recommended configuration, add it to your `eslint.config.js` file. Th
 
 ```javascript
 // eslint.config.mjs
-import tsparser from "@typescript-eslint/parser";
-import { defineConfig } from "eslint/config";
 import obsidianmd from "eslint-plugin-obsidianmd";
+import { defineConfig, globalIgnores } from "eslint/config";
 
-export default defineConfig([
-  ...obsidianmd.configs.recommended,
-  {
-    files: ["**/*.ts"],
-    languageOptions: {
-      parser: tsparser,
-      parserOptions: { project: "./tsconfig.json" },
-    },
-
-    // You can add your own configuration to override or add rules
-    rules: {
-      // example: turn off a rule from the recommended set
-      "obsidianmd/sample-names": "off",
-      // example: add a rule not in the recommended set and set its severity
-      "obsidianmd/prefer-file-manager-trash": "error",
-    },
-  },
-]);
-
+export default defineConfig(
+	globalIgnores([
+		"node_modules",
+		"dist",
+		"esbuild.config.mjs",
+		"eslint.config.mjs",
+		"version-bump.mjs"
+	]),
+	{
+		files: [
+			'**/*.js',
+			'**/*.jsx',
+			'**/*.cjs',
+			'**/*.mjs',
+			'**/*.ts',
+			'**/*.tsx',
+			'**/*.cts',
+			'**/*.mts',
+		],
+		extends: obsidianmd.configs.recommended
+	},
+	{
+		files: ['package.json'],
+		extends: obsidianmd.configs.packageJson
+	}
+);
 ```
 
 ### Legacy Config (`.eslintrc`)
