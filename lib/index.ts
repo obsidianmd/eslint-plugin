@@ -210,6 +210,9 @@ const flatRecommendedGeneralRules: RulesConfig = {
     ]
 };
 
+const tsconfigRootDir = getRootFolder() ?? cwd();
+const hasTsconfig = fs.existsSync(path.join(tsconfigRootDir, 'tsconfig.json'));
+
 const flatRecommendedConfig: Config[] = defineConfig([
     js.configs.recommended,
     {
@@ -247,7 +250,9 @@ const flatRecommendedConfig: Config[] = defineConfig([
             '**/*.cts',
             '**/*.mts',
         ],
-        extends: tseslint.configs.recommendedTypeChecked as Config[],
+        extends: (hasTsconfig
+            ? tseslint.configs.recommendedTypeChecked
+            : tseslint.configs.recommended) as Config[],
         rules: {
             ...flatRecommendedGeneralRules,
             ...recommendedPluginRulesConfig
@@ -287,15 +292,12 @@ const flatRecommendedConfig: Config[] = defineConfig([
                 ecmaFeatures: {
                     jsx: true
                 },
-                projectService: {
-                    allowDefaultProject: [
-                        '*.js',
-                        '*.jsx',
-                        '*.cjs',
-                        '*.mjs',
-                    ],
-                },
-                tsconfigRootDir: getRootFolder() ?? ''
+                ...(hasTsconfig
+                    ? {
+                        projectService: true,
+                        tsconfigRootDir,
+                    }
+                    : {}),
             },
         }
     },
