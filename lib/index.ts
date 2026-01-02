@@ -32,6 +32,7 @@ import depend from 'eslint-plugin-depend';
 import globals from "globals";
 import fs from "node:fs";
 import path from "node:path";
+import { cwd } from "node:process";
 import { Config, defineConfig, globalIgnores } from "eslint/config";
 import type { RuleDefinition, RuleDefinitionTypeOptions, RulesConfig } from "@eslint/core";
 
@@ -83,7 +84,8 @@ const plugin = {
     } as unknown as Record<string, RuleDefinition<RuleDefinitionTypeOptions>>,
     configs: {
         recommended: [] as Config[],
-        recommendedWithLocalesEn: [] as Config[]
+        recommendedWithLocalesEn: [] as Config[],
+        packageJson: [] as Config[]
     }
 } satisfies ESLint.Plugin;
 
@@ -208,6 +210,9 @@ const flatRecommendedGeneralRules: RulesConfig = {
     ]
 };
 
+const tsconfigRootDir = getRootFolder() ?? cwd();
+const hasTsconfig = fs.existsSync(path.join(tsconfigRootDir, 'tsconfig.json'));
+
 const flatRecommendedConfig: Config[] = defineConfig([
     js.configs.recommended,
     {
@@ -221,7 +226,12 @@ const flatRecommendedConfig: Config[] = defineConfig([
             "@microsoft/sdl": sdl,
             depend
         },
-        files: ['**/*.js', "**/*.jsx"],
+        files: [
+            '**/*.js',
+            "**/*.jsx",
+            '**/*.cjs',
+            '**/*.mjs',
+        ],
         extends: tseslint.configs.recommended as Config[],
         rules: {
             ...flatRecommendedGeneralRules,
@@ -234,29 +244,19 @@ const flatRecommendedConfig: Config[] = defineConfig([
             "@microsoft/sdl": sdl,
             depend
         },
-        files: ['**/*.ts', "**/*.tsx"],
-        extends: tseslint.configs.recommendedTypeChecked as Config[],
+        files: [
+            '**/*.ts',
+            '**/*.tsx',
+            '**/*.cts',
+            '**/*.mts',
+        ],
+        extends: (hasTsconfig
+            ? tseslint.configs.recommendedTypeChecked
+            : tseslint.configs.recommended) as Config[],
         rules: {
             ...flatRecommendedGeneralRules,
             ...recommendedPluginRulesConfig
         },
-    },
-    {
-        files: ['package.json'],
-        language: 'json/json',
-        extends: [tseslint.configs.disableTypeChecked as Config],
-        plugins: {
-            depend,
-            json
-        },
-        rules: {
-            "no-irregular-whitespace": "off",
-            "depend/ban-dependencies": [
-                "error", {
-                    "presets": ["native", "microutilities", "preferred"]
-                }
-            ]
-        }
     },
     {
         languageOptions: {
@@ -285,8 +285,38 @@ const flatRecommendedConfig: Config[] = defineConfig([
                 sleep: "readonly"
             }
         },
-    }
+    },
+    {
+        languageOptions: {
+            parserOptions: {
+                ecmaFeatures: {
+                    jsx: true
+                },
+                ...(hasTsconfig
+                    ? {
+                        projectService: true,
+                        tsconfigRootDir,
+                    }
+                    : {}),
+            },
+        }
+    },
+    globalIgnores([
+        'node_modules',
+    ])
 ]);
+
+function getRootFolder(): string | null {
+    let currentFolder = cwd();
+    while (currentFolder !== '.' && currentFolder !== '/') {
+        if (fs.existsSync(path.join(currentFolder, 'package.json'))) {
+            return currentFolder;
+        }
+        currentFolder = path.dirname(currentFolder);
+    }
+
+    return null;
+}
 
 const hybridRecommendedConfig: Config[] = defineConfig({
     rules: recommendedPluginRulesConfig,
@@ -343,9 +373,29 @@ const recommendedWithLocalesEn: Config[] = defineConfig({
     extends: recommendedWithLocalesEnBase
 });
 
+const packageJsonConfig: Config[] = defineConfig([
+    {
+        files: ['package.json'],
+        language: 'json/json',
+        plugins: {
+            depend,
+            json
+        },
+        rules: {
+            "no-irregular-whitespace": "off",
+            "depend/ban-dependencies": [
+                "error", {
+                    "presets": ["native", "microutilities", "preferred"]
+                }
+            ]
+        }
+    },
+]);
+
 plugin.configs = {
     recommended: hybridRecommendedConfig,
-    recommendedWithLocalesEn
+    recommendedWithLocalesEn,
+    packageJson: packageJsonConfig
 };
 
 export default plugin;
