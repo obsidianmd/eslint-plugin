@@ -83,7 +83,8 @@ const plugin = {
     } as unknown as Record<string, RuleDefinition<RuleDefinitionTypeOptions>>,
     configs: {
         recommended: [] as Config[],
-        recommendedWithLocalesEn: [] as Config[]
+        recommendedWithLocalesEn: [] as Config[],
+        packageJson: [] as Config[]
     }
 } satisfies ESLint.Plugin;
 
@@ -242,23 +243,6 @@ const flatRecommendedConfig: Config[] = defineConfig([
         },
     },
     {
-        files: ['package.json'],
-        language: 'json/json',
-        extends: [tseslint.configs.disableTypeChecked as Config],
-        plugins: {
-            depend,
-            json
-        },
-        rules: {
-            "no-irregular-whitespace": "off",
-            "depend/ban-dependencies": [
-                "error", {
-                    "presets": ["native", "microutilities", "preferred"]
-                }
-            ]
-        }
-    },
-    {
         languageOptions: {
             globals: {
                 ...globals.browser,
@@ -343,9 +327,29 @@ const recommendedWithLocalesEn: Config[] = defineConfig({
     extends: recommendedWithLocalesEnBase
 });
 
+const packageJsonConfig: Config[] = defineConfig([
+    {
+        files: ['package.json'],
+        language: 'json/json',
+        plugins: {
+            depend,
+            json
+        },
+        rules: {
+            "no-irregular-whitespace": "off",
+            "depend/ban-dependencies": [
+                "error", {
+                    "presets": ["native", "microutilities", "preferred"]
+                }
+            ]
+        }
+    },
+]);
+
 plugin.configs = {
     recommended: hybridRecommendedConfig,
-    recommendedWithLocalesEn
+    recommendedWithLocalesEn,
+    packageJson: packageJsonConfig
 };
 
 export default plugin;
