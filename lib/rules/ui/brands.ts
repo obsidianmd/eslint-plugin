@@ -65,5 +65,6 @@ export const DEFAULT_BRANDS: string[] = [
     "WebStorm",
     "PyCharm",
     "React",
-    "Svelte"
+    "Svelte",
+    "WebDAV"
 ];
