@@ -34,6 +34,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { Config, defineConfig, globalIgnores } from "eslint/config";
 import type { RuleDefinition, RuleDefinitionTypeOptions, RulesConfig } from "@eslint/core";
+import noUnsanitizedPlugin from "eslint-plugin-no-unsanitized";
 
 interface PackageJson {
     name: string;
@@ -219,10 +220,11 @@ const flatRecommendedConfig: Config[] = defineConfig([
         plugins: {
             import: importPlugin,
             "@microsoft/sdl": sdl,
-            depend
+            depend,
+            noUnsanitizedPlugin
         },
         files: ['**/*.js', "**/*.jsx"],
-        extends: tseslint.configs.recommended as Config[],
+        extends: [...(tseslint.configs.recommended as Config[]), noUnsanitizedPlugin.configs.recommended],
         rules: {
             ...flatRecommendedGeneralRules,
             ...recommendedPluginRulesConfig
@@ -232,10 +234,11 @@ const flatRecommendedConfig: Config[] = defineConfig([
         plugins: {
             import: importPlugin,
             "@microsoft/sdl": sdl,
-            depend
+            depend,
+            noUnsanitizedPlugin
         },
         files: ['**/*.ts', "**/*.tsx"],
-        extends: tseslint.configs.recommendedTypeChecked as Config[],
+        extends: [...(tseslint.configs.recommendedTypeChecked as Config[]), noUnsanitizedPlugin.configs.recommended],
         rules: {
             ...flatRecommendedGeneralRules,
             ...recommendedPluginRulesConfig
