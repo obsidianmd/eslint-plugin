@@ -19,6 +19,7 @@ import sampleNames from "./rules/sampleNames.js";
 import validateManifest from "./rules/validateManifest.js";
 import validateLicense from "./rules/validateLicense.js";
 import ruleCustomMessage from "./rules/ruleCustomMessage.js";
+import noUnsupportedApi from "./rules/noUnsupportedApi.js";
 import { getManifest } from "./manifest.js";
 import { ui } from "./rules/ui/index.js";
 
@@ -78,6 +79,7 @@ const plugin = {
         "validate-manifest": validateManifest,
         "validate-license": validateLicense,
         "rule-custom-message": ruleCustomMessage,
+        "no-unsupported-api": noUnsupportedApi,
         "ui/sentence-case": ui.sentenceCase,
         "ui/sentence-case-json": ui.sentenceCaseJson,
         "ui/sentence-case-locale-module": ui.sentenceCaseLocaleModule,
@@ -111,6 +113,7 @@ const recommendedPluginRulesConfig: RulesConfig = {
     "obsidianmd/prefer-abstract-input-suggest": "error",
     "obsidianmd/regex-lookbehind": "error",
     "obsidianmd/sample-names": "error",
+    "obsidianmd/no-unsupported-api": "error",
     "obsidianmd/validate-manifest": "error",
     "obsidianmd/validate-license": ["error"],
     "obsidianmd/ui/sentence-case": ["error", { enforceCamelCaseLower: true }],
