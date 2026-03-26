@@ -6,6 +6,7 @@ const ruleTester = new RuleTester();
 ruleTester.run("validate-manifest", manifestRule, {
     valid: [
         {
+            name: "complete valid manifest is accepted",
             filename: "manifest.json",
             code: `{
                     "id": "obsidianifier",
@@ -19,6 +20,7 @@ ruleTester.run("validate-manifest", manifestRule, {
                 }`,
         },
         {
+            name: "manifest with string fundingUrl is accepted",
             filename: "manifest.json",
             code: `{
                     "id": "test-id",
@@ -32,6 +34,7 @@ ruleTester.run("validate-manifest", manifestRule, {
                 }`,
         },
         {
+            name: "manifest with object fundingUrl is accepted",
             filename: "manifest.json",
             code: `{
                     "id": "test-id",
@@ -47,6 +50,7 @@ ruleTester.run("validate-manifest", manifestRule, {
                 }`,
         },
         {
+            name: "valid description is accepted",
             filename: "manifest.json",
             code: `{
                     "id": "valid-description",
@@ -59,6 +63,7 @@ ruleTester.run("validate-manifest", manifestRule, {
                 }`,
         },
         {
+            name: "description ending with period is accepted",
             filename: "manifest.json",
             code: `{
                     "id": "valid-description-with-periods",
@@ -72,8 +77,8 @@ ruleTester.run("validate-manifest", manifestRule, {
         },
     ],
     invalid: [
-        // Forbidden words tests
         {
+            name: "forbidden word 'plugin' in id, name, and description",
             filename: "manifest.json",
             code: `{
                     "id": "my-plugin",
@@ -101,6 +106,7 @@ ruleTester.run("validate-manifest", manifestRule, {
             ],
         },
         {
+            name: "missing required keys reports all missing",
             filename: "manifest.json",
             code: `{"name": "My Plugin"}`,
             errors: [
@@ -117,6 +123,7 @@ ruleTester.run("validate-manifest", manifestRule, {
             ],
         },
         {
+            name: "forbidden words 'obsidian' and 'plugin' in name",
             filename: "manifest.json",
             code: `{
                     "id": "my-plugin",
@@ -144,6 +151,7 @@ ruleTester.run("validate-manifest", manifestRule, {
             ],
         },
         {
+            name: "forbidden words 'obsidian' and 'plugin' in id and description",
             filename: "manifest.json",
             code: `{
                     "id": "my-obsidian-plugin",
@@ -170,14 +178,14 @@ ruleTester.run("validate-manifest", manifestRule, {
                 },
             ],
         },
-        // Structure validation tests
         {
+            name: "array root type is forbidden",
             filename: "manifest.json",
-            code: `[]`, // Test for invalid root type
+            code: `[]`,
             errors: [{ messageId: "mustBeRootObject" }],
         },
-        // Type validation tests
         {
+            name: "authorUrl with number type is forbidden",
             filename: "manifest.json",
             code: `{
                     "id": "test-id",
@@ -201,6 +209,7 @@ ruleTester.run("validate-manifest", manifestRule, {
             ],
         },
         {
+            name: "authorUrl with null type is forbidden",
             filename: "manifest.json",
             code: `{
                     "id": "test-id",
@@ -224,6 +233,7 @@ ruleTester.run("validate-manifest", manifestRule, {
             ],
         },
         {
+            name: "authorUrl with object type is forbidden",
             filename: "manifest.json",
             code: `{
                     "id": "test-id",
@@ -246,8 +256,8 @@ ruleTester.run("validate-manifest", manifestRule, {
                 },
             ],
         },
-        // FundingUrl tests
         {
+            name: "fundingUrl entry with number type is forbidden",
             filename: "manifest.json",
             code: `{
                     "id": "test-id",
@@ -273,6 +283,7 @@ ruleTester.run("validate-manifest", manifestRule, {
             ],
         },
         {
+            name: "empty fundingUrl object is forbidden",
             filename: "manifest.json",
             code: `{
                     "id": "test-id",
@@ -292,6 +303,7 @@ ruleTester.run("validate-manifest", manifestRule, {
             ],
         },
         {
+            name: "empty fundingUrl string is forbidden",
             filename: "manifest.json",
             code: `{
                     "id": "test-id",
@@ -310,6 +322,7 @@ ruleTester.run("validate-manifest", manifestRule, {
             ],
         },
         {
+            name: "fundingUrl entry with number alongside valid entry is forbidden",
             filename: "manifest.json",
             code: `{
                     "id": "test-id",
@@ -336,6 +349,7 @@ ruleTester.run("validate-manifest", manifestRule, {
             ],
         },
         {
+            name: "empty fundingUrl entry alongside valid entry is forbidden",
             filename: "manifest.json",
             code: `{
                     "id": "test-id",
@@ -358,6 +372,7 @@ ruleTester.run("validate-manifest", manifestRule, {
             ],
         },
         {
+            name: "fundingUrl entry with object type is forbidden",
             filename: "manifest.json",
             code: `{
                     "id": "test-id",
@@ -386,6 +401,7 @@ ruleTester.run("validate-manifest", manifestRule, {
             ],
         },
         {
+            name: "duplicate fundingUrl key is forbidden",
             filename: "manifest.json",
             code: `{
                     "id": "test-id",
@@ -407,8 +423,8 @@ ruleTester.run("validate-manifest", manifestRule, {
                 },
             ],
         },
-        // Duplicate keys tests
         {
+            name: "duplicate manifest key is forbidden",
             filename: "manifest.json",
             code: `{
                     "id": "test-id",
@@ -427,8 +443,8 @@ ruleTester.run("validate-manifest", manifestRule, {
                 },
             ],
         },
-        // Description tests
         {
+            name: "too short description is forbidden",
             filename: "manifest.json",
             code: `{
                     "id": "short-description",
@@ -446,6 +462,7 @@ ruleTester.run("validate-manifest", manifestRule, {
             ],
         },
         {
+            name: "too long description is forbidden",
             filename: "manifest.json",
             // from: https://stallman-copypasta.github.io/
             code: `{
@@ -464,6 +481,7 @@ ruleTester.run("validate-manifest", manifestRule, {
             ],
         },
         {
+            name: "description without ending period is forbidden",
             filename: "manifest.json",
             code: `{
                     "id": "remove-periods",
@@ -484,6 +502,7 @@ ruleTester.run("validate-manifest", manifestRule, {
             ],
         },
         {
+            name: "all lowercase description is forbidden",
             filename: "manifest.json",
             code: `{
                     "id": "all-lowercase",
@@ -504,6 +523,7 @@ ruleTester.run("validate-manifest", manifestRule, {
             ],
         },
         {
+            name: "description with special characters is forbidden",
             filename: "manifest.json",
             code: `{
                     "id": "more-special-characters",
@@ -524,6 +544,7 @@ ruleTester.run("validate-manifest", manifestRule, {
             ],
         },
         {
+            name: "description with emojis is forbidden",
             filename: "manifest.json",
             code: `{
                     "id": "emojis-are-my-culture",

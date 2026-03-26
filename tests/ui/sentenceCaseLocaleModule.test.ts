@@ -21,6 +21,7 @@ try {
     tester.run("ui-sentence-case-locale-module", rule, {
         valid: [
             {
+                name: "sentence case values in default export are allowed",
                 filename: "en.ts",
                 code: `export default {
           pdf: "Export as PDF",
@@ -28,12 +29,14 @@ try {
         };`,
             },
             {
+                name: "sentence case in named export is allowed",
                 filename: "locales/en/module.ts",
                 code: `export const enUS = {
           autoReveal: "Enable auto-reveal",
         };`,
             },
             {
+                name: "sentence case in as-const variable is allowed",
                 filename: "en.ts",
                 code: `const strings = {
           open: "Open settings",
@@ -41,6 +44,7 @@ try {
         export default strings;`,
             },
             {
+                name: "sentence case in array value is allowed",
                 filename: "en.ts",
                 code: `export default {
           items: ["Open settings"],
@@ -49,6 +53,7 @@ try {
         ],
         invalid: [
             {
+                name: "title case in default export is forbidden",
                 filename: "en.ts",
                 code: `export default {
           autoReveal: "Enable Auto Reveal",
@@ -56,6 +61,7 @@ try {
                 errors: [{ messageId: "useSentenceCase" }],
             },
             {
+                name: "auto-fix corrects title case in default export",
                 filename: "en.ts",
                 code: "export default { label: \"Enable Auto Reveal\" };",
                 output: "export default { label: \"Enable auto reveal\" };",
@@ -63,6 +69,7 @@ try {
                 errors: [{ messageId: "useSentenceCase" }],
             },
             {
+                name: "title case in as-const variable is forbidden",
                 filename: "en.ts",
                 code: `const strings = {
           autoReveal: "Enable Auto Reveal",
@@ -71,6 +78,7 @@ try {
                 errors: [{ messageId: "useSentenceCase" }],
             },
             {
+                name: "title case in array value is forbidden",
                 filename: "en.ts",
                 code: `export default {
           items: ["Enable Auto Reveal"],
@@ -78,6 +86,7 @@ try {
                 errors: [{ messageId: "useSentenceCase" }],
             },
             {
+                name: "title case in nested named export is forbidden",
                 filename: "en.ts",
                 code: `export const en = {
           nested: {

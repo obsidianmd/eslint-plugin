@@ -5,8 +5,8 @@ const ruleTester = new RuleTester();
 
 ruleTester.run("no-deprecated-text-input-suggest", noDeprecatedSuggestRule, {
     valid: [
-        // Valid: A standard popperjs call without the custom modifier.
         {
+            name: "popperjs call without sameWidth modifier is allowed",
             code: `
                 import { createPopper } from '@popperjs/core';
                 createPopper(button, tooltip, {
@@ -14,8 +14,8 @@ ruleTester.run("no-deprecated-text-input-suggest", noDeprecatedSuggestRule, {
                 });
             `,
         },
-        // Valid: A popperjs call with other modifiers.
         {
+            name: "popperjs call with other modifiers is allowed",
             code: `
                 import { createPopper } from '@popperjs/core';
                 createPopper(button, tooltip, {
@@ -23,14 +23,14 @@ ruleTester.run("no-deprecated-text-input-suggest", noDeprecatedSuggestRule, {
                 });
             `,
         },
-        // Valid: A call to a different function.
         {
+            name: "call to a different function is allowed",
             code: "someOtherFunction();",
         },
     ],
     invalid: [
-        // Invalid: The exact pattern from the deprecated implementation.
         {
+            name: "deprecated sameWidth modifier pattern is forbidden",
             code: `
                 import { createPopper } from '@popperjs/core';
                 createPopper(inputEl, suggestEl, {

@@ -5,11 +5,20 @@ const ruleTester = new RuleTester();
 
 ruleTester.run("regex-lookbehind", regexLookbehindRule, {
     valid: [
-        { code: "const re = /foo/;", options: [{ isDesktopOnly: false }] },
-        { code: "const re = /(?<=foo)bar/;", options: [{ isDesktopOnly: true }] },
+        {
+            name: "regex without lookbehind is allowed",
+            code: "const re = /foo/;",
+            options: [{ isDesktopOnly: false }],
+        },
+        {
+            name: "lookbehind in desktop-only mode is allowed",
+            code: "const re = /(?<=foo)bar/;",
+            options: [{ isDesktopOnly: true }],
+        },
     ],
     invalid: [
         {
+            name: "lookbehind in non-desktop mode is forbidden",
             code: "const re = /(?<=foo)bar/;",
             options: [{ isDesktopOnly: false }],
             errors: [{ messageId: "lookbehind" }],
