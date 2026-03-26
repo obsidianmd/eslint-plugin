@@ -5,23 +5,23 @@ const ruleTester = new RuleTester();
 
 ruleTester.run("prefer-file-manager-trash-file", preferFileManagerTrashRule, {
     valid: [
-        // Correct usage
         {
+            name: "FileManager.trashFile is allowed",
             code: `
                 declare class FileManager { trashFile(file: unknown): void; }
                 declare const fileManager: FileManager;
                 fileManager.trashFile(someFile);
             `,
         },
-        // Calling delete on a non-Vault object is fine
         {
+            name: "delete on non-Vault object is allowed",
             code: `
                 const mySet = new Set();
                 mySet.delete(1);
             `,
         },
-        // Calling other methods on Vault is fine
         {
+            name: "other Vault methods are allowed",
             code: `
                 declare class Vault { create(path: string, data: string): void; }
                 declare const vault: Vault;
@@ -30,8 +30,8 @@ ruleTester.run("prefer-file-manager-trash-file", preferFileManagerTrashRule, {
         },
     ],
     invalid: [
-        // Basic invalid cases
         {
+            name: "vault.trash is forbidden",
             code: `
                 declare class Vault { trash(file: unknown): void; }
                 declare const vault: Vault;
@@ -45,6 +45,7 @@ ruleTester.run("prefer-file-manager-trash-file", preferFileManagerTrashRule, {
             ],
         },
         {
+            name: "vault.delete is forbidden",
             code: `
                 declare class Vault { delete(file: unknown): void; }
                 declare const vault: Vault;
@@ -57,8 +58,8 @@ ruleTester.run("prefer-file-manager-trash-file", preferFileManagerTrashRule, {
                 },
             ],
         },
-        // A more realistic plugin scenario
         {
+            name: "app.vault.trash is forbidden",
             code: `
                 declare class Vault { trash(file: unknown): void; }
                 declare class App { vault: Vault; }
@@ -72,8 +73,8 @@ ruleTester.run("prefer-file-manager-trash-file", preferFileManagerTrashRule, {
                 },
             ],
         },
-        // Test with an intermediate variable
         {
+            name: "intermediate variable holding vault with delete is forbidden",
             code: `
                 declare class Vault { delete(file: unknown): void; }
                 declare const myVault: Vault;

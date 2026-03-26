@@ -16,8 +16,8 @@ const MOCK_API = `
 
 ruleTester.run("no-view-references-in-plugin", noViewReferencesRule, {
     valid: [
-        // A valid case where a view is created and returned without storing it in the plugin.
         {
+            name: "view created and returned without storing is allowed",
             code: `
                 ${MOCK_API}
                 class MyPlugin extends Plugin {
@@ -27,8 +27,8 @@ ruleTester.run("no-view-references-in-plugin", noViewReferencesRule, {
                 }
             `,
         },
-        // Using a function keyword instead of an arrow function.
         {
+            name: "function keyword in factory is allowed",
             code: `
                 ${MOCK_API}
                 class MyPlugin extends Plugin {
@@ -40,8 +40,8 @@ ruleTester.run("no-view-references-in-plugin", noViewReferencesRule, {
                 }
             `,
         },
-        // Assigning a non-View property inside the factory. This is perfectly fine and should not be flagged.
         {
+            name: "assigning non-View property in factory is allowed",
             code: `
                 ${MOCK_API}
                 class MyPlugin extends Plugin {
@@ -57,8 +57,8 @@ ruleTester.run("no-view-references-in-plugin", noViewReferencesRule, {
         },
     ],
     invalid: [
-        // Invalid cases where a view is assigned to a property of the plugin, which can cause memory leaks.
         {
+            name: "assigning view to plugin property in arrow expression is forbidden",
             code: `
                 ${MOCK_API}
                 class MyPlugin extends Plugin {
@@ -70,8 +70,8 @@ ruleTester.run("no-view-references-in-plugin", noViewReferencesRule, {
             `,
             errors: [{ messageId: "avoidViewReference" }],
         },
-        // Invalid case where a view is assigned to a property of the plugin, but using an arrow function.
         {
+            name: "assigning view to plugin property in arrow block is forbidden",
             code: `
                 ${MOCK_API}
                 class MyPlugin extends Plugin {
@@ -85,8 +85,8 @@ ruleTester.run("no-view-references-in-plugin", noViewReferencesRule, {
             `,
             errors: [{ messageId: "avoidViewReference" }],
         },
-        // Assigning on one line and returning on another.
         {
+            name: "assigning on one line and returning on another is forbidden",
             code: `
                 ${MOCK_API}
                  class MyPlugin extends Plugin {
@@ -101,8 +101,8 @@ ruleTester.run("no-view-references-in-plugin", noViewReferencesRule, {
              `,
             errors: [{ messageId: "avoidViewReference" }],
         },
-        // Assignment via an Alias (const self = this;)
         {
+            name: "assignment via alias (const self = this) is forbidden",
             code: `
                 ${MOCK_API}
                 class MyPlugin extends Plugin {

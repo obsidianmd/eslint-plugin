@@ -11,6 +11,7 @@ const ruleTester = new RuleTester();
 ruleTester.run("no-problematic-settings-headings", rule, {
     valid: [
         {
+            name: "custom heading name is allowed",
             code: `
                 ${MOCK_CLASS}
                 class MyTab extends PluginSettingTab {
@@ -24,6 +25,7 @@ ruleTester.run("no-problematic-settings-headings", rule, {
     ],
     invalid: [
         {
+            name: "heading with 'Settings' is forbidden",
             code: `
                 ${MOCK_CLASS}
                 class MyTab extends PluginSettingTab {
@@ -36,6 +38,7 @@ ruleTester.run("no-problematic-settings-headings", rule, {
             errors: [{ messageId: "settings" }],
         },
         {
+            name: "heading with 'General Options' triggers both settings and general",
             code: `
                 ${MOCK_CLASS}
                 class MyTab extends PluginSettingTab {
@@ -59,6 +62,7 @@ ruleTester.run("no-problematic-settings-headings", rule, {
             `,
         },
         {
+            name: "heading with 'General' is forbidden and auto-removed",
             code: `
                 ${MOCK_CLASS}
                 class MyTab extends PluginSettingTab {
@@ -79,6 +83,7 @@ ruleTester.run("no-problematic-settings-headings", rule, {
             `,
         },
         {
+            name: "heading containing plugin name is forbidden and auto-removed",
             code: `
                 ${MOCK_CLASS}
                 class MyTab extends PluginSettingTab {

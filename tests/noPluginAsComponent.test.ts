@@ -25,8 +25,8 @@ const MOCK_API = `
 
 ruleTester.run("no-plugin-as-component", noPluginAsComponentRule, {
     valid: [
-        // Correct: Using a View component instance (passed as a variable `this`)
         {
+            name: "View using this as component is allowed",
             code: `
                 ${MOCK_API}
                 declare const app: App;
@@ -38,8 +38,8 @@ ruleTester.run("no-plugin-as-component", noPluginAsComponentRule, {
                 }
             `,
         },
-        // Correct: Storing the component in a variable first
         {
+            name: "storing component in variable first is allowed",
             code: `
                 ${MOCK_API}
                 declare const app: App;
@@ -55,8 +55,8 @@ ruleTester.run("no-plugin-as-component", noPluginAsComponentRule, {
         },
     ],
     invalid: [
-        // Invalid: Passing `new Component()` directly
         {
+            name: "new Component() directly in render is forbidden",
             code: `
                 ${MOCK_API}
                 declare const app: App;
@@ -69,8 +69,8 @@ ruleTester.run("no-plugin-as-component", noPluginAsComponentRule, {
             `,
             errors: [{ messageId: "avoidNewComponent" }],
         },
-        // Invalid: Passing `this` from within the Plugin class
         {
+            name: "this from Plugin class as component is forbidden",
             code: `
                 ${MOCK_API}
                 declare const app: App;
@@ -83,8 +83,8 @@ ruleTester.run("no-plugin-as-component", noPluginAsComponentRule, {
             `,
             errors: [{ messageId: "avoidPluginComponent" }],
         },
-        // Invalid: Passing a variable that holds the plugin instance
         {
+            name: "variable holding plugin instance as component is forbidden",
             code: `
                 ${MOCK_API}
                 declare const app: App;
