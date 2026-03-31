@@ -14,6 +14,7 @@ import objectAssign from "./rules/objectAssign.js";
 import platform from "./rules/platform.js";
 import preferAbstractInputSuggest from "./rules/preferAbstractInputSuggest.js";
 import preferFileManagerTrashFile from "./rules/preferFileManagerTrashFile.js";
+import preferInstanceof from "./rules/preferInstanceof.js";
 import regexLookbehind from "./rules/regexLookbehind.js";
 import sampleNames from "./rules/sampleNames.js";
 import validateManifest from "./rules/validateManifest.js";
@@ -74,6 +75,7 @@ const plugin = {
         platform: platform,
         "prefer-abstract-input-suggest": preferAbstractInputSuggest,
         "prefer-file-manager-trash-file": preferFileManagerTrashFile,
+        "prefer-instanceof": preferInstanceof,
         "regex-lookbehind": regexLookbehind,
         "sample-names": sampleNames,
         "validate-manifest": validateManifest,
@@ -110,6 +112,7 @@ const recommendedPluginRulesConfig: RulesConfig = {
     "obsidianmd/object-assign": "error",
     "obsidianmd/platform": "error",
     "obsidianmd/prefer-file-manager-trash-file": "warn",
+    "obsidianmd/prefer-instanceof": "error",
     "obsidianmd/prefer-abstract-input-suggest": "error",
     "obsidianmd/regex-lookbehind": "error",
     "obsidianmd/sample-names": "error",
