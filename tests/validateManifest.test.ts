@@ -9,12 +9,12 @@ ruleTester.run("validate-manifest", manifestRule, {
             name: "complete valid manifest is accepted",
             filename: "manifest.json",
             code: `{
-                    "id": "obsidianifier",
-                    "name": "Obsidianifier",
+                    "id": "foo-bar",
+                    "name": "Foo bar",
                     "author": "Me",
                     "version": "1.0.0",
                     "minAppVersion": "1.0.0",
-                    "description": "A way to obsidianify your life.",
+                    "description": "A way to foo bar your life.",
                     "isDesktopOnly": false,
                     "authorUrl": "https://example.com"
                 }`,
@@ -179,10 +179,128 @@ ruleTester.run("validate-manifest", manifestRule, {
             ],
         },
         {
+            name: "forbidden word 'PLUGIN' is case insensitive",
+            filename: "manifest.json",
+            code: `{
+                    "id": "my-PLUGIN-tool",
+                    "name": "My Tool",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "A great tool.",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                {
+                    messageId: "noForbiddenWords",
+                    data: { word: "plugin", key: "id" },
+                },
+            ],
+        },
+        {
+            name: "forbidden word 'obsidian' in name",
+            filename: "manifest.json",
+            code: `{
+                    "id": "my-tool",
+                    "name": "Obsidian Helper",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "A great tool.",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                {
+                    messageId: "noForbiddenWords",
+                    data: { word: "obsidian", key: "name" },
+                },
+            ],
+        },
+        {
+            name: "forbidden word 'plugin' matched as substring",
+            filename: "manifest.json",
+            code: `{
+                    "id": "myplugin",
+                    "name": "MyPlugin",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "A great tool.",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                {
+                    messageId: "noForbiddenWords",
+                    data: { word: "plugin", key: "id" },
+                },
+                {
+                    messageId: "noForbiddenWords",
+                    data: { word: "plugin", key: "name" },
+                },
+            ],
+        },
+        {
+            name: "forbidden word 'obsidian' in description",
+            filename: "manifest.json",
+            code: `{
+                    "id": "my-tool",
+                    "name": "My Tool",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "The best obsidian companion.",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                {
+                    messageId: "noForbiddenWords",
+                    data: { word: "obsidian", key: "description" },
+                },
+            ],
+        },
+        {
+            name: "forbidden word 'obsidian' in description",
+            filename: "manifest.json",
+            code: `{
+                    "id": "my-tool",
+                    "name": "My Tool",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "An Obsidian plugin for notes.",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                {
+                    messageId: "noForbiddenWords",
+                    data: { word: "obsidian' or 'plugin", key: "description" },
+                },
+            ],
+        },
+        {
             name: "array root type is forbidden",
             filename: "manifest.json",
             code: `[]`,
             errors: [{ messageId: "mustBeRootObject" }],
+        },
+        {
+            name: "forbidden word only in id with clean name and description",
+            filename: "manifest.json",
+            code: `{
+                    "id": "obsidian-notes",
+                    "name": "Notes Manager",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Manage your notes efficiently.",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                {
+                    messageId: "noForbiddenWords",
+                    data: { word: "obsidian", key: "id" },
+                },
+            ],
         },
         {
             name: "authorUrl with number type is forbidden",
@@ -464,7 +582,6 @@ ruleTester.run("validate-manifest", manifestRule, {
         {
             name: "too long description is forbidden",
             filename: "manifest.json",
-            // from: https://stallman-copypasta.github.io/
             code: `{
                     "id": "long-description",
                     "name": "Long description",
