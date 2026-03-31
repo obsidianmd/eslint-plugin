@@ -137,6 +137,9 @@ tester.run("ui-sentence-case", rule, {
         {
             name: "Notice with parenthesized sentence is allowed",
             code: "new Notice('This is a short sentence. (And this is another one.)');",
+        },
+        {
+            code: "new Notice('WebDAV CalDAV');",
         }
     ],
     invalid: [
