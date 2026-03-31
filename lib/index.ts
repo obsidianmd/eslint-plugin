@@ -13,6 +13,7 @@ import noViewReferencesInPlugin from "./rules/noViewReferencesInPlugin.js";
 import objectAssign from "./rules/objectAssign.js";
 import platform from "./rules/platform.js";
 import preferAbstractInputSuggest from "./rules/preferAbstractInputSuggest.js";
+import preferActiveDoc from "./rules/preferActiveDoc.js";
 import preferFileManagerTrashFile from "./rules/preferFileManagerTrashFile.js";
 import preferInstanceof from "./rules/preferInstanceof.js";
 import regexLookbehind from "./rules/regexLookbehind.js";
@@ -74,6 +75,7 @@ const plugin = {
         "object-assign": objectAssign,
         platform: platform,
         "prefer-abstract-input-suggest": preferAbstractInputSuggest,
+        "prefer-active-doc": preferActiveDoc,
         "prefer-file-manager-trash-file": preferFileManagerTrashFile,
         "prefer-instanceof": preferInstanceof,
         "regex-lookbehind": regexLookbehind,
@@ -114,6 +116,7 @@ const recommendedPluginRulesConfig: RulesConfig = {
     "obsidianmd/prefer-file-manager-trash-file": "warn",
     "obsidianmd/prefer-instanceof": "error",
     "obsidianmd/prefer-abstract-input-suggest": "error",
+    "obsidianmd/prefer-active-doc": "error",
     "obsidianmd/regex-lookbehind": "error",
     "obsidianmd/sample-names": "error",
     "obsidianmd/no-unsupported-api": "error",
