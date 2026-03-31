@@ -119,6 +119,8 @@ const recommendedPluginRulesConfig: RulesConfig = {
     "obsidianmd/ui/sentence-case": ["error", { enforceCamelCaseLower: true }],
 }
 
+import { restrictedGlobalsOptions, restrictedImportsOptions } from "./ruleOptions.js";
+
 const flatRecommendedGeneralRules: RulesConfig = {
     "no-unused-vars": "off",
     "no-prototype-bultins": "off",
@@ -128,62 +130,8 @@ const flatRecommendedGeneralRules: RulesConfig = {
     "prefer-const": "off",
     "no-implicit-globals": "error",
     "no-console": "off", // overridden by obsidianmd/rule-custom-message
-    "no-restricted-globals": [
-        "error",
-        {
-            name: "app",
-            message:
-                "Avoid using the global app object. Instead use the reference provided by your plugin instance.",
-        },
-        "warn",
-        {
-            name: "fetch",
-            message:
-                "Use the built-in `requestUrl` function instead of `fetch` for network requests in Obsidian.",
-        },
-        {
-            name: "localStorage",
-            message: "Prefer `App#saveLocalStorage` / `App#loadLocalStorage` functions to write / read localStorage data that's unique to a vault."
-        }
-    ],
-    "no-restricted-imports": [
-        "error",
-        {
-            name: "axios",
-            message:
-                "Use the built-in `requestUrl` function instead of `axios`.",
-        },
-        {
-            name: "superagent",
-            message:
-                "Use the built-in `requestUrl` function instead of `superagent`.",
-        },
-        {
-            name: "got",
-            message:
-                "Use the built-in `requestUrl` function instead of `got`.",
-        },
-        {
-            name: "ofetch",
-            message:
-                "Use the built-in `requestUrl` function instead of `ofetch`.",
-        },
-        {
-            name: "ky",
-            message:
-                "Use the built-in `requestUrl` function instead of `ky`.",
-        },
-        {
-            name: "node-fetch",
-            message:
-                "Use the built-in `requestUrl` function instead of `node-fetch`.",
-        },
-        {
-            name: "moment",
-            message:
-                "The 'moment' package is bundled with Obsidian. Please import it from 'obsidian' instead.",
-        },
-    ],
+    "no-restricted-globals": ["error", ...restrictedGlobalsOptions],
+    "no-restricted-imports": ["error", ...restrictedImportsOptions],
     "no-alert": "error",
     "no-undef": "error",
     "@typescript-eslint/ban-ts-comment": "off",
