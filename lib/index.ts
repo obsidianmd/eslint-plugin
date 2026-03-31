@@ -18,6 +18,7 @@ import preferActiveDoc from "./rules/preferActiveDoc.js";
 import preferFileManagerTrashFile from "./rules/preferFileManagerTrashFile.js";
 import preferActiveWindowTimers from "./rules/preferActiveWindowTimers.js";
 import preferInstanceof from "./rules/preferInstanceof.js";
+import preferGetLanguage from "./rules/preferGetLanguage.js";
 import regexLookbehind from "./rules/regexLookbehind.js";
 import sampleNames from "./rules/sampleNames.js";
 import validateManifest from "./rules/validateManifest.js";
@@ -82,6 +83,7 @@ const plugin = {
         "prefer-file-manager-trash-file": preferFileManagerTrashFile,
         "prefer-instanceof": preferInstanceof,
         "prefer-active-window-timers": preferActiveWindowTimers,
+        "prefer-get-language": preferGetLanguage,
         "regex-lookbehind": regexLookbehind,
         "sample-names": sampleNames,
         "validate-manifest": validateManifest,
@@ -120,6 +122,7 @@ const recommendedPluginRulesConfig: RulesConfig = {
     "obsidianmd/platform": "error",
     "obsidianmd/prefer-file-manager-trash-file": "warn",
     "obsidianmd/prefer-instanceof": "error",
+    "obsidianmd/prefer-get-language": "error",
     "obsidianmd/prefer-abstract-input-suggest": "error",
     "obsidianmd/prefer-active-window-timers": "error",
     "obsidianmd/prefer-active-doc": "error",
