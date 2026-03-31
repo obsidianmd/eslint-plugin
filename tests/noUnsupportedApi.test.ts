@@ -67,6 +67,21 @@ ruleTester.run("no-unsupported-api", rule, {
             options: [{ minAppVersion: "1.0.0" }],
         },
         {
+            name: "super.setValue in AbstractInputSuggest subclass is allowed at 1.4.10",
+            code: `
+                import { AbstractInputSuggest } from 'obsidian';
+                class MyInputSuggest extends AbstractInputSuggest<string> {
+                    getSuggestions(): string[] { return []; }
+                    renderSuggestion(): void {}
+                    selectSuggestion(): void {}
+                    setValue(value: string): void {
+                        super.setValue(value);
+                    }
+                }
+            `,
+            options: [{ minAppVersion: "1.4.10" }],
+        },
+        {
             name: "Function setTooltip available at minAppVersion 1.4.4",
             code: `
                 import { setTooltip } from 'obsidian';
@@ -163,6 +178,22 @@ ruleTester.run("no-unsupported-api", rule, {
             `,
             options: [{ minAppVersion: "1.0.0" }],
             errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "super.setValue in AbstractInputSuggest subclass requires 1.4.10",
+            code: `
+                import { AbstractInputSuggest } from 'obsidian';
+                class MyInputSuggest extends AbstractInputSuggest<string> {
+                    getSuggestions(): string[] { return []; }
+                    renderSuggestion(): void {}
+                    selectSuggestion(): void {}
+                    setValue(value: string): void {
+                        super.setValue(value);
+                    }
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }, { messageId: "apiNotAvailable" }],
         },
         {
             name: "SecretStorage requires 1.11.1 but SecretStorage.setSecret requires 1.11.4,",
