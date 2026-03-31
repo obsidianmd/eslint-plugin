@@ -3,6 +3,7 @@ import { commands } from "./rules/commands/index.js";
 import { settingsTab } from "./rules/settingsTab/index.js";
 import { vault } from "./rules/vault/index.js";
 import detachLeaves from "./rules/detachLeaves.js";
+import editorDropPaste from "./rules/editorDropPaste.js";
 import hardcodedConfigPath from "./rules/hardcodedConfigPath.js";
 import noForbiddenElements from "./rules/noForbiddenElements.js";
 import noSampleCode from "./rules/noSampleCode.js";
@@ -65,6 +66,7 @@ const plugin = {
             settingsTab.noProblematicSettingsHeadings,
         "vault/iterate": vault.iterate,
         "detach-leaves": detachLeaves,
+        "editor-drop-paste": editorDropPaste,
         "hardcoded-config-path": hardcodedConfigPath,
         "no-forbidden-elements": noForbiddenElements,
         "no-plugin-as-component": noPluginAsComponent,
@@ -104,6 +106,7 @@ const recommendedPluginRulesConfig: RulesConfig = {
     "obsidianmd/settings-tab/no-problematic-settings-headings": "error",
     "obsidianmd/vault/iterate": "error",
     "obsidianmd/detach-leaves": "error",
+    "obsidianmd/editor-drop-paste": "error",
     "obsidianmd/hardcoded-config-path": "error",
     "obsidianmd/no-forbidden-elements": "error",
     "obsidianmd/no-plugin-as-component": "error",
