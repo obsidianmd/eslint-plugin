@@ -24,9 +24,10 @@ const OPTIONAL_SCHEMA = {
 const FORBIDDEN_WORDS = ["obsidian", "plugin"];
 
 function hasForbiddenWords(str: string): [boolean, string] {
-    let forbiddenWordsFound = new Set<string>();
+    const forbiddenWordsFound = new Set<string>();
+    const strLower = str.toLowerCase();
     for (const word of FORBIDDEN_WORDS) {
-        if (str.match(new RegExp(`\\b${word}\\b`, "i"))) {
+        if (strLower.includes(word)) {
             forbiddenWordsFound.add(word);
         }
     }
