@@ -26,6 +26,8 @@ jobs:
             - run: npm test
             - run: npm run check:eslint-docs
             - run: npm publish --provenance --access public
+              env:
+                  NODE_AUTH_TOKEN: ""
             - name: Show npm debug log
               if: failure()
               run: ls -t /home/runner/.npm/_logs/*.log | head -1 | xargs cat
