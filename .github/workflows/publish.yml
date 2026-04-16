@@ -25,7 +25,11 @@ jobs:
             - run: npm run build
             - run: npm test
             - run: npm run check:eslint-docs
-            - run: npm publish --provenance --access public
+            - name: Debug OIDC env
+              run: |
+                  echo "ACTIONS_ID_TOKEN_REQUEST_URL set: ${ACTIONS_ID_TOKEN_REQUEST_URL:+yes}"
+                  echo "ACTIONS_ID_TOKEN_REQUEST_TOKEN set: ${ACTIONS_ID_TOKEN_REQUEST_TOKEN:+yes}"
+            - run: npm publish --provenance --access public --loglevel silly
               env:
                   NODE_AUTH_TOKEN: ""
             - name: Show npm debug log
