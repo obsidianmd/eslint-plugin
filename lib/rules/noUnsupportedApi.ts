@@ -153,6 +153,9 @@ export default ruleCreator<Options, "apiNotAvailable">({
                     continue;
                 }
                 if (gt(sinceVersion, minAppVersion)) {
+                    if (isGuardedByRequireApiVersion(node, sinceVersion)) {
+                        return;
+                    }
                     reported.add(node);
                     context.report({
                         node,
@@ -166,6 +169,58 @@ export default ruleCreator<Options, "apiNotAvailable">({
                     return;
                 }
             }
+        }
+
+        function extractRequireApiVersion(expr: TSESTree.Expression): string | undefined {
+            if (
+                expr.type === AST_NODE_TYPES.CallExpression &&
+                expr.callee.type === AST_NODE_TYPES.Identifier &&
+                expr.callee.name === "requireApiVersion" &&
+                expr.arguments.length >= 1 &&
+                expr.arguments[0].type === AST_NODE_TYPES.Literal &&
+                typeof (expr.arguments[0] as TSESTree.Literal).value === "string"
+            ) {
+                return (expr.arguments[0] as TSESTree.StringLiteral).value;
+            }
+            if (expr.type === AST_NODE_TYPES.LogicalExpression && expr.operator === "&&") {
+                return extractRequireApiVersion(expr.left);
+            }
+            return undefined;
+        }
+
+        function isGuardedByRequireApiVersion(node: TSESTree.Node, sinceVersion: string): boolean {
+            let current: TSESTree.Node | undefined = node.parent;
+            let prevChild: TSESTree.Node = node;
+
+            while (current) {
+                if (current.type === AST_NODE_TYPES.IfStatement) {
+                    if (prevChild !== current.test && prevChild !== current.alternate) {
+                        const guardVersion = extractRequireApiVersion(current.test);
+                        if (guardVersion && !gt(sinceVersion, guardVersion)) {
+                            return true;
+                        }
+                    }
+                } else if (current.type === AST_NODE_TYPES.ConditionalExpression) {
+                    if (prevChild !== current.test && prevChild !== current.alternate) {
+                        const guardVersion = extractRequireApiVersion(current.test);
+                        if (guardVersion && !gt(sinceVersion, guardVersion)) {
+                            return true;
+                        }
+                    }
+                } else if (
+                    current.type === AST_NODE_TYPES.LogicalExpression &&
+                    current.operator === "&&" &&
+                    prevChild === current.right
+                ) {
+                    const guardVersion = extractRequireApiVersion(current.left);
+                    if (guardVersion && !gt(sinceVersion, guardVersion)) {
+                        return true;
+                    }
+                }
+                prevChild = current;
+                current = current.parent;
+            }
+            return false;
         }
     }
 });

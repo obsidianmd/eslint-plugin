@@ -90,6 +90,47 @@ ruleTester.run("no-unsupported-api", rule, {
             `,
             options: [{ minAppVersion: "1.4.4" }],
         },
+        {
+            name: "API guarded by requireApiVersion if-statement is allowed",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                if (requireApiVersion("1.10.0")) {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "API guarded by requireApiVersion with && in if-test is allowed",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                const condition = true;
+                if (requireApiVersion("1.10.0") && condition) {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "API guarded by requireApiVersion logical-AND expression is allowed",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                requireApiVersion("1.10.0") && app.renderContext;
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "API guarded by requireApiVersion ternary is allowed",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                requireApiVersion("1.10.0") ? app.renderContext : undefined;
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
     ],
     invalid: [
         {
@@ -194,6 +235,18 @@ ruleTester.run("no-unsupported-api", rule, {
             `,
             options: [{ minAppVersion: "1.0.0" }],
             errors: [{ messageId: "apiNotAvailable" }, { messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "API guarded by requireApiVersion with insufficient version is still flagged",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                if (requireApiVersion("1.0.0")) {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
         },
         {
             name: "SecretStorage requires 1.11.1 but SecretStorage.setSecret requires 1.11.4,",
