@@ -1,4 +1,8 @@
-# Allows redefining error messages from other ESLint rules that don't provide this functionality natively (`obsidianmd/rule-custom-message`)
+# obsidianmd/rule-custom-message
+
+📝 Allows redefining error messages from other ESLint rules that don't provide this functionality natively.
+
+💼 This rule is enabled in the following configs: ✅ `recommended`, 🇬🇧 `recommendedWithLocalesEn`.
 
 <!-- end auto-generated rule header -->
 

@@ -1,4 +1,8 @@
-# Enforce sentence case for English TS/JS locale module strings (`obsidianmd/ui/sentence-case-locale-module`)
+# obsidianmd/ui/sentence-case-locale-module
+
+📝 Enforce sentence case for English TS/JS locale module strings.
+
+⚠️ This rule _warns_ in the 🇬🇧 `recommendedWithLocalesEn` config.
 
 🔧 This rule is automatically fixable by the [`--fix` CLI option](https://eslint.org/docs/latest/user-guide/command-line-interface#--fix).
 

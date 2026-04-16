@@ -1,4 +1,8 @@
-# Disallow usage of Obsidian APIs not available in the plugin's minimum app version (`obsidianmd/no-unsupported-api`)
+# obsidianmd/no-unsupported-api
+
+📝 Disallow usage of Obsidian APIs not available in the plugin's minimum app version.
+
+💼 This rule is enabled in the following configs: ✅ `recommended`, 🇬🇧 `recommendedWithLocalesEn`.
 
 <!-- end auto-generated rule header -->
 

@@ -1,3 +1,7 @@
-# Rename sample plugin class names (`obsidianmd/sample-names`)
+# obsidianmd/sample-names
+
+📝 Rename sample plugin class names.
+
+💼 This rule is enabled in the following configs: ✅ `recommended`, 🇬🇧 `recommendedWithLocalesEn`.
 
 <!-- end auto-generated rule header -->
