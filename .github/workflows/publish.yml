@@ -28,4 +28,4 @@ jobs:
             - run: npm publish --provenance --access public
             - name: Show npm debug log
               if: failure()
-              run: cat /home/runner/.npm/_logs/*.log
+              run: ls -t /home/runner/.npm/_logs/*.log | head -1 | xargs cat
