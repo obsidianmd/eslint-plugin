@@ -7,7 +7,7 @@
 	"homepage": "https://obsidian.md",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/obsidianmd/eslint-plugin.git"
+		"url": "git+https://github.com/obsidianmd/eslint-plugin.git"
 	},
 	"keywords": [
 		"eslint",
