@@ -19,19 +19,10 @@ jobs:
             # Setup .npmrc file to publish to npm
             - uses: actions/setup-node@v6
               with:
-                  node-version: "22.x"
+                  node-version: "24"
                   registry-url: "https://registry.npmjs.org"
             - run: npm ci
             - run: npm run build
             - run: npm test
             - run: npm run check:eslint-docs
-            - name: Debug OIDC env
-              run: |
-                  echo "ACTIONS_ID_TOKEN_REQUEST_URL set: ${ACTIONS_ID_TOKEN_REQUEST_URL:+yes}"
-                  echo "ACTIONS_ID_TOKEN_REQUEST_TOKEN set: ${ACTIONS_ID_TOKEN_REQUEST_TOKEN:+yes}"
-            - run: npm publish --provenance --access public --loglevel silly
-              env:
-                  NODE_AUTH_TOKEN: ""
-            - name: Show npm debug log
-              if: failure()
-              run: ls -t /home/runner/.npm/_logs/*.log | head -1 | xargs cat
+            - run: npm publish --provenance --access public
