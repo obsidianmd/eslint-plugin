@@ -41,7 +41,7 @@
 		"eslint-plugin-json-schema-validator": "5.1.0",
 		"eslint-plugin-security": "2.1.1",
 		"globals": "14.0.0",
-		"obsidian": "1.8.7",
+		"obsidian": "1.12.3",
         "semver": "^7.7.4",
 		"typescript": "5.4.5"
 	},
