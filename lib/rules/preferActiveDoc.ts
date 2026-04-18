@@ -37,6 +37,10 @@ export default ruleCreator({
                     return reportBannedGlobal(node);
                 }
 
+                if (!Object.hasOwn(REPLACEMENTS, node.name)) {
+                    return;
+                }
+
                 const replacement = REPLACEMENTS[node.name];
                 if (!replacement) {
                     return;
