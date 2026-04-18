@@ -102,7 +102,8 @@ export default ruleCreator({
                 (node.parent.type === TSESTree.AST_NODE_TYPES.MemberExpression && node.parent.property === node) ||
                 (node.parent.type === TSESTree.AST_NODE_TYPES.Property && node.parent.key === node) ||
                 (node.parent.type === TSESTree.AST_NODE_TYPES.VariableDeclarator && node.parent.id === node) ||
-                (node.parent.type === TSESTree.AST_NODE_TYPES.UnaryExpression && node.parent.operator === "typeof")
+                (node.parent.type === TSESTree.AST_NODE_TYPES.UnaryExpression && node.parent.operator === "typeof") ||
+                (node.parent.type === TSESTree.AST_NODE_TYPES.TSModuleDeclaration)
             ) {
                 return;
             }
