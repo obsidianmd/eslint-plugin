@@ -46,6 +46,10 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
             code: "const obj = { global: 1 }; obj.global;",
         },
         {
+            name: "declare global is allowed",
+            code: "declare global { var someVar: string; }",
+        },
+        {
             name: "constructor is not replaced",
             code: "class A { constructor() {} }",
         },
