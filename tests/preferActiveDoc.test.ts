@@ -45,6 +45,34 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
             name: "property named global on an object is allowed",
             code: "const obj = { global: 1 }; obj.global;",
         },
+        {
+            name: "constructor is not replaced",
+            code: "class A { constructor() {} }",
+        },
+        {
+            name: "hasOwnProperty is not replaced",
+            code: "class A { hasOwnProperty() {} }",
+        },
+        {
+            name: "isPrototypeOf is not replaced",
+            code: "class A { isPrototypeOf() {} }",
+        },
+        {
+            name: "propertyIsEnumerable is not replaced",
+            code: "class A { propertyIsEnumerable() {} }",
+        },
+        {
+            name: "toLocaleString is not replaced",
+            code: "class A { toLocaleString() {} }",
+        },
+        {
+            name: "toString is not replaced",
+            code: "class A { toString() {} }",
+        },
+        {
+            name: "valueOf is not replaced",
+            code: "class A { valueOf() {} }",
+        },
     ],
     invalid: [
         {
