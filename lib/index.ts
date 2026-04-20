@@ -3,6 +3,7 @@ import { commands } from "./rules/commands/index.js";
 import { settingsTab } from "./rules/settingsTab/index.js";
 import { vault } from "./rules/vault/index.js";
 import detachLeaves from "./rules/detachLeaves.js";
+import editorDropPaste from "./rules/editorDropPaste.js";
 import hardcodedConfigPath from "./rules/hardcodedConfigPath.js";
 import noForbiddenElements from "./rules/noForbiddenElements.js";
 import noSampleCode from "./rules/noSampleCode.js";
@@ -13,12 +14,17 @@ import noViewReferencesInPlugin from "./rules/noViewReferencesInPlugin.js";
 import objectAssign from "./rules/objectAssign.js";
 import platform from "./rules/platform.js";
 import preferAbstractInputSuggest from "./rules/preferAbstractInputSuggest.js";
+import preferActiveDoc from "./rules/preferActiveDoc.js";
 import preferFileManagerTrashFile from "./rules/preferFileManagerTrashFile.js";
+import preferActiveWindowTimers from "./rules/preferActiveWindowTimers.js";
+import preferInstanceof from "./rules/preferInstanceof.js";
+import preferGetLanguage from "./rules/preferGetLanguage.js";
 import regexLookbehind from "./rules/regexLookbehind.js";
 import sampleNames from "./rules/sampleNames.js";
 import validateManifest from "./rules/validateManifest.js";
 import validateLicense from "./rules/validateLicense.js";
 import ruleCustomMessage from "./rules/ruleCustomMessage.js";
+import noUnsupportedApi from "./rules/noUnsupportedApi.js";
 import { getManifest } from "./manifest.js";
 import { ui } from "./rules/ui/index.js";
 
@@ -34,6 +40,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { Config, defineConfig, globalIgnores } from "eslint/config";
 import type { RuleDefinition, RuleDefinitionTypeOptions, RulesConfig } from "@eslint/core";
+import noUnsanitizedPlugin from "eslint-plugin-no-unsanitized";
 
 interface PackageJson {
     name: string;
@@ -61,6 +68,7 @@ const plugin = {
             settingsTab.noProblematicSettingsHeadings,
         "vault/iterate": vault.iterate,
         "detach-leaves": detachLeaves,
+        "editor-drop-paste": editorDropPaste,
         "hardcoded-config-path": hardcodedConfigPath,
         "no-forbidden-elements": noForbiddenElements,
         "no-plugin-as-component": noPluginAsComponent,
@@ -71,12 +79,17 @@ const plugin = {
         "object-assign": objectAssign,
         platform: platform,
         "prefer-abstract-input-suggest": preferAbstractInputSuggest,
+        "prefer-active-doc": preferActiveDoc,
         "prefer-file-manager-trash-file": preferFileManagerTrashFile,
+        "prefer-instanceof": preferInstanceof,
+        "prefer-active-window-timers": preferActiveWindowTimers,
+        "prefer-get-language": preferGetLanguage,
         "regex-lookbehind": regexLookbehind,
         "sample-names": sampleNames,
         "validate-manifest": validateManifest,
         "validate-license": validateLicense,
         "rule-custom-message": ruleCustomMessage,
+        "no-unsupported-api": noUnsupportedApi,
         "ui/sentence-case": ui.sentenceCase,
         "ui/sentence-case-json": ui.sentenceCaseJson,
         "ui/sentence-case-locale-module": ui.sentenceCaseLocaleModule,
@@ -97,6 +110,7 @@ const recommendedPluginRulesConfig: RulesConfig = {
     "obsidianmd/settings-tab/no-problematic-settings-headings": "error",
     "obsidianmd/vault/iterate": "error",
     "obsidianmd/detach-leaves": "error",
+    "obsidianmd/editor-drop-paste": "error",
     "obsidianmd/hardcoded-config-path": "error",
     "obsidianmd/no-forbidden-elements": "error",
     "obsidianmd/no-plugin-as-component": "error",
@@ -107,13 +121,20 @@ const recommendedPluginRulesConfig: RulesConfig = {
     "obsidianmd/object-assign": "error",
     "obsidianmd/platform": "error",
     "obsidianmd/prefer-file-manager-trash-file": "warn",
+    "obsidianmd/prefer-instanceof": "error",
+    "obsidianmd/prefer-get-language": "error",
     "obsidianmd/prefer-abstract-input-suggest": "error",
+    "obsidianmd/prefer-active-window-timers": "error",
+    "obsidianmd/prefer-active-doc": "error",
     "obsidianmd/regex-lookbehind": "error",
     "obsidianmd/sample-names": "error",
+    "obsidianmd/no-unsupported-api": "error",
     "obsidianmd/validate-manifest": "error",
     "obsidianmd/validate-license": ["error"],
     "obsidianmd/ui/sentence-case": ["error", { enforceCamelCaseLower: true }],
 }
+
+import { restrictedGlobalsOptions, restrictedImportsOptions } from "./ruleOptions.js";
 
 const flatRecommendedGeneralRules: RulesConfig = {
     "no-unused-vars": "off",
@@ -124,62 +145,8 @@ const flatRecommendedGeneralRules: RulesConfig = {
     "prefer-const": "off",
     "no-implicit-globals": "error",
     "no-console": "off", // overridden by obsidianmd/rule-custom-message
-    "no-restricted-globals": [
-        "error",
-        {
-            name: "app",
-            message:
-                "Avoid using the global app object. Instead use the reference provided by your plugin instance.",
-        },
-        "warn",
-        {
-            name: "fetch",
-            message:
-                "Use the built-in `requestUrl` function instead of `fetch` for network requests in Obsidian.",
-        },
-        {
-            name: "localStorage",
-            message: "Prefer `App#saveLocalStorage` / `App#loadLocalStorage` functions to write / read localStorage data that's unique to a vault."
-        }
-    ],
-    "no-restricted-imports": [
-        "error",
-        {
-            name: "axios",
-            message:
-                "Use the built-in `requestUrl` function instead of `axios`.",
-        },
-        {
-            name: "superagent",
-            message:
-                "Use the built-in `requestUrl` function instead of `superagent`.",
-        },
-        {
-            name: "got",
-            message:
-                "Use the built-in `requestUrl` function instead of `got`.",
-        },
-        {
-            name: "ofetch",
-            message:
-                "Use the built-in `requestUrl` function instead of `ofetch`.",
-        },
-        {
-            name: "ky",
-            message:
-                "Use the built-in `requestUrl` function instead of `ky`.",
-        },
-        {
-            name: "node-fetch",
-            message:
-                "Use the built-in `requestUrl` function instead of `node-fetch`.",
-        },
-        {
-            name: "moment",
-            message:
-                "The 'moment' package is bundled with Obsidian. Please import it from 'obsidian' instead.",
-        },
-    ],
+    "no-restricted-globals": ["error", ...restrictedGlobalsOptions],
+    "no-restricted-imports": ["error", ...restrictedImportsOptions],
     "no-alert": "error",
     "no-undef": "error",
     "@typescript-eslint/ban-ts-comment": "off",
@@ -219,10 +186,11 @@ const flatRecommendedConfig: Config[] = defineConfig([
         plugins: {
             import: importPlugin,
             "@microsoft/sdl": sdl,
-            depend
+            depend,
+            noUnsanitizedPlugin
         },
         files: ['**/*.js', "**/*.jsx"],
-        extends: tseslint.configs.recommended as Config[],
+        extends: [...(tseslint.configs.recommended as Config[]), noUnsanitizedPlugin.configs.recommended],
         rules: {
             ...flatRecommendedGeneralRules,
             ...recommendedPluginRulesConfig
@@ -232,10 +200,11 @@ const flatRecommendedConfig: Config[] = defineConfig([
         plugins: {
             import: importPlugin,
             "@microsoft/sdl": sdl,
-            depend
+            depend,
+            noUnsanitizedPlugin
         },
         files: ['**/*.ts', "**/*.tsx"],
-        extends: tseslint.configs.recommendedTypeChecked as Config[],
+        extends: [...(tseslint.configs.recommendedTypeChecked as Config[]), noUnsanitizedPlugin.configs.recommended],
         rules: {
             ...flatRecommendedGeneralRules,
             ...recommendedPluginRulesConfig

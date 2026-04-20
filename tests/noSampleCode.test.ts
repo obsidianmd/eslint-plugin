@@ -5,24 +5,24 @@ const ruleTester = new RuleTester();
 
 ruleTester.run("no-sample-code", noSampleCode, {
     valid: [
-        // Valid: A different, legitimate registerInterval call
         {
+            name: "custom registerInterval call is allowed",
             code: "this.registerInterval(window.setInterval(() => this.doSomething(), 1000));",
         },
-        // Valid: A different, legitimate registerDomEvent call
         {
+            name: "custom registerDomEvent call is allowed",
             code: "this.registerDomEvent(this.containerEl, 'click', () => this.onClick());",
         },
     ],
     invalid: [
-        // Invalid: The sample setInterval call
         {
+            name: "sample setInterval call is forbidden",
             code: "this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));",
             errors: [{ messageId: "removeSampleInterval" }],
             output: "", // The auto-fix should remove the entire line
         },
-        // Invalid: The sample registerDomEvent call
         {
+            name: "sample registerDomEvent call is forbidden",
             code: `this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
                 console.log('click', evt);
             });`,

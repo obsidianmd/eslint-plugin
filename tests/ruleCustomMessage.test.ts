@@ -16,20 +16,24 @@ const options = [entry] as const;
 ruleTester.run("rule-custom-message", ruleCustomMessage, {
     valid: [
         {
+            name: "console.warn is allowed",
             code: "console.warn('This is a warning');",
             options,
         },
         {
+            name: "console.error is allowed",
             code: "console.error('This is an error');",
             options
         },
         {
+            name: "console.debug is allowed",
             code: "console.debug('This is a debug');",
             options,
         },
     ],
     invalid: [
         {
+            name: "console.log triggers custom message",
             code: "console.log('This is a log');",
             options,
             errors: [
@@ -44,6 +48,7 @@ ruleTester.run("rule-custom-message", ruleCustomMessage, {
             ],
         },
         {
+            name: "console.info triggers custom message",
             code: "console.info('This is an info');",
             options,
             errors: [

@@ -67,5 +67,8 @@ export const DEFAULT_BRANDS: string[] = [
     "React",
     "OpenAI",
     "Jekyll",
-    "Svelte"
+    "Svelte",
+    "CalDAV",
+    "CardDAV",
+    "WebDAV"
 ];

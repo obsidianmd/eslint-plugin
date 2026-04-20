@@ -55,7 +55,6 @@ export const DEFAULT_ACRONYMS: string[] = [
     // Services
     "RSS",
     "S3",
-    "WebDAV",
     // Identifiers
     "ID",
     // Other

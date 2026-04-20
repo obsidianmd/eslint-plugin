@@ -4,6 +4,10 @@ on:
     release:
         types: [published]
 
+permissions:
+    id-token: write  # Required for OIDC
+    contents: read
+
 jobs:
     build:
         runs-on: ubuntu-latest
@@ -13,14 +17,12 @@ jobs:
         steps:
             - uses: actions/checkout@v4
             # Setup .npmrc file to publish to npm
-            - uses: actions/setup-node@v4
+            - uses: actions/setup-node@v6
               with:
-                  node-version: "22.x"
+                  node-version: "24"
                   registry-url: "https://registry.npmjs.org"
             - run: npm ci
             - run: npm run build
             - run: npm test
             - run: npm run check:eslint-docs
             - run: npm publish --provenance --access public
-              env:
-                  NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

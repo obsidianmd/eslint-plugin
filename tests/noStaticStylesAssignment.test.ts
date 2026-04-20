@@ -5,26 +5,42 @@ const ruleTester = new RuleTester();
 
 ruleTester.run("no-static-styles-assignment", noInlineStylesRule, {
     valid: [
-        // Correct: Using classList
-        { code: "el.classList.add('my-class');" },
-        // Allowed: Dynamic style assignment from a variable
-        { code: "const myWidth = '100px'; el.style.width = myWidth;" },
-        // Allowed: Dynamic style assignment from a template literal
-        { code: "el.style.transform = `translateX(${offset}px)`;" },
-        // Allowed: Dynamic setProperty
-        { code: "el.style.setProperty('--my-var', someValue);" },
-        // Allowed: setAttribute for other attributes
-        { code: "el.setAttribute('data-id', '123');" },
-        // Allowed: Reading a style is fine
-        { code: "const color = el.style.color;" },
-        // Allowed: setting CSS variable
-        { code: "el.setCssProps({ '--some-var': 'blue' });" },
-        // Allowed: Dynamic/computed keys are not statically analyzable
-        { code: "el.setCssProps({ [someKey]: someValue });" },
+        {
+            name: "classList.add is allowed",
+            code: "el.classList.add('my-class');",
+        },
+        {
+            name: "dynamic style from variable is allowed",
+            code: "const myWidth = '100px'; el.style.width = myWidth;",
+        },
+        {
+            name: "dynamic style from template literal is allowed",
+            code: "el.style.transform = `translateX(${offset}px)`;",
+        },
+        {
+            name: "dynamic setProperty is allowed",
+            code: "el.style.setProperty('--my-var', someValue);",
+        },
+        {
+            name: "setAttribute for non-style attributes is allowed",
+            code: "el.setAttribute('data-id', '123');",
+        },
+        {
+            name: "reading style is allowed",
+            code: "const color = el.style.color;",
+        },
+        {
+            name: "setCssProps with CSS variable is allowed",
+            code: "el.setCssProps({ '--some-var': 'blue' });",
+        },
+        {
+            name: "setCssProps with computed key is allowed",
+            code: "el.setCssProps({ [someKey]: someValue });",
+        },
     ],
     invalid: [
-        // Invalid: Direct property assignment with a literal
         {
+            name: "style.color with literal is forbidden",
             code: "el.style.color = 'red';",
             errors: [
                 {
@@ -33,8 +49,8 @@ ruleTester.run("no-static-styles-assignment", noInlineStylesRule, {
                 },
             ],
         },
-        // Invalid: cssText assignment with a literal
         {
+            name: "style.cssText with literal is forbidden",
             code: "el.style.cssText = 'font-weight: bold;';",
             errors: [
                 {
@@ -43,8 +59,8 @@ ruleTester.run("no-static-styles-assignment", noInlineStylesRule, {
                 },
             ],
         },
-        // Invalid: setProperty with a literal value
         {
+            name: "setProperty with literal value is forbidden",
             code: "el.style.setProperty('background', 'blue');",
             errors: [
                 {
@@ -53,8 +69,8 @@ ruleTester.run("no-static-styles-assignment", noInlineStylesRule, {
                 },
             ],
         },
-        // Invalid: setAttribute('style', ...) with a literal value
         {
+            name: "setAttribute('style', literal) is forbidden",
             code: "el.setAttribute('style', 'padding: 10px;');",
             errors: [
                 {
@@ -63,8 +79,8 @@ ruleTester.run("no-static-styles-assignment", noInlineStylesRule, {
                 },
             ],
         },
-        // Invalid: Chained member expression
         {
+            name: "chained member expression style assignment is forbidden",
             code: "this.containerEl.style.border = '1px solid black';",
             errors: [
                 {
@@ -73,8 +89,8 @@ ruleTester.run("no-static-styles-assignment", noInlineStylesRule, {
                 },
             ],
         },
-        // Invalid: setting CSS non-variable property
         {
+            name: "setCssProps with non-variable property is forbidden",
             code: "el.setCssProps({ 'color': 'blue' });",
             errors: [
                 {
@@ -83,8 +99,8 @@ ruleTester.run("no-static-styles-assignment", noInlineStylesRule, {
                 }
             ]
         },
-        // Invalid: setting CSS non-variable property
         {
+            name: "setCssStyles with non-variable property is forbidden",
             code: "el.setCssStyles({ 'color': 'blue' });",
             errors: [
                 {

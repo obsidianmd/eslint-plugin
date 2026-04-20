@@ -11,6 +11,7 @@ const ruleTester = new RuleTester();
 ruleTester.run("no-manual-html-headings", noManualHeadingsRule, {
     valid: [
         {
+            name: "createEl('div') is allowed",
             code: `
                 ${MOCK_CLASS}
                 class MyTab extends PluginSettingTab {
@@ -23,6 +24,7 @@ ruleTester.run("no-manual-html-headings", noManualHeadingsRule, {
     ],
     invalid: [
         {
+            name: "createEl('h2') is forbidden and auto-fixed to Setting",
             code: `
                 ${MOCK_CLASS}
                 class MyTab extends PluginSettingTab {
@@ -42,6 +44,7 @@ ruleTester.run("no-manual-html-headings", noManualHeadingsRule, {
             `,
         },
         {
+            name: "createEl('h3') with destructured containerEl is forbidden",
             code: `
                 ${MOCK_CLASS}
                 class MyTab extends PluginSettingTab {
