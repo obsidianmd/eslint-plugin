@@ -77,6 +77,10 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
             name: "valueOf is not replaced",
             code: "class A { valueOf() {} }",
         },
+        {
+            name: "__proto__ is not replaced",
+            code: "class A { __proto__() {} }",
+        },
     ],
     invalid: [
         {
