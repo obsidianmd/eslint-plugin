@@ -6,6 +6,7 @@ import detachLeaves from "./rules/detachLeaves.js";
 import editorDropPaste from "./rules/editorDropPaste.js";
 import hardcodedConfigPath from "./rules/hardcodedConfigPath.js";
 import noForbiddenElements from "./rules/noForbiddenElements.js";
+import noGlobalThis from "./rules/noGlobalThis.js";
 import noSampleCode from "./rules/noSampleCode.js";
 import noPluginAsComponent from "./rules/noPluginAsComponent.js";
 import noStaticStylesAssignment from "./rules/noStaticStylesAssignment.js";
@@ -71,6 +72,7 @@ const plugin = {
         "editor-drop-paste": editorDropPaste,
         "hardcoded-config-path": hardcodedConfigPath,
         "no-forbidden-elements": noForbiddenElements,
+        "no-global-this": noGlobalThis,
         "no-plugin-as-component": noPluginAsComponent,
         "no-sample-code": noSampleCode,
         "no-tfile-tfolder-cast": noTFileTFolderCast,
@@ -113,6 +115,7 @@ const recommendedPluginRulesConfig: RulesConfig = {
     "obsidianmd/editor-drop-paste": "error",
     "obsidianmd/hardcoded-config-path": "error",
     "obsidianmd/no-forbidden-elements": "error",
+    "obsidianmd/no-global-this": "error",
     "obsidianmd/no-plugin-as-component": "error",
     "obsidianmd/no-sample-code": "error",
     "obsidianmd/no-tfile-tfolder-cast": "error",

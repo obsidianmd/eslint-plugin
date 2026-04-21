@@ -38,18 +38,6 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
             code: "if (typeof document !== 'undefined') {}",
         },
         {
-            name: "typeof globalThis check is allowed",
-            code: "if (typeof globalThis !== 'undefined') {}",
-        },
-        {
-            name: "property named global on an object is allowed",
-            code: "const obj = { global: 1 }; obj.global;",
-        },
-        {
-            name: "declare global is allowed",
-            code: "declare global { var someVar: string; }",
-        },
-        {
             name: "constructor is not replaced",
             code: "class A { constructor() {} }",
         },
@@ -132,16 +120,6 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
             name: "document.addEventListener is forbidden",
             code: "document.addEventListener('click', handler);",
             errors: [{ messageId: "preferActive" }],
-        },
-        {
-            name: "globalThis reference is forbidden",
-            code: "globalThis.setTimeout(() => {}, 100);",
-            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" } }],
-        },
-        {
-            name: "global reference is forbidden",
-            code: "global.process;",
-            errors: [{ messageId: "avoidGlobal", data: { name: "global" } }],
         },
     ],
 });
