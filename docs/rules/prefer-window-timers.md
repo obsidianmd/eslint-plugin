@@ -1,6 +1,9 @@
+# obsidianmd/no-global-this
+
+📝 Disallow `global` and `globalThis`. Use `window` or `activeWindow` for popout window compatibility.
 # obsidianmd/prefer-window-timers
 
-📝 Prefer `window.setTimeout()` and related timer functions over bare global calls for popout window compatibility.
+📝 Prefer `window.setTimeout()` and related timer functions over bare or `activeWindow` calls.
 
 💼 This rule is enabled in the following configs: ✅ `recommended`, 🇬🇧 `recommendedWithLocalesEn`.
 
