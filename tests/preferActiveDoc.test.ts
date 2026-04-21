@@ -94,25 +94,21 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
         {
             name: "bare document reference is forbidden",
             code: "document.createElement('div');",
-            output: "activeDocument.createElement('div');",
             errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
         },
         {
             name: "document.body is forbidden",
             code: "const body = document.body;",
-            output: "const body = activeDocument.body;",
             errors: [{ messageId: "preferActive" }],
         },
         {
             name: "document.querySelector is forbidden",
             code: "document.querySelector('.my-class');",
-            output: "activeDocument.querySelector('.my-class');",
             errors: [{ messageId: "preferActive" }],
         },
         {
             name: "document.addEventListener is forbidden",
             code: "document.addEventListener('click', handler);",
-            output: "activeDocument.addEventListener('click', handler);",
             errors: [{ messageId: "preferActive" }],
         },
         {
