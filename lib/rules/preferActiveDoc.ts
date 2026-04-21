@@ -29,7 +29,7 @@ export default ruleCreator({
                 "Prefer `activeDocument` and `activeWindow` over `document` and `window` for popout window compatibility.",
         },
         schema: [],
-        fixable: "code" as const,
+        fixable: undefined,
         messages: {
             preferActive:
                 "Use '{{replacement}}' instead of '{{original}}' for popout window compatibility.",
@@ -107,9 +107,6 @@ export default ruleCreator({
                     data: {
                         original: node.name,
                         replacement,
-                    },
-                    fix(fixer) {
-                        return fixer.replaceText(node, replacement);
                     },
                 });
             },
