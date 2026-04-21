@@ -6,6 +6,7 @@ import detachLeaves from "./rules/detachLeaves.js";
 import editorDropPaste from "./rules/editorDropPaste.js";
 import hardcodedConfigPath from "./rules/hardcodedConfigPath.js";
 import noForbiddenElements from "./rules/noForbiddenElements.js";
+import noGlobalThis from "./rules/noGlobalThis.js";
 import noSampleCode from "./rules/noSampleCode.js";
 import noPluginAsComponent from "./rules/noPluginAsComponent.js";
 import noStaticStylesAssignment from "./rules/noStaticStylesAssignment.js";
@@ -15,7 +16,6 @@ import objectAssign from "./rules/objectAssign.js";
 import platform from "./rules/platform.js";
 import preferAbstractInputSuggest from "./rules/preferAbstractInputSuggest.js";
 import preferActiveDoc from "./rules/preferActiveDoc.js";
-import preferCreateEl from "./rules/preferCreateEl.js";
 import preferFileManagerTrashFile from "./rules/preferFileManagerTrashFile.js";
 import preferWindowTimers from "./rules/preferWindowTimers.js";
 import preferInstanceof from "./rules/preferInstanceof.js";
@@ -26,7 +26,6 @@ import validateManifest from "./rules/validateManifest.js";
 import validateLicense from "./rules/validateLicense.js";
 import ruleCustomMessage from "./rules/ruleCustomMessage.js";
 import noUnsupportedApi from "./rules/noUnsupportedApi.js";
-import noNodejsModules from "./rules/noNodejsModules.js";
 import { getManifest } from "./manifest.js";
 import { ui } from "./rules/ui/index.js";
 
@@ -40,7 +39,7 @@ import depend from 'eslint-plugin-depend';
 import globals from "globals";
 import fs from "node:fs";
 import path from "node:path";
-import { type Config, defineConfig, globalIgnores } from "@eslint/config-helpers";
+import { Config, defineConfig, globalIgnores } from "eslint/config";
 import type { RuleDefinition, RuleDefinitionTypeOptions, RulesConfig } from "@eslint/core";
 import noUnsanitizedPlugin from "eslint-plugin-no-unsanitized";
 
@@ -73,6 +72,7 @@ const plugin = {
         "editor-drop-paste": editorDropPaste,
         "hardcoded-config-path": hardcodedConfigPath,
         "no-forbidden-elements": noForbiddenElements,
+        "no-global-this": noGlobalThis,
         "no-plugin-as-component": noPluginAsComponent,
         "no-sample-code": noSampleCode,
         "no-tfile-tfolder-cast": noTFileTFolderCast,
@@ -82,7 +82,6 @@ const plugin = {
         platform: platform,
         "prefer-abstract-input-suggest": preferAbstractInputSuggest,
         "prefer-active-doc": preferActiveDoc,
-        "prefer-create-el": preferCreateEl,
         "prefer-file-manager-trash-file": preferFileManagerTrashFile,
         "prefer-instanceof": preferInstanceof,
         "prefer-window-timers": preferWindowTimers,
@@ -93,7 +92,6 @@ const plugin = {
         "validate-license": validateLicense,
         "rule-custom-message": ruleCustomMessage,
         "no-unsupported-api": noUnsupportedApi,
-        "no-nodejs-modules": noNodejsModules,
         "ui/sentence-case": ui.sentenceCase,
         "ui/sentence-case-json": ui.sentenceCaseJson,
         "ui/sentence-case-locale-module": ui.sentenceCaseLocaleModule,
@@ -103,16 +101,6 @@ const plugin = {
         recommendedWithLocalesEn: [] as Config[]
     }
 } satisfies ESLint.Plugin;
-
-// Rules that require type information (call getParserServices).
-// These must only run on files parsed by @typescript-eslint/parser.
-const recommendedTypedRulesConfig: RulesConfig = {
-    "obsidianmd/no-plugin-as-component": "error",
-    "obsidianmd/no-view-references-in-plugin": "error",
-    "obsidianmd/no-unsupported-api": "error",
-    "obsidianmd/prefer-file-manager-trash-file": "warn",
-    "obsidianmd/prefer-instanceof": "error",
-};
 
 const recommendedPluginRulesConfig: RulesConfig = {
     "obsidianmd/commands/no-command-in-command-id": "error",
@@ -127,20 +115,26 @@ const recommendedPluginRulesConfig: RulesConfig = {
     "obsidianmd/editor-drop-paste": "error",
     "obsidianmd/hardcoded-config-path": "error",
     "obsidianmd/no-forbidden-elements": "error",
+    "obsidianmd/no-global-this": "error",
+    "obsidianmd/no-plugin-as-component": "error",
     "obsidianmd/no-sample-code": "error",
     "obsidianmd/no-tfile-tfolder-cast": "error",
+    "obsidianmd/no-view-references-in-plugin": "error",
     "obsidianmd/no-static-styles-assignment": "error",
     "obsidianmd/object-assign": "error",
     "obsidianmd/platform": "error",
+    "obsidianmd/prefer-file-manager-trash-file": "warn",
+    "obsidianmd/prefer-instanceof": "error",
     "obsidianmd/prefer-get-language": "error",
     "obsidianmd/prefer-abstract-input-suggest": "error",
-    "obsidianmd/prefer-active-window-timers": "error",
-    "obsidianmd/prefer-active-doc": "off",
-    "obsidianmd/prefer-create-el": "error",
+    "obsidianmd/prefer-window-timers": "error",
+    "obsidianmd/prefer-active-doc": "warn",
     "obsidianmd/regex-lookbehind": "error",
     "obsidianmd/sample-names": "error",
+    "obsidianmd/no-unsupported-api": "error",
     "obsidianmd/validate-manifest": "error",
     "obsidianmd/validate-license": ["error"],
+    "obsidianmd/ui/sentence-case": ["error", { enforceCamelCaseLower: true }],
 }
 
 import { restrictedGlobalsOptions, restrictedImportsOptions } from "./ruleOptions.js";
@@ -158,21 +152,9 @@ const flatRecommendedGeneralRules: RulesConfig = {
     "no-restricted-imports": ["error", ...restrictedImportsOptions],
     "no-alert": "error",
     "no-undef": "error",
-    "@typescript-eslint/no-unused-vars": [
-        "warn",
-        {
-            "args": "all",
-            "argsIgnorePattern": "^_",
-            "caughtErrors": "all",
-            "caughtErrorsIgnorePattern": "^_",
-            "destructuredArrayIgnorePattern": "^_",
-            "varsIgnorePattern": "^_",
-            "ignoreRestSiblings": true
-        }
-    ],
     "@typescript-eslint/ban-ts-comment": "off",
-    "@typescript-eslint/no-require-imports": "off",
     "@typescript-eslint/no-deprecated": "error",
+    "@typescript-eslint/no-unused-vars": ["warn", { args: "none" }],
     "@typescript-eslint/require-await": "off",
     "@typescript-eslint/no-explicit-any": [
         "error",
@@ -180,7 +162,7 @@ const flatRecommendedGeneralRules: RulesConfig = {
     ],
     "@microsoft/sdl/no-document-write": "error",
     "@microsoft/sdl/no-inner-html": "error",
-    "obsidianmd/no-nodejs-modules":
+    "import/no-nodejs-modules":
         manifest && manifest.isDesktopOnly ? "off" : "error",
     "import/no-extraneous-dependencies": "error",
     "obsidianmd/rule-custom-message": [
@@ -228,8 +210,7 @@ const flatRecommendedConfig: Config[] = defineConfig([
         extends: [...(tseslint.configs.recommendedTypeChecked as Config[]), noUnsanitizedPlugin.configs.recommended],
         rules: {
             ...flatRecommendedGeneralRules,
-            ...recommendedPluginRulesConfig,
-            ...recommendedTypedRulesConfig
+            ...recommendedPluginRulesConfig
         },
     },
     {
@@ -253,7 +234,6 @@ const flatRecommendedConfig: Config[] = defineConfig([
         languageOptions: {
             globals: {
                 ...globals.browser,
-                require: "readonly",
                 ...(manifest?.isDesktopOnly ? {
                     ...globals.node,
                     NodeJS: "readonly"
@@ -280,16 +260,10 @@ const flatRecommendedConfig: Config[] = defineConfig([
     }
 ]);
 
-const hybridRecommendedConfig: Config[] = defineConfig([
-    {
-        rules: recommendedPluginRulesConfig,
-        extends: flatRecommendedConfig
-    },
-    {
-        files: ['**/*.ts', '**/*.tsx'],
-        rules: recommendedTypedRulesConfig
-    },
-]);
+const hybridRecommendedConfig: Config[] = defineConfig({
+    rules: recommendedPluginRulesConfig,
+    extends: flatRecommendedConfig
+});
 
 const recommendedWithLocalesEnBase: Config[] = defineConfig([
     ...flatRecommendedConfig,
@@ -336,16 +310,10 @@ const recommendedWithLocalesEnBase: Config[] = defineConfig([
     }
 ]);
 
-const recommendedWithLocalesEn: Config[] = defineConfig([
-    {
-        rules: recommendedPluginRulesConfig,
-        extends: recommendedWithLocalesEnBase
-    },
-    {
-        files: ['**/*.ts', '**/*.tsx'],
-        rules: recommendedTypedRulesConfig
-    },
-]);
+const recommendedWithLocalesEn: Config[] = defineConfig({
+    rules: recommendedPluginRulesConfig,
+    extends: recommendedWithLocalesEnBase
+});
 
 plugin.configs = {
     recommended: hybridRecommendedConfig,
