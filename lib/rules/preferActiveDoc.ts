@@ -10,7 +10,13 @@ const REPLACEMENTS: Record<string, string> = {
     window: "activeWindow",
 };
 
-const BANNED_GLOBALS = new Set(["global", "globalThis"]);
+const WINDOW_TIMER_METHODS = new Set([
+    "clearInterval",
+    "clearTimeout",
+    "requestAnimationFrame",
+    "setInterval",
+    "setTimeout",
+]);
 
 export default ruleCreator({
     name: "prefer-active-doc",
@@ -21,22 +27,16 @@ export default ruleCreator({
                 "Prefer `activeDocument` and `activeWindow` over `document` and `window` for popout window compatibility.",
         },
         schema: [],
-        fixable: "code" as const,
+        fixable: undefined,
         messages: {
             preferActive:
                 "Use '{{replacement}}' instead of '{{original}}' for popout window compatibility.",
-            avoidGlobal:
-                "Avoid using '{{name}}'. Use 'activeWindow' or 'activeDocument' for popout window compatibility.",
         },
     },
     defaultOptions: [],
     create(context) {
         return {
             Identifier(node: TSESTree.Identifier) {
-                if (BANNED_GLOBALS.has(node.name)) {
-                    return reportBannedGlobal(node);
-                }
-
                 if (!Object.hasOwn(REPLACEMENTS, node.name)) {
                     return;
                 }
@@ -75,6 +75,17 @@ export default ruleCreator({
                     return;
                 }
 
+                // Skip window.setTimeout/clearTimeout/setInterval/clearInterval — timer functions should use window, not activeWindow
+                if (
+                    node.name === "window" &&
+                    node.parent.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
+                    node.parent.object === node &&
+                    node.parent.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
+                    WINDOW_TIMER_METHODS.has(node.parent.property.name)
+                ) {
+                    return;
+                }
+
                 // Check scope: only flag global references, not local variables named document/window
                 const scope = context.sourceCode.getScope(node);
                 const variable = findVariable(scope, node.name);
@@ -89,37 +100,9 @@ export default ruleCreator({
                         original: node.name,
                         replacement,
                     },
-                    fix(fixer) {
-                        return fixer.replaceText(node, replacement);
-                    },
                 });
             },
         };
-
-        function reportBannedGlobal(node: TSESTree.Identifier): void {
-            // Same skip logic as replaceable globals
-            if (
-                (node.parent.type === TSESTree.AST_NODE_TYPES.MemberExpression && node.parent.property === node) ||
-                (node.parent.type === TSESTree.AST_NODE_TYPES.Property && node.parent.key === node) ||
-                (node.parent.type === TSESTree.AST_NODE_TYPES.VariableDeclarator && node.parent.id === node) ||
-                (node.parent.type === TSESTree.AST_NODE_TYPES.UnaryExpression && node.parent.operator === "typeof") ||
-                (node.parent.type === TSESTree.AST_NODE_TYPES.TSModuleDeclaration)
-            ) {
-                return;
-            }
-
-            const scope = context.sourceCode.getScope(node);
-            const variable = findVariable(scope, node.name);
-            if (variable && variable.defs.length > 0) {
-                return;
-            }
-
-            context.report({
-                node,
-                messageId: "avoidGlobal",
-                data: { name: node.name },
-            });
-        }
 
         function findVariable(scope: ReturnType<typeof context.sourceCode.getScope>, name: string): { defs: unknown[] } | null {
             let current: typeof scope | null = scope;

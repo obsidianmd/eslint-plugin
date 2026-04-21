@@ -6,6 +6,7 @@ import detachLeaves from "./rules/detachLeaves.js";
 import editorDropPaste from "./rules/editorDropPaste.js";
 import hardcodedConfigPath from "./rules/hardcodedConfigPath.js";
 import noForbiddenElements from "./rules/noForbiddenElements.js";
+import noGlobalThis from "./rules/noGlobalThis.js";
 import noSampleCode from "./rules/noSampleCode.js";
 import noPluginAsComponent from "./rules/noPluginAsComponent.js";
 import noStaticStylesAssignment from "./rules/noStaticStylesAssignment.js";
@@ -16,7 +17,7 @@ import platform from "./rules/platform.js";
 import preferAbstractInputSuggest from "./rules/preferAbstractInputSuggest.js";
 import preferActiveDoc from "./rules/preferActiveDoc.js";
 import preferFileManagerTrashFile from "./rules/preferFileManagerTrashFile.js";
-import preferActiveWindowTimers from "./rules/preferActiveWindowTimers.js";
+import preferWindowTimers from "./rules/preferWindowTimers.js";
 import preferInstanceof from "./rules/preferInstanceof.js";
 import preferGetLanguage from "./rules/preferGetLanguage.js";
 import regexLookbehind from "./rules/regexLookbehind.js";
@@ -71,6 +72,7 @@ const plugin = {
         "editor-drop-paste": editorDropPaste,
         "hardcoded-config-path": hardcodedConfigPath,
         "no-forbidden-elements": noForbiddenElements,
+        "no-global-this": noGlobalThis,
         "no-plugin-as-component": noPluginAsComponent,
         "no-sample-code": noSampleCode,
         "no-tfile-tfolder-cast": noTFileTFolderCast,
@@ -82,7 +84,7 @@ const plugin = {
         "prefer-active-doc": preferActiveDoc,
         "prefer-file-manager-trash-file": preferFileManagerTrashFile,
         "prefer-instanceof": preferInstanceof,
-        "prefer-active-window-timers": preferActiveWindowTimers,
+        "prefer-window-timers": preferWindowTimers,
         "prefer-get-language": preferGetLanguage,
         "regex-lookbehind": regexLookbehind,
         "sample-names": sampleNames,
@@ -113,6 +115,7 @@ const recommendedPluginRulesConfig: RulesConfig = {
     "obsidianmd/editor-drop-paste": "error",
     "obsidianmd/hardcoded-config-path": "error",
     "obsidianmd/no-forbidden-elements": "error",
+    "obsidianmd/no-global-this": "error",
     "obsidianmd/no-plugin-as-component": "error",
     "obsidianmd/no-sample-code": "error",
     "obsidianmd/no-tfile-tfolder-cast": "error",
@@ -124,8 +127,8 @@ const recommendedPluginRulesConfig: RulesConfig = {
     "obsidianmd/prefer-instanceof": "error",
     "obsidianmd/prefer-get-language": "error",
     "obsidianmd/prefer-abstract-input-suggest": "error",
-    "obsidianmd/prefer-active-window-timers": "error",
-    "obsidianmd/prefer-active-doc": "error",
+    "obsidianmd/prefer-window-timers": "error",
+    "obsidianmd/prefer-active-doc": "warn",
     "obsidianmd/regex-lookbehind": "error",
     "obsidianmd/sample-names": "error",
     "obsidianmd/no-unsupported-api": "error",

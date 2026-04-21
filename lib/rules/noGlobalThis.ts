@@ -5,54 +5,53 @@ const ruleCreator = ESLintUtils.RuleCreator(
         `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
 );
 
-const TIMER_FUNCTIONS = new Set([
-    "setTimeout",
-    "setInterval",
-    "clearTimeout",
-    "clearInterval",
-]);
+const BANNED_GLOBALS = new Set(["global", "globalThis"]);
 
 export default ruleCreator({
-    name: "prefer-active-window-timers",
+    name: "no-global-this",
     meta: {
         type: "suggestion" as const,
         docs: {
             description:
-                "Prefer `activeWindow.setTimeout()` and related timer functions over bare global calls for popout window compatibility.",
+                "Disallow `global` and `globalThis`. Use `window` or `activeWindow` for popout window compatibility.",
         },
         schema: [],
         fixable: "code" as const,
         messages: {
-            preferActiveWindow:
-                "Use 'activeWindow.{{name}}()' instead of '{{name}}()' for popout window compatibility.",
+            avoidGlobal:
+                "Avoid using '{{name}}'. Use 'window' or 'activeWindow' for popout window compatibility.",
         },
     },
     defaultOptions: [],
     create(context) {
         return {
-            CallExpression(node: TSESTree.CallExpression) {
-                if (node.callee.type !== TSESTree.AST_NODE_TYPES.Identifier) {
+            Identifier(node: TSESTree.Identifier) {
+                if (!BANNED_GLOBALS.has(node.name)) {
                     return;
                 }
 
-                const name = node.callee.name;
-                if (!TIMER_FUNCTIONS.has(name)) {
+                if (
+                    (node.parent.type === TSESTree.AST_NODE_TYPES.MemberExpression && node.parent.property === node) ||
+                    (node.parent.type === TSESTree.AST_NODE_TYPES.Property && node.parent.key === node) ||
+                    (node.parent.type === TSESTree.AST_NODE_TYPES.VariableDeclarator && node.parent.id === node) ||
+                    (node.parent.type === TSESTree.AST_NODE_TYPES.UnaryExpression && node.parent.operator === "typeof") ||
+                    (node.parent.type === TSESTree.AST_NODE_TYPES.TSModuleDeclaration)
+                ) {
                     return;
                 }
 
-                // Only flag global references, not local functions
                 const scope = context.sourceCode.getScope(node);
-                const variable = findVariable(scope, name);
+                const variable = findVariable(scope, node.name);
                 if (variable && variable.defs.length > 0) {
                     return;
                 }
 
                 context.report({
-                    node: node.callee,
-                    messageId: "preferActiveWindow",
-                    data: { name },
+                    node,
+                    messageId: "avoidGlobal",
+                    data: { name: node.name },
                     fix(fixer) {
-                        return fixer.replaceText(node.callee, `activeWindow.${name}`);
+                        return fixer.replaceText(node, "window");
                     },
                 });
             },
