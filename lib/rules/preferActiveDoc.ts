@@ -12,6 +12,14 @@ const REPLACEMENTS: Record<string, string> = {
 
 const BANNED_GLOBALS = new Set(["global", "globalThis"]);
 
+const WINDOW_TIMER_METHODS = new Set([
+    "clearInterval",
+    "clearTimeout",
+    "requestAnimationFrame",
+    "setInterval",
+    "setTimeout",
+]);
+
 export default ruleCreator({
     name: "prefer-active-doc",
     meta: {
@@ -72,6 +80,17 @@ export default ruleCreator({
 
                 // Skip typeof expressions (typeof window === 'undefined')
                 if (node.parent.type === TSESTree.AST_NODE_TYPES.UnaryExpression && node.parent.operator === "typeof") {
+                    return;
+                }
+
+                // Skip window.setTimeout/clearTimeout/setInterval/clearInterval — timer functions should use window, not activeWindow
+                if (
+                    node.name === "window" &&
+                    node.parent.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
+                    node.parent.object === node &&
+                    node.parent.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
+                    WINDOW_TIMER_METHODS.has(node.parent.property.name)
+                ) {
                     return;
                 }
 

@@ -16,7 +16,7 @@ import platform from "./rules/platform.js";
 import preferAbstractInputSuggest from "./rules/preferAbstractInputSuggest.js";
 import preferActiveDoc from "./rules/preferActiveDoc.js";
 import preferFileManagerTrashFile from "./rules/preferFileManagerTrashFile.js";
-import preferActiveWindowTimers from "./rules/preferActiveWindowTimers.js";
+import preferWindowTimers from "./rules/preferWindowTimers.js";
 import preferInstanceof from "./rules/preferInstanceof.js";
 import preferGetLanguage from "./rules/preferGetLanguage.js";
 import regexLookbehind from "./rules/regexLookbehind.js";
@@ -82,7 +82,7 @@ const plugin = {
         "prefer-active-doc": preferActiveDoc,
         "prefer-file-manager-trash-file": preferFileManagerTrashFile,
         "prefer-instanceof": preferInstanceof,
-        "prefer-active-window-timers": preferActiveWindowTimers,
+        "prefer-window-timers": preferWindowTimers,
         "prefer-get-language": preferGetLanguage,
         "regex-lookbehind": regexLookbehind,
         "sample-names": sampleNames,
@@ -124,7 +124,7 @@ const recommendedPluginRulesConfig: RulesConfig = {
     "obsidianmd/prefer-instanceof": "error",
     "obsidianmd/prefer-get-language": "error",
     "obsidianmd/prefer-abstract-input-suggest": "error",
-    "obsidianmd/prefer-active-window-timers": "error",
+    "obsidianmd/prefer-window-timers": "error",
     "obsidianmd/prefer-active-doc": "error",
     "obsidianmd/regex-lookbehind": "error",
     "obsidianmd/sample-names": "error",

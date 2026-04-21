@@ -11,7 +11,7 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
         },
         {
             name: "activeWindow is allowed",
-            code: "activeWindow.requestAnimationFrame(() => {});",
+            code: "activeWindow.getComputedStyle(el);",
         },
         {
             name: "property named document on an object is allowed",
@@ -81,6 +81,26 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
             name: "__proto__ is not replaced",
             code: "class A { __proto__() {} }",
         },
+        {
+            name: "window.setTimeout is allowed",
+            code: "window.setTimeout(() => {}, 100);",
+        },
+        {
+            name: "window.clearTimeout is allowed",
+            code: "window.clearTimeout(id);",
+        },
+        {
+            name: "window.setInterval is allowed",
+            code: "window.setInterval(() => {}, 1000);",
+        },
+        {
+            name: "window.clearInterval is allowed",
+            code: "window.clearInterval(id);",
+        },
+        {
+            name: "window.requestAnimationFrame is allowed",
+            code: "window.requestAnimationFrame(() => {});",
+        },
     ],
     invalid: [
         {
@@ -91,8 +111,8 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
         },
         {
             name: "bare window reference is forbidden",
-            code: "window.requestAnimationFrame(() => {});",
-            output: "activeWindow.requestAnimationFrame(() => {});",
+            code: "window.getComputedStyle(el);",
+            output: "activeWindow.getComputedStyle(el);",
             errors: [{ messageId: "preferActive", data: { original: "window", replacement: "activeWindow" } }],
         },
         {
@@ -117,12 +137,6 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
             name: "document.addEventListener is forbidden",
             code: "document.addEventListener('click', handler);",
             output: "activeDocument.addEventListener('click', handler);",
-            errors: [{ messageId: "preferActive" }],
-        },
-        {
-            name: "window.setTimeout is forbidden",
-            code: "window.setTimeout(() => {}, 100);",
-            output: "activeWindow.setTimeout(() => {}, 100);",
             errors: [{ messageId: "preferActive" }],
         },
         {
