@@ -69,6 +69,26 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
             name: "__proto__ is not replaced",
             code: "class A { __proto__() {} }",
         },
+        {
+            name: "window.setTimeout is allowed",
+            code: "window.setTimeout(() => {}, 100);",
+        },
+        {
+            name: "window.clearTimeout is allowed",
+            code: "window.clearTimeout(id);",
+        },
+        {
+            name: "window.setInterval is allowed",
+            code: "window.setInterval(() => {}, 1000);",
+        },
+        {
+            name: "window.clearInterval is allowed",
+            code: "window.clearInterval(id);",
+        },
+        {
+            name: "window.requestAnimationFrame is allowed",
+            code: "window.requestAnimationFrame(() => {});",
+        },
     ],
     invalid: [
         {
