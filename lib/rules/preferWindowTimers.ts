@@ -60,20 +60,21 @@ export default ruleCreator({
                 }
 
                 // activeWindow.setTimeout() → window.setTimeout()
+                const callee = node.callee;
                 if (
-                    node.callee.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
-                    node.callee.object.type === TSESTree.AST_NODE_TYPES.Identifier &&
-                    node.callee.object.name === "activeWindow" &&
-                    node.callee.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
-                    TIMER_FUNCTIONS.has(node.callee.property.name)
+                    callee.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
+                    callee.object.type === TSESTree.AST_NODE_TYPES.Identifier &&
+                    callee.object.name === "activeWindow" &&
+                    callee.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
+                    TIMER_FUNCTIONS.has(callee.property.name)
                 ) {
-                    const name = node.callee.property.name;
+                    const name = callee.property.name;
                     context.report({
-                        node: node.callee,
+                        node: callee,
                         messageId: "noActiveWindowTimer",
                         data: { name },
                         fix(fixer) {
-                            return fixer.replaceText(node.callee.object, "window");
+                            return fixer.replaceText(callee.object, "window");
                         },
                     });
                 }
