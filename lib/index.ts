@@ -39,7 +39,7 @@ import depend from 'eslint-plugin-depend';
 import globals from "globals";
 import fs from "node:fs";
 import path from "node:path";
-import { Config, defineConfig, globalIgnores } from "eslint/config";
+import { type Config, defineConfig, globalIgnores } from "@eslint/config-helpers";
 import type { RuleDefinition, RuleDefinitionTypeOptions, RulesConfig } from "@eslint/core";
 import noUnsanitizedPlugin from "eslint-plugin-no-unsanitized";
 
