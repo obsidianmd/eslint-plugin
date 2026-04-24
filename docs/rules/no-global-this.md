@@ -1,6 +1,6 @@
 # obsidianmd/no-global-this
 
-Disallow `global` and `globalThis`. Use `window` or `activeWindow` for popout window compatibility.
+📝 Disallow `global` and `globalThis`. Use `window` or `activeWindow` for popout window compatibility.
 
 💼 This rule is enabled in the following configs: ✅ `recommended`, 🇬🇧 `recommendedWithLocalesEn`.
 
