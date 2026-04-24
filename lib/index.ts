@@ -102,6 +102,16 @@ const plugin = {
     }
 } satisfies ESLint.Plugin;
 
+// Rules that require type information (call getParserServices).
+// These must only run on files parsed by @typescript-eslint/parser.
+const recommendedTypedRulesConfig: RulesConfig = {
+    "obsidianmd/no-plugin-as-component": "error",
+    "obsidianmd/no-view-references-in-plugin": "error",
+    "obsidianmd/no-unsupported-api": "error",
+    "obsidianmd/prefer-file-manager-trash-file": "warn",
+    "obsidianmd/prefer-instanceof": "error",
+};
+
 const recommendedPluginRulesConfig: RulesConfig = {
     "obsidianmd/commands/no-command-in-command-id": "error",
     "obsidianmd/commands/no-command-in-command-name": "error",
@@ -115,15 +125,11 @@ const recommendedPluginRulesConfig: RulesConfig = {
     "obsidianmd/editor-drop-paste": "error",
     "obsidianmd/hardcoded-config-path": "error",
     "obsidianmd/no-forbidden-elements": "error",
-    "obsidianmd/no-plugin-as-component": "error",
     "obsidianmd/no-sample-code": "error",
     "obsidianmd/no-tfile-tfolder-cast": "error",
-    "obsidianmd/no-view-references-in-plugin": "error",
     "obsidianmd/no-static-styles-assignment": "error",
     "obsidianmd/object-assign": "error",
     "obsidianmd/platform": "error",
-    "obsidianmd/prefer-file-manager-trash-file": "warn",
-    "obsidianmd/prefer-instanceof": "error",
     "obsidianmd/prefer-get-language": "error",
     "obsidianmd/prefer-abstract-input-suggest": "error",
     "obsidianmd/prefer-active-window-timers": "error",
@@ -131,7 +137,6 @@ const recommendedPluginRulesConfig: RulesConfig = {
     "obsidianmd/prefer-create-el": "error",
     "obsidianmd/regex-lookbehind": "error",
     "obsidianmd/sample-names": "error",
-    "obsidianmd/no-unsupported-api": "error",
     "obsidianmd/validate-manifest": "error",
     "obsidianmd/validate-license": ["error"],
     "obsidianmd/ui/sentence-case": ["error", { enforceCamelCaseLower: true }],
@@ -210,7 +215,8 @@ const flatRecommendedConfig: Config[] = defineConfig([
         extends: [...(tseslint.configs.recommendedTypeChecked as Config[]), noUnsanitizedPlugin.configs.recommended],
         rules: {
             ...flatRecommendedGeneralRules,
-            ...recommendedPluginRulesConfig
+            ...recommendedPluginRulesConfig,
+            ...recommendedTypedRulesConfig
         },
     },
     {
@@ -260,10 +266,16 @@ const flatRecommendedConfig: Config[] = defineConfig([
     }
 ]);
 
-const hybridRecommendedConfig: Config[] = defineConfig({
-    rules: recommendedPluginRulesConfig,
-    extends: flatRecommendedConfig
-});
+const hybridRecommendedConfig: Config[] = defineConfig([
+    {
+        rules: recommendedPluginRulesConfig,
+        extends: flatRecommendedConfig
+    },
+    {
+        files: ['**/*.ts', '**/*.tsx'],
+        rules: recommendedTypedRulesConfig
+    },
+]);
 
 const recommendedWithLocalesEnBase: Config[] = defineConfig([
     ...flatRecommendedConfig,
@@ -310,10 +322,16 @@ const recommendedWithLocalesEnBase: Config[] = defineConfig([
     }
 ]);
 
-const recommendedWithLocalesEn: Config[] = defineConfig({
-    rules: recommendedPluginRulesConfig,
-    extends: recommendedWithLocalesEnBase
-});
+const recommendedWithLocalesEn: Config[] = defineConfig([
+    {
+        rules: recommendedPluginRulesConfig,
+        extends: recommendedWithLocalesEnBase
+    },
+    {
+        files: ['**/*.ts', '**/*.tsx'],
+        rules: recommendedTypedRulesConfig
+    },
+]);
 
 plugin.configs = {
     recommended: hybridRecommendedConfig,
