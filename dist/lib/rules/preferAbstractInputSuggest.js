@@ -1,0 +1,56 @@
+import { TSESTree, ESLintUtils } from "@typescript-eslint/utils";
+const ruleCreator = ESLintUtils.RuleCreator((name) => `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`);
+export default ruleCreator({
+    name: "no-deprecated-text-input-suggest",
+    meta: {
+        type: "suggestion",
+        docs: {
+            description: "Disallow Liam's frequently copied `TextInputSuggest` implementation in favor of the built-in `AbstractInputSuggest`.",
+        },
+        schema: [],
+        messages: {
+            preferAbstractInputSuggest: "This appears to be a custom `TextInputSuggest` implementation. Please use the built-in `AbstractInputSuggest` API instead.",
+        },
+    },
+    defaultOptions: [],
+    create(context) {
+        return {
+            // We start by looking for any call to a function named `createPopper`.
+            "CallExpression[callee.name='createPopper']"(node) {
+                // The options object is the 3rd argument.
+                const options = node.arguments[2];
+                if (!options || options.type !== TSESTree.AST_NODE_TYPES.ObjectExpression) {
+                    return;
+                }
+                // Find the `modifiers` property within the options.
+                const modifiersProp = options.properties.find((prop) => prop.type === TSESTree.AST_NODE_TYPES.Property &&
+                    prop.key.type === TSESTree.AST_NODE_TYPES.Identifier &&
+                    prop.key.name === "modifiers");
+                if (!modifiersProp ||
+                    modifiersProp.value.type !== TSESTree.AST_NODE_TYPES.ArrayExpression) {
+                    return;
+                }
+                // Check if any modifier in the array has the name "sameWidth".
+                const hasSameWidthModifier = modifiersProp.value.elements.some((element) => {
+                    if (!element || element.type !== TSESTree.AST_NODE_TYPES.ObjectExpression) {
+                        return false;
+                    }
+                    // Find the `name` property of the modifier object.
+                    const nameProp = element.properties.find((prop) => prop.type === TSESTree.AST_NODE_TYPES.Property &&
+                        prop.key.type === TSESTree.AST_NODE_TYPES.Identifier &&
+                        prop.key.name === "name");
+                    // Check if its value is the literal string "sameWidth".
+                    return (nameProp &&
+                        nameProp.value.type === TSESTree.AST_NODE_TYPES.Literal &&
+                        nameProp.value.value === "sameWidth");
+                });
+                if (hasSameWidthModifier) {
+                    context.report({
+                        node,
+                        messageId: "preferAbstractInputSuggest",
+                    });
+                }
+            },
+        };
+    },
+});
