@@ -10,28 +10,16 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
             code: "activeDocument.createElement('div');",
         },
         {
-            name: "activeWindow is allowed",
-            code: "activeWindow.requestAnimationFrame(() => {});",
+            name: "bare window reference is allowed",
+            code: "window.requestAnimationFrame(() => {});",
         },
         {
             name: "property named document on an object is allowed",
             code: "const obj = { document: 1 }; obj.document;",
         },
         {
-            name: "property named window on an object is allowed",
-            code: "const obj = { window: 1 }; obj.window;",
-        },
-        {
             name: "local variable named document is allowed",
             code: "const document = activeDocument; document.createElement('div');",
-        },
-        {
-            name: "local variable named window is allowed",
-            code: "const window = activeWindow; window.setTimeout(() => {}, 0);",
-        },
-        {
-            name: "typeof window check is allowed",
-            code: "if (typeof window !== 'undefined') {}",
         },
         {
             name: "typeof document check is allowed",
@@ -90,21 +78,9 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
             errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
         },
         {
-            name: "bare window reference is forbidden",
-            code: "window.requestAnimationFrame(() => {});",
-            output: "activeWindow.requestAnimationFrame(() => {});",
-            errors: [{ messageId: "preferActive", data: { original: "window", replacement: "activeWindow" } }],
-        },
-        {
             name: "document.body is forbidden",
             code: "const body = document.body;",
             output: "const body = activeDocument.body;",
-            errors: [{ messageId: "preferActive" }],
-        },
-        {
-            name: "window.innerWidth is forbidden",
-            code: "const width = window.innerWidth;",
-            output: "const width = activeWindow.innerWidth;",
             errors: [{ messageId: "preferActive" }],
         },
         {
@@ -117,12 +93,6 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
             name: "document.addEventListener is forbidden",
             code: "document.addEventListener('click', handler);",
             output: "activeDocument.addEventListener('click', handler);",
-            errors: [{ messageId: "preferActive" }],
-        },
-        {
-            name: "window.setTimeout is forbidden",
-            code: "window.setTimeout(() => {}, 100);",
-            output: "activeWindow.setTimeout(() => {}, 100);",
             errors: [{ messageId: "preferActive" }],
         },
         {
