@@ -157,9 +157,20 @@ const flatRecommendedGeneralRules: RulesConfig = {
     "no-restricted-imports": ["error", ...restrictedImportsOptions],
     "no-alert": "error",
     "no-undef": "error",
+    "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+            "args": "all",
+            "argsIgnorePattern": "^_",
+            "caughtErrors": "all",
+            "caughtErrorsIgnorePattern": "^_",
+            "destructuredArrayIgnorePattern": "^_",
+            "varsIgnorePattern": "^_",
+            "ignoreRestSiblings": true
+        }
+    ],
     "@typescript-eslint/ban-ts-comment": "off",
     "@typescript-eslint/no-deprecated": "error",
-    "@typescript-eslint/no-unused-vars": ["warn", { args: "none" }],
     "@typescript-eslint/require-await": "off",
     "@typescript-eslint/no-explicit-any": [
         "error",
