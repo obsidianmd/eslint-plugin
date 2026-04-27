@@ -135,7 +135,7 @@ const recommendedPluginRulesConfig: RulesConfig = {
     "obsidianmd/prefer-get-language": "error",
     "obsidianmd/prefer-abstract-input-suggest": "error",
     "obsidianmd/prefer-active-window-timers": "error",
-    "obsidianmd/prefer-active-doc": "error",
+    "obsidianmd/prefer-active-doc": "off",
     "obsidianmd/prefer-create-el": "error",
     "obsidianmd/regex-lookbehind": "error",
     "obsidianmd/sample-names": "error",
