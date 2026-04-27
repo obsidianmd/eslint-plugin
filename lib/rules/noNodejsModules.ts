@@ -106,6 +106,14 @@ function extractsPlatformIsDesktop(expr: TSESTree.Expression): boolean {
     ) {
         return extractsPlatformIsDesktop(expr.left);
     }
+    // !Platform.isDesktop ? ... (inverted check in alternate branch)
+    if (
+        expr.type === AST_NODE_TYPES.UnaryExpression &&
+        expr.operator === "!" &&
+        isPlatformIsDesktop(expr.argument)
+    ) {
+        return true;
+    }
     return false;
 }
 
@@ -121,9 +129,19 @@ function isGuardedByPlatformIsDesktop(node: TSESTree.Node): boolean {
                     return true;
                 }
             }
+            // Check for early return pattern: if (!Platform.isDesktop) { throw/return }
+            if (prevChild !== current.test && isEarlyExitGuard(current)) {
+                return true;
+            }
         } else if (current.type === AST_NODE_TYPES.ConditionalExpression) {
             if (prevChild !== current.test && prevChild !== current.alternate) {
                 if (extractsPlatformIsDesktop(current.test)) {
+                    return true;
+                }
+            }
+            // Check ternary: Platform.isDesktop ? import(...) : ...
+            if (prevChild === current.consequent) {
+                if (isPlatformIsDesktop(current.test)) {
                     return true;
                 }
             }
@@ -135,9 +153,94 @@ function isGuardedByPlatformIsDesktop(node: TSESTree.Node): boolean {
             if (extractsPlatformIsDesktop(current.left)) {
                 return true;
             }
+        } else if (
+            current.type === AST_NODE_TYPES.FunctionDeclaration ||
+            current.type === AST_NODE_TYPES.FunctionExpression ||
+            current.type === AST_NODE_TYPES.ArrowFunctionExpression
+        ) {
+            // Check if function body starts with Platform.isDesktop guard that throws
+            if (hasGuardAtFunctionStart(current)) {
+                return true;
+            }
+        } else if (current.type === AST_NODE_TYPES.MethodDefinition) {
+            // Check method definitions
+            if (
+                current.value.type === AST_NODE_TYPES.FunctionExpression &&
+                hasGuardAtFunctionStart(current.value)
+            ) {
+                return true;
+            }
         }
         prevChild = current;
         current = current.parent;
     }
     return false;
+}
+
+/**
+ * Checks if an if-statement is an early exit guard pattern:
+ * if (!Platform.isDesktop) { throw ... } or if (!Platform.isDesktop) { return ... }
+ */
+function isEarlyExitGuard(ifStmt: TSESTree.IfStatement): boolean {
+    // Must not have an else clause (code after if is what we're protecting)
+    if (ifStmt.alternate) {
+        return false;
+    }
+
+    const test = ifStmt.test;
+
+    // Check for: if (!Platform.isDesktop)
+    if (
+        test.type === AST_NODE_TYPES.UnaryExpression &&
+        test.operator === "!" &&
+        isPlatformIsDesktop(test.argument)
+    ) {
+        return hasEarlyExit(ifStmt.consequent);
+    }
+
+    return false;
+}
+
+/**
+ * Checks if a statement or block contains an early exit (throw or return)
+ */
+function hasEarlyExit(stmt: TSESTree.Statement): boolean {
+    if (stmt.type === AST_NODE_TYPES.ThrowStatement ||
+        stmt.type === AST_NODE_TYPES.ReturnStatement) {
+        return true;
+    }
+
+    if (stmt.type === AST_NODE_TYPES.BlockStatement) {
+        // Check if first statement is throw or return
+        const firstStmt = stmt.body[0];
+        if (firstStmt && (
+            firstStmt.type === AST_NODE_TYPES.ThrowStatement ||
+            firstStmt.type === AST_NODE_TYPES.ReturnStatement
+        )) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Checks if function starts with guard: if (!Platform.isDesktop) { throw/return }
+ */
+function hasGuardAtFunctionStart(
+    func: TSESTree.FunctionDeclaration | TSESTree.FunctionExpression | TSESTree.ArrowFunctionExpression
+): boolean {
+    const body = func.body;
+
+    // Arrow functions might have expression bodies
+    if (body.type !== AST_NODE_TYPES.BlockStatement) {
+        return false;
+    }
+
+    const firstStatement = body.body[0];
+    if (!firstStatement || firstStatement.type !== AST_NODE_TYPES.IfStatement) {
+        return false;
+    }
+
+    return isEarlyExitGuard(firstStatement);
 }
