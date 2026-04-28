@@ -17,9 +17,7 @@ export default ruleCreator({
         schema: [],
         messages: {
             noNodejs:
-                "Do not import Node.js built-in module \"{{module}}\". Node.js APIs are not available on mobile. Use a dynamic import() guarded by Platform.isDesktop instead.",
-            noNodejsRequire:
-                "Do not use require() for Node.js built-in module \"{{module}}\". Use a dynamic import() guarded by Platform.isDesktop instead.",
+                "Do not import Node.js built-in module \"{{module}}\". Node.js APIs are not available on mobile. Use a dynamic import() or require() guarded by Platform.isDesktop instead.",
         },
     },
     defaultOptions: [],
@@ -59,7 +57,7 @@ export default ruleCreator({
                 });
             },
 
-            // require() calls — always forbidden, use dynamic import() instead
+            // require() calls — allowed when guarded by Platform.isDesktop
             CallExpression(node: TSESTree.CallExpression) {
                 if (
                     node.callee.type !== AST_NODE_TYPES.Identifier ||
@@ -74,9 +72,12 @@ export default ruleCreator({
                 if (!isBuiltin(source)) {
                     return;
                 }
+                if (isGuardedByPlatformIsDesktop(node)) {
+                    return;
+                }
                 context.report({
                     node,
-                    messageId: "noNodejsRequire",
+                    messageId: "noNodejs",
                     data: { module: source },
                 });
             },

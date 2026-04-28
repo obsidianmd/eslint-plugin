@@ -30,6 +30,14 @@ ruleTester.run("no-nodejs-modules", noNodejsModules, {
             code: "Platform.isDesktop && import('fs');",
         },
         {
+            name: "require() inside if (Platform.isDesktop) is allowed",
+            code: "if (Platform.isDesktop) { const fs = require('fs'); }",
+        },
+        {
+            name: "require() with Platform.isDesktop && short-circuit is allowed",
+            code: "Platform.isDesktop && require('fs');",
+        },
+        {
             name: "dynamic import() nested inside Platform.isDesktop guard is allowed",
             code: "if (Platform.isDesktop) { if (true) { const fs = await import('fs'); } }",
         },
@@ -170,14 +178,9 @@ ruleTester.run("no-nodejs-modules", noNodejsModules, {
             errors: [{ messageId: "noNodejs" }],
         },
         {
-            name: "require() of node module is always forbidden",
+            name: "require() of node module without guard is forbidden",
             code: "const path = require('path');",
-            errors: [{ messageId: "noNodejsRequire" }],
-        },
-        {
-            name: "require() inside Platform.isDesktop guard is still forbidden",
-            code: "if (Platform.isDesktop) { require('fs'); }",
-            errors: [{ messageId: "noNodejsRequire" }],
+            errors: [{ messageId: "noNodejs" }],
         },
         {
             name: "dynamic import() without guard in function is forbidden",
