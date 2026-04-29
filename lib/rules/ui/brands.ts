@@ -19,6 +19,7 @@ export const DEFAULT_BRANDS: string[] = [
     "GPT",
     "Anthropic",
     "Claude",
+    "Cursor",
     "Microsoft",
     // Cloud storage
     "Google Drive",
