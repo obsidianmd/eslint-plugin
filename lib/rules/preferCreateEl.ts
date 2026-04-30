@@ -176,7 +176,7 @@ export default ruleCreator({
 
             const replacement = isDocGlobal
                 ? "createFragment()"
-                : `${getText(obj)}.createFragment()`;
+                : "activeWindow.createFragment()";
 
             report(node, replacement);
         }

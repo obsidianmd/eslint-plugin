@@ -175,9 +175,9 @@ ruleTester.run("prefer-create-el", preferCreateEl, {
             errors: [{ messageId: "preferCreateEl" }],
         },
         {
-            name: "activeDocument.createDocumentFragment() → activeDocument.createFragment()",
+            name: "activeDocument.createDocumentFragment() → activeWindow.createFragment()",
             code: "activeDocument.createDocumentFragment();",
-            output: "activeDocument.createFragment();",
+            output: "activeWindow.createFragment();",
             errors: [{ messageId: "preferCreateEl" }],
         },
     ],
