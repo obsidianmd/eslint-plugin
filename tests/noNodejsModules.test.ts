@@ -183,6 +183,16 @@ ruleTester.run("no-nodejs-modules", noNodejsModules, {
             errors: [{ messageId: "noNodejs" }],
         },
         {
+            name: "require() inside if (!Platform.isDesktop) is forbidden",
+            code: "if (!Platform.isDesktop) { require('fs'); }",
+            errors: [{ messageId: "noNodejs" }],
+        },
+        {
+            name: "dynamic import() inside if (!Platform.isDesktop) is forbidden",
+            code: "if (!Platform.isDesktop) { import('fs'); }",
+            errors: [{ messageId: "noNodejs" }],
+        },
+        {
             name: "dynamic import() without guard in function is forbidden",
             code: `
                 async function test() {

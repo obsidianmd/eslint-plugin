@@ -172,6 +172,7 @@ const flatRecommendedGeneralRules: RulesConfig = {
         }
     ],
     "@typescript-eslint/ban-ts-comment": "off",
+    "@typescript-eslint/no-require-imports": "off",
     "@typescript-eslint/no-deprecated": "error",
     "@typescript-eslint/require-await": "off",
     "@typescript-eslint/no-explicit-any": [
@@ -253,6 +254,7 @@ const flatRecommendedConfig: Config[] = defineConfig([
         languageOptions: {
             globals: {
                 ...globals.browser,
+                require: "readonly",
                 ...(manifest?.isDesktopOnly ? {
                     ...globals.node,
                     NodeJS: "readonly"

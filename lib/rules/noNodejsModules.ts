@@ -107,14 +107,6 @@ function extractsPlatformIsDesktop(expr: TSESTree.Expression): boolean {
     ) {
         return extractsPlatformIsDesktop(expr.left);
     }
-    // !Platform.isDesktop ? ... (inverted check in alternate branch)
-    if (
-        expr.type === AST_NODE_TYPES.UnaryExpression &&
-        expr.operator === "!" &&
-        isPlatformIsDesktop(expr.argument)
-    ) {
-        return true;
-    }
     return false;
 }
 
@@ -129,10 +121,6 @@ function isGuardedByPlatformIsDesktop(node: TSESTree.Node): boolean {
                 if (extractsPlatformIsDesktop(current.test)) {
                     return true;
                 }
-            }
-            // Check for early return pattern: if (!Platform.isDesktop) { throw/return }
-            if (prevChild !== current.test && isEarlyExitGuard(current)) {
-                return true;
             }
         } else if (current.type === AST_NODE_TYPES.ConditionalExpression) {
             if (prevChild !== current.test && prevChild !== current.alternate) {
@@ -159,16 +147,8 @@ function isGuardedByPlatformIsDesktop(node: TSESTree.Node): boolean {
             current.type === AST_NODE_TYPES.FunctionExpression ||
             current.type === AST_NODE_TYPES.ArrowFunctionExpression
         ) {
-            // Check if function body starts with Platform.isDesktop guard that throws
+            // Check if function body starts with: if (!Platform.isDesktop) { throw/return }
             if (hasGuardAtFunctionStart(current)) {
-                return true;
-            }
-        } else if (current.type === AST_NODE_TYPES.MethodDefinition) {
-            // Check method definitions
-            if (
-                current.value.type === AST_NODE_TYPES.FunctionExpression &&
-                hasGuardAtFunctionStart(current.value)
-            ) {
                 return true;
             }
         }
