@@ -26,6 +26,7 @@ export default ruleCreator({
                 if (
                     typeof node.value === "string" &&
                     node.value.match(/\.obsidian(?![a-zA-Z_-])/)
+                    && !node.value.startsWith("http")
                 ) {
                     context.report({
                         node,
