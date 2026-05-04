@@ -17,6 +17,10 @@ ruleTester.run("hardcoded-config-path", hardcodedConfigPathRule, {
             name: ".obsidianCache string is allowed",
             code: 'const config = ".obsidianCache";',
         },
+        {
+            name: "URL string is allowed",
+            code: 'const config = "https://publish.obsidian.md/";',
+        },
     ],
     invalid: [
         {
