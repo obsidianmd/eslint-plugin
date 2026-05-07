@@ -1,0 +1,8 @@
+{
+  "name": "banned-project",
+  "version": "1.0.0",
+  "dependencies": {
+    "obsidian": "1.0.0",
+    "is-number": "7.0.0"
+  }
+}

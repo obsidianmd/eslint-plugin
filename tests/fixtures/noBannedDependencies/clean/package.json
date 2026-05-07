@@ -1,0 +1,10 @@
+{
+  "name": "clean-project",
+  "version": "1.0.0",
+  "dependencies": {
+    "obsidian": "1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "5.0.0"
+  }
+}

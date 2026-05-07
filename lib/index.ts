@@ -26,17 +26,16 @@ import validateManifest from "./rules/validateManifest.js";
 import validateLicense from "./rules/validateLicense.js";
 import ruleCustomMessage from "./rules/ruleCustomMessage.js";
 import noUnsupportedApi from "./rules/noUnsupportedApi.js";
+import noBannedDependencies from "./rules/noBannedDependencies.js";
 import noNodejsModules from "./rules/noNodejsModules.js";
 import { getManifest } from "./manifest.js";
 import { ui } from "./rules/ui/index.js";
 
 // --- Import plugins and configs for the recommended config ---
 import js from "@eslint/js";
-import json from "@eslint/json";
 import tseslint from "typescript-eslint";
 import sdl from "@microsoft/eslint-plugin-sdl";
 import importPlugin from "eslint-plugin-import";
-import depend from 'eslint-plugin-depend';
 import globals from "globals";
 import fs from "node:fs";
 import path from "node:path";
@@ -92,6 +91,7 @@ const plugin = {
         "validate-manifest": validateManifest,
         "validate-license": validateLicense,
         "rule-custom-message": ruleCustomMessage,
+        "no-banned-dependencies": noBannedDependencies,
         "no-unsupported-api": noUnsupportedApi,
         "no-nodejs-modules": noNodejsModules,
         "ui/sentence-case": ui.sentenceCase,
@@ -141,6 +141,7 @@ const recommendedPluginRulesConfig: RulesConfig = {
     "obsidianmd/sample-names": "error",
     "obsidianmd/validate-manifest": "error",
     "obsidianmd/validate-license": ["error"],
+    "obsidianmd/no-banned-dependencies": "error",
     "obsidianmd/ui/sentence-case": ["error", { enforceCamelCaseLower: true }],
 }
 
@@ -208,7 +209,6 @@ const flatRecommendedConfig: Config[] = defineConfig([
         plugins: {
             import: importPlugin,
             "@microsoft/sdl": sdl,
-            depend,
             noUnsanitizedPlugin
         },
         files: ['**/*.js', "**/*.jsx"],
@@ -222,7 +222,6 @@ const flatRecommendedConfig: Config[] = defineConfig([
         plugins: {
             import: importPlugin,
             "@microsoft/sdl": sdl,
-            depend,
             noUnsanitizedPlugin
         },
         files: ['**/*.ts', "**/*.tsx"],
@@ -233,23 +232,7 @@ const flatRecommendedConfig: Config[] = defineConfig([
             ...recommendedTypedRulesConfig
         },
     },
-    {
-        files: ['package.json'],
-        language: 'json/json',
-        extends: [tseslint.configs.disableTypeChecked as Config],
-        plugins: {
-            depend,
-            json
-        },
-        rules: {
-            "no-irregular-whitespace": "off",
-            "depend/ban-dependencies": [
-                "error", {
-                    "presets": ["native", "microutilities", "preferred"]
-                }
-            ]
-        }
-    },
+
     {
         languageOptions: {
             globals: {
