@@ -1,3 +1,0 @@
-import { ESLintUtils } from "@typescript-eslint/utils";
-declare const _default: ESLintUtils.RuleModule<"commandInName", [], unknown, ESLintUtils.RuleListener>;
-export default _default;
