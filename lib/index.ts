@@ -25,6 +25,7 @@ import sampleNames from "./rules/sampleNames.js";
 import validateManifest from "./rules/validateManifest.js";
 import validateLicense from "./rules/validateLicense.js";
 import ruleCustomMessage from "./rules/ruleCustomMessage.js";
+import noNodejsModules from "./rules/noNodejsModules.js";
 import noUnsupportedApi from "./rules/noUnsupportedApi.js";
 import { getManifest } from "./manifest.js";
 import { ui } from "./rules/ui/index.js";
@@ -91,6 +92,7 @@ const plugin = {
         "validate-manifest": validateManifest,
         "validate-license": validateLicense,
         "rule-custom-message": ruleCustomMessage,
+        "no-nodejs-modules": noNodejsModules,
         "no-unsupported-api": noUnsupportedApi,
         "ui/sentence-case": ui.sentenceCase,
         "ui/sentence-case-json": ui.sentenceCaseJson,
@@ -168,7 +170,7 @@ const flatRecommendedGeneralRules: RulesConfig = {
     ],
     "@microsoft/sdl/no-document-write": "error",
     "@microsoft/sdl/no-inner-html": "error",
-    "import/no-nodejs-modules":
+    "obsidianmd/no-nodejs-modules":
         manifest && manifest.isDesktopOnly ? "off" : "error",
     "import/no-extraneous-dependencies": "error",
     "obsidianmd/rule-custom-message": [
