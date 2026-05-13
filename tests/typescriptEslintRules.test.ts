@@ -17,7 +17,7 @@ ruleTester.run("ts-no-unused-vars", tseslintPlugin.rules["no-unused-vars"], {
         },
         {
             name: "rest sibling destructuring is allowed with ignoreRestSiblings: true",
-            code: "const settings = { toRemove: 'x', other: 'y' }; const { toRemove: _removed, ...rest } = settings; console.log(rest);",
+            code: "const settings = { toRemove: 'x', other: 'y' }; const { toRemove, ...rest } = settings; console.log(rest);",
             options: [{ args: "none", ignoreRestSiblings: true }],
         },
     ],
