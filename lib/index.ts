@@ -145,10 +145,11 @@ const recommendedPluginRulesConfig: RulesConfig = {
     "obsidianmd/ui/sentence-case": ["error", { enforceCamelCaseLower: true }],
 }
 
-import { restrictedGlobalsOptions, restrictedImportsOptions } from "./ruleOptions.js";
+import { restrictedGlobalsOptions, restrictedImportsOptions, noUnusedExpressionsOptions } from "./ruleOptions.js";
 
 const flatRecommendedGeneralRules: RulesConfig = {
     "no-unused-vars": "off",
+    "no-unused-expressions": "off",
     "no-prototype-bultins": "off",
     "no-self-compare": "warn",
     "no-eval": "error",
@@ -163,6 +164,7 @@ const flatRecommendedGeneralRules: RulesConfig = {
     "@typescript-eslint/ban-ts-comment": "off",
     "@typescript-eslint/no-deprecated": "error",
     "@typescript-eslint/no-unused-vars": ["warn", { args: "none" }],
+    "@typescript-eslint/no-unused-expressions": ["error", ...noUnusedExpressionsOptions],
     "@typescript-eslint/require-await": "off",
     "@typescript-eslint/no-explicit-any": [
         "error",

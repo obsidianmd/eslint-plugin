@@ -53,3 +53,5 @@ export const restrictedImportsOptions = [
             "The 'moment' package is bundled with Obsidian. Please import it from 'obsidian' instead.",
     },
 ] as const;
+
+export const noUnusedExpressionsOptions = [{ allowShortCircuit: true, allowTernary: true }] as const;

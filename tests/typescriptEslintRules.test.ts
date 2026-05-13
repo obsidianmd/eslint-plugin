@@ -1,5 +1,6 @@
 import { RuleTester } from "@typescript-eslint/rule-tester";
 import tseslintPlugin from "@typescript-eslint/eslint-plugin";
+import { noUnusedExpressionsOptions } from "../lib/ruleOptions.js";
 
 const ruleTester = new RuleTester();
 
@@ -279,13 +280,25 @@ ruleTester.run("ts-no-unused-expressions", tseslintPlugin.rules["no-unused-expre
     valid: [
         {
             name: "expression used in assignment is allowed",
+            options: noUnusedExpressionsOptions,
             code: "const x = 1 + 2;",
+        },
+        {
+            name: "short circuit expression is allowed",
+            code: "a && b();",
+            options: noUnusedExpressionsOptions,
+        },
+        {
+            name: "ternary expression is allowed",
+            code: "a ? b() : c();",
+            options: noUnusedExpressionsOptions,
         },
     ],
     invalid: [
         {
             name: "unused expression is forbidden",
             code: "1 + 2;",
+            options: noUnusedExpressionsOptions,
             errors: [{ messageId: "unusedExpression" }],
         },
     ],
