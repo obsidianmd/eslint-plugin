@@ -163,7 +163,7 @@ const flatRecommendedGeneralRules: RulesConfig = {
     "no-undef": "error",
     "@typescript-eslint/ban-ts-comment": "off",
     "@typescript-eslint/no-deprecated": "error",
-    "@typescript-eslint/no-unused-vars": ["warn", { args: "none" }],
+    "@typescript-eslint/no-unused-vars": ["warn", { args: "none", ignoreRestSiblings: true }],
     "@typescript-eslint/no-unused-expressions": ["error", ...noUnusedExpressionsOptions],
     "@typescript-eslint/require-await": "off",
     "@typescript-eslint/no-explicit-any": [
