@@ -1,4 +1,5 @@
-import { TSESTree, ESLintUtils, TSESLint } from "@typescript-eslint/utils";
+import { TSESTree, TSESLint } from "@typescript-eslint/utils";
+import { createRuleCreator } from "../../ruleCreator.js";
 import {
     createSentenceCaseReporter,
     resolveSentenceCaseConfig,
@@ -8,10 +9,7 @@ import {
 
 type MessageId = "useSentenceCase";
 
-const ruleCreator = ESLintUtils.RuleCreator(
-    (name) =>
-        `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/ui/${name}.md`,
-);
+const ruleCreator = createRuleCreator("ui");
 
 // Default configuration with no custom options specified
 const defaultOptions: SentenceCaseRuleOptions = [{}] as const;
@@ -220,13 +218,39 @@ export default ruleCreator({
             {
                 type: "object",
                 properties: {
-                    mode: { type: "string", enum: ["loose", "strict"] },
-                    brands: { type: "array", items: { type: "string" } },
-                    acronyms: { type: "array", items: { type: "string" } },
-                    ignoreWords: { type: "array", items: { type: "string" } },
-                    ignoreRegex: { type: "array", items: { type: "string" } },
-                    allowAutoFix: { type: "boolean" },
-                    enforceCamelCaseLower: { type: "boolean" },
+                    mode: {
+                        type: "string",
+                        enum: ["loose", "strict"],
+                        description: "Controls sentence case strictness; loose preserves CamelCase tokens while strict lowercases them.",
+                    },
+                    brands: {
+                        type: "array",
+                        items: { type: "string" },
+                        description: "Brand names to preserve with their canonical casing.",
+                    },
+                    acronyms: {
+                        type: "array",
+                        items: { type: "string" },
+                        description: "Acronyms that should remain uppercase.",
+                    },
+                    ignoreWords: {
+                        type: "array",
+                        items: { type: "string" },
+                        description: "Words to skip when applying sentence case.",
+                    },
+                    ignoreRegex: {
+                        type: "array",
+                        items: { type: "string" },
+                        description: "Regex patterns for strings to ignore entirely.",
+                    },
+                    allowAutoFix: {
+                        type: "boolean",
+                        description: "Whether to enable auto-fixes for sentence case violations.",
+                    },
+                    enforceCamelCaseLower: {
+                        type: "boolean",
+                        description: "Whether to force CamelCase/PascalCase tokens to lowercase.",
+                    },
                 },
                 additionalProperties: false,
             },
