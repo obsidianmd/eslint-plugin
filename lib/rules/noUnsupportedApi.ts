@@ -5,11 +5,7 @@ import { join, dirname } from "node:path";
 import { gt } from "semver";
 import ts from "typescript";
 import { getManifest } from "../manifest.js";
-
-const ruleCreator = ESLintUtils.RuleCreator(
-    (name) =>
-        `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
-);
+import { ruleCreator } from "../ruleCreator.js";
 
 type Options = [{ minAppVersion?: string }?];
 

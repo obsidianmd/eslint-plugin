@@ -4,11 +4,7 @@ import {
     TSESTree,
 } from "@typescript-eslint/utils";
 import ts from "typescript";
-
-const ruleCreator = ESLintUtils.RuleCreator(
-    (name) =>
-        `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
-);
+import { ruleCreator } from "../ruleCreator.js";
 
 // Recursively checks if a type is or extends the 'Plugin' class.
 function isPluginType(type: ts.Type, services: ParserServices): boolean {

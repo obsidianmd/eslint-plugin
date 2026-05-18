@@ -1,9 +1,7 @@
-import { TSESTree, ESLintUtils } from "@typescript-eslint/utils";
+import { TSESTree } from "@typescript-eslint/utils";
+import { createRuleCreator } from "../../ruleCreator.js";
 
-const ruleCreator = ESLintUtils.RuleCreator(
-    (name) =>
-        `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/settings-tab/${name}.md`,
-);
+const ruleCreator = createRuleCreator("settings-tab");
 
 const HEADING_TAGS = new Set(["h1", "h2", "h3", "h4", "h5", "h6"]);
 

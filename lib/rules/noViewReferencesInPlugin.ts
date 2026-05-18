@@ -4,11 +4,7 @@ import {
     TSESTree,
 } from "@typescript-eslint/utils";
 import type ts from "typescript";
-
-const ruleCreator = ESLintUtils.RuleCreator(
-    (name) =>
-        `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
-);
+import { ruleCreator } from "../ruleCreator.js";
 
 // Check if a type is a subclass of a given class name.
 function isSubclassOf(
