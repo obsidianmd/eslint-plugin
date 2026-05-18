@@ -1,6 +1,6 @@
 import { TSESTree } from "@typescript-eslint/utils";
 import path from "node:path";
-import { ruleCreator } from "../ruleCreator.js";
+import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 const BASE_SCHEMA = {
     author: "string",
@@ -49,7 +49,7 @@ export default ruleCreator({
         docs: {
             description:
                 "Validate the structure of manifest.json for Obsidian plugins.",
-            url: "https://docs.obsidian.md/Reference/Manifest",
+            url: docsUrl("validate-manifest"),
         },
         schema: [],
         messages: {

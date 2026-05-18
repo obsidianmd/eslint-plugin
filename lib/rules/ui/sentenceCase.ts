@@ -1,5 +1,5 @@
 import { TSESTree, TSESLint } from "@typescript-eslint/utils";
-import { ruleCreator } from "../../ruleCreator.js";
+import { docsUrl, ruleCreator } from "../../ruleCreator.js";
 import {
     createSentenceCaseReporter,
     resolveSentenceCaseConfig,
@@ -208,7 +208,7 @@ export default ruleCreator({
         docs: {
             description:
                 "Enforce sentence case for UI strings",
-            url: "https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/ui/sentence-case.md",
+            url: docsUrl("sentence-case", "ui"),
         },
         fixable: "code", // Allows ESLint to automatically fix violations
         hasSuggestions: false,

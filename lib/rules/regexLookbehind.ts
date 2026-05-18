@@ -1,6 +1,6 @@
 import { getManifest } from "../manifest.js";
 import { TSESTree } from "@typescript-eslint/utils";
-import { ruleCreator } from "../ruleCreator.js";
+import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 type Options = [{ isDesktopOnly?: boolean }?];
 
@@ -9,7 +9,7 @@ export default ruleCreator<Options, "lookbehind">({
         docs: {
             description:
                 "Using lookbehinds in Regex is not supported in some iOS versions",
-            url: "https://docs.obsidian.md/Plugins/Getting+started/Mobile+development#Lookbehind+in+regular+expressions",
+            url: docsUrl("regex-lookbehind"),
         },
         type: "problem" as const,
         messages: {

@@ -1,12 +1,12 @@
 import { TSESTree } from "@typescript-eslint/utils";
-import { ruleCreator } from "../../ruleCreator.js";
+import { docsUrl, ruleCreator } from "../../ruleCreator.js";
 
 export default ruleCreator({
     meta: {
         type: "suggestion" as const,
         docs: {
             description: "Discourage providing default hotkeys for commands.",
-            url: "https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#Avoid+setting+default+hotkeys",
+            url: docsUrl("no-default-hotkeys", "commands"),
         },
         messages: {
             hotkeys:

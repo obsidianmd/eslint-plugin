@@ -1,6 +1,6 @@
 import { TSESTree } from "@typescript-eslint/utils";
 import { getManifest } from "../../manifest.js";
-import { ruleCreator } from "../../ruleCreator.js";
+import { docsUrl, ruleCreator } from "../../ruleCreator.js";
 
 type Options = [{ pluginId?: string }?];
 
@@ -9,7 +9,7 @@ export default ruleCreator<Options, "pluginId">({
         type: "suggestion" as const,
         docs: {
             description: "Disallow including the plugin ID in a command ID.",
-            url: "https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#Commands",
+            url: docsUrl("no-plugin-id-in-command-id", "commands"),
         },
         messages: {
             pluginId: "The command ID should not include the plugin ID. Obsidian will make sure that there are no conflicts with other plugins.",
