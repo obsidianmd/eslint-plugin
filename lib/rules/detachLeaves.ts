@@ -2,7 +2,6 @@ import { TSESTree } from "@typescript-eslint/utils";
 import { ruleCreator } from "../ruleCreator.js";
 
 export default ruleCreator({
-    name: "detach-leaves",
     meta: {
         docs: {
             description: "Don't detach leaves in onunload.",

@@ -1,13 +1,13 @@
 import { AST_TOKEN_TYPES, TSESTree } from "@typescript-eslint/utils";
 import path from "path";
-import { ruleCreator } from "../ruleCreator.js";
+import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 export default ruleCreator({
-    name: "validate-license",
     meta: {
         type: "problem" as const,
         docs: {
             description: "Validate the structure of copyright notices in LICENSE files for Obsidian plugins.",
+            url: docsUrl("validate-license"),
         },
         schema: [
             {

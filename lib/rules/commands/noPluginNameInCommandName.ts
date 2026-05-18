@@ -1,13 +1,10 @@
 import { TSESTree } from "@typescript-eslint/utils";
 import { getManifest } from "../../manifest.js";
-import { createRuleCreator } from "../../ruleCreator.js";
-
-const ruleCreator = createRuleCreator("commands");
+import { ruleCreator } from "../../ruleCreator.js";
 
 type Options = [{ pluginName?: string }?];
 
 export default ruleCreator<Options, "pluginName">({
-    name: "no-plugin-name-in-command-name",
     meta: {
         type: "suggestion" as const,
         docs: {

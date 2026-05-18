@@ -1,5 +1,5 @@
 import { TSESLint, TSESTree } from "@typescript-eslint/utils";
-import { createRuleCreator } from "../../ruleCreator.js";
+import { ruleCreator } from "../../ruleCreator.js";
 import {
     createSentenceCaseReporter,
     getContextFilename,
@@ -10,7 +10,6 @@ import {
 
 type MessageId = "useSentenceCase";
 
-const ruleCreator = createRuleCreator("ui");
 
 // Default configuration with no custom options specified
 const defaultOptions: SentenceCaseRuleOptions = [{}] as const;
@@ -25,7 +24,6 @@ function isInJsonFile(
 
 
 export default ruleCreator({
-    name: "sentence-case-json",
     meta: {
         type: "suggestion" as const,
         docs: {

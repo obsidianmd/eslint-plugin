@@ -44,7 +44,6 @@ function getAstNodeType(node: TSESTree.Node): string {
 }
 
 export default ruleCreator({
-    name: "validate-manifest",
     meta: {
         type: "problem" as const,
         docs: {

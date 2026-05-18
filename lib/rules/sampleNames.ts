@@ -10,7 +10,6 @@ const sampleNames = [
 ];
 
 export default ruleCreator({
-    name: "sample-names",
     meta: {
         docs: {
             description: "Rename sample plugin class names",

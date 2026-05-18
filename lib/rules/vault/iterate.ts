@@ -1,10 +1,7 @@
 import { TSESTree } from "@typescript-eslint/utils";
-import { createRuleCreator } from "../../ruleCreator.js";
-
-const ruleCreator = createRuleCreator("vault");
+import { ruleCreator } from "../../ruleCreator.js";
 
 export default ruleCreator({
-    name: "vault-iterate",
     meta: {
         docs: {
             description:

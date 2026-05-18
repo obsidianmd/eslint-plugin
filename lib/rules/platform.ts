@@ -4,7 +4,6 @@ import { ruleCreator } from "../ruleCreator.js";
 const BANNED_PROPERTIES = new Set(["userAgent", "platform"]);
 
 export default ruleCreator({
-    name: "platform",
     meta: {
         type: "problem" as const,
         docs: {

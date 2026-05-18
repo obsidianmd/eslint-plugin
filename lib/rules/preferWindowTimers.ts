@@ -1,5 +1,5 @@
 import { TSESTree } from "@typescript-eslint/utils";
-import { ruleCreator } from "../ruleCreator.js";
+import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 const TIMER_FUNCTIONS = new Set([
     "clearInterval",
@@ -10,12 +10,12 @@ const TIMER_FUNCTIONS = new Set([
 ]);
 
 export default ruleCreator({
-    name: "prefer-window-timers",
     meta: {
         type: "suggestion" as const,
         docs: {
             description:
                 "Prefer `window.setTimeout()` and related timer functions over bare global calls for popout window compatibility.",
+            url: docsUrl("prefer-window-timers"),
         },
         schema: [],
         fixable: "code" as const,

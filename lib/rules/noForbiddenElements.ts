@@ -1,5 +1,5 @@
 import { TSESTree } from "@typescript-eslint/utils";
-import { ruleCreator } from "../ruleCreator.js";
+import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 // We want to catch patterns like:
 //
@@ -70,12 +70,12 @@ function isArgumentForbiddenElement(arg: TSESTree.CallExpressionArgument): strin
 
 
 export default ruleCreator({
-    name: "no-forbidden-elements",
     meta: {
         type: "problem" as const,
         docs: {
             description:
                 "Disallow attachment of forbidden elements to the DOM in Obsidian plugins.",
+            url: docsUrl("no-forbidden-elements"),
         },
         schema: [],
         messages: {

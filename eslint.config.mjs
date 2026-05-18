@@ -21,7 +21,7 @@ export default [
     {
         files: ["lib/rules/**/*.ts"],
         rules: {
-            "eslint-plugin/require-meta-docs-url": "warn",
+            "eslint-plugin/require-meta-docs-url": "error",
             "eslint-plugin/require-meta-docs-description": ["error", { pattern: ".+" }],
             "eslint-plugin/require-meta-default-options": "off",
         },

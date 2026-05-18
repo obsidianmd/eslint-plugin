@@ -5,7 +5,6 @@ import { ruleCreator } from "../ruleCreator.js";
 type Options = [{ isDesktopOnly?: boolean }?];
 
 export default ruleCreator<Options, "lookbehind">({
-    name: "regex-lookbehind",
     meta: {
         docs: {
             description:

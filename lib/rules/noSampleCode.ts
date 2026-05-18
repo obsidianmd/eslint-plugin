@@ -1,5 +1,5 @@
 import { TSESTree } from "@typescript-eslint/utils";
-import { ruleCreator } from "../ruleCreator.js";
+import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 /**
  * Checks if a node is the sample `registerInterval` call.
@@ -105,12 +105,12 @@ function isSampleDomEventCall(node: TSESTree.CallExpression): boolean {
 }
 
 export default ruleCreator({
-    name: "no-sample-code",
     meta: {
         type: "problem" as const,
         docs: {
             description:
                 "Disallow sample code snippets from the Obsidian plugin template.",
+            url: docsUrl("no-sample-code"),
         },
         schema: [],
         messages: {

@@ -1,5 +1,5 @@
 import { TSESTree, TSESLint } from "@typescript-eslint/utils";
-import { createRuleCreator } from "../../ruleCreator.js";
+import { ruleCreator } from "../../ruleCreator.js";
 import {
     createSentenceCaseReporter,
     getContextFilename,
@@ -11,7 +11,6 @@ import {
 
 type MessageId = "useSentenceCase";
 
-const ruleCreator = createRuleCreator("ui");
 
 // Default configuration with no custom options specified
 const defaultOptions: SentenceCaseRuleOptions = [{}] as const;
@@ -67,7 +66,6 @@ function collectStringLiterals(
 }
 
 export default ruleCreator({
-    name: "sentence-case-locale-module",
     meta: {
         type: "suggestion" as const,
         docs: {

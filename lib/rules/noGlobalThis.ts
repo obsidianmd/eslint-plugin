@@ -1,15 +1,15 @@
 import { TSESTree } from "@typescript-eslint/utils";
-import { ruleCreator } from "../ruleCreator.js";
+import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 const BANNED_GLOBALS = new Set(["global", "globalThis"]);
 
 export default ruleCreator({
-    name: "no-global-this",
     meta: {
         type: "suggestion" as const,
         docs: {
             description:
                 "Disallow `global` and `globalThis`. Use `window` or `activeWindow` for popout window compatibility.",
+            url: docsUrl("no-global-this"),
         },
         schema: [],
         fixable: "code" as const,

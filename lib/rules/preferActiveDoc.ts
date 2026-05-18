@@ -1,5 +1,5 @@
 import { TSESTree } from "@typescript-eslint/utils";
-import { ruleCreator } from "../ruleCreator.js";
+import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 const REPLACEMENTS: Record<string, string> = {
     document: "activeDocument",
@@ -14,12 +14,12 @@ const WINDOW_TIMER_METHODS = new Set([
 ]);
 
 export default ruleCreator({
-    name: "prefer-active-doc",
     meta: {
         type: "suggestion" as const,
         docs: {
             description:
                 "Prefer `activeDocument` over `document` for popout window compatibility.",
+            url: docsUrl("prefer-active-doc"),
         },
         schema: [],
         fixable: undefined,

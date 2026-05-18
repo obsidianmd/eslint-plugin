@@ -4,7 +4,7 @@ import {
     TSESTree,
 } from "@typescript-eslint/utils";
 import ts from "typescript";
-import { ruleCreator } from "../ruleCreator.js";
+import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 // Recursively checks if a type is or extends the 'Plugin' class.
 function isPluginType(type: ts.Type, services: ParserServices): boolean {
@@ -32,12 +32,12 @@ function isPluginType(type: ts.Type, services: ParserServices): boolean {
 }
 
 export default ruleCreator({
-    name: "no-plugin-as-component",
     meta: {
         type: "problem" as const,
         docs: {
             description:
                 "Disallow anti-patterns when passing a component to MarkdownRenderer.render to prevent memory leaks.",
+            url: docsUrl("no-plugin-as-component"),
         },
         schema: [],
         messages: {
