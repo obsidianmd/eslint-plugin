@@ -1,10 +1,6 @@
 import { getManifest } from "../manifest.js";
-import { TSESTree, ESLintUtils } from "@typescript-eslint/utils";
-
-const ruleCreator = ESLintUtils.RuleCreator(
-    (name) =>
-        `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
-);
+import { TSESTree } from "@typescript-eslint/utils";
+import { ruleCreator } from "../ruleCreator.js";
 
 type Options = [{ isDesktopOnly?: boolean }?];
 
