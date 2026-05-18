@@ -8,6 +8,10 @@
 
 <!-- end auto-generated rule header -->
 
+## Further reading
+
+- [UI text - Plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#UI+text)
+
 ## Options
 
 - **`pluginName`** (`string`, optional): The plugin name to check against. Defaults to `manifest.json` `name`.
