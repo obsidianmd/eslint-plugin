@@ -1,10 +1,6 @@
-import { TSESTree, ESLintUtils } from "@typescript-eslint/utils";
+import { TSESTree } from "@typescript-eslint/utils";
 import path from "node:path";
-
-const ruleCreator = ESLintUtils.RuleCreator(
-    (name) =>
-        `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
-);
+import { ruleCreator } from "../ruleCreator.js";
 
 const BASE_SCHEMA = {
     author: "string",
@@ -189,13 +185,6 @@ export default ruleCreator({
                                             context.report({
                                                 node: prop.value,
                                                 messageId: "invalidFundingUrl",
-                                                data: {
-                                                    key: key as string,
-                                                    expectedType: "string",
-                                                    actualType: getAstNodeType(
-                                                        prop.value,
-                                                    ),
-                                                },
                                             });
                                         }
 
@@ -210,7 +199,6 @@ export default ruleCreator({
                                                 node: prop.value,
                                                 messageId:
                                                     "emptyFundingUrlObject",
-                                                data: { key: key as string },
                                             });
                                         }
                                     }
@@ -219,7 +207,6 @@ export default ruleCreator({
                                     context.report({
                                         node: valueNode,
                                         messageId: "emptyFundingUrlObject",
-                                        data: { key: key as string },
                                     });
                                 }
                             } else if (

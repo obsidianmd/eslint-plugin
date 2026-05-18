@@ -1,9 +1,5 @@
-import { ESLintUtils, TSESTree } from "@typescript-eslint/utils";
-
-const ruleCreator = ESLintUtils.RuleCreator(
-    (name) =>
-        `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
-);
+import { TSESTree } from "@typescript-eslint/utils";
+import { ruleCreator } from "../ruleCreator.js";
 
 const REPLACEMENTS: Record<string, string> = {
     document: "activeDocument",
@@ -30,8 +26,6 @@ export default ruleCreator({
         messages: {
             preferActive:
                 "Use '{{replacement}}' instead of '{{original}}' for popout window compatibility.",
-            avoidGlobal:
-                "Avoid using '{{name}}'. Use 'activeDocument' for popout window compatibility.",
         },
     },
     defaultOptions: [],
