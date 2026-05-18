@@ -1,9 +1,7 @@
-import { TSESTree, ESLintUtils } from "@typescript-eslint/utils";
+import { TSESTree } from "@typescript-eslint/utils";
+import { createRuleCreator } from "../../ruleCreator.js";
 
-const ruleCreator = ESLintUtils.RuleCreator(
-    (name) =>
-        `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/vault/${name}.md`,
-);
+const ruleCreator = createRuleCreator("vault");
 
 export default ruleCreator({
     name: "vault-iterate",

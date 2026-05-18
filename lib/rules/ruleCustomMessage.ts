@@ -1,11 +1,6 @@
-import { ESLintUtils } from "@typescript-eslint/utils";
 import type { TSESLint, TSESTree } from "@typescript-eslint/utils";
 import { builtinRules } from "eslint/use-at-your-own-risk";
-
-const ruleCreator = ESLintUtils.RuleCreator(
-    (name) =>
-        `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
-);
+import { ruleCreator } from "../ruleCreator.js";
 
 type MessageOverrides = Record<string, string>;
 
