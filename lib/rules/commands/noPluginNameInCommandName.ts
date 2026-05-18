@@ -1,6 +1,6 @@
 import { TSESTree } from "@typescript-eslint/utils";
 import { getManifest } from "../../manifest.js";
-import { ruleCreator } from "../../ruleCreator.js";
+import { docsUrl, ruleCreator } from "../../ruleCreator.js";
 
 type Options = [{ pluginName?: string }?];
 
@@ -10,7 +10,7 @@ export default ruleCreator<Options, "pluginName">({
         docs: {
             description:
                 "Disallow including the plugin name in a command name.",
-            url: "https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#Commands",
+            url: docsUrl("no-plugin-name-in-command-name", "commands"),
         },
         messages: {
             pluginName: "The command name should not include the plugin name, the plugin name is already shown next to the command name in the UI.",

@@ -1,6 +1,6 @@
 import { TSESTree } from "@typescript-eslint/utils";
 import { getManifest } from "../../manifest.js";
-import { ruleCreator } from "../../ruleCreator.js";
+import { docsUrl, ruleCreator } from "../../ruleCreator.js";
 
 type Options = [{ pluginName?: string }?];
 
@@ -8,7 +8,7 @@ export default ruleCreator<Options, "settings" | "general" | "pluginName">({
     meta: {
         docs: {
             description: "Discourage anti-patterns in settings headings.",
-            url: "https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#UI+text",
+            url: docsUrl("no-problematic-settings-headings", "settings-tab"),
         },
         type: "problem" as const,
         messages: {

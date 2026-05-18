@@ -1,11 +1,11 @@
 import { TSESTree } from "@typescript-eslint/utils";
-import { ruleCreator } from "../ruleCreator.js";
+import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 export default ruleCreator({
     meta: {
         docs: {
             description: "Don't detach leaves in onunload.",
-            url: "https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#Don't+detach+leaves+in+%60onunload%60",
+            url: docsUrl("detach-leaves"),
         },
         type: "problem" as const,
         messages: {

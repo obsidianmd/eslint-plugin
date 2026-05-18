@@ -1,5 +1,5 @@
 import { TSESTree, TSESLint } from "@typescript-eslint/utils";
-import { ruleCreator } from "../../ruleCreator.js";
+import { docsUrl, ruleCreator } from "../../ruleCreator.js";
 import {
     createSentenceCaseReporter,
     getContextFilename,
@@ -70,7 +70,7 @@ export default ruleCreator({
         type: "suggestion" as const,
         docs: {
             description: "Enforce sentence case for English TS/JS locale module strings",
-            url: "https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/ui/sentence-case-locale-module.md",
+            url: docsUrl("sentence-case-locale-module", "ui"),
         },
         fixable: "code",
         hasSuggestions: false,
