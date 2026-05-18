@@ -7,7 +7,7 @@ export default ruleCreator({
         docs: {
             description:
                 "Disallow Liam's frequently copied `TextInputSuggest` implementation in favor of the built-in `AbstractInputSuggest`.",
-            url: docsUrl("no-deprecated-text-input-suggest"),
+            url: docsUrl("prefer-abstract-input-suggest"),
         },
         schema: [],
         messages: {
