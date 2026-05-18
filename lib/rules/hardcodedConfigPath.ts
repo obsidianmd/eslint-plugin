@@ -1,16 +1,11 @@
-import { TSESTree, ESLintUtils } from "@typescript-eslint/utils";
-
-const ruleCreator = ESLintUtils.RuleCreator(
-    (name) =>
-        `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
-);
+import { TSESTree } from "@typescript-eslint/utils";
+import { ruleCreator } from "../ruleCreator.js";
 
 export default ruleCreator({
     name: "hardcoded-config-path",
     meta: {
         docs: {
-            description: "test",
-            url: "https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#Commands",
+            description: "Disallow hardcoded `.obsidian` config paths. Use `Vault#configDir` instead.",
         },
         type: "problem" as const,
         messages: {
