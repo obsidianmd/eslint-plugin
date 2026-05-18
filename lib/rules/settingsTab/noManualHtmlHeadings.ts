@@ -1,12 +1,9 @@
 import { TSESTree } from "@typescript-eslint/utils";
-import { createRuleCreator } from "../../ruleCreator.js";
-
-const ruleCreator = createRuleCreator("settings-tab");
+import { ruleCreator } from "../../ruleCreator.js";
 
 const HEADING_TAGS = new Set(["h1", "h2", "h3", "h4", "h5", "h6"]);
 
 export default ruleCreator({
-    name: "no-manual-html-headings",
     meta: {
         docs: {
             description:

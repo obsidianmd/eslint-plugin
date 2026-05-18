@@ -1,13 +1,13 @@
 import { TSESTree } from "@typescript-eslint/utils";
-import { ruleCreator } from "../ruleCreator.js";
+import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 export default ruleCreator({
-    name: "prefer-get-language",
     meta: {
         type: "problem" as const,
         docs: {
             description:
                 "Prefer Obsidian's `getLanguage()` over `localStorage.getItem('language')` and `i18next-browser-languagedetector` for detecting the user's language.",
+            url: docsUrl("prefer-get-language"),
         },
         schema: [],
         messages: {

@@ -1,16 +1,16 @@
 import { TSESTree } from "@typescript-eslint/utils";
 import { getParserServices } from "@typescript-eslint/utils/eslint-utils";
-import { ruleCreator } from "../ruleCreator.js";
+import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 const BANNED_METHODS = new Set(["trash", "delete"]);
 
 export default ruleCreator({
-    name: "prefer-file-manager-trash-file",
     meta: {
         type: "suggestion" as const,
         docs: {
             description:
                 "Prefer FileManager.trashFile() over Vault.trash() or Vault.delete() to respect user settings.",
+            url: docsUrl("prefer-file-manager-trash-file"),
         },
         schema: [],
         messages: {

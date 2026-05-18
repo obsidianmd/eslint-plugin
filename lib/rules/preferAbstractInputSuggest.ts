@@ -1,13 +1,13 @@
 import { TSESTree } from "@typescript-eslint/utils";
-import { ruleCreator } from "../ruleCreator.js";
+import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 export default ruleCreator({
-    name: "no-deprecated-text-input-suggest",
     meta: {
         type: "suggestion" as const,
         docs: {
             description:
                 "Disallow Liam's frequently copied `TextInputSuggest` implementation in favor of the built-in `AbstractInputSuggest`.",
+            url: docsUrl("no-deprecated-text-input-suggest"),
         },
         schema: [],
         messages: {

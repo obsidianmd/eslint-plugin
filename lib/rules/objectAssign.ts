@@ -1,12 +1,12 @@
 import { TSESTree } from "@typescript-eslint/utils";
-import { ruleCreator } from "../ruleCreator.js";
+import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 export default ruleCreator({
-    name: "object-assign",
     meta: {
         type: "problem" as const,
         docs: {
             description: "Discourage using `Object.assign` with two arguments",
+            url: docsUrl("object-assign"),
         },
         schema: [],
         messages: {

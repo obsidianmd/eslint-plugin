@@ -1,10 +1,7 @@
 import { TSESTree } from "@typescript-eslint/utils";
-import { createRuleCreator } from "../../ruleCreator.js";
-
-const ruleCreator = createRuleCreator("commands");
+import { ruleCreator } from "../../ruleCreator.js";
 
 export default ruleCreator({
-    name: "no-command-in-command-name",
     meta: {
         type: "suggestion" as const,
         docs: {

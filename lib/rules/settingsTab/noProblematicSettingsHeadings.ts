@@ -1,13 +1,10 @@
 import { TSESTree } from "@typescript-eslint/utils";
 import { getManifest } from "../../manifest.js";
-import { createRuleCreator } from "../../ruleCreator.js";
-
-const ruleCreator = createRuleCreator("settings-tab");
+import { ruleCreator } from "../../ruleCreator.js";
 
 type Options = [{ pluginName?: string }?];
 
 export default ruleCreator<Options, "settings" | "general" | "pluginName">({
-    name: "no-problematic-settings-headings",
     meta: {
         docs: {
             description: "Discourage anti-patterns in settings headings.",

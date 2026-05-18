@@ -1,5 +1,5 @@
 import { TSESTree } from "@typescript-eslint/utils";
-import { ruleCreator } from "../ruleCreator.js";
+import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 // This rule will flag:
 //
@@ -27,12 +27,12 @@ function isStyleMemberExpression(
 }
 
 export default ruleCreator({
-    name: "no-static-styles-assignment",
     meta: {
         type: "suggestion" as const,
         docs: {
             description:
                 "Disallow setting styles directly on DOM elements, favoring CSS classes instead.",
+            url: docsUrl("no-static-styles-assignment"),
         },
         schema: [],
         messages: {

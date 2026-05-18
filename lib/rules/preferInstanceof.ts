@@ -1,7 +1,7 @@
 import { ESLintUtils, TSESTree } from "@typescript-eslint/utils";
 import type { ParserServices } from "@typescript-eslint/utils";
 import type ts from "typescript";
-import { ruleCreator } from "../ruleCreator.js";
+import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 const INSTANCEABLE_BASE_TYPES = new Set(["Node", "UIEvent"]);
 
@@ -30,12 +30,12 @@ function isInstanceableType(type: ts.Type, services: ParserServices): boolean {
 }
 
 export default ruleCreator({
-    name: "prefer-instanceof",
     meta: {
         type: "suggestion" as const,
         docs: {
             description:
                 "Prefer `.instanceOf(T)` over `instanceof T` for cross-window safe type checks on DOM Nodes and UIEvents.",
+            url: docsUrl("prefer-instanceof"),
         },
         schema: [],
         fixable: "code" as const,
