@@ -1,6 +1,6 @@
 # obsidianmd/hardcoded-config-path
 
-📝 Test.
+📝 Disallow hardcoded `.obsidian` config paths. Use `Vault#configDir` instead.
 
 💼 This rule is enabled in the following configs: ✅ `recommended`, 🇬🇧 `recommendedWithLocalesEn`.
 
