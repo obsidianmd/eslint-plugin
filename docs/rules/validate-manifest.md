@@ -5,3 +5,7 @@
 💼 This rule is enabled in the following configs: ✅ `recommended`, 🇬🇧 `recommendedWithLocalesEn`.
 
 <!-- end auto-generated rule header -->
+
+## Further reading
+
+- [Manifest reference](https://docs.obsidian.md/Reference/Manifest)
