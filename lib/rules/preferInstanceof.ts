@@ -33,6 +33,11 @@ function isInstanceableType(type: ts.Type, services: ParserServices): boolean {
     return false;
 }
 
+function hasInstanceOfMethod(type: ts.Type): boolean {
+    const property = type.getProperty("instanceOf");
+    return property !== undefined;
+}
+
 export default ruleCreator({
     name: "prefer-instanceof",
     meta: {
@@ -43,9 +48,12 @@ export default ruleCreator({
         },
         schema: [],
         fixable: "code" as const,
+        hasSuggestions: true as const,
         messages: {
             preferInstanceof:
                 "Use '.instanceOf({{className}})' instead of 'instanceof {{className}}' for cross-window safe type checking.",
+            preferInstanceofSuggestion:
+                "Replace 'instanceof {{className}}' with '.instanceOf({{className}})'.",
         },
     },
     defaultOptions: [],
@@ -65,6 +73,7 @@ export default ruleCreator({
 
                 const rightText = context.sourceCode.getText(node.right);
                 const leftText = context.sourceCode.getText(node.left);
+                const canAutofix = hasInstanceOfMethod(leftType);
 
                 context.report({
                     node,
@@ -72,9 +81,23 @@ export default ruleCreator({
                     data: {
                         className: rightText,
                     },
-                    fix(fixer) {
-                        return fixer.replaceText(node, `${leftText}.instanceOf(${rightText})`);
-                    },
+                    ...(canAutofix
+                        ? {
+                            fix(fixer) {
+                                return fixer.replaceText(node, `${leftText}.instanceOf(${rightText})`);
+                            },
+                        }
+                        : {
+                            suggest: [
+                                {
+                                    messageId: "preferInstanceofSuggestion" as const,
+                                    data: { className: rightText },
+                                    fix(fixer) {
+                                        return fixer.replaceText(node, `${leftText}.instanceOf(${rightText})`);
+                                    },
+                                },
+                            ],
+                        }),
                 });
             },
         };
