@@ -1,4 +1,4 @@
-import { TSESTree } from "@typescript-eslint/utils";
+import { ESLintUtils, TSESTree } from "@typescript-eslint/utils";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 const TAG_SHORTHANDS: Record<string, string> = {
@@ -18,13 +18,23 @@ export default ruleCreator({
         },
         schema: [],
         fixable: "code" as const,
+        hasSuggestions: true as const,
         messages: {
             preferCreateEl:
                 "Use '{{replacement}}' instead of '{{original}}'.",
+            preferCreateElSuggestion:
+                "Replace '{{original}}' with '{{replacement}}'.",
         },
     },
     defaultOptions: [],
     create(context) {
+        const services = ESLintUtils.getParserServices(context);
+
+        function hasObsidianDomHelpers(node: TSESTree.Node): boolean {
+            const type = services.getTypeAtLocation(node);
+            return type.getProperty("createEl") !== undefined;
+        }
+
         return {
             CallExpression(node: TSESTree.CallExpression) {
                 checkCreateElement(node);
@@ -54,6 +64,7 @@ export default ruleCreator({
                 return;
             }
 
+            const canAutofix = isActiveDoc || hasObsidianDomHelpers(obj);
             const tagArg = node.arguments[0];
             const tagName = getStringLiteralValue(tagArg);
             const shorthand = tagName ? TAG_SHORTHANDS[tagName] : undefined;
@@ -61,11 +72,11 @@ export default ruleCreator({
             if (shorthand) {
                 const prefix = isDocGlobal ? "" : getText(obj) + ".";
                 const replacement = `${prefix}${shorthand}()`;
-                report(node, replacement);
+                report(node, replacement, canAutofix);
             } else {
                 const prefix = isDocGlobal ? "" : getText(obj) + ".";
                 const replacement = `${prefix}createEl(${getText(tagArg)})`;
-                report(node, replacement);
+                report(node, replacement, canAutofix);
             }
         }
 
@@ -95,13 +106,14 @@ export default ruleCreator({
                 return;
             }
 
+            const canAutofix = isActiveDoc || hasObsidianDomHelpers(obj);
             const tagArg = node.arguments[1];
             const remainingArgs = node.arguments.slice(2);
             const prefix = isDocGlobal ? "" : getText(obj) + ".";
             const argsText = [getText(tagArg), ...remainingArgs.map((arg) => getText(arg))].join(", ");
             const replacement = `${prefix}createSvg(${argsText})`;
 
-            report(node, replacement);
+            report(node, replacement, canAutofix);
         }
 
         function checkCreateElShorthand(node: TSESTree.CallExpression): void {
@@ -147,7 +159,7 @@ export default ruleCreator({
                 .join(", ");
             const replacement = `${prefix}${shorthand}(${argsText})`;
 
-            report(node, replacement);
+            report(node, replacement, true);
         }
 
         function checkCreateDocumentFragment(node: TSESTree.CallExpression): void {
@@ -170,21 +182,37 @@ export default ruleCreator({
                 return;
             }
 
+            const canAutofix = isActiveDoc || hasObsidianDomHelpers(obj);
             const replacement = isDocGlobal
                 ? "createFragment()"
                 : "activeWindow.createFragment()";
 
-            report(node, replacement);
+            report(node, replacement, canAutofix);
         }
 
-        function report(node: TSESTree.CallExpression, replacement: string): void {
+        function report(node: TSESTree.CallExpression, replacement: string, canAutofix: boolean): void {
+            const original = getText(node);
             context.report({
                 node,
                 messageId: "preferCreateEl",
-                data: { replacement, original: getText(node) },
-                fix(fixer) {
-                    return fixer.replaceText(node, replacement);
-                },
+                data: { replacement, original },
+                ...(canAutofix
+                    ? {
+                        fix(fixer) {
+                            return fixer.replaceText(node, replacement);
+                        },
+                    }
+                    : {
+                        suggest: [
+                            {
+                                messageId: "preferCreateElSuggestion" as const,
+                                data: { replacement, original },
+                                fix(fixer) {
+                                    return fixer.replaceText(node, replacement);
+                                },
+                            },
+                        ],
+                    }),
             });
         }
 

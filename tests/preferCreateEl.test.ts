@@ -3,6 +3,29 @@ import preferCreateEl from "../lib/rules/preferCreateEl.js";
 
 const ruleTester = new RuleTester();
 
+const MOCK_OBSIDIAN_DOM = `
+    declare global {
+        interface Node {
+            createEl(tag: string, o?: any): HTMLElement;
+            createDiv(o?: any): HTMLDivElement;
+            createSpan(o?: any): HTMLSpanElement;
+            createSvg(tag: string, o?: any): SVGElement;
+        }
+        interface Document {
+            createEl(tag: string, o?: any): HTMLElement;
+            createDiv(o?: any): HTMLDivElement;
+            createSpan(o?: any): HTMLSpanElement;
+            createSvg(tag: string, o?: any): SVGElement;
+        }
+        function createEl(tag: string, o?: any): HTMLElement;
+        function createDiv(o?: any): HTMLDivElement;
+        function createSpan(o?: any): HTMLSpanElement;
+        function createSvg(tag: string, o?: any): SVGElement;
+        function createFragment(): DocumentFragment;
+    }
+    export {};
+`;
+
 ruleTester.run("prefer-create-el", preferCreateEl, {
     valid: [
         {
@@ -67,30 +90,47 @@ ruleTester.run("prefer-create-el", preferCreateEl, {
         },
     ],
     invalid: [
-        // createElement → createEl
+        // --- With Obsidian augmentations: autofix ---
+
+        // createElement → createEl (with Obsidian types)
         {
-            name: "document.createElement(tag) → createEl(tag)",
-            code: "document.createElement('p');",
-            output: "createEl('p');",
+            name: "document.createElement(tag) → createEl(tag) with Obsidian types",
+            code: `${MOCK_OBSIDIAN_DOM}\ndocument.createElement('p');`,
+            output: `${MOCK_OBSIDIAN_DOM}\ncreateEl('p');`,
             errors: [{ messageId: "preferCreateEl" }],
         },
+        {
+            name: "document.createElement('div') → createDiv() with Obsidian types",
+            code: `${MOCK_OBSIDIAN_DOM}\ndocument.createElement('div');`,
+            output: `${MOCK_OBSIDIAN_DOM}\ncreateDiv();`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        {
+            name: "document.createElement('span') → createSpan() with Obsidian types",
+            code: `${MOCK_OBSIDIAN_DOM}\ndocument.createElement('span');`,
+            output: `${MOCK_OBSIDIAN_DOM}\ncreateSpan();`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        // createElementNS (SVG) → createSvg (with Obsidian types)
+        {
+            name: "document.createElementNS(SVG_NS, tag) → createSvg(tag) with Obsidian types",
+            code: `${MOCK_OBSIDIAN_DOM}\ndocument.createElementNS('http://www.w3.org/2000/svg', 'path');`,
+            output: `${MOCK_OBSIDIAN_DOM}\ncreateSvg('path');`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        // createDocumentFragment → createFragment (with Obsidian types)
+        {
+            name: "document.createDocumentFragment() → createFragment() with Obsidian types",
+            code: `${MOCK_OBSIDIAN_DOM}\ndocument.createDocumentFragment();`,
+            output: `${MOCK_OBSIDIAN_DOM}\ncreateFragment();`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+
+        // --- activeDocument: always autofix (Obsidian-only identifier) ---
         {
             name: "activeDocument.createElement(tag) → activeDocument.createEl(tag)",
             code: "activeDocument.createElement('p');",
             output: "activeDocument.createEl('p');",
-            errors: [{ messageId: "preferCreateEl" }],
-        },
-        // createElement with shorthand tags
-        {
-            name: "document.createElement('div') → createDiv()",
-            code: "document.createElement('div');",
-            output: "createDiv();",
-            errors: [{ messageId: "preferCreateEl" }],
-        },
-        {
-            name: "document.createElement('span') → createSpan()",
-            code: "document.createElement('span');",
-            output: "createSpan();",
             errors: [{ messageId: "preferCreateEl" }],
         },
         {
@@ -105,7 +145,20 @@ ruleTester.run("prefer-create-el", preferCreateEl, {
             output: "activeDocument.createSpan();",
             errors: [{ messageId: "preferCreateEl" }],
         },
-        // createEl shorthand
+        {
+            name: "activeDocument.createElementNS(SVG_NS, tag) → activeDocument.createSvg(tag)",
+            code: "activeDocument.createElementNS('http://www.w3.org/2000/svg', 'svg');",
+            output: "activeDocument.createSvg('svg');",
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        {
+            name: "activeDocument.createDocumentFragment() → activeWindow.createFragment()",
+            code: "activeDocument.createDocumentFragment();",
+            output: "activeWindow.createFragment();",
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+
+        // --- createEl shorthand: always autofix (already Obsidian API) ---
         {
             name: "createEl('div') → createDiv()",
             code: "createEl('div');",
@@ -148,37 +201,82 @@ ruleTester.run("prefer-create-el", preferCreateEl, {
             output: "this.containerEl.createDiv();",
             errors: [{ messageId: "preferCreateEl" }],
         },
-        // createElementNS (SVG) → createSvg
+
+        // --- Without Obsidian augmentations: suggestion only ---
         {
-            name: "document.createElementNS(SVG_NS, tag) → createSvg(tag)",
+            name: "document.createElement without Obsidian types offers suggestion instead of autofix",
+            code: "document.createElement('p');",
+            errors: [
+                {
+                    messageId: "preferCreateEl",
+                    suggestions: [
+                        {
+                            messageId: "preferCreateElSuggestion",
+                            output: "createEl('p');",
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "document.createElement('div') without Obsidian types offers suggestion instead of autofix",
+            code: "document.createElement('div');",
+            errors: [
+                {
+                    messageId: "preferCreateEl",
+                    suggestions: [
+                        {
+                            messageId: "preferCreateElSuggestion",
+                            output: "createDiv();",
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "document.createElementNS(SVG_NS) without Obsidian types offers suggestion instead of autofix",
             code: "document.createElementNS('http://www.w3.org/2000/svg', 'path');",
-            output: "createSvg('path');",
-            errors: [{ messageId: "preferCreateEl" }],
+            errors: [
+                {
+                    messageId: "preferCreateEl",
+                    suggestions: [
+                        {
+                            messageId: "preferCreateElSuggestion",
+                            output: "createSvg('path');",
+                        },
+                    ],
+                },
+            ],
         },
         {
-            name: "activeDocument.createElementNS(SVG_NS, tag) → activeDocument.createSvg(tag)",
-            code: "activeDocument.createElementNS('http://www.w3.org/2000/svg', 'svg');",
-            output: "activeDocument.createSvg('svg');",
-            errors: [{ messageId: "preferCreateEl" }],
-        },
-        {
-            name: "document.createElementNS(SVG_NS, tag) with variable → createSvg(tag)",
-            code: "document.createElementNS('http://www.w3.org/2000/svg', tag);",
-            output: "createSvg(tag);",
-            errors: [{ messageId: "preferCreateEl" }],
-        },
-        // createDocumentFragment → createFragment
-        {
-            name: "document.createDocumentFragment() → createFragment()",
+            name: "document.createDocumentFragment() without Obsidian types offers suggestion instead of autofix",
             code: "document.createDocumentFragment();",
-            output: "createFragment();",
-            errors: [{ messageId: "preferCreateEl" }],
+            errors: [
+                {
+                    messageId: "preferCreateEl",
+                    suggestions: [
+                        {
+                            messageId: "preferCreateElSuggestion",
+                            output: "createFragment();",
+                        },
+                    ],
+                },
+            ],
         },
         {
-            name: "activeDocument.createDocumentFragment() → activeWindow.createFragment()",
-            code: "activeDocument.createDocumentFragment();",
-            output: "activeWindow.createFragment();",
-            errors: [{ messageId: "preferCreateEl" }],
+            name: "document.createElementNS(SVG_NS, tag) with variable without Obsidian types offers suggestion",
+            code: "document.createElementNS('http://www.w3.org/2000/svg', tag);",
+            errors: [
+                {
+                    messageId: "preferCreateEl",
+                    suggestions: [
+                        {
+                            messageId: "preferCreateElSuggestion",
+                            output: "createSvg(tag);",
+                        },
+                    ],
+                },
+            ],
         },
     ],
 });
