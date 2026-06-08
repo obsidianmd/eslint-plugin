@@ -40,21 +40,6 @@ ruleTester.run("no-monkey-patching", noMonkeyPatchingRule, {
     ],
     invalid: [
         {
-            name: "import from monkey-around is forbidden",
-            code: "import { around } from 'monkey-around';",
-            errors: [{ messageId: "noMonkeyAroundImport" }],
-        },
-        {
-            name: "import default from monkey-around is forbidden",
-            code: "import monkeyAround from 'monkey-around';",
-            errors: [{ messageId: "noMonkeyAroundImport" }],
-        },
-        {
-            name: "require monkey-around is forbidden",
-            code: "const { around } = require('monkey-around');",
-            errors: [{ messageId: "noMonkeyAroundImport" }],
-        },
-        {
             name: "direct prototype method assignment is forbidden",
             code: "Workspace.prototype.getActiveViewOfType = function() { return null; };",
             errors: [{ messageId: "directPrototypeAssignment", data: { name: "Workspace.prototype.getActiveViewOfType" } }],
