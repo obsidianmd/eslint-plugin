@@ -11,11 +11,15 @@ const ruleCreator = ESLintUtils.RuleCreator(
 // - element.style.setProperty('color', 'red')
 // - element.style.cssText = 'color: red;'
 // - element.setAttribute('style', 'color: red;')
+// - element.setCssProps({ 'color': 'blue' })  (non-custom-property key in setCssProps)
+// - element.setCssStyles({ '--my-var': 'blue' })  (custom property key in setCssStyles)
 //
 // This rule will not flag:
 //
 // - element.style.width = myWidth; (assignment from a variable)
 // - element.style.transform = `translateX(${offset}px)`; (assignment from a template literal with expressions)
+// - element.setCssProps({ '--my-var': 'blue' })  (custom property in setCssProps is correct usage)
+// - element.setCssStyles({ 'color': 'blue' })  (standard property in setCssStyles is correct usage)
 
 // Checks if a node is a MemberExpression accessing the 'style' property.
 // e.g., `el.style` or `this.containerEl.style`
@@ -41,7 +45,11 @@ export default ruleCreator({
         schema: [],
         messages: {
             avoidStyleAssignment:
-                "Avoid setting styles directly via `{{property}}`. Use CSS classes for better theming and maintainability. Use the `setCssProps` function if the CSS properties need to change dynamically.",
+                "Avoid setting styles directly via `{{property}}`. Use CSS classes for better theming and maintainability. Use `setCssProps` for dynamic CSS custom properties or `setCssStyles` for dynamic standard properties.",
+            avoidNonCustomPropertyInSetCssProps:
+                "`setCssProps` should only be used for CSS custom properties (prefixed with `--`). Use `setCssStyles` for standard CSS properties, or CSS classes for static styles.",
+            avoidCustomPropertyInSetCssStyles:
+                "`setCssStyles` should only be used for standard CSS properties. Use `setCssProps` for CSS custom properties (prefixed with `--`).",
         },
     },
     defaultOptions: [],
@@ -113,7 +121,7 @@ export default ruleCreator({
                     }
                 }
 
-                // Case 3: `el.style.setCssProps({ 'color': 'blue' })`
+                // Case 3: `el.setCssProps({ 'color': 'blue' })` — only custom properties (--*) belong here
                 if (
                     propertyName === "setCssProps" && node.arguments[0].type === TSESTree.AST_NODE_TYPES.ObjectExpression
                 ) {
@@ -121,24 +129,22 @@ export default ruleCreator({
                         if (property.type === TSESTree.AST_NODE_TYPES.Property && property.key.type === TSESTree.AST_NODE_TYPES.Literal && typeof property.key.value === 'string' && !property.key.value.startsWith('--')) {
                             context.report({
                                 node,
-                                messageId: "avoidStyleAssignment",
-                                data: { property: "el.setCssProps" },
+                                messageId: "avoidNonCustomPropertyInSetCssProps",
                             });
                             break;
                         }
                     }
                 }
 
-                // Case 4: `el.style.setCssStyles({ 'color': 'blue' })`
+                // Case 4: `el.setCssStyles({ '--my-var': 'blue' })` — custom properties (--*) belong in setCssProps
                 if (
                     propertyName === "setCssStyles" && node.arguments[0].type === TSESTree.AST_NODE_TYPES.ObjectExpression
                 ) {
                     for (const property of node.arguments[0].properties) {
-                        if (property.type === TSESTree.AST_NODE_TYPES.Property && property.key.type === TSESTree.AST_NODE_TYPES.Literal && typeof property.key.value === 'string' && !property.key.value.startsWith('--')) {
+                        if (property.type === TSESTree.AST_NODE_TYPES.Property && property.key.type === TSESTree.AST_NODE_TYPES.Literal && typeof property.key.value === 'string' && property.key.value.startsWith('--')) {
                             context.report({
                                 node,
-                                messageId: "avoidStyleAssignment",
-                                data: { property: "el.setCssStyles" },
+                                messageId: "avoidCustomPropertyInSetCssStyles",
                             });
                             break;
                         }
