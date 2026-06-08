@@ -61,12 +61,10 @@ export default ruleCreator({
         type: "problem" as const,
         docs: {
             description:
-                "Discourage monkey patching prototypes and using the `monkey-around` package.",
+                "Discourage directly modifying prototypes.",
         },
         schema: [],
         messages: {
-            noMonkeyAroundImport:
-                "Do not use the `monkey-around` package. Monkey patching Obsidian internals is discouraged.",
             directPrototypeAssignment:
                 "Do not assign to `{{name}}`. Directly modifying prototypes is unsafe and discouraged.",
             definePropertyOnPrototype:
@@ -78,30 +76,7 @@ export default ruleCreator({
     defaultOptions: [],
     create(context) {
         return {
-            ImportDeclaration(node: TSESTree.ImportDeclaration) {
-                if (node.source.value === "monkey-around") {
-                    context.report({
-                        node,
-                        messageId: "noMonkeyAroundImport",
-                    });
-                }
-            },
-
             CallExpression(node: TSESTree.CallExpression) {
-                if (
-                    node.callee.type === TSESTree.AST_NODE_TYPES.Identifier &&
-                    node.callee.name === "require" &&
-                    node.arguments.length >= 1 &&
-                    node.arguments[0].type === TSESTree.AST_NODE_TYPES.Literal &&
-                    node.arguments[0].value === "monkey-around"
-                ) {
-                    context.report({
-                        node,
-                        messageId: "noMonkeyAroundImport",
-                    });
-                    return;
-                }
-
                 if (
                     node.callee.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
                     node.callee.object.type === TSESTree.AST_NODE_TYPES.Identifier &&
