@@ -25,6 +25,7 @@ import sampleNames from "./rules/sampleNames.js";
 import validateManifest from "./rules/validateManifest.js";
 import validateLicense from "./rules/validateLicense.js";
 import ruleCustomMessage from "./rules/ruleCustomMessage.js";
+import noMonkeyPatching from "./rules/noMonkeyPatching.js";
 import noNodejsModules from "./rules/noNodejsModules.js";
 import noUnsupportedApi from "./rules/noUnsupportedApi.js";
 import { getManifest } from "./manifest.js";
@@ -78,6 +79,7 @@ const plugin = {
         "no-sample-code": noSampleCode,
         "no-tfile-tfolder-cast": noTFileTFolderCast,
         "no-view-references-in-plugin": noViewReferencesInPlugin,
+        "no-monkey-patching": noMonkeyPatching,
         "no-static-styles-assignment": noStaticStylesAssignment,
         "object-assign": objectAssign,
         platform: platform,
@@ -131,6 +133,7 @@ const recommendedPluginRulesConfig: RulesConfig = {
     "obsidianmd/no-plugin-as-component": "error",
     "obsidianmd/no-sample-code": "error",
     "obsidianmd/no-tfile-tfolder-cast": "error",
+    "obsidianmd/no-monkey-patching": "error",
     "obsidianmd/no-static-styles-assignment": "error",
     "obsidianmd/object-assign": "error",
     "obsidianmd/platform": "error",
