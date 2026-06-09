@@ -65,8 +65,42 @@ ruleTester.run("no-deprecated-display", noDeprecatedDisplayRule, {
                 {
                     messageId: "deprecatedDisplay",
                     data: { minAppVersion: "1.13.0" },
+                    // Highlight points at the `display` identifier only.
+                    line: 4,
+                    column: 21,
+                    endColumn: 28,
                 },
             ],
+            // Autofix deletes the whole display() member.
+            output: `
+                ${MOCK_CLASS}
+                class MyTab extends PluginSettingTab {
+                    getSettingDefinitions() { return []; }
+                }
+            `,
+        },
+        {
+            name: "autofix removes a display arrow field including its semicolon",
+            options: [{ minAppVersion: "1.13.0" }],
+            code: `
+                ${MOCK_CLASS}
+                class MyTab extends PluginSettingTab {
+                    getSettingDefinitions() { return []; }
+                    display = () => {};
+                }
+            `,
+            errors: [
+                {
+                    messageId: "deprecatedDisplay",
+                    data: { minAppVersion: "1.13.0" },
+                },
+            ],
+            output: `
+                ${MOCK_CLASS}
+                class MyTab extends PluginSettingTab {
+                    getSettingDefinitions() { return []; }
+                }
+            `,
         },
     ],
 });
