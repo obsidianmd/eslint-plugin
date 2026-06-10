@@ -68,6 +68,13 @@ const plugin = {
             settingsTab.noManualHtmlHeadings,
         "settings-tab/no-problematic-settings-headings":
             settingsTab.noProblematicSettingsHeadings,
+        "settings-tab/require-display": settingsTab.requireDisplay,
+        "settings-tab/prefer-setting-definitions":
+            settingsTab.preferSettingDefinitions,
+        "settings-tab/prefer-update-over-display":
+            settingsTab.preferUpdateOverDisplay,
+        "settings-tab/no-deprecated-display":
+            settingsTab.noDeprecatedDisplay,
         "vault/iterate": vault.iterate,
         "detach-leaves": detachLeaves,
         "editor-drop-paste": editorDropPaste,
@@ -122,6 +129,10 @@ const recommendedPluginRulesConfig: RulesConfig = {
     "obsidianmd/commands/no-plugin-name-in-command-name": "error",
     "obsidianmd/settings-tab/no-manual-html-headings": "error",
     "obsidianmd/settings-tab/no-problematic-settings-headings": "error",
+    "obsidianmd/settings-tab/require-display": "error",
+    "obsidianmd/settings-tab/prefer-setting-definitions": "warn",
+    "obsidianmd/settings-tab/prefer-update-over-display": "warn",
+    "obsidianmd/settings-tab/no-deprecated-display": "warn",
     "obsidianmd/vault/iterate": "error",
     "obsidianmd/detach-leaves": "error",
     "obsidianmd/editor-drop-paste": "error",
