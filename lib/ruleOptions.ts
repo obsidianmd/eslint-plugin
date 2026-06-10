@@ -50,7 +50,8 @@ export const restrictedImportsOptions = [
     {
         name: "moment",
         message:
-            "The 'moment' package is bundled with Obsidian. Please import it from 'obsidian' instead.",
+            "The 'moment' package is bundled with Obsidian. Import the `moment` value from 'obsidian' instead. For the `Moment` type, rely on the global `moment` namespace or add `type Moment = moment.Moment;` (type-only imports from 'moment' are allowed).",
+        allowTypeImports: true,
     },
 ] as const;
 
