@@ -20,6 +20,7 @@ export default ruleCreator({
                     disableUnchangedYear: {
                         type: "boolean",
                         description: "If true, do not report errors for unchanged years.",
+                        default: false,
                     }
                 }
             }
