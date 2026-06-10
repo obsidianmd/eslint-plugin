@@ -112,13 +112,16 @@ const plugin = {
 } satisfies ESLint.Plugin;
 
 // Rules that require type information (call getParserServices).
-// These must only run on files parsed by @typescript-eslint/parser.
+// These must only run on files linted with type information (the TS block,
+// which extends recommendedTypeChecked). Applying them to plain JS files
+// throws "you have used a rule which requires type information".
 const recommendedTypedRulesConfig: RulesConfig = {
     "obsidianmd/no-plugin-as-component": "error",
     "obsidianmd/no-view-references-in-plugin": "error",
     "obsidianmd/no-unsupported-api": "error",
     "obsidianmd/prefer-file-manager-trash-file": "warn",
     "obsidianmd/prefer-instanceof": "error",
+    "@typescript-eslint/no-deprecated": "error",
 };
 
 const recommendedPluginRulesConfig: RulesConfig = {
@@ -139,7 +142,6 @@ const recommendedPluginRulesConfig: RulesConfig = {
     "obsidianmd/hardcoded-config-path": "error",
     "obsidianmd/no-forbidden-elements": "error",
     "obsidianmd/no-global-this": "error",
-    "obsidianmd/no-plugin-as-component": "error",
     "obsidianmd/no-sample-code": "error",
     "obsidianmd/no-tfile-tfolder-cast": "error",
     "obsidianmd/no-static-styles-assignment": "error",
@@ -169,11 +171,14 @@ const flatRecommendedGeneralRules: RulesConfig = {
     "no-implicit-globals": "error",
     "no-console": "off", // overridden by obsidianmd/rule-custom-message
     "no-restricted-globals": ["error", ...restrictedGlobalsOptions],
-    "no-restricted-imports": ["error", ...restrictedImportsOptions],
+    // Use the @typescript-eslint variant so `allowTypeImports` is honored
+    // (the core rule has no such option). The base rule must be disabled to
+    // avoid double-reporting. See https://github.com/obsidianmd/eslint-plugin/issues/143
+    "no-restricted-imports": "off",
+    "@typescript-eslint/no-restricted-imports": ["error", ...restrictedImportsOptions],
     "no-alert": "error",
     "no-undef": "error",
     "@typescript-eslint/ban-ts-comment": "off",
-    "@typescript-eslint/no-deprecated": "error",
     "@typescript-eslint/no-unused-vars": ["warn", { args: "none", ignoreRestSiblings: true }],
     "@typescript-eslint/no-unused-expressions": ["error", ...noUnusedExpressionsOptions],
     "@typescript-eslint/require-await": "off",
