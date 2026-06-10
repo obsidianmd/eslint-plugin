@@ -1,17 +1,12 @@
-import { TSESTree, ESLintUtils } from "@typescript-eslint/utils";
-
-const ruleCreator = ESLintUtils.RuleCreator(
-    (name) =>
-        `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/vault/${name}.md`,
-);
+import { TSESTree } from "@typescript-eslint/utils";
+import { docsUrl, ruleCreator } from "../../ruleCreator.js";
 
 export default ruleCreator({
-    name: "vault-iterate",
     meta: {
         docs: {
             description:
                 "Avoid iterating all files to find a file by its path",
-            url: "https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#Avoid+iterating+all+files+to+find+a+file+by+its+path",
+            url: docsUrl("iterate", "vault"),
         },
         type: "problem" as const,
         messages: {

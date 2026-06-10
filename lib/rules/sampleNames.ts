@@ -1,9 +1,5 @@
-import { TSESTree, ESLintUtils } from "@typescript-eslint/utils";
-
-const ruleCreator = ESLintUtils.RuleCreator(
-    (name) =>
-        `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
-);
+import { TSESTree } from "@typescript-eslint/utils";
+import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 const sampleNames = [
     "MyPlugin",
@@ -14,11 +10,10 @@ const sampleNames = [
 ];
 
 export default ruleCreator({
-    name: "sample-names",
     meta: {
         docs: {
             description: "Rename sample plugin class names",
-            url: "https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#Rename+placeholder+class+names",
+            url: docsUrl("sample-names"),
         },
         type: "problem" as const,
         messages: {

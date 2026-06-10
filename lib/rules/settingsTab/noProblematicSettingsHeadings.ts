@@ -1,19 +1,14 @@
-import { TSESTree, ESLintUtils } from "@typescript-eslint/utils";
+import { TSESTree } from "@typescript-eslint/utils";
 import { getManifest } from "../../manifest.js";
-
-const ruleCreator = ESLintUtils.RuleCreator(
-    (name) =>
-        `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/settings-tab/${name}.md`,
-);
+import { docsUrl, ruleCreator } from "../../ruleCreator.js";
 
 type Options = [{ pluginName?: string }?];
 
 export default ruleCreator<Options, "settings" | "general" | "pluginName">({
-    name: "no-problematic-settings-headings",
     meta: {
         docs: {
             description: "Discourage anti-patterns in settings headings.",
-            url: "https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#UI+text",
+            url: docsUrl("no-problematic-settings-headings", "settings-tab"),
         },
         type: "problem" as const,
         messages: {

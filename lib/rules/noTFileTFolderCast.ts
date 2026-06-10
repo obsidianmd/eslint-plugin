@@ -1,19 +1,15 @@
-import { TSESTree, ESLintUtils } from "@typescript-eslint/utils";
-
-const ruleCreator = ESLintUtils.RuleCreator(
-    (name) =>
-        `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
-);
+import { TSESTree } from "@typescript-eslint/utils";
+import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 const BANNED_CAST_TYPES = new Set(["TFile", "TFolder"]);
 
 export default ruleCreator({
-    name: "no-tfile-tfolder-cast",
     meta: {
         type: "suggestion" as const,
         docs: {
             description:
                 "Disallow type casting to TFile or TFolder, suggesting instanceof checks instead.",
+            url: docsUrl("no-tfile-tfolder-cast"),
         },
         schema: [],
         messages: {

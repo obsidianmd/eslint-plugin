@@ -1,9 +1,5 @@
-import { ESLintUtils, TSESTree } from "@typescript-eslint/utils";
-
-const ruleCreator = ESLintUtils.RuleCreator(
-    (name) =>
-        `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
-);
+import { TSESTree } from "@typescript-eslint/utils";
+import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 const REPLACEMENTS: Record<string, string> = {
     document: "activeDocument",
@@ -18,20 +14,18 @@ const WINDOW_TIMER_METHODS = new Set([
 ]);
 
 export default ruleCreator({
-    name: "prefer-active-doc",
     meta: {
         type: "suggestion" as const,
         docs: {
             description:
                 "Prefer `activeDocument` over `document` for popout window compatibility.",
+            url: docsUrl("prefer-active-doc"),
         },
         schema: [],
         fixable: undefined,
         messages: {
             preferActive:
                 "Use '{{replacement}}' instead of '{{original}}' for popout window compatibility.",
-            avoidGlobal:
-                "Avoid using '{{name}}'. Use 'activeDocument' for popout window compatibility.",
         },
     },
     defaultOptions: [],

@@ -1,9 +1,5 @@
-import { TSESTree, ESLintUtils } from "@typescript-eslint/utils";
-
-const ruleCreator = ESLintUtils.RuleCreator(
-    (name) =>
-        `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
-);
+import { TSESTree } from "@typescript-eslint/utils";
+import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 // This rule will flag:
 //
@@ -31,12 +27,12 @@ function isStyleMemberExpression(
 }
 
 export default ruleCreator({
-    name: "no-static-styles-assignment",
     meta: {
         type: "suggestion" as const,
         docs: {
             description:
                 "Disallow setting styles directly on DOM elements, favoring CSS classes instead.",
+            url: docsUrl("no-static-styles-assignment"),
         },
         schema: [],
         messages: {

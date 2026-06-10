@@ -1,17 +1,12 @@
-import { TSESTree, ESLintUtils } from "@typescript-eslint/utils";
-
-const ruleCreator = ESLintUtils.RuleCreator(
-    (name) =>
-        `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/commands/${name}.md`,
-);
+import { TSESTree } from "@typescript-eslint/utils";
+import { docsUrl, ruleCreator } from "../../ruleCreator.js";
 
 export default ruleCreator({
-    name: "no-command-in-command-id",
     meta: {
         type: "suggestion" as const,
         docs: {
             description: "Disallow using the word 'command' in a command ID.",
-            url: "https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#Commands",
+            url: docsUrl("no-command-in-command-id", "commands"),
         },
         messages: {
             commandInId: "Adding `command` to the command ID is not necessary.",

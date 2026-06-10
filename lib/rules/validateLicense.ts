@@ -1,18 +1,13 @@
-import { AST_TOKEN_TYPES, ESLintUtils, TSESTree } from "@typescript-eslint/utils";
+import { AST_TOKEN_TYPES, TSESTree } from "@typescript-eslint/utils";
 import path from "path";
-
-const ruleCreator = ESLintUtils.RuleCreator(
-    (name) =>
-        `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
-);
+import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 export default ruleCreator({
-    name: "validate-license",
     meta: {
         type: "problem" as const,
         docs: {
             description: "Validate the structure of copyright notices in LICENSE files for Obsidian plugins.",
-            url: "???",
+            url: docsUrl("validate-license"),
         },
         schema: [
             {

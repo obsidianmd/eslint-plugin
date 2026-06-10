@@ -1,20 +1,15 @@
 import { getManifest } from "../manifest.js";
-import { TSESTree, ESLintUtils } from "@typescript-eslint/utils";
-
-const ruleCreator = ESLintUtils.RuleCreator(
-    (name) =>
-        `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
-);
+import { TSESTree } from "@typescript-eslint/utils";
+import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 type Options = [{ isDesktopOnly?: boolean }?];
 
 export default ruleCreator<Options, "lookbehind">({
-    name: "regex-lookbehind",
     meta: {
         docs: {
             description:
                 "Using lookbehinds in Regex is not supported in some iOS versions",
-            url: "https://docs.obsidian.md/Plugins/Getting+started/Mobile+development#Lookbehind+in+regular+expressions",
+            url: docsUrl("regex-lookbehind"),
         },
         type: "problem" as const,
         messages: {

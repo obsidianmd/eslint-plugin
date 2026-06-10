@@ -5,11 +5,7 @@ import { join, dirname } from "node:path";
 import { gt } from "semver";
 import ts from "typescript";
 import { getManifest } from "../manifest.js";
-
-const ruleCreator = ESLintUtils.RuleCreator(
-    (name) =>
-        `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
-);
+import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 type Options = [{ minAppVersion?: string }?];
 
@@ -27,12 +23,12 @@ let cachedSinceMap: SinceMap | undefined;
 let cachedDtsPath: string | undefined;
 
 export default ruleCreator<Options, "apiNotAvailable">({
-    name: "no-unsupported-api",
     meta: {
         type: "problem",
         docs: {
             description:
                 "Disallow usage of Obsidian APIs not available in the plugin's minimum app version",
+            url: docsUrl("no-unsupported-api"),
         },
         schema: [
             {

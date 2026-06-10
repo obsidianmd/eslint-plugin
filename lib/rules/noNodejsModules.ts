@@ -1,18 +1,14 @@
-import { AST_NODE_TYPES, ESLintUtils } from "@typescript-eslint/utils";
+import { AST_NODE_TYPES } from "@typescript-eslint/utils";
 import type { TSESTree } from "@typescript-eslint/utils";
 import { isBuiltin } from "node:module";
-
-const ruleCreator = ESLintUtils.RuleCreator(
-    (name) =>
-        `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
-);
+import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 export default ruleCreator({
-    name: "no-nodejs-modules",
     meta: {
         type: "problem",
         docs: {
             description: "Disallow importing Node.js built-in modules unless guarded by Platform.isDesktop",
+            url: docsUrl("no-nodejs-modules"),
         },
         schema: [],
         messages: {

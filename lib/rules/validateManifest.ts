@@ -1,10 +1,6 @@
-import { TSESTree, ESLintUtils } from "@typescript-eslint/utils";
+import { TSESTree } from "@typescript-eslint/utils";
 import path from "node:path";
-
-const ruleCreator = ESLintUtils.RuleCreator(
-    (name) =>
-        `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
-);
+import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 const BASE_SCHEMA = {
     author: "string",
@@ -48,13 +44,12 @@ function getAstNodeType(node: TSESTree.Node): string {
 }
 
 export default ruleCreator({
-    name: "validate-manifest",
     meta: {
         type: "problem" as const,
         docs: {
             description:
                 "Validate the structure of manifest.json for Obsidian plugins.",
-            url: "https://docs.obsidian.md/Reference/Manifest",
+            url: docsUrl("validate-manifest"),
         },
         schema: [],
         messages: {
@@ -189,13 +184,6 @@ export default ruleCreator({
                                             context.report({
                                                 node: prop.value,
                                                 messageId: "invalidFundingUrl",
-                                                data: {
-                                                    key: key as string,
-                                                    expectedType: "string",
-                                                    actualType: getAstNodeType(
-                                                        prop.value,
-                                                    ),
-                                                },
                                             });
                                         }
 
@@ -210,7 +198,6 @@ export default ruleCreator({
                                                 node: prop.value,
                                                 messageId:
                                                     "emptyFundingUrlObject",
-                                                data: { key: key as string },
                                             });
                                         }
                                     }
@@ -219,7 +206,6 @@ export default ruleCreator({
                                     context.report({
                                         node: valueNode,
                                         messageId: "emptyFundingUrlObject",
-                                        data: { key: key as string },
                                     });
                                 }
                             } else if (

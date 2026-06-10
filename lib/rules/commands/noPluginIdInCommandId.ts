@@ -1,20 +1,15 @@
-import { TSESTree, ESLintUtils } from "@typescript-eslint/utils";
+import { TSESTree } from "@typescript-eslint/utils";
 import { getManifest } from "../../manifest.js";
-
-const ruleCreator = ESLintUtils.RuleCreator(
-    (name) =>
-        `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/commands/${name}.md`,
-);
+import { docsUrl, ruleCreator } from "../../ruleCreator.js";
 
 type Options = [{ pluginId?: string }?];
 
 export default ruleCreator<Options, "pluginId">({
-    name: "no-plugin-id-in-command-id",
     meta: {
         type: "suggestion" as const,
         docs: {
             description: "Disallow including the plugin ID in a command ID.",
-            url: "https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#Commands",
+            url: docsUrl("no-plugin-id-in-command-id", "commands"),
         },
         messages: {
             pluginId: "The command ID should not include the plugin ID. Obsidian will make sure that there are no conflicts with other plugins.",

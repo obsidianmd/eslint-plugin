@@ -1,17 +1,12 @@
-import { TSESTree, ESLintUtils } from "@typescript-eslint/utils";
-
-const ruleCreator = ESLintUtils.RuleCreator(
-    (name) =>
-        `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
-);
+import { TSESTree } from "@typescript-eslint/utils";
+import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 export default ruleCreator({
-    name: "object-assign",
     meta: {
         type: "problem" as const,
         docs: {
             description: "Discourage using `Object.assign` with two arguments",
-            //TODO: Add url
+            url: docsUrl("object-assign"),
         },
         schema: [],
         messages: {

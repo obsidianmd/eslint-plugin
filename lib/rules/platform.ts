@@ -1,19 +1,14 @@
-import { TSESTree, ESLintUtils } from "@typescript-eslint/utils";
-
-const ruleCreator = ESLintUtils.RuleCreator(
-    (name) =>
-        `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
-);
+import { TSESTree } from "@typescript-eslint/utils";
+import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 const BANNED_PROPERTIES = new Set(["userAgent", "platform"]);
 
 export default ruleCreator({
-    name: "platform",
     meta: {
         type: "problem" as const,
         docs: {
             description: "Disallow use of navigator API for OS detection",
-            url: "https://docs.obsidian.md/Plugins/Getting+started/Mobile+development#Platform-specific+features",
+            url: docsUrl("platform"),
         },
         schema: [],
         messages: {

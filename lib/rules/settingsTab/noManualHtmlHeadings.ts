@@ -1,19 +1,14 @@
-import { TSESTree, ESLintUtils } from "@typescript-eslint/utils";
-
-const ruleCreator = ESLintUtils.RuleCreator(
-    (name) =>
-        `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/settings-tab/${name}.md`,
-);
+import { TSESTree } from "@typescript-eslint/utils";
+import { docsUrl, ruleCreator } from "../../ruleCreator.js";
 
 const HEADING_TAGS = new Set(["h1", "h2", "h3", "h4", "h5", "h6"]);
 
 export default ruleCreator({
-    name: "no-manual-html-headings",
     meta: {
         docs: {
             description:
                 "Disallow using HTML heading elements for settings headings.",
-            url: "https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#UI+text",
+            url: docsUrl("no-manual-html-headings", "settings-tab"),
         },
         type: "problem" as const,
         messages: {

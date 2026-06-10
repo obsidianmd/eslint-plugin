@@ -4,11 +4,7 @@ import {
     TSESTree,
 } from "@typescript-eslint/utils";
 import type ts from "typescript";
-
-const ruleCreator = ESLintUtils.RuleCreator(
-    (name) =>
-        `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
-);
+import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 // Check if a type is a subclass of a given class name.
 function isSubclassOf(
@@ -36,12 +32,12 @@ function isSubclassOf(
 }
 
 export default ruleCreator({
-    name: "no-view-references-in-plugin",
     meta: {
         type: "problem" as const,
         docs: {
             description:
                 "Disallow storing references to custom views directly in the plugin, which can cause memory leaks.",
+            url: docsUrl("no-view-references-in-plugin"),
         },
         schema: [],
         messages: {

@@ -1,9 +1,5 @@
-import { ESLintUtils, TSESTree } from "@typescript-eslint/utils";
-
-const ruleCreator = ESLintUtils.RuleCreator(
-    (name) =>
-        `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
-);
+import { TSESTree } from "@typescript-eslint/utils";
+import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 const TAG_SHORTHANDS: Record<string, string> = {
     div: "createDiv",
@@ -13,12 +9,12 @@ const TAG_SHORTHANDS: Record<string, string> = {
 const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
 
 export default ruleCreator({
-    name: "prefer-create-el",
     meta: {
         type: "suggestion" as const,
         docs: {
             description:
                 "Prefer Obsidian DOM helpers (`createEl`, `createDiv`, `createSpan`, `createSvg`, `createFragment`) over native DOM methods.",
+            url: docsUrl("prefer-create-el"),
         },
         schema: [],
         fixable: "code" as const,

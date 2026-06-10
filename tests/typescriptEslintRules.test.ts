@@ -9,19 +9,24 @@ ruleTester.run("ts-no-unused-vars", tseslintPlugin.rules["no-unused-vars"], {
         {
             name: "used variable is allowed",
             code: "const x = 1; console.log(x);",
-            options: [{ args: "none" }],
+            options: [{ args: "none", ignoreRestSiblings: true }],
         },
         {
             name: "unused function argument is allowed with args: none",
             code: "function foo(unusedParam: string) { return 1; }; foo('test');",
-            options: [{ args: "none" }],
+            options: [{ args: "none", ignoreRestSiblings: true }],
+        },
+        {
+            name: "rest sibling destructuring is allowed with ignoreRestSiblings: true",
+            code: "const settings = { toRemove: 'x', other: 'y' }; const { toRemove, ...rest } = settings; console.log(rest);",
+            options: [{ args: "none", ignoreRestSiblings: true }],
         },
     ],
     invalid: [
         {
             name: "unused variable is forbidden",
             code: "const unused = 1;",
-            options: [{ args: "none" }],
+            options: [{ args: "none", ignoreRestSiblings: true }],
             errors: [{ messageId: "unusedVar" }],
         },
     ],

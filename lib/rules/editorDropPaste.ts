@@ -1,19 +1,15 @@
-import { ESLintUtils, TSESTree } from "@typescript-eslint/utils";
-
-const ruleCreator = ESLintUtils.RuleCreator(
-    (name) =>
-        `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
-);
+import { TSESTree } from "@typescript-eslint/utils";
+import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 const EVENTS = new Set(["editor-drop", "editor-paste"]);
 
 export default ruleCreator({
-    name: "editor-drop-paste",
     meta: {
         type: "problem" as const,
         docs: {
             description:
                 "Require checking `evt.defaultPrevented` and calling `evt.preventDefault()` in editor-drop/editor-paste handlers.",
+            url: docsUrl("editor-drop-paste"),
         },
         schema: [],
         messages: {

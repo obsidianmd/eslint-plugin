@@ -1,11 +1,6 @@
-import { ESLintUtils } from "@typescript-eslint/utils";
 import type { TSESLint, TSESTree } from "@typescript-eslint/utils";
 import { builtinRules } from "eslint/use-at-your-own-risk";
-
-const ruleCreator = ESLintUtils.RuleCreator(
-    (name) =>
-        `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
-);
+import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 type MessageOverrides = Record<string, string>;
 
@@ -40,11 +35,11 @@ interface ReportDescriptor {
 type NodeHandler = (node: TSESTree.Node) => void;
 
 export default ruleCreator<Options, "customMessage">({
-    name: "rule-custom-message",
     meta: {
         docs: {
             description:
                 "Allows redefining error messages from other ESLint rules that don't provide this functionality natively.",
+            url: docsUrl("rule-custom-message"),
         },
         type: "problem" as const,
         messages: {
