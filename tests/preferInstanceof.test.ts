@@ -18,6 +18,16 @@ const MOCK_DOM = `
     declare class KeyboardEvent extends UIEvent {}
 `;
 
+// DOM types WITHOUT the instanceOf method (standard browser types, no Obsidian augmentation)
+const MOCK_DOM_NO_INSTANCEOF = `
+    declare class Node {}
+    declare class Element extends Node {}
+    declare class HTMLElement extends Element {}
+
+    declare class UIEvent {}
+    declare class MouseEvent extends UIEvent {}
+`;
+
 ruleTester.run("prefer-instanceof", preferInstanceofRule, {
     valid: [
         {
@@ -115,6 +125,56 @@ ruleTester.run("prefer-instanceof", preferInstanceofRule, {
                 if (el.instanceOf(HTMLDivElement)) {}
             `,
             errors: [{ messageId: "preferInstanceof", data: { className: "HTMLDivElement" } }],
+        },
+        {
+            name: "instanceof on Node without instanceOf method offers suggestion instead of autofix",
+            code: `
+                ${MOCK_DOM_NO_INSTANCEOF}
+                declare const el: Node;
+                if (el instanceof HTMLElement) {}
+            `,
+            errors: [
+                {
+                    messageId: "preferInstanceof",
+                    data: { className: "HTMLElement" },
+                    suggestions: [
+                        {
+                            messageId: "preferInstanceofSuggestion",
+                            data: { className: "HTMLElement" },
+                            output: `
+                ${MOCK_DOM_NO_INSTANCEOF}
+                declare const el: Node;
+                if (el.instanceOf(HTMLElement)) {}
+            `,
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "instanceof on UIEvent without instanceOf method offers suggestion instead of autofix",
+            code: `
+                ${MOCK_DOM_NO_INSTANCEOF}
+                declare const evt: UIEvent;
+                if (evt instanceof MouseEvent) {}
+            `,
+            errors: [
+                {
+                    messageId: "preferInstanceof",
+                    data: { className: "MouseEvent" },
+                    suggestions: [
+                        {
+                            messageId: "preferInstanceofSuggestion",
+                            data: { className: "MouseEvent" },
+                            output: `
+                ${MOCK_DOM_NO_INSTANCEOF}
+                declare const evt: UIEvent;
+                if (evt.instanceOf(MouseEvent)) {}
+            `,
+                        },
+                    ],
+                },
+            ],
         },
     ],
 });

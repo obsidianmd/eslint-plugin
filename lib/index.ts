@@ -16,6 +16,7 @@ import objectAssign from "./rules/objectAssign.js";
 import platform from "./rules/platform.js";
 import preferAbstractInputSuggest from "./rules/preferAbstractInputSuggest.js";
 import preferActiveDoc from "./rules/preferActiveDoc.js";
+import preferCreateEl from "./rules/preferCreateEl.js";
 import preferFileManagerTrashFile from "./rules/preferFileManagerTrashFile.js";
 import preferWindowTimers from "./rules/preferWindowTimers.js";
 import preferInstanceof from "./rules/preferInstanceof.js";
@@ -83,6 +84,7 @@ const plugin = {
         platform: platform,
         "prefer-abstract-input-suggest": preferAbstractInputSuggest,
         "prefer-active-doc": preferActiveDoc,
+        "prefer-create-el": preferCreateEl,
         "prefer-file-manager-trash-file": preferFileManagerTrashFile,
         "prefer-instanceof": preferInstanceof,
         "prefer-window-timers": preferWindowTimers,
@@ -110,6 +112,7 @@ const recommendedTypedRulesConfig: RulesConfig = {
     "obsidianmd/no-plugin-as-component": "error",
     "obsidianmd/no-view-references-in-plugin": "error",
     "obsidianmd/no-unsupported-api": "error",
+    "obsidianmd/prefer-create-el": "error",
     "obsidianmd/prefer-file-manager-trash-file": "warn",
     "obsidianmd/prefer-instanceof": "error",
 };
