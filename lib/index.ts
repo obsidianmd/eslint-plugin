@@ -169,7 +169,11 @@ const flatRecommendedGeneralRules: RulesConfig = {
     "no-implicit-globals": "error",
     "no-console": "off", // overridden by obsidianmd/rule-custom-message
     "no-restricted-globals": ["error", ...restrictedGlobalsOptions],
-    "no-restricted-imports": ["error", ...restrictedImportsOptions],
+    // Use the @typescript-eslint variant so `allowTypeImports` is honored
+    // (the core rule has no such option). The base rule must be disabled to
+    // avoid double-reporting. See https://github.com/obsidianmd/eslint-plugin/issues/143
+    "no-restricted-imports": "off",
+    "@typescript-eslint/no-restricted-imports": ["error", ...restrictedImportsOptions],
     "no-alert": "error",
     "no-undef": "error",
     "@typescript-eslint/ban-ts-comment": "off",

@@ -2,7 +2,7 @@ import { RuleTester } from "eslint";
 import { builtinRules } from "eslint/use-at-your-own-risk";
 import type { Rule } from "eslint";
 import globals from "globals";
-import { restrictedGlobalsOptions, restrictedImportsOptions } from "../lib/ruleOptions.js";
+import { restrictedGlobalsOptions } from "../lib/ruleOptions.js";
 
 const ruleTester = new RuleTester();
 const scriptRuleTester = new RuleTester({
@@ -1087,64 +1087,8 @@ function testExplicitlyConfiguredRules(): void {
         ],
     });
 
-    ruleTester.run("no-restricted-imports", getBuiltinRule("no-restricted-imports"), {
-        valid: [
-            {
-                name: "importing obsidian is allowed",
-                code: "import { Plugin } from 'obsidian';",
-                options: restrictedImportsOptions,
-            },
-            {
-                name: "importing moment from obsidian is allowed",
-                code: "import { moment } from 'obsidian';",
-                options: restrictedImportsOptions,
-            },
-        ],
-        invalid: [
-            {
-                name: "importing axios is forbidden",
-                code: "import axios from 'axios';",
-                options: restrictedImportsOptions,
-                errors: [{ messageId: "pathWithCustomMessage" }],
-            },
-            {
-                name: "importing got is forbidden",
-                code: "import got from 'got';",
-                options: restrictedImportsOptions,
-                errors: [{ messageId: "pathWithCustomMessage" }],
-            },
-            {
-                name: "importing node-fetch is forbidden",
-                code: "import fetch from 'node-fetch';",
-                options: restrictedImportsOptions,
-                errors: [{ messageId: "pathWithCustomMessage" }],
-            },
-            {
-                name: "importing moment directly is forbidden",
-                code: "import moment from 'moment';",
-                options: restrictedImportsOptions,
-                errors: [{ messageId: "pathWithCustomMessage" }],
-            },
-            {
-                name: "importing ky is forbidden",
-                code: "import ky from 'ky';",
-                options: restrictedImportsOptions,
-                errors: [{ messageId: "pathWithCustomMessage" }],
-            },
-            {
-                name: "importing ofetch is forbidden",
-                code: "import { ofetch } from 'ofetch';",
-                options: restrictedImportsOptions,
-                errors: [{ messageId: "pathWithCustomMessage" }],
-            },
-            {
-                name: "importing superagent is forbidden",
-                code: "import superagent from 'superagent';",
-                options: restrictedImportsOptions,
-                errors: [{ messageId: "pathWithCustomMessage" }],
-            },
-        ],
-    });
+    // `no-restricted-imports` is configured via the @typescript-eslint variant
+    // (to honor `allowTypeImports`); it is tested in restrictedImports.test.ts.
 
     ruleTester.run("no-alert", getBuiltinRule("no-alert"), {
         valid: [
@@ -1270,7 +1214,6 @@ type TestedBuiltinRule =
     | "no-redeclare"
     | "no-regex-spaces"
     | "no-restricted-globals"
-    | "no-restricted-imports"
     | "no-self-assign"
     | "no-self-compare"
     | "no-setter-return"
