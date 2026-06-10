@@ -5,3 +5,7 @@
 ⚠️ This rule _warns_ in the following configs: ✅ `recommended`, 🇬🇧 `recommendedWithLocalesEn`.
 
 <!-- end auto-generated rule header -->
+
+## Further reading
+
+- [Migrate to declarative settings](https://docs.obsidian.md/Plugins/Guides/Migrate+to+declarative+settings)

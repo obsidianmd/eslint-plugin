@@ -6,6 +6,10 @@
 
 <!-- end auto-generated rule header -->
 
+## Further reading
+
+- [Migrate to declarative settings](https://docs.obsidian.md/Plugins/Guides/Migrate+to+declarative+settings)
+
 ## Options
 
 <!-- begin auto-generated rule options list -->

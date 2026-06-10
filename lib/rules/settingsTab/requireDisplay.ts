@@ -1,5 +1,6 @@
-import { TSESTree, ESLintUtils } from "@typescript-eslint/utils";
+import { TSESTree } from "@typescript-eslint/utils";
 import { lt as semverLt } from "semver";
+import { docsUrl, ruleCreator } from "../../ruleCreator.js";
 import {
     DECLARATIVE_MIN_VERSION,
     findClassMember,
@@ -8,21 +9,15 @@ import {
     resolveMinAppVersion,
 } from "./shared.js";
 
-const ruleCreator = ESLintUtils.RuleCreator(
-    (name) =>
-        `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/settings-tab/${name}.md`,
-);
-
 type Options = [{ minAppVersion?: string }?];
 
 export default ruleCreator<Options, "missingDisplay">({
-    name: "require-display",
     meta: {
         type: "problem" as const,
         docs: {
             description:
                 "Require a display() method on PluginSettingTab subclasses when minAppVersion is below 1.13.0.",
-            url: "https://docs.obsidian.md/Plugins/Guides/Migrate+to+declarative+settings",
+            url: docsUrl("require-display", "settings-tab"),
         },
         schema: minAppVersionSchema,
         messages: {

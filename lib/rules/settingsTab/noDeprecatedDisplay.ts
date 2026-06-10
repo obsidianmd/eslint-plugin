@@ -1,5 +1,6 @@
-import { TSESTree, ESLintUtils } from "@typescript-eslint/utils";
+import { TSESTree } from "@typescript-eslint/utils";
 import { gte as semverGte } from "semver";
+import { docsUrl, ruleCreator } from "../../ruleCreator.js";
 import {
     DECLARATIVE_MIN_VERSION,
     findClassMember,
@@ -8,21 +9,15 @@ import {
     resolveMinAppVersion,
 } from "./shared.js";
 
-const ruleCreator = ESLintUtils.RuleCreator(
-    (name) =>
-        `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/settings-tab/${name}.md`,
-);
-
 type Options = [{ minAppVersion?: string }?];
 
 export default ruleCreator<Options, "deprecatedDisplay">({
-    name: "no-deprecated-display",
     meta: {
         type: "suggestion" as const,
         docs: {
             description:
                 "Disallow a leftover display() method on PluginSettingTab subclasses once getSettingDefinitions() is implemented and minAppVersion is 1.13.0 or later.",
-            url: "https://docs.obsidian.md/Plugins/Guides/Migrate+to+declarative+settings",
+            url: docsUrl("no-deprecated-display", "settings-tab"),
         },
         schema: minAppVersionSchema,
         fixable: "code" as const,

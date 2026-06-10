@@ -1,24 +1,19 @@
-import { TSESTree, ESLintUtils } from "@typescript-eslint/utils";
+import { TSESTree } from "@typescript-eslint/utils";
+import { docsUrl, ruleCreator } from "../../ruleCreator.js";
 import { findClassMember, isPluginSettingTab } from "./shared.js";
 
-const ruleCreator = ESLintUtils.RuleCreator(
-    (name) =>
-        `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/settings-tab/${name}.md`,
-);
-
 export default ruleCreator({
-    name: "prefer-setting-definitions",
     meta: {
         type: "suggestion" as const,
         docs: {
             description:
                 "Encourage PluginSettingTab subclasses to implement getSettingDefinitions() so settings appear in Obsidian 1.13+ settings search.",
-            url: "https://docs.obsidian.md/Plugins/Guides/Migrate+to+declarative+settings",
+            url: docsUrl("prefer-setting-definitions", "settings-tab"),
         },
         schema: [],
         messages: {
             missingSettingDefinitions:
-                "This PluginSettingTab does not implement getSettingDefinitions(); its settings will not appear in Obsidian's settings search for users on 1.13.0 or later. Consider adopting the declarative settings API: https://docs.obsidian.md/Plugins/Guides/Migrate+to+declarative+settings",
+                "This PluginSettingTab does not implement getSettingDefinitions(); its settings will not appear in Obsidian's settings search for users on 1.13.0 or later. Consider adopting the declarative settings API.",
         },
     },
     defaultOptions: [],
