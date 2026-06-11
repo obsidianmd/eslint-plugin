@@ -1,4 +1,4 @@
-import type { ESLint, Linter } from "eslint";
+import type { ESLint } from "eslint";
 import { commands } from "./rules/commands/index.js";
 import { settingsTab } from "./rules/settingsTab/index.js";
 import { vault } from "./rules/vault/index.js";
@@ -41,7 +41,7 @@ import depend from 'eslint-plugin-depend';
 import globals from "globals";
 import fs from "node:fs";
 import path from "node:path";
-import { Config, defineConfig, globalIgnores } from "eslint/config";
+import { Config, defineConfig } from "eslint/config";
 import type { RuleDefinition, RuleDefinitionTypeOptions, RulesConfig } from "@eslint/core";
 import noUnsanitizedPlugin from "eslint-plugin-no-unsanitized";
 
@@ -51,7 +51,11 @@ interface PackageJson {
 }
 
 const manifest = getManifest();
-const packageJson = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, "../../package.json"), "utf8")) as PackageJson;
+const currentDir = import.meta.dirname ?? path.dirname(new URL(import.meta.url).pathname);
+const packageJsonPath = fs.existsSync(path.join(currentDir, "../../package.json"))
+    ? path.join(currentDir, "../../package.json")
+    : path.join(currentDir, "../package.json");
+const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8")) as PackageJson;
 
 const plugin = {
     meta: {
@@ -117,7 +121,7 @@ const plugin = {
 // These must only run on files linted with type information (the TS block,
 // which extends recommendedTypeChecked). Applying them to plain JS files
 // throws "you have used a rule which requires type information".
-const recommendedTypedRulesConfig: RulesConfig = {
+const recommendedPluginRulesConfigTypeChecked: RulesConfig = {
     "obsidianmd/no-plugin-as-component": "error",
     "obsidianmd/no-view-references-in-plugin": "error",
     "obsidianmd/no-unsupported-api": "error",
@@ -127,7 +131,7 @@ const recommendedTypedRulesConfig: RulesConfig = {
     "@typescript-eslint/no-deprecated": "error",
 };
 
-const recommendedPluginRulesConfig: RulesConfig = {
+const recommendedPluginRulesConfigBase: RulesConfig = {
     "obsidianmd/commands/no-command-in-command-id": "error",
     "obsidianmd/commands/no-command-in-command-name": "error",
     "obsidianmd/commands/no-default-hotkeys": "error",
@@ -152,14 +156,23 @@ const recommendedPluginRulesConfig: RulesConfig = {
     "obsidianmd/platform": "error",
     "obsidianmd/prefer-get-language": "error",
     "obsidianmd/prefer-abstract-input-suggest": "error",
+    "obsidianmd/prefer-create-el": "error",
     "obsidianmd/prefer-window-timers": "error",
-    "obsidianmd/prefer-active-doc": "warn",
+    "obsidianmd/prefer-active-doc": "off",
     "obsidianmd/regex-lookbehind": "error",
     "obsidianmd/sample-names": "error",
     "obsidianmd/validate-manifest": "error",
     "obsidianmd/validate-license": ["error"],
     "obsidianmd/ui/sentence-case": ["error", { enforceCamelCaseLower: true }],
+    "obsidianmd/ui/sentence-case-json": "off",
+    "obsidianmd/ui/sentence-case-locale-module": "off",
 }
+
+// Combined rules for TypeScript files
+const recommendedPluginRulesConfig: RulesConfig = {
+    ...recommendedPluginRulesConfigBase,
+    ...recommendedPluginRulesConfigTypeChecked,
+};
 
 import { restrictedGlobalsOptions, restrictedImportsOptions, noUnusedExpressionsOptions } from "./ruleOptions.js";
 
@@ -225,7 +238,7 @@ const flatRecommendedConfig: Config[] = defineConfig([
         extends: [...(tseslint.configs.recommended as Config[]), noUnsanitizedPlugin.configs.recommended],
         rules: {
             ...flatRecommendedGeneralRules,
-            ...recommendedPluginRulesConfig
+            ...recommendedPluginRulesConfigBase
         }
     },
     {
@@ -239,8 +252,7 @@ const flatRecommendedConfig: Config[] = defineConfig([
         extends: [...(tseslint.configs.recommendedTypeChecked as Config[]), noUnsanitizedPlugin.configs.recommended],
         rules: {
             ...flatRecommendedGeneralRules,
-            ...recommendedPluginRulesConfig,
-            ...recommendedTypedRulesConfig
+            ...recommendedPluginRulesConfig
         },
     },
     {
@@ -292,12 +304,12 @@ const flatRecommendedConfig: Config[] = defineConfig([
 
 const hybridRecommendedConfig: Config[] = defineConfig([
     {
-        rules: recommendedPluginRulesConfig,
+        rules: recommendedPluginRulesConfigBase,
         extends: flatRecommendedConfig
     },
     {
         files: ['**/*.ts', '**/*.tsx'],
-        rules: recommendedTypedRulesConfig
+        rules: recommendedPluginRulesConfigTypeChecked
     },
 ]);
 
@@ -348,12 +360,12 @@ const recommendedWithLocalesEnBase: Config[] = defineConfig([
 
 const recommendedWithLocalesEn: Config[] = defineConfig([
     {
-        rules: recommendedPluginRulesConfig,
+        rules: recommendedPluginRulesConfigBase,
         extends: recommendedWithLocalesEnBase
     },
     {
         files: ['**/*.ts', '**/*.tsx'],
-        rules: recommendedTypedRulesConfig
+        rules: recommendedPluginRulesConfigTypeChecked
     },
 ]);
 

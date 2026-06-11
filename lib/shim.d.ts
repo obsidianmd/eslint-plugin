@@ -40,3 +40,16 @@ declare module "eslint-plugin-no-unsanitized" {
     const plugin: NoUnsanitizedPlugin;
     export default plugin;
 }
+
+declare module "@eslint/json" {
+    import type { ESLint } from "eslint";
+    const plugin: ESLint.Plugin;
+    export default plugin;
+}
+
+declare module "eslint-plugin-depend" {
+    import type { ESLint, Rule } from "eslint";
+    export const rules: Record<string, Rule.RuleModule>;
+    const plugin: ESLint.Plugin;
+    export default plugin;
+}

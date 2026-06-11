@@ -2,7 +2,7 @@
 
 📝 Enforce sentence case for English TS/JS locale module strings.
 
-⚠️ This rule _warns_ in the 🇬🇧 `recommendedWithLocalesEn` config.
+🚫 This rule is _disabled_ in the following configs: ✅ `recommended`, 🇬🇧 `recommendedWithLocalesEn`.
 
 🔧 This rule is automatically fixable by the [`--fix` CLI option](https://eslint.org/docs/latest/user-guide/command-line-interface#--fix).
 
