@@ -1,4 +1,4 @@
-import type { ESLint, Linter } from "eslint";
+import type { ESLint } from "eslint";
 import { commands } from "./rules/commands/index.js";
 import { settingsTab } from "./rules/settingsTab/index.js";
 import { vault } from "./rules/vault/index.js";
@@ -16,6 +16,7 @@ import objectAssign from "./rules/objectAssign.js";
 import platform from "./rules/platform.js";
 import preferAbstractInputSuggest from "./rules/preferAbstractInputSuggest.js";
 import preferActiveDoc from "./rules/preferActiveDoc.js";
+import preferCreateEl from "./rules/preferCreateEl.js";
 import preferFileManagerTrashFile from "./rules/preferFileManagerTrashFile.js";
 import preferWindowTimers from "./rules/preferWindowTimers.js";
 import preferInstanceof from "./rules/preferInstanceof.js";
@@ -37,10 +38,11 @@ import tseslint from "typescript-eslint";
 import sdl from "@microsoft/eslint-plugin-sdl";
 import importPlugin from "eslint-plugin-import";
 import depend from 'eslint-plugin-depend';
+import eslintComments from "@eslint-community/eslint-plugin-eslint-comments";
 import globals from "globals";
 import fs from "node:fs";
 import path from "node:path";
-import { Config, defineConfig, globalIgnores } from "eslint/config";
+import { Config, defineConfig } from "eslint/config";
 import type { RuleDefinition, RuleDefinitionTypeOptions, RulesConfig } from "@eslint/core";
 import noUnsanitizedPlugin from "eslint-plugin-no-unsanitized";
 
@@ -50,7 +52,23 @@ interface PackageJson {
 }
 
 const manifest = getManifest();
-const packageJson = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, "../../package.json"), "utf8")) as PackageJson;
+
+function findPackageJson(startDir: string): string {
+    let dir = startDir;
+    while (true) {
+        const candidate = path.join(dir, "package.json");
+        if (fs.existsSync(candidate)) {
+            const parsed = JSON.parse(fs.readFileSync(candidate, "utf8"));
+            if (parsed.name === "eslint-plugin-obsidianmd") return candidate;
+        }
+        const parent = path.dirname(dir);
+        if (parent === dir) throw new Error("Could not find eslint-plugin-obsidianmd package.json");
+        dir = parent;
+    }
+}
+
+const currentDir = import.meta.dirname ?? path.dirname(new URL(import.meta.url).pathname);
+const packageJson = JSON.parse(fs.readFileSync(findPackageJson(currentDir), "utf8")) as PackageJson;
 
 const plugin = {
     meta: {
@@ -90,6 +108,7 @@ const plugin = {
         platform: platform,
         "prefer-abstract-input-suggest": preferAbstractInputSuggest,
         "prefer-active-doc": preferActiveDoc,
+        "prefer-create-el": preferCreateEl,
         "prefer-file-manager-trash-file": preferFileManagerTrashFile,
         "prefer-instanceof": preferInstanceof,
         "prefer-window-timers": preferWindowTimers,
@@ -111,17 +130,8 @@ const plugin = {
     }
 } satisfies ESLint.Plugin;
 
-// Rules that require type information (call getParserServices).
-// These must only run on files parsed by @typescript-eslint/parser.
-const recommendedTypedRulesConfig: RulesConfig = {
-    "obsidianmd/no-plugin-as-component": "error",
-    "obsidianmd/no-view-references-in-plugin": "error",
-    "obsidianmd/no-unsupported-api": "error",
-    "obsidianmd/prefer-file-manager-trash-file": "warn",
-    "obsidianmd/prefer-instanceof": "error",
-};
-
-const recommendedPluginRulesConfig: RulesConfig = {
+// Rules that don't require TypeScript type information (can apply to JS and TS files)
+const recommendedPluginRulesConfigBase: RulesConfig = {
     "obsidianmd/commands/no-command-in-command-id": "error",
     "obsidianmd/commands/no-command-in-command-name": "error",
     "obsidianmd/commands/no-default-hotkeys": "error",
@@ -139,7 +149,6 @@ const recommendedPluginRulesConfig: RulesConfig = {
     "obsidianmd/hardcoded-config-path": "error",
     "obsidianmd/no-forbidden-elements": "error",
     "obsidianmd/no-global-this": "error",
-    "obsidianmd/no-plugin-as-component": "error",
     "obsidianmd/no-sample-code": "error",
     "obsidianmd/no-tfile-tfolder-cast": "error",
     "obsidianmd/no-static-styles-assignment": "error",
@@ -149,12 +158,29 @@ const recommendedPluginRulesConfig: RulesConfig = {
     "obsidianmd/prefer-abstract-input-suggest": "error",
     "obsidianmd/prefer-window-timers": "error",
     "obsidianmd/prefer-active-doc": "warn",
+    "obsidianmd/prefer-create-el": "error",
     "obsidianmd/regex-lookbehind": "error",
     "obsidianmd/sample-names": "error",
     "obsidianmd/validate-manifest": "error",
     "obsidianmd/validate-license": ["error"],
     "obsidianmd/ui/sentence-case": ["error", { enforceCamelCaseLower: true }],
-}
+};
+
+// Rules that require TypeScript type information (TypeScript-only).
+// These must only run on files parsed by @typescript-eslint/parser.
+const recommendedPluginRulesConfigTypeChecked: RulesConfig = {
+    "obsidianmd/no-plugin-as-component": "error",
+    "obsidianmd/no-view-references-in-plugin": "error",
+    "obsidianmd/no-unsupported-api": "error",
+    "obsidianmd/prefer-file-manager-trash-file": "warn",
+    "obsidianmd/prefer-instanceof": "error",
+};
+
+// Combined rules for TypeScript files
+const recommendedPluginRulesConfig: RulesConfig = {
+    ...recommendedPluginRulesConfigBase,
+    ...recommendedPluginRulesConfigTypeChecked,
+};
 
 import { restrictedGlobalsOptions, restrictedImportsOptions, noUnusedExpressionsOptions } from "./ruleOptions.js";
 
@@ -217,7 +243,8 @@ const flatRecommendedConfig: Config[] = defineConfig([
         extends: [...(tseslint.configs.recommended as Config[]), noUnsanitizedPlugin.configs.recommended],
         rules: {
             ...flatRecommendedGeneralRules,
-            ...recommendedPluginRulesConfig
+            // Only apply base rules (no type-checked rules) for JavaScript
+            ...recommendedPluginRulesConfigBase
         }
     },
     {
@@ -231,8 +258,8 @@ const flatRecommendedConfig: Config[] = defineConfig([
         extends: [...(tseslint.configs.recommendedTypeChecked as Config[]), noUnsanitizedPlugin.configs.recommended],
         rules: {
             ...flatRecommendedGeneralRules,
+            // Apply all obsidianmd rules (including type-checked) for TypeScript
             ...recommendedPluginRulesConfig,
-            ...recommendedTypedRulesConfig
         },
     },
     {
@@ -282,14 +309,170 @@ const flatRecommendedConfig: Config[] = defineConfig([
     }
 ]);
 
+// Scanner's restricted imports (same packages, warn severity, scanner's moment phrasing)
+const scannerRestrictedImportsOptions = [
+    { name: "axios", message: "Use the built-in `requestUrl` function instead of `axios`." },
+    { name: "superagent", message: "Use the built-in `requestUrl` function instead of `superagent`." },
+    { name: "got", message: "Use the built-in `requestUrl` function instead of `got`." },
+    { name: "ofetch", message: "Use the built-in `requestUrl` function instead of `ofetch`." },
+    { name: "ky", message: "Use the built-in `requestUrl` function instead of `ky`." },
+    { name: "node-fetch", message: "Use the built-in `requestUrl` function instead of `node-fetch`." },
+    { name: "moment", message: "The 'moment' package is bundled with Obsidian. Please import it from 'obsidian' instead." },
+];
+
+// The recommended config matches the community plugin scanner's rules.
+// This ensures local linting results match what the scanner flags during review.
 const hybridRecommendedConfig: Config[] = defineConfig([
+    ...flatRecommendedConfig,
+    // Linter options from scanner's eslint-release layer
     {
-        rules: recommendedPluginRulesConfig,
-        extends: flatRecommendedConfig
+        linterOptions: {
+            reportUnusedDisableDirectives: "error",
+            reportUnusedInlineConfigs: "error",
+        },
     },
+    // JSON file overrides: disable type-aware rules
     {
-        files: ['**/*.ts', '**/*.tsx'],
-        rules: recommendedTypedRulesConfig
+        files: ["**/*.json"],
+        rules: {
+            "obsidianmd/no-plugin-as-component": "off",
+            "obsidianmd/no-view-references-in-plugin": "off",
+            "obsidianmd/no-unsupported-api": "off",
+            "obsidianmd/prefer-file-manager-trash-file": "off",
+            "obsidianmd/prefer-instanceof": "off",
+        }
+    },
+    // Main rule overrides for all source files
+    {
+        files: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", "manifest.json"],
+        plugins: {
+            "eslint-comments": eslintComments,
+            obsidianmd: plugin,
+        },
+        rules: {
+            // === Security rules (error) ===
+            "no-eval": "error",
+            "no-implied-eval": "error",
+            "no-unsanitized/method": "error",
+            "no-unsanitized/property": "error",
+            "obsidianmd/no-forbidden-elements": "error",
+            "obsidianmd/regex-lookbehind": "error",
+
+            // === Portal re-escalations (error) ===
+            "obsidianmd/settings-tab/no-manual-html-headings": "error",
+            "obsidianmd/settings-tab/no-problematic-settings-headings": "error",
+            "obsidianmd/sample-names": "error",
+            "obsidianmd/no-sample-code": "error",
+            "obsidianmd/platform": "error",
+            "obsidianmd/no-plugin-as-component": "error",
+            "obsidianmd/detach-leaves": "error",
+            "obsidianmd/no-static-styles-assignment": "error",
+            "obsidianmd/no-view-references-in-plugin": "error",
+            "obsidianmd/no-unsupported-api": "error",
+
+            // === Downgraded to warn (from error in base) ===
+            "obsidianmd/commands/no-command-in-command-id": "warn",
+            "obsidianmd/commands/no-command-in-command-name": "warn",
+            "obsidianmd/commands/no-default-hotkeys": "warn",
+            "obsidianmd/commands/no-plugin-id-in-command-id": "warn",
+            "obsidianmd/commands/no-plugin-name-in-command-name": "warn",
+            "obsidianmd/vault/iterate": "warn",
+            "obsidianmd/editor-drop-paste": "warn",
+            "obsidianmd/hardcoded-config-path": "warn",
+            "obsidianmd/no-global-this": "warn",
+            "obsidianmd/no-tfile-tfolder-cast": "warn",
+            "obsidianmd/object-assign": "warn",
+            "obsidianmd/prefer-abstract-input-suggest": "warn",
+            "obsidianmd/prefer-active-doc": "warn",
+            "obsidianmd/prefer-get-language": "warn",
+            "obsidianmd/prefer-instanceof": "warn",
+            "obsidianmd/prefer-window-timers": "warn",
+            "obsidianmd/prefer-file-manager-trash-file": "warn",
+
+            // === Always warn (scanner doesn't check manifest.isDesktopOnly) ===
+            "obsidianmd/no-nodejs-modules": "warn",
+
+            // === Disabled rules ===
+            "obsidianmd/validate-manifest": "off",
+            "obsidianmd/validate-license": "off",
+            "obsidianmd/ui/sentence-case": "off",
+            "obsidianmd/ui/sentence-case-json": "off",
+            "obsidianmd/ui/sentence-case-locale-module": "off",
+            "no-undef": "off",
+            "no-console": "off",
+            "import/no-unresolved": "off",
+            "@typescript-eslint/restrict-template-expressions": "off",
+            "@typescript-eslint/no-base-to-string": "off",
+
+            // === General rules at warn ===
+            "no-implicit-globals": "warn",
+            "no-alert": "warn",
+            "no-self-compare": "warn",
+            "no-restricted-globals": ["warn", ...restrictedGlobalsOptions],
+            "no-restricted-imports": ["warn", ...scannerRestrictedImportsOptions],
+            "@typescript-eslint/no-deprecated": "warn",
+            "@typescript-eslint/no-unused-vars": ["warn", { args: "none", ignoreRestSiblings: true }],
+            "@typescript-eslint/no-unused-expressions": ["warn", ...noUnusedExpressionsOptions],
+            "@typescript-eslint/no-explicit-any": ["warn", { fixToUnknown: true }],
+            "@microsoft/sdl/no-document-write": "warn",
+            "@microsoft/sdl/no-inner-html": "warn",
+            "import/no-extraneous-dependencies": "warn",
+
+            // === no-unsafe-* family (warn, re-enabled from off) ===
+            "@typescript-eslint/no-unsafe-member-access": "warn",
+            "@typescript-eslint/no-unsafe-assignment": "warn",
+            "@typescript-eslint/no-unsafe-argument": "warn",
+            "@typescript-eslint/no-unsafe-call": "warn",
+            "@typescript-eslint/no-unsafe-return": "warn",
+
+            // === no-new-func off (replaced by rule-custom-message wrapper) ===
+            "no-new-func": "off",
+
+            // === Combined rule-custom-message (no-new-func + no-console) ===
+            "obsidianmd/rule-custom-message": [
+                "error",
+                {
+                    "no-new-func": {
+                        messages: {
+                            "The Function constructor is eval": "Using the `Function` constructor is dangerous because it executes arbitrary code, similar to `eval()`"
+                        }
+                    },
+                    "no-console": {
+                        messages: {
+                            "Unexpected console statement. Only these console methods are allowed: warn, error, debug.": "Avoid unnecessary logging to console. See https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#Avoid+unnecessary+logging+to+console",
+                        },
+                        options: [{ allow: ["warn", "error", "debug"] }],
+                    }
+                }
+            ],
+
+            // === eslint-comments rules ===
+            "eslint-comments/no-unlimited-disable": "error",
+            "eslint-comments/require-description": "error",
+            "eslint-comments/disable-enable-pair": ["error", { allowWholeFile: false }],
+            "eslint-comments/no-restricted-disable": [
+                "error",
+                "obsidianmd/*",
+                "no-console",
+                "no-restricted-globals",
+                "no-restricted-imports",
+                "no-alert",
+                "@typescript-eslint/no-deprecated",
+                "@typescript-eslint/no-explicit-any",
+                "@microsoft/sdl/no-document-write",
+                "@microsoft/sdl/no-eval",
+                "@microsoft/sdl/no-inner-html",
+                "import/no-nodejs-modules",
+            ],
+        }
+    },
+    // depend/ban-dependencies at warn for source files (scanner applies to source, not just package.json)
+    {
+        files: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", "**/package.json"],
+        plugins: { depend },
+        rules: {
+            "depend/ban-dependencies": ["warn", { presets: ["native", "microutilities", "preferred"] }],
+        },
     },
 ]);
 
@@ -339,14 +522,7 @@ const recommendedWithLocalesEnBase: Config[] = defineConfig([
 ]);
 
 const recommendedWithLocalesEn: Config[] = defineConfig([
-    {
-        rules: recommendedPluginRulesConfig,
-        extends: recommendedWithLocalesEnBase
-    },
-    {
-        files: ['**/*.ts', '**/*.tsx'],
-        rules: recommendedTypedRulesConfig
-    },
+    ...recommendedWithLocalesEnBase
 ]);
 
 plugin.configs = {

@@ -2,7 +2,7 @@
 
 📝 Enforce sentence case for English JSON locale strings.
 
-⚠️ This rule _warns_ in the 🇬🇧 `recommendedWithLocalesEn` config.
+⚠️🚫 This rule _warns_ in the 🇬🇧 `recommendedWithLocalesEn` config. This rule is _disabled_ in the ✅ `recommended` config.
 
 🔧 This rule is automatically fixable by the [`--fix` CLI option](https://eslint.org/docs/latest/user-guide/command-line-interface#--fix).
 

@@ -2,7 +2,7 @@
 
 📝 Validate the structure of manifest.json for Obsidian plugins.
 
-💼 This rule is enabled in the following configs: ✅ `recommended`, 🇬🇧 `recommendedWithLocalesEn`.
+💼🚫 This rule is enabled in the 🇬🇧 `recommendedWithLocalesEn` config. This rule is _disabled_ in the ✅ `recommended` config.
 
 <!-- end auto-generated rule header -->
 
