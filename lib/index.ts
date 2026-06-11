@@ -157,7 +157,7 @@ const recommendedPluginRulesConfigBase: RulesConfig = {
     "obsidianmd/prefer-get-language": "error",
     "obsidianmd/prefer-abstract-input-suggest": "error",
     "obsidianmd/prefer-window-timers": "error",
-    "obsidianmd/prefer-active-doc": "warn",
+    "obsidianmd/prefer-active-doc": "off",
     "obsidianmd/prefer-create-el": "error",
     "obsidianmd/regex-lookbehind": "error",
     "obsidianmd/sample-names": "error",
@@ -383,7 +383,6 @@ const hybridRecommendedConfig: Config[] = defineConfig([
             "obsidianmd/no-tfile-tfolder-cast": "warn",
             "obsidianmd/object-assign": "warn",
             "obsidianmd/prefer-abstract-input-suggest": "warn",
-            "obsidianmd/prefer-active-doc": "warn",
             "obsidianmd/prefer-get-language": "warn",
             "obsidianmd/prefer-instanceof": "warn",
             "obsidianmd/prefer-window-timers": "warn",
@@ -393,6 +392,7 @@ const hybridRecommendedConfig: Config[] = defineConfig([
             "obsidianmd/no-nodejs-modules": "warn",
 
             // === Disabled rules ===
+            "obsidianmd/prefer-active-doc": "off",
             "obsidianmd/validate-manifest": "off",
             "obsidianmd/validate-license": "off",
             "obsidianmd/ui/sentence-case": "off",
