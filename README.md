@@ -20,7 +20,7 @@ With the release of ESLint v9, the default configuration file is now `eslint.con
 
 ### Flat Config (`eslint.config.js`) - Recommended for ESLint v9+
 
-To use the recommended configuration, add it to your `eslint.config.js` file. This will enable all the recommended rules.
+The `recommended` configuration matches the ESLint checks that the Obsidian community plugin scanner runs during plugin review. This ensures your local linting results match what the scanner will flag.
 
 ```javascript
 // eslint.config.mjs
@@ -47,6 +47,33 @@ export default defineConfig([
   },
 ]);
 
+```
+
+**Scanner file ignore patterns:**
+
+The scanner skips certain files during review. To fully replicate scanner behavior, add these to your config:
+
+```javascript
+import { globalIgnores } from "eslint/config";
+
+export default defineConfig([
+  ...obsidianmd.configs.recommended,
+  globalIgnores([
+    "node_modules", "dist", "build", "pkg", "test-vault",
+    ".obsidian", "**/.obsidian/**",
+    "esbuild.config.mjs", "version-bump.mjs",
+    "**/*.test.*", "**/*.tests.*", "**/*.spec.*", "**/*.specs.*",
+    "**/test/**", "**/tests/**", "**/__tests__/**",
+    "**/mocks/**", "**/__mocks__/**",
+    "**/*.cjs", "**/*.mjs", "**/*.cts", "**/*.mts",
+    "**/vite*", "**/scripts/**", "**/docs/**",
+    "**/i18n/**", "**/i18next/**", "**/locale/**",
+    "**/locales/**", "**/translations/**", "**/l10n/**",
+    ".pnpm-store", "**/testUtils**",
+    "automation/**", "e2e-tests/**",
+  ]),
+  // ... your config
+]);
 ```
 
 ### Legacy Config (`.eslintrc`)
@@ -103,32 +130,32 @@ You can also override or add rules:
 
 | Name                                                                                                         | Description                                                                                                                                           | 💼     | ⚠️     | 🚫     | 🔧 | 💡 |
 | :----------------------------------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------- | :----- | :----- | :----- | :- | :- |
-| [commands/no-command-in-command-id](docs/rules/commands/no-command-in-command-id.md)                         | Disallow using the word 'command' in a command ID.                                                                                                    | ✅ 🇬🇧 |        |        |    |    |
-| [commands/no-command-in-command-name](docs/rules/commands/no-command-in-command-name.md)                     | Disallow using the word 'command' in a command name.                                                                                                  | ✅ 🇬🇧 |        |        |    |    |
-| [commands/no-default-hotkeys](docs/rules/commands/no-default-hotkeys.md)                                     | Discourage providing default hotkeys for commands.                                                                                                    | ✅ 🇬🇧 |        |        |    |    |
-| [commands/no-plugin-id-in-command-id](docs/rules/commands/no-plugin-id-in-command-id.md)                     | Disallow including the plugin ID in a command ID.                                                                                                     | ✅ 🇬🇧 |        |        |    |    |
-| [commands/no-plugin-name-in-command-name](docs/rules/commands/no-plugin-name-in-command-name.md)             | Disallow including the plugin name in a command name.                                                                                                 | ✅ 🇬🇧 |        |        |    |    |
+| [commands/no-command-in-command-id](docs/rules/commands/no-command-in-command-id.md)                         | Disallow using the word 'command' in a command ID.                                                                                                    | 🇬🇧   | ✅      |        |    |    |
+| [commands/no-command-in-command-name](docs/rules/commands/no-command-in-command-name.md)                     | Disallow using the word 'command' in a command name.                                                                                                  | 🇬🇧   | ✅      |        |    |    |
+| [commands/no-default-hotkeys](docs/rules/commands/no-default-hotkeys.md)                                     | Discourage providing default hotkeys for commands.                                                                                                    | 🇬🇧   | ✅      |        |    |    |
+| [commands/no-plugin-id-in-command-id](docs/rules/commands/no-plugin-id-in-command-id.md)                     | Disallow including the plugin ID in a command ID.                                                                                                     | 🇬🇧   | ✅      |        |    |    |
+| [commands/no-plugin-name-in-command-name](docs/rules/commands/no-plugin-name-in-command-name.md)             | Disallow including the plugin name in a command name.                                                                                                 | 🇬🇧   | ✅      |        |    |    |
 | [detach-leaves](docs/rules/detach-leaves.md)                                                                 | Don't detach leaves in onunload.                                                                                                                      | ✅ 🇬🇧 |        |        | 🔧 |    |
-| [editor-drop-paste](docs/rules/editor-drop-paste.md)                                                         | Require checking `evt.defaultPrevented` and calling `evt.preventDefault()` in editor-drop/editor-paste handlers.                                      | ✅ 🇬🇧 |        |        |    |    |
-| [hardcoded-config-path](docs/rules/hardcoded-config-path.md)                                                 | Disallow hardcoded `.obsidian` config paths. Use `Vault#configDir` instead.                                                                           | ✅ 🇬🇧 |        |        |    |    |
+| [editor-drop-paste](docs/rules/editor-drop-paste.md)                                                         | Require checking `evt.defaultPrevented` and calling `evt.preventDefault()` in editor-drop/editor-paste handlers.                                      | 🇬🇧   | ✅      |        |    |    |
+| [hardcoded-config-path](docs/rules/hardcoded-config-path.md)                                                 | Disallow hardcoded `.obsidian` config paths. Use `Vault#configDir` instead.                                                                           | 🇬🇧   | ✅      |        |    |    |
 | [no-forbidden-elements](docs/rules/no-forbidden-elements.md)                                                 | Disallow attachment of forbidden elements to the DOM in Obsidian plugins.                                                                             | ✅ 🇬🇧 |        |        |    |    |
-| [no-global-this](docs/rules/no-global-this.md)                                                               | Disallow `global` and `globalThis`. Use `window` or `activeWindow` for popout window compatibility.                                                   | ✅ 🇬🇧 |        |        | 🔧 |    |
-| [no-nodejs-modules](docs/rules/no-nodejs-modules.md)                                                         | Disallow importing Node.js built-in modules unless guarded by Platform.isDesktop                                                                      | ✅ 🇬🇧 |        |        |    |    |
+| [no-global-this](docs/rules/no-global-this.md)                                                               | Disallow `global` and `globalThis`. Use `window` or `activeWindow` for popout window compatibility.                                                   | 🇬🇧   | ✅      |        | 🔧 |    |
+| [no-nodejs-modules](docs/rules/no-nodejs-modules.md)                                                         | Disallow importing Node.js built-in modules unless guarded by Platform.isDesktop                                                                      | 🇬🇧   | ✅      |        |    |    |
 | [no-plugin-as-component](docs/rules/no-plugin-as-component.md)                                               | Disallow anti-patterns when passing a component to MarkdownRenderer.render to prevent memory leaks.                                                   | ✅ 🇬🇧 |        |        |    |    |
 | [no-sample-code](docs/rules/no-sample-code.md)                                                               | Disallow sample code snippets from the Obsidian plugin template.                                                                                      | ✅ 🇬🇧 |        |        | 🔧 |    |
 | [no-static-styles-assignment](docs/rules/no-static-styles-assignment.md)                                     | Disallow setting styles directly on DOM elements, favoring CSS classes instead.                                                                       | ✅ 🇬🇧 |        |        |    |    |
-| [no-tfile-tfolder-cast](docs/rules/no-tfile-tfolder-cast.md)                                                 | Disallow type casting to TFile or TFolder, suggesting instanceof checks instead.                                                                      | ✅ 🇬🇧 |        |        |    |    |
+| [no-tfile-tfolder-cast](docs/rules/no-tfile-tfolder-cast.md)                                                 | Disallow type casting to TFile or TFolder, suggesting instanceof checks instead.                                                                      | 🇬🇧   | ✅      |        |    |    |
 | [no-unsupported-api](docs/rules/no-unsupported-api.md)                                                       | Disallow usage of Obsidian APIs not available in the plugin's minimum app version                                                                     | ✅ 🇬🇧 |        |        |    |    |
 | [no-view-references-in-plugin](docs/rules/no-view-references-in-plugin.md)                                   | Disallow storing references to custom views directly in the plugin, which can cause memory leaks.                                                     | ✅ 🇬🇧 |        |        |    |    |
-| [object-assign](docs/rules/object-assign.md)                                                                 | Discourage using `Object.assign` with two arguments                                                                                                   | ✅ 🇬🇧 |        |        |    |    |
+| [object-assign](docs/rules/object-assign.md)                                                                 | Discourage using `Object.assign` with two arguments                                                                                                   | 🇬🇧   | ✅      |        |    |    |
 | [platform](docs/rules/platform.md)                                                                           | Disallow use of navigator API for OS detection                                                                                                        | ✅ 🇬🇧 |        |        |    |    |
-| [prefer-abstract-input-suggest](docs/rules/prefer-abstract-input-suggest.md)                                 | Disallow Liam's frequently copied `TextInputSuggest` implementation in favor of the built-in `AbstractInputSuggest`.                                  | ✅ 🇬🇧 |        |        |    |    |
+| [prefer-abstract-input-suggest](docs/rules/prefer-abstract-input-suggest.md)                                 | Disallow Liam's frequently copied `TextInputSuggest` implementation in favor of the built-in `AbstractInputSuggest`.                                  | 🇬🇧   | ✅      |        |    |    |
 | [prefer-active-doc](docs/rules/prefer-active-doc.md)                                                         | Prefer `activeDocument` over `document` for popout window compatibility.                                                                              |        |        | ✅ 🇬🇧 |    |    |
 | [prefer-create-el](docs/rules/prefer-create-el.md)                                                           | Prefer Obsidian DOM helpers (`createEl`, `createDiv`, `createSpan`, `createSvg`, `createFragment`) over native DOM methods.                           | ✅ 🇬🇧 |        |        | 🔧 | 💡 |
 | [prefer-file-manager-trash-file](docs/rules/prefer-file-manager-trash-file.md)                               | Prefer FileManager.trashFile() over Vault.trash() or Vault.delete() to respect user settings.                                                         |        | ✅ 🇬🇧 |        |    |    |
-| [prefer-get-language](docs/rules/prefer-get-language.md)                                                     | Prefer Obsidian's `getLanguage()` over `localStorage.getItem('language')` and `i18next-browser-languagedetector` for detecting the user's language.   | ✅ 🇬🇧 |        |        |    |    |
-| [prefer-instanceof](docs/rules/prefer-instanceof.md)                                                         | Prefer `.instanceOf(T)` over `instanceof T` for cross-window safe type checks on DOM Nodes and UIEvents.                                              | ✅ 🇬🇧 |        |        | 🔧 | 💡 |
-| [prefer-window-timers](docs/rules/prefer-window-timers.md)                                                   | Prefer `window.setTimeout()` and related timer functions over bare global calls for popout window compatibility.                                      | ✅ 🇬🇧 |        |        | 🔧 |    |
+| [prefer-get-language](docs/rules/prefer-get-language.md)                                                     | Prefer Obsidian's `getLanguage()` over `localStorage.getItem('language')` and `i18next-browser-languagedetector` for detecting the user's language.   | 🇬🇧   | ✅      |        |    |    |
+| [prefer-instanceof](docs/rules/prefer-instanceof.md)                                                         | Prefer `.instanceOf(T)` over `instanceof T` for cross-window safe type checks on DOM Nodes and UIEvents.                                              | 🇬🇧   | ✅      |        | 🔧 | 💡 |
+| [prefer-window-timers](docs/rules/prefer-window-timers.md)                                                   | Prefer `window.setTimeout()` and related timer functions over bare global calls for popout window compatibility.                                      | 🇬🇧   | ✅      |        | 🔧 |    |
 | [regex-lookbehind](docs/rules/regex-lookbehind.md)                                                           | Using lookbehinds in Regex is not supported in some iOS versions                                                                                      | ✅ 🇬🇧 |        |        |    |    |
 | [rule-custom-message](docs/rules/rule-custom-message.md)                                                     | Allows redefining error messages from other ESLint rules that don't provide this functionality natively.                                              | ✅ 🇬🇧 |        |        |    |    |
 | [sample-names](docs/rules/sample-names.md)                                                                   | Rename sample plugin class names                                                                                                                      | ✅ 🇬🇧 |        |        |    |    |
@@ -138,12 +165,12 @@ You can also override or add rules:
 | [settings-tab/prefer-setting-definitions](docs/rules/settings-tab/prefer-setting-definitions.md)             | Encourage PluginSettingTab subclasses to implement getSettingDefinitions() so settings appear in Obsidian 1.13+ settings search.                      |        | ✅ 🇬🇧 |        |    |    |
 | [settings-tab/prefer-update-over-display](docs/rules/settings-tab/prefer-update-over-display.md)             | Prefer this.update() over this.display() to refresh a PluginSettingTab on Obsidian 1.13+.                                                             |        | ✅ 🇬🇧 |        | 🔧 |    |
 | [settings-tab/require-display](docs/rules/settings-tab/require-display.md)                                   | Require a display() method on PluginSettingTab subclasses when minAppVersion is below 1.13.0.                                                         | ✅ 🇬🇧 |        |        |    |    |
-| [ui/sentence-case](docs/rules/ui/sentence-case.md)                                                           | Enforce sentence case for UI strings                                                                                                                  | ✅ 🇬🇧 |        |        | 🔧 |    |
+| [ui/sentence-case](docs/rules/ui/sentence-case.md)                                                           | Enforce sentence case for UI strings                                                                                                                  | 🇬🇧   |        | ✅      | 🔧 |    |
 | [ui/sentence-case-json](docs/rules/ui/sentence-case-json.md)                                                 | Enforce sentence case for English JSON locale strings                                                                                                 |        |        | ✅ 🇬🇧 | 🔧 |    |
 | [ui/sentence-case-locale-module](docs/rules/ui/sentence-case-locale-module.md)                               | Enforce sentence case for English TS/JS locale module strings                                                                                         |        |        | ✅ 🇬🇧 | 🔧 |    |
-| [validate-license](docs/rules/validate-license.md)                                                           | Validate the structure of copyright notices in LICENSE files for Obsidian plugins.                                                                    | ✅ 🇬🇧 |        |        |    |    |
-| [validate-manifest](docs/rules/validate-manifest.md)                                                         | Validate the structure of manifest.json for Obsidian plugins.                                                                                         | ✅ 🇬🇧 |        |        |    |    |
-| [vault/iterate](docs/rules/vault/iterate.md)                                                                 | Avoid iterating all files to find a file by its path                                                                                                  | ✅ 🇬🇧 |        |        | 🔧 |    |
+| [validate-license](docs/rules/validate-license.md)                                                           | Validate the structure of copyright notices in LICENSE files for Obsidian plugins.                                                                    | 🇬🇧   |        | ✅      |    |    |
+| [validate-manifest](docs/rules/validate-manifest.md)                                                         | Validate the structure of manifest.json for Obsidian plugins.                                                                                         | 🇬🇧   |        | ✅      |    |    |
+| [vault/iterate](docs/rules/vault/iterate.md)                                                                 | Avoid iterating all files to find a file by its path                                                                                                  | 🇬🇧   | ✅      |        | 🔧 |    |
 
 <!-- end auto-generated rules list -->
 

@@ -2,7 +2,7 @@
 
 📝 Disallow using the word 'command' in a command name.
 
-💼 This rule is enabled in the following configs: ✅ `recommended`, 🇬🇧 `recommendedWithLocalesEn`.
+💼⚠️ This rule is enabled in the 🇬🇧 `recommendedWithLocalesEn` config. This rule _warns_ in the ✅ `recommended` config.
 
 <!-- end auto-generated rule header -->
 

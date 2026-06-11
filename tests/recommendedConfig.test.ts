@@ -76,7 +76,7 @@ describe("recommended config", () => {
 			}
 		});
 
-		it("type-checked rules should not appear in JS config", () => {
+		it("type-aware rules should be referenced in JS config", () => {
 			const typeCheckedRules = [
 				"obsidianmd/no-plugin-as-component",
 				"obsidianmd/no-view-references-in-plugin",
@@ -86,8 +86,8 @@ describe("recommended config", () => {
 			];
 			for (const rule of typeCheckedRules) {
 				assert.ok(
-					!(rule in jsRules),
-					`type-checked rule ${rule} should NOT be in the JS config (would crash without type info)`
+					rule in jsRules,
+					`type-aware rule ${rule} should be referenced in the JS config`
 				);
 			}
 		});

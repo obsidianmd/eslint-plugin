@@ -45,6 +45,7 @@ import { fileURLToPath } from "node:url";
 import { Config, defineConfig } from "eslint/config";
 import type { RuleDefinition, RuleDefinitionTypeOptions, RulesConfig } from "@eslint/core";
 import noUnsanitizedPlugin from "eslint-plugin-no-unsanitized";
+import eslintComments from "@eslint-community/eslint-plugin-eslint-comments";
 
 interface PackageJson {
     name: string;
@@ -308,13 +309,156 @@ const flatRecommendedConfig: Config[] = defineConfig([
 ]);
 
 const hybridRecommendedConfig: Config[] = defineConfig([
+    ...flatRecommendedConfig,
+    // Linter options from scanner's eslint-release layer
     {
-        rules: recommendedPluginRulesConfigBase,
-        extends: flatRecommendedConfig
+        linterOptions: {
+            reportUnusedDisableDirectives: "error",
+            reportUnusedInlineConfigs: "error",
+        },
     },
+    // JSON file overrides: disable type-aware rules
     {
-        files: ['**/*.ts', '**/*.tsx'],
-        rules: recommendedPluginRulesConfigTypeChecked
+        files: ["**/*.json"],
+        rules: {
+            "obsidianmd/no-plugin-as-component": "off",
+            "obsidianmd/no-view-references-in-plugin": "off",
+            "obsidianmd/no-unsupported-api": "off",
+            "obsidianmd/prefer-file-manager-trash-file": "off",
+            "obsidianmd/prefer-instanceof": "off",
+        }
+    },
+    // Main rule overrides for all source files
+    {
+        files: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", "manifest.json"],
+        plugins: {
+            "eslint-comments": eslintComments,
+            obsidianmd: plugin,
+        },
+        rules: {
+            // === Security rules (error) ===
+            "no-eval": "error",
+            "no-implied-eval": "error",
+            "no-unsanitized/method": "error",
+            "no-unsanitized/property": "error",
+            "obsidianmd/no-forbidden-elements": "error",
+            "obsidianmd/regex-lookbehind": "error",
+
+            // === Portal re-escalations (error) ===
+            "obsidianmd/settings-tab/no-manual-html-headings": "error",
+            "obsidianmd/settings-tab/no-problematic-settings-headings": "error",
+            "obsidianmd/sample-names": "error",
+            "obsidianmd/no-sample-code": "error",
+            "obsidianmd/platform": "error",
+            "obsidianmd/no-plugin-as-component": "error",
+            "obsidianmd/detach-leaves": "error",
+            "obsidianmd/no-static-styles-assignment": "error",
+            "obsidianmd/no-view-references-in-plugin": "error",
+            "obsidianmd/no-unsupported-api": "error",
+
+            // === Downgraded to warn (from error in base) ===
+            "obsidianmd/commands/no-command-in-command-id": "warn",
+            "obsidianmd/commands/no-command-in-command-name": "warn",
+            "obsidianmd/commands/no-default-hotkeys": "warn",
+            "obsidianmd/commands/no-plugin-id-in-command-id": "warn",
+            "obsidianmd/commands/no-plugin-name-in-command-name": "warn",
+            "obsidianmd/vault/iterate": "warn",
+            "obsidianmd/editor-drop-paste": "warn",
+            "obsidianmd/hardcoded-config-path": "warn",
+            "obsidianmd/no-global-this": "warn",
+            "obsidianmd/no-tfile-tfolder-cast": "warn",
+            "obsidianmd/object-assign": "warn",
+            "obsidianmd/prefer-abstract-input-suggest": "warn",
+            "obsidianmd/prefer-get-language": "warn",
+            "obsidianmd/prefer-instanceof": "warn",
+            "obsidianmd/prefer-window-timers": "warn",
+            "obsidianmd/prefer-file-manager-trash-file": "warn",
+
+            // === Always warn (scanner doesn't check manifest.isDesktopOnly) ===
+            "obsidianmd/no-nodejs-modules": "warn",
+
+            // === Disabled rules ===
+            "obsidianmd/prefer-active-doc": "off",
+            "obsidianmd/validate-manifest": "off",
+            "obsidianmd/validate-license": "off",
+            "obsidianmd/ui/sentence-case": "off",
+            "obsidianmd/ui/sentence-case-json": "off",
+            "obsidianmd/ui/sentence-case-locale-module": "off",
+            "no-undef": "off",
+            "no-console": "off",
+            "import/no-unresolved": "off",
+            "@typescript-eslint/restrict-template-expressions": "off",
+            "@typescript-eslint/no-base-to-string": "off",
+
+            // === General rules at warn ===
+            "no-implicit-globals": "warn",
+            "no-alert": "warn",
+            "no-self-compare": "warn",
+            "no-restricted-globals": ["warn", ...restrictedGlobalsOptions],
+            "no-restricted-imports": ["warn", ...restrictedImportsOptions],
+            "@typescript-eslint/no-deprecated": "warn",
+            "@typescript-eslint/no-unused-vars": ["warn", { args: "none", ignoreRestSiblings: true }],
+            "@typescript-eslint/no-unused-expressions": ["warn", ...noUnusedExpressionsOptions],
+            "@typescript-eslint/no-explicit-any": ["warn", { fixToUnknown: true }],
+            "@microsoft/sdl/no-document-write": "warn",
+            "@microsoft/sdl/no-inner-html": "warn",
+            "import/no-extraneous-dependencies": "warn",
+
+            // === no-unsafe-* family (warn, re-enabled from off) ===
+            "@typescript-eslint/no-unsafe-member-access": "warn",
+            "@typescript-eslint/no-unsafe-assignment": "warn",
+            "@typescript-eslint/no-unsafe-argument": "warn",
+            "@typescript-eslint/no-unsafe-call": "warn",
+            "@typescript-eslint/no-unsafe-return": "warn",
+
+            // === no-new-func off (replaced by rule-custom-message wrapper) ===
+            "no-new-func": "off",
+
+            // === Combined rule-custom-message (no-new-func + no-console) ===
+            "obsidianmd/rule-custom-message": [
+                "error",
+                {
+                    "no-new-func": {
+                        messages: {
+                            "The Function constructor is eval": "Using the `Function` constructor is dangerous because it executes arbitrary code, similar to `eval()`"
+                        }
+                    },
+                    "no-console": {
+                        messages: {
+                            "Unexpected console statement. Only these console methods are allowed: warn, error, debug.": "Avoid unnecessary logging to console. See https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#Avoid+unnecessary+logging+to+console",
+                        },
+                        options: [{ allow: ["warn", "error", "debug"] }],
+                    }
+                }
+            ],
+
+            // === eslint-comments rules ===
+            "eslint-comments/no-unlimited-disable": "error",
+            "eslint-comments/require-description": "error",
+            "eslint-comments/disable-enable-pair": ["error", { allowWholeFile: false }],
+            "eslint-comments/no-restricted-disable": [
+                "error",
+                "obsidianmd/*",
+                "no-console",
+                "no-restricted-globals",
+                "no-restricted-imports",
+                "no-alert",
+                "@typescript-eslint/no-deprecated",
+                "@typescript-eslint/no-explicit-any",
+                "@microsoft/sdl/no-document-write",
+                "@microsoft/sdl/no-eval",
+                "@microsoft/sdl/no-inner-html",
+                "import/no-nodejs-modules",
+            ],
+        }
+    },
+    // depend/ban-dependencies at warn for source files (scanner applies to source, not just package.json)
+    {
+        files: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", "**/package.json"],
+        plugins: { depend },
+        rules: {
+            "depend/ban-dependencies": ["warn", { presets: ["native", "microutilities", "preferred"] }],
+        },
     },
 ]);
 
