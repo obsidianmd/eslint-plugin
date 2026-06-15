@@ -12,7 +12,6 @@ const ruleCreator = ESLintUtils.RuleCreator(
 // - element.style.cssText = 'color: red;'
 // - element.setAttribute('style', 'color: red;')
 // - element.setCssProps({ 'color': 'blue' })  (non-custom-property key in setCssProps)
-// - element.setCssStyles({ '--my-var': 'blue' })  (custom property key in setCssStyles)
 //
 // This rule will not flag:
 //
@@ -48,8 +47,7 @@ export default ruleCreator({
                 "Avoid setting styles directly via `{{property}}`. Use CSS classes for better theming and maintainability. Use `setCssProps` for dynamic CSS custom properties or `setCssStyles` for dynamic standard properties.",
             avoidNonCustomPropertyInSetCssProps:
                 "`setCssProps` should only be used for CSS custom properties (prefixed with `--`). Use `setCssStyles` for standard CSS properties, or CSS classes for static styles.",
-            avoidCustomPropertyInSetCssStyles:
-                "`setCssStyles` should only be used for standard CSS properties. Use `setCssProps` for CSS custom properties (prefixed with `--`).",
+
         },
     },
     defaultOptions: [],
@@ -136,20 +134,7 @@ export default ruleCreator({
                     }
                 }
 
-                // Case 4: `el.setCssStyles({ '--my-var': 'blue' })` — custom properties (--*) belong in setCssProps
-                if (
-                    propertyName === "setCssStyles" && node.arguments[0].type === TSESTree.AST_NODE_TYPES.ObjectExpression
-                ) {
-                    for (const property of node.arguments[0].properties) {
-                        if (property.type === TSESTree.AST_NODE_TYPES.Property && property.key.type === TSESTree.AST_NODE_TYPES.Literal && typeof property.key.value === 'string' && property.key.value.startsWith('--')) {
-                            context.report({
-                                node,
-                                messageId: "avoidCustomPropertyInSetCssStyles",
-                            });
-                            break;
-                        }
-                    }
-                }
+
             },
         };
     },

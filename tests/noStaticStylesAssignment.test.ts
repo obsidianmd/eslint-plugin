@@ -106,14 +106,6 @@ ruleTester.run("no-static-styles-assignment", noInlineStylesRule, {
                 }
             ]
         },
-        {
-            name: "setCssStyles with custom property key is forbidden",
-            code: "el.setCssStyles({ '--my-var': 'blue' });",
-            errors: [
-                {
-                    messageId: "avoidCustomPropertyInSetCssStyles",
-                }
-            ]
-        }
+
     ],
 });
