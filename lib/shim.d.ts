@@ -12,16 +12,15 @@ declare module "@microsoft/eslint-plugin-sdl" {
 }
 
 declare module "eslint-plugin-import" {
-    import type { ESLint, Rule } from "eslint";
+    import type { Rule } from "eslint";
 
-    interface ImportPlugin extends ESLint.Plugin {
-        rules: {
-            "no-extraneous-dependencies": Rule.RuleModule;
-            "no-nodejs-modules": Rule.RuleModule;
-        };
-    }
-    const plugin: ImportPlugin;
-    export default plugin;
+    export const rules: {
+        "no-extraneous-dependencies": Rule.RuleModule;
+        "no-nodejs-modules": Rule.RuleModule;
+        [key: string]: Rule.RuleModule;
+    };
+    export const configs: Record<string, unknown>;
+    export const flatConfigs: Record<string, unknown>;
 }
 
 
@@ -38,18 +37,5 @@ declare module "eslint-plugin-no-unsanitized" {
         };
     }
     const plugin: NoUnsanitizedPlugin;
-    export default plugin;
-}
-
-declare module "@eslint/json" {
-    import type { ESLint } from "eslint";
-    const plugin: ESLint.Plugin;
-    export default plugin;
-}
-
-declare module "eslint-plugin-depend" {
-    import type { ESLint, Rule } from "eslint";
-    export const rules: Record<string, Rule.RuleModule>;
-    const plugin: ESLint.Plugin;
     export default plugin;
 }

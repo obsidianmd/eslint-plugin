@@ -37,7 +37,6 @@ import json from "@eslint/json";
 import tseslint from "typescript-eslint";
 import sdl from "@microsoft/eslint-plugin-sdl";
 import * as importPlugin from "eslint-plugin-import";
-const importPluginObj = importPlugin as unknown as ESLint.Plugin;
 import depend from 'eslint-plugin-depend';
 import globals from "globals";
 import fs from "node:fs";
@@ -235,7 +234,7 @@ const flatRecommendedConfig: Config[] = defineConfig([
     },
     {
         plugins: {
-            import: importPluginObj,
+            import: importPlugin as ESLint.Plugin,
             "@microsoft/sdl": sdl,
             depend,
             noUnsanitizedPlugin
@@ -249,7 +248,7 @@ const flatRecommendedConfig: Config[] = defineConfig([
     },
     {
         plugins: {
-            import: importPluginObj,
+            import: importPlugin as ESLint.Plugin,
             "@microsoft/sdl": sdl,
             depend,
             noUnsanitizedPlugin

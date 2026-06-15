@@ -101,7 +101,7 @@ You can also override or add rules:
 🔧 Automatically fixable by the [`--fix` CLI option](https://eslint.org/docs/user-guide/command-line-interface#--fix).\
 💡 Manually fixable by [editor suggestions](https://eslint.org/docs/latest/use/core-concepts#rule-suggestions).
 
-| Name                                                                                                         | Description                                                                                                                                           | 💼     | ⚠️     | 🚫     | 🔧 | 💡 |
+| Name                                                                                                         | Description                                                                                                                                           | 💼     | ⚠️     | 🚫     | 🔧 | 💡 |
 | :----------------------------------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------- | :----- | :----- | :----- | :- | :- |
 | [commands/no-command-in-command-id](docs/rules/commands/no-command-in-command-id.md)                         | Disallow using the word 'command' in a command ID.                                                                                                    | ✅ 🇬🇧 |        |        |    |    |
 | [commands/no-command-in-command-name](docs/rules/commands/no-command-in-command-name.md)                     | Disallow using the word 'command' in a command name.                                                                                                  | ✅ 🇬🇧 |        |        |    |    |
