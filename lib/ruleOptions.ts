@@ -52,6 +52,11 @@ export const restrictedImportsOptions = [
         message:
             "The 'moment' package is bundled with Obsidian. Please import it from 'obsidian' instead.",
     },
+    {
+        name: "monkey-around",
+        message:
+            "This plugin may be modifying Obsidian internals. Plugins that do this have a higher likelihood to introduce unexpected behavior in the app. They are also more likely to break when Obsidian updates.",
+    },
 ] as const;
 
 export const noUnusedExpressionsOptions = [{ allowShortCircuit: true, allowTernary: true }] as const;
