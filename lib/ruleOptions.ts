@@ -55,7 +55,7 @@ export const restrictedImportsOptions = [
     {
         name: "monkey-around",
         message:
-            "Monkey patching Obsidian internals is discouraged.",
+            "This plugin may be modifying Obsidian internals. Plugins that do this have a higher likelihood to introduce unexpected behavior in the app. They are also more likely to break when Obsidian updates.",
     },
 ] as const;
 

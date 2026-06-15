@@ -5,24 +5,28 @@ const ruleCreator = ESLintUtils.RuleCreator(
         `https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
 );
 
-// Matches: Foo.prototype.bar, Foo.prototype
-function isPrototypeAccess(node: TSESTree.MemberExpression): boolean {
-    if (
-        node.object.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
-        node.object.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
-        node.object.property.name === "prototype"
-    ) {
-        return true;
+function isPrototypeAccess(node: TSESTree.Node): node is TSESTree.MemberExpression {
+    if (node.type !== TSESTree.AST_NODE_TYPES.MemberExpression) {
+        return false;
     }
-
     if (
         node.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
         node.property.name === "prototype"
     ) {
         return true;
     }
-
+    if (
+        node.computed &&
+        node.property.type === TSESTree.AST_NODE_TYPES.Literal &&
+        node.property.value === "prototype"
+    ) {
+        return true;
+    }
     return false;
+}
+
+function isPrototypeMemberAccess(node: TSESTree.MemberExpression): boolean {
+    return isPrototypeAccess(node.object);
 }
 
 function getMemberName(node: TSESTree.MemberExpression): string {
@@ -45,13 +49,21 @@ function getMemberName(node: TSESTree.MemberExpression): string {
     return parts.join(".");
 }
 
-function isPrototypeMemberExpression(node: TSESTree.Node): boolean {
-    if (node.type !== TSESTree.AST_NODE_TYPES.MemberExpression) {
-        return false;
-    }
+const PROTO_METHODS = {
+    defineProperty: "definePropertyOnPrototype",
+    defineProperties: "definePropertyOnPrototype",
+    assign: "assignToPrototype",
+    set: "assignToPrototype",
+} as const;
+
+function isGetPrototypeOfCall(node: TSESTree.Expression): boolean {
     return (
-        node.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
-        node.property.name === "prototype"
+        node.type === TSESTree.AST_NODE_TYPES.CallExpression &&
+        node.callee.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
+        node.callee.object.type === TSESTree.AST_NODE_TYPES.Identifier &&
+        (node.callee.object.name === "Object" || node.callee.object.name === "Reflect") &&
+        node.callee.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
+        node.callee.property.name === "getPrototypeOf"
     );
 }
 
@@ -71,6 +83,12 @@ export default ruleCreator({
                 "Do not use `Object.defineProperty` on `{{name}}`. Directly modifying prototypes is unsafe and discouraged.",
             assignToPrototype:
                 "Do not use `Object.assign` on `{{name}}`. Directly modifying prototypes is unsafe and discouraged.",
+            setPrototypeOf:
+                "Do not use `Object.setPrototypeOf` on a prototype. Directly modifying prototypes is unsafe and discouraged.",
+            deletePrototypeMember:
+                "Do not delete `{{name}}`. Directly modifying prototypes is unsafe and discouraged.",
+            getPrototypeOfAssignment:
+                "Do not assign to a member of `Object.getPrototypeOf(...)`. Directly modifying prototypes is unsafe and discouraged.",
         },
     },
     defaultOptions: [],
@@ -78,54 +96,39 @@ export default ruleCreator({
         return {
             CallExpression(node: TSESTree.CallExpression) {
                 if (
-                    node.callee.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
-                    node.callee.object.type === TSESTree.AST_NODE_TYPES.Identifier &&
-                    node.callee.object.name === "Object" &&
-                    node.callee.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
-                    node.callee.property.name === "defineProperty" &&
-                    node.arguments.length >= 2 &&
-                    isPrototypeMemberExpression(node.arguments[0])
+                    node.callee.type !== TSESTree.AST_NODE_TYPES.MemberExpression ||
+                    node.callee.object.type !== TSESTree.AST_NODE_TYPES.Identifier ||
+                    node.callee.property.type !== TSESTree.AST_NODE_TYPES.Identifier
                 ) {
-                    const target = node.arguments[0] as TSESTree.MemberExpression;
+                    return;
+                }
+
+                const objectName = node.callee.object.name;
+                const methodName = node.callee.property.name;
+
+                if (
+                    (objectName === "Object" || objectName === "Reflect") &&
+                    methodName === "setPrototypeOf" &&
+                    node.arguments.length >= 1 &&
+                    isPrototypeAccess(node.arguments[0])
+                ) {
                     context.report({
                         node,
-                        messageId: "definePropertyOnPrototype",
-                        data: { name: getMemberName(target) },
+                        messageId: "setPrototypeOf",
                     });
                     return;
                 }
 
                 if (
-                    node.callee.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
-                    node.callee.object.type === TSESTree.AST_NODE_TYPES.Identifier &&
-                    node.callee.object.name === "Object" &&
-                    node.callee.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
-                    node.callee.property.name === "defineProperties" &&
+                    (objectName === "Object" || objectName === "Reflect") &&
+                    methodName in PROTO_METHODS &&
                     node.arguments.length >= 1 &&
-                    isPrototypeMemberExpression(node.arguments[0])
+                    isPrototypeAccess(node.arguments[0])
                 ) {
                     const target = node.arguments[0] as TSESTree.MemberExpression;
                     context.report({
                         node,
-                        messageId: "definePropertyOnPrototype",
-                        data: { name: getMemberName(target) },
-                    });
-                    return;
-                }
-
-                if (
-                    node.callee.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
-                    node.callee.object.type === TSESTree.AST_NODE_TYPES.Identifier &&
-                    node.callee.object.name === "Object" &&
-                    node.callee.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
-                    node.callee.property.name === "assign" &&
-                    node.arguments.length >= 1 &&
-                    isPrototypeMemberExpression(node.arguments[0])
-                ) {
-                    const target = node.arguments[0] as TSESTree.MemberExpression;
-                    context.report({
-                        node,
-                        messageId: "assignToPrototype",
+                        messageId: PROTO_METHODS[methodName as keyof typeof PROTO_METHODS],
                         data: { name: getMemberName(target) },
                     });
                     return;
@@ -137,11 +140,33 @@ export default ruleCreator({
                     return;
                 }
 
-                if (isPrototypeAccess(node.left)) {
+                if (isGetPrototypeOfCall(node.left.object)) {
+                    context.report({
+                        node,
+                        messageId: "getPrototypeOfAssignment",
+                    });
+                    return;
+                }
+
+                if (isPrototypeMemberAccess(node.left) || isPrototypeAccess(node.left)) {
                     context.report({
                         node,
                         messageId: "directPrototypeAssignment",
                         data: { name: getMemberName(node.left) },
+                    });
+                }
+            },
+
+            UnaryExpression(node: TSESTree.UnaryExpression) {
+                if (
+                    node.operator === "delete" &&
+                    node.argument.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
+                    isPrototypeMemberAccess(node.argument)
+                ) {
+                    context.report({
+                        node,
+                        messageId: "deletePrototypeMember",
+                        data: { name: getMemberName(node.argument) },
                     });
                 }
             },
