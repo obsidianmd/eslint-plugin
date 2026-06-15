@@ -1,33 +1,14 @@
 import assert from "node:assert";
+import { ESLint } from "eslint";
 import plugin from "../lib/index.js";
 
-function resolveRulesForFile(configs: any[], filename: string): Record<string, any> {
-	const resolved: Record<string, any> = {};
-
-	for (const config of configs) {
-		if (config.files) {
-			const patterns: unknown[] = Array.isArray(config.files) ? config.files : [config.files];
-			const matches = patterns.some((p: unknown) => {
-				if (typeof p !== "string") return false;
-				if (p === filename) return true;
-				if (p.startsWith("**/") && filename.endsWith(p.slice(3))) return true;
-				if (p.startsWith("**/*.") && filename.endsWith(p.slice(4))) return true;
-				return false;
-			});
-			if (!matches) continue;
-		}
-
-		if (config.extends) {
-			const extendsArr = Array.isArray(config.extends) ? config.extends : [config.extends];
-			const extendedRules = resolveRulesForFile(extendsArr, filename);
-			Object.assign(resolved, extendedRules);
-		}
-
-		if (config.rules) {
-			Object.assign(resolved, config.rules);
-		}
-	}
-	return resolved;
+async function rulesFor(configName: keyof typeof plugin.configs, filename: string): Promise<Record<string, any>> {
+	const eslint = new ESLint({
+		overrideConfigFile: true,
+		overrideConfig: plugin.configs[configName],
+	});
+	const cfg = await eslint.calculateConfigForFile(filename);
+	return cfg.rules ?? {};
 }
 
 function getSeverity(ruleValue: any): string {
@@ -58,8 +39,13 @@ describe("recommended config", () => {
 	});
 
 	describe("structure", () => {
-		const tsRules = resolveRulesForFile(plugin.configs.recommended, "src/main.ts");
-		const jsRules = resolveRulesForFile(plugin.configs.recommended, "src/main.js");
+		let tsRules: Record<string, any>;
+		let jsRules: Record<string, any>;
+
+		before(async () => {
+			tsRules = await rulesFor("recommended", "src/main.ts");
+			jsRules = await rulesFor("recommended", "src/main.js");
+		});
 
 		it("should resolve rules for .ts files", () => {
 			assert.ok(Object.keys(tsRules).length > 0, "should have rules for .ts files");

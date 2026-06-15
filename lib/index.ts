@@ -36,11 +36,13 @@ import js from "@eslint/js";
 import json from "@eslint/json";
 import tseslint from "typescript-eslint";
 import sdl from "@microsoft/eslint-plugin-sdl";
-import importPlugin from "eslint-plugin-import";
+import * as importPlugin from "eslint-plugin-import";
+const importPluginObj = importPlugin as unknown as ESLint.Plugin;
 import depend from 'eslint-plugin-depend';
 import globals from "globals";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { Config, defineConfig } from "eslint/config";
 import type { RuleDefinition, RuleDefinitionTypeOptions, RulesConfig } from "@eslint/core";
 import noUnsanitizedPlugin from "eslint-plugin-no-unsanitized";
@@ -51,7 +53,11 @@ interface PackageJson {
 }
 
 const manifest = getManifest();
-const currentDir = import.meta.dirname ?? path.dirname(new URL(import.meta.url).pathname);
+// fileURLToPath handles file:// URLs correctly on all platforms (including Windows),
+// unlike new URL().pathname which yields /C:/... on Windows.
+const currentDir = import.meta.dirname ?? path.dirname(fileURLToPath(import.meta.url));
+// Resolve package.json from both possible locations: the path differs between
+// source layout (../package.json) and build output (../../package.json).
 const packageJsonPath = fs.existsSync(path.join(currentDir, "../../package.json"))
     ? path.join(currentDir, "../../package.json")
     : path.join(currentDir, "../package.json");
@@ -229,7 +235,7 @@ const flatRecommendedConfig: Config[] = defineConfig([
     },
     {
         plugins: {
-            import: importPlugin,
+            import: importPluginObj,
             "@microsoft/sdl": sdl,
             depend,
             noUnsanitizedPlugin
@@ -243,7 +249,7 @@ const flatRecommendedConfig: Config[] = defineConfig([
     },
     {
         plugins: {
-            import: importPlugin,
+            import: importPluginObj,
             "@microsoft/sdl": sdl,
             depend,
             noUnsanitizedPlugin
@@ -358,6 +364,9 @@ const recommendedWithLocalesEnBase: Config[] = defineConfig([
     }
 ]);
 
+// Inherits all base rules via recommendedPluginRulesConfigBase (JS+TS) and adds
+// type-checked rules for TS files. Locale-specific overrides (e.g. sentence-case-json
+// set to "warn" for en.json) are applied inside recommendedWithLocalesEnBase.
 const recommendedWithLocalesEn: Config[] = defineConfig([
     {
         rules: recommendedPluginRulesConfigBase,
