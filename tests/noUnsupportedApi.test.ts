@@ -102,6 +102,18 @@ ruleTester.run("no-unsupported-api", rule, {
             options: [{ minAppVersion: "1.0.0" }],
         },
         {
+            name: "API guarded by requireApiVersion if-statement with constant variable is allowed",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                const version = "1.10.0";
+                if (requireApiVersion(version)) {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
             name: "API guarded by requireApiVersion with && in if-test is allowed",
             code: `
                 import { requireApiVersion, App } from 'obsidian';
