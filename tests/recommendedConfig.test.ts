@@ -27,6 +27,19 @@ function getSeverity(ruleValue: any): string {
 
 const VALID_SEVERITIES = new Set(["off", "warn", "error"]);
 
+// Exhaustive list of obsidianmd rules that call getParserServices.
+// If you add a rule that uses getParserServices, add it here.
+// These rules MUST be in recommendedPluginRulesConfigTypeChecked (TS only),
+// NOT in recommendedPluginRulesConfigBase (which also applies to JS).
+const TYPE_CHECKED_RULES = [
+	"obsidianmd/no-plugin-as-component",
+	"obsidianmd/no-view-references-in-plugin",
+	"obsidianmd/no-unsupported-api",
+	"obsidianmd/prefer-create-el",
+	"obsidianmd/prefer-file-manager-trash-file",
+	"obsidianmd/prefer-instanceof",
+];
+
 describe("recommended config", () => {
 	it("should be exported as a non-empty array", () => {
 		assert.ok(Array.isArray(plugin.configs.recommended));
@@ -66,9 +79,14 @@ describe("recommended config", () => {
 		});
 
 		it("every registered obsidianmd rule should appear in the .ts config", () => {
+			const fileSpecificRules = new Set([
+				"obsidianmd/ui/sentence-case-json",
+				"obsidianmd/ui/sentence-case-locale-module",
+			]);
 			const registeredRules = Object.keys(plugin.rules);
 			for (const rule of registeredRules) {
 				const prefixed = `obsidianmd/${rule}`;
+				if (fileSpecificRules.has(prefixed)) continue;
 				assert.ok(
 					prefixed in tsRules,
 					`registered rule ${prefixed} is not referenced in the recommended config for .ts files`
@@ -77,14 +95,7 @@ describe("recommended config", () => {
 		});
 
 		it("type-checked rules should not appear in JS config", () => {
-			const typeCheckedRules = [
-				"obsidianmd/no-plugin-as-component",
-				"obsidianmd/no-view-references-in-plugin",
-				"obsidianmd/no-unsupported-api",
-				"obsidianmd/prefer-file-manager-trash-file",
-				"obsidianmd/prefer-instanceof",
-			];
-			for (const rule of typeCheckedRules) {
+			for (const rule of TYPE_CHECKED_RULES) {
 				assert.ok(
 					!(rule in jsRules),
 					`type-checked rule ${rule} should NOT be in the JS config (would crash without type info)`
@@ -93,14 +104,7 @@ describe("recommended config", () => {
 		});
 
 		it("type-checked rules should appear in TS config", () => {
-			const typeCheckedRules = [
-				"obsidianmd/no-plugin-as-component",
-				"obsidianmd/no-view-references-in-plugin",
-				"obsidianmd/no-unsupported-api",
-				"obsidianmd/prefer-file-manager-trash-file",
-				"obsidianmd/prefer-instanceof",
-			];
-			for (const rule of typeCheckedRules) {
+			for (const rule of TYPE_CHECKED_RULES) {
 				assert.ok(
 					rule in tsRules,
 					`type-checked rule ${rule} should be in the TS config`
@@ -115,7 +119,6 @@ describe("recommended config", () => {
 				"obsidianmd/no-forbidden-elements",
 				"obsidianmd/no-global-this",
 				"obsidianmd/prefer-window-timers",
-				"obsidianmd/prefer-create-el",
 			];
 			for (const rule of baseRules) {
 				assert.ok(
@@ -135,5 +138,87 @@ describe("recommendedWithLocalesEn config", () => {
 	it("should be exported as a non-empty array", () => {
 		assert.ok(Array.isArray(plugin.configs.recommendedWithLocalesEn));
 		assert.ok(plugin.configs.recommendedWithLocalesEn.length > 0);
+	});
+
+	describe("structure", () => {
+		let tsRules: Record<string, any>;
+		let jsRules: Record<string, any>;
+		let enJsonRules: Record<string, any>;
+		let enTsRules: Record<string, any>;
+
+		before(async () => {
+			tsRules = await rulesFor("recommendedWithLocalesEn", "src/main.ts");
+			jsRules = await rulesFor("recommendedWithLocalesEn", "src/main.js");
+			enJsonRules = await rulesFor("recommendedWithLocalesEn", "locales/en.json");
+			enTsRules = await rulesFor("recommendedWithLocalesEn", "locales/en.ts");
+		});
+
+		it("sentence-case-json should be 'warn' for en.json files", () => {
+			assert.strictEqual(
+				getSeverity(enJsonRules["obsidianmd/ui/sentence-case-json"]),
+				"warn"
+			);
+		});
+
+		it("sentence-case-locale-module should be 'warn' for en.ts files", () => {
+			assert.strictEqual(
+				getSeverity(enTsRules["obsidianmd/ui/sentence-case-locale-module"]),
+				"warn"
+			);
+		});
+
+		it("sentence-case-json should be off or absent for non-en files", () => {
+			const severity = getSeverity(tsRules["obsidianmd/ui/sentence-case-json"]);
+			assert.ok(
+				severity === "off" || !("obsidianmd/ui/sentence-case-json" in tsRules),
+				`sentence-case-json should be off or absent for non-en files, got: ${severity}`
+			);
+		});
+
+		it("type-checked rules should not appear in JS config", () => {
+			for (const rule of TYPE_CHECKED_RULES) {
+				assert.ok(
+					!(rule in jsRules),
+					`type-checked rule ${rule} should NOT be in the JS config for recommendedWithLocalesEn`
+				);
+			}
+		});
+
+		it("type-checked rules should appear in TS config", () => {
+			for (const rule of TYPE_CHECKED_RULES) {
+				assert.ok(
+					rule in tsRules,
+					`type-checked rule ${rule} should be in the TS config for recommendedWithLocalesEn`
+				);
+			}
+		});
+	});
+});
+
+describe("type-checked rule guard", () => {
+	let jsRules: Record<string, any>;
+	let tsRules: Record<string, any>;
+
+	before(async () => {
+		jsRules = await rulesFor("recommended", "src/main.js");
+		tsRules = await rulesFor("recommended", "src/main.ts");
+	});
+
+	it("type-requiring rules must not appear in JS config", () => {
+		for (const rule of TYPE_CHECKED_RULES) {
+			assert.ok(
+				!(rule in jsRules),
+				`${rule} requires type info (getParserServices) but appears in JS config — move it to recommendedPluginRulesConfigTypeChecked only`
+			);
+		}
+	});
+
+	it("type-requiring rules must appear in TS config", () => {
+		for (const rule of TYPE_CHECKED_RULES) {
+			assert.ok(
+				rule in tsRules,
+				`${rule} requires type info but is missing from TS config — add it to recommendedPluginRulesConfigTypeChecked`
+			);
+		}
 	});
 });

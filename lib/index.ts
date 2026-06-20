@@ -161,7 +161,6 @@ const recommendedPluginRulesConfigBase: RulesConfig = {
     "obsidianmd/platform": "error",
     "obsidianmd/prefer-get-language": "error",
     "obsidianmd/prefer-abstract-input-suggest": "error",
-    "obsidianmd/prefer-create-el": "error",
     "obsidianmd/prefer-window-timers": "error",
     "obsidianmd/prefer-active-doc": "off",
     "obsidianmd/regex-lookbehind": "error",
@@ -169,8 +168,6 @@ const recommendedPluginRulesConfigBase: RulesConfig = {
     "obsidianmd/validate-manifest": "error",
     "obsidianmd/validate-license": ["error"],
     "obsidianmd/ui/sentence-case": ["error", { enforceCamelCaseLower: true }],
-    "obsidianmd/ui/sentence-case-json": "off",
-    "obsidianmd/ui/sentence-case-locale-module": "off",
 }
 
 // Combined rules for TypeScript files
@@ -307,16 +304,7 @@ const flatRecommendedConfig: Config[] = defineConfig([
     }
 ]);
 
-const hybridRecommendedConfig: Config[] = defineConfig([
-    {
-        rules: recommendedPluginRulesConfigBase,
-        extends: flatRecommendedConfig
-    },
-    {
-        files: ['**/*.ts', '**/*.tsx'],
-        rules: recommendedPluginRulesConfigTypeChecked
-    },
-]);
+const hybridRecommendedConfig: Config[] = flatRecommendedConfig;
 
 const recommendedWithLocalesEnBase: Config[] = defineConfig([
     ...flatRecommendedConfig,
@@ -363,19 +351,7 @@ const recommendedWithLocalesEnBase: Config[] = defineConfig([
     }
 ]);
 
-// Inherits all base rules via recommendedPluginRulesConfigBase (JS+TS) and adds
-// type-checked rules for TS files. Locale-specific overrides (e.g. sentence-case-json
-// set to "warn" for en.json) are applied inside recommendedWithLocalesEnBase.
-const recommendedWithLocalesEn: Config[] = defineConfig([
-    {
-        rules: recommendedPluginRulesConfigBase,
-        extends: recommendedWithLocalesEnBase
-    },
-    {
-        files: ['**/*.ts', '**/*.tsx'],
-        rules: recommendedPluginRulesConfigTypeChecked
-    },
-]);
+const recommendedWithLocalesEn: Config[] = recommendedWithLocalesEnBase;
 
 plugin.configs = {
     recommended: hybridRecommendedConfig,
