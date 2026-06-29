@@ -236,7 +236,7 @@ const flatRecommendedConfig: Config[] = defineConfig([
             depend,
             noUnsanitizedPlugin
         },
-        files: ['**/*.js', "**/*.jsx"],
+        files: ['**/*.{js,cjs,mjs,jsx}'],
         extends: [...(tseslint.configs.recommended as Config[]), noUnsanitizedPlugin.configs.recommended],
         rules: {
             ...flatRecommendedGeneralRules,
@@ -250,7 +250,7 @@ const flatRecommendedConfig: Config[] = defineConfig([
             depend,
             noUnsanitizedPlugin
         },
-        files: ['**/*.ts', "**/*.tsx"],
+        files: ['**/*.{ts,cts,mts,tsx}'],
         extends: [...(tseslint.configs.recommendedTypeChecked as Config[]), noUnsanitizedPlugin.configs.recommended],
         rules: {
             ...flatRecommendedGeneralRules,
@@ -304,9 +304,7 @@ const flatRecommendedConfig: Config[] = defineConfig([
     }
 ]);
 
-const hybridRecommendedConfig: Config[] = flatRecommendedConfig;
-
-const recommendedWithLocalesEnBase: Config[] = defineConfig([
+const recommendedWithLocalesEn: Config[] = defineConfig([
     ...flatRecommendedConfig,
     {
         plugins: { obsidianmd: plugin },
@@ -351,10 +349,8 @@ const recommendedWithLocalesEnBase: Config[] = defineConfig([
     }
 ]);
 
-const recommendedWithLocalesEn: Config[] = recommendedWithLocalesEnBase;
-
 plugin.configs = {
-    recommended: hybridRecommendedConfig,
+    recommended: flatRecommendedConfig,
     recommendedWithLocalesEn
 };
 
