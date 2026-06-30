@@ -12,16 +12,15 @@ declare module "@microsoft/eslint-plugin-sdl" {
 }
 
 declare module "eslint-plugin-import" {
-    import type { ESLint, Rule } from "eslint";
+    import type { Rule } from "eslint";
 
-    interface ImportPlugin extends ESLint.Plugin {
-        rules: {
-            "no-extraneous-dependencies": Rule.RuleModule;
-            "no-nodejs-modules": Rule.RuleModule;
-        };
-    }
-    const plugin: ImportPlugin;
-    export default plugin;
+    export const rules: {
+        "no-extraneous-dependencies": Rule.RuleModule;
+        "no-nodejs-modules": Rule.RuleModule;
+        [key: string]: Rule.RuleModule;
+    };
+    export const configs: Record<string, unknown>;
+    export const flatConfigs: Record<string, unknown>;
 }
 
 

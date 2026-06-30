@@ -1,4 +1,4 @@
-import type { ESLint, Linter } from "eslint";
+import type { ESLint } from "eslint";
 import { commands } from "./rules/commands/index.js";
 import { settingsTab } from "./rules/settingsTab/index.js";
 import { vault } from "./rules/vault/index.js";
@@ -36,12 +36,13 @@ import js from "@eslint/js";
 import json from "@eslint/json";
 import tseslint from "typescript-eslint";
 import sdl from "@microsoft/eslint-plugin-sdl";
-import importPlugin from "eslint-plugin-import";
+import * as importPlugin from "eslint-plugin-import";
 import depend from 'eslint-plugin-depend';
 import globals from "globals";
 import fs from "node:fs";
 import path from "node:path";
-import { Config, defineConfig, globalIgnores } from "eslint/config";
+import { fileURLToPath } from "node:url";
+import { Config, defineConfig } from "eslint/config";
 import type { RuleDefinition, RuleDefinitionTypeOptions, RulesConfig } from "@eslint/core";
 import noUnsanitizedPlugin from "eslint-plugin-no-unsanitized";
 
@@ -51,7 +52,15 @@ interface PackageJson {
 }
 
 const manifest = getManifest();
-const packageJson = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, "../../package.json"), "utf8")) as PackageJson;
+// fileURLToPath handles file:// URLs correctly on all platforms (including Windows),
+// unlike new URL().pathname which yields /C:/... on Windows.
+const currentDir = import.meta.dirname ?? path.dirname(fileURLToPath(import.meta.url));
+// Resolve package.json from both possible locations: the path differs between
+// source layout (../package.json) and build output (../../package.json).
+const packageJsonPath = fs.existsSync(path.join(currentDir, "../../package.json"))
+    ? path.join(currentDir, "../../package.json")
+    : path.join(currentDir, "../package.json");
+const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8")) as PackageJson;
 
 const plugin = {
     meta: {
@@ -117,7 +126,7 @@ const plugin = {
 // These must only run on files linted with type information (the TS block,
 // which extends recommendedTypeChecked). Applying them to plain JS files
 // throws "you have used a rule which requires type information".
-const recommendedTypedRulesConfig: RulesConfig = {
+const recommendedPluginRulesConfigTypeChecked: RulesConfig = {
     "obsidianmd/no-plugin-as-component": "error",
     "obsidianmd/no-view-references-in-plugin": "error",
     "obsidianmd/no-unsupported-api": "error",
@@ -127,7 +136,7 @@ const recommendedTypedRulesConfig: RulesConfig = {
     "@typescript-eslint/no-deprecated": "error",
 };
 
-const recommendedPluginRulesConfig: RulesConfig = {
+const recommendedPluginRulesConfigBase: RulesConfig = {
     "obsidianmd/commands/no-command-in-command-id": "error",
     "obsidianmd/commands/no-command-in-command-name": "error",
     "obsidianmd/commands/no-default-hotkeys": "error",
@@ -153,13 +162,19 @@ const recommendedPluginRulesConfig: RulesConfig = {
     "obsidianmd/prefer-get-language": "error",
     "obsidianmd/prefer-abstract-input-suggest": "error",
     "obsidianmd/prefer-window-timers": "error",
-    "obsidianmd/prefer-active-doc": "warn",
+    "obsidianmd/prefer-active-doc": "off",
     "obsidianmd/regex-lookbehind": "error",
     "obsidianmd/sample-names": "error",
     "obsidianmd/validate-manifest": "error",
     "obsidianmd/validate-license": ["error"],
     "obsidianmd/ui/sentence-case": ["error", { enforceCamelCaseLower: true }],
 }
+
+// Combined rules for TypeScript files
+const recommendedPluginRulesConfig: RulesConfig = {
+    ...recommendedPluginRulesConfigBase,
+    ...recommendedPluginRulesConfigTypeChecked,
+};
 
 import { restrictedGlobalsOptions, restrictedImportsOptions, noUnusedExpressionsOptions } from "./ruleOptions.js";
 
@@ -216,31 +231,30 @@ const flatRecommendedConfig: Config[] = defineConfig([
     },
     {
         plugins: {
-            import: importPlugin,
+            import: importPlugin as ESLint.Plugin,
             "@microsoft/sdl": sdl,
             depend,
             noUnsanitizedPlugin
         },
-        files: ['**/*.js', "**/*.jsx"],
+        files: ['**/*.{js,cjs,mjs,jsx}'],
         extends: [...(tseslint.configs.recommended as Config[]), noUnsanitizedPlugin.configs.recommended],
         rules: {
             ...flatRecommendedGeneralRules,
-            ...recommendedPluginRulesConfig
+            ...recommendedPluginRulesConfigBase
         }
     },
     {
         plugins: {
-            import: importPlugin,
+            import: importPlugin as ESLint.Plugin,
             "@microsoft/sdl": sdl,
             depend,
             noUnsanitizedPlugin
         },
-        files: ['**/*.ts', "**/*.tsx"],
+        files: ['**/*.{ts,cts,mts,tsx}'],
         extends: [...(tseslint.configs.recommendedTypeChecked as Config[]), noUnsanitizedPlugin.configs.recommended],
         rules: {
             ...flatRecommendedGeneralRules,
-            ...recommendedPluginRulesConfig,
-            ...recommendedTypedRulesConfig
+            ...recommendedPluginRulesConfig
         },
     },
     {
@@ -290,18 +304,7 @@ const flatRecommendedConfig: Config[] = defineConfig([
     }
 ]);
 
-const hybridRecommendedConfig: Config[] = defineConfig([
-    {
-        rules: recommendedPluginRulesConfig,
-        extends: flatRecommendedConfig
-    },
-    {
-        files: ['**/*.ts', '**/*.tsx'],
-        rules: recommendedTypedRulesConfig
-    },
-]);
-
-const recommendedWithLocalesEnBase: Config[] = defineConfig([
+const recommendedWithLocalesEn: Config[] = defineConfig([
     ...flatRecommendedConfig,
     {
         plugins: { obsidianmd: plugin },
@@ -346,19 +349,8 @@ const recommendedWithLocalesEnBase: Config[] = defineConfig([
     }
 ]);
 
-const recommendedWithLocalesEn: Config[] = defineConfig([
-    {
-        rules: recommendedPluginRulesConfig,
-        extends: recommendedWithLocalesEnBase
-    },
-    {
-        files: ['**/*.ts', '**/*.tsx'],
-        rules: recommendedTypedRulesConfig
-    },
-]);
-
 plugin.configs = {
-    recommended: hybridRecommendedConfig,
+    recommended: flatRecommendedConfig,
     recommendedWithLocalesEn
 };
 
