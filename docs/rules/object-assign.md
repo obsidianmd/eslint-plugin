@@ -2,6 +2,6 @@
 
 📝 Discourage using `Object.assign` with two arguments.
 
-💼 This rule is enabled in the following configs: ✅ `recommended`, 🇬🇧 `recommendedWithLocalesEn`.
+⚠️ This rule _warns_ in the following configs: ✅ `recommended`, 🇬🇧 `recommendedWithLocalesEn`.
 
 <!-- end auto-generated rule header -->

@@ -195,6 +195,137 @@ describe("recommendedWithLocalesEn config", () => {
 	});
 });
 
+describe("scanner-aligned severities", () => {
+	let tsRules: Record<string, any>;
+	let jsRules: Record<string, any>;
+
+	before(async () => {
+		tsRules = await rulesFor("recommended", "src/main.ts");
+		jsRules = await rulesFor("recommended", "src/main.js");
+	});
+
+	it("security rules should be at error", () => {
+		const securityRules = [
+			"no-eval",
+			"no-implied-eval",
+			"no-unsanitized/method",
+			"no-unsanitized/property",
+		];
+		for (const rule of securityRules) {
+			assert.strictEqual(
+				getSeverity(tsRules[rule]),
+				"error",
+				`security rule ${rule} should be 'error'`
+			);
+		}
+	});
+
+	it("scanner-escalated obsidianmd rules should be at error", () => {
+		const escalatedRules = [
+			"obsidianmd/detach-leaves",
+			"obsidianmd/platform",
+			"obsidianmd/sample-names",
+			"obsidianmd/no-sample-code",
+			"obsidianmd/no-static-styles-assignment",
+			"obsidianmd/settings-tab/no-manual-html-headings",
+			"obsidianmd/settings-tab/no-problematic-settings-headings",
+			"obsidianmd/no-forbidden-elements",
+			"obsidianmd/regex-lookbehind",
+		];
+		for (const rule of escalatedRules) {
+			assert.strictEqual(
+				getSeverity(tsRules[rule]),
+				"error",
+				`scanner-escalated rule ${rule} should be 'error'`
+			);
+		}
+	});
+
+	it("scanner-escalated type-checked rules should be at error", () => {
+		const escalatedTypeChecked = [
+			"obsidianmd/no-plugin-as-component",
+			"obsidianmd/no-view-references-in-plugin",
+			"obsidianmd/no-unsupported-api",
+		];
+		for (const rule of escalatedTypeChecked) {
+			assert.strictEqual(
+				getSeverity(tsRules[rule]),
+				"error",
+				`scanner-escalated type-checked rule ${rule} should be 'error'`
+			);
+		}
+	});
+
+	it("non-escalated obsidianmd rules should be at warn", () => {
+		const warnRules = [
+			"obsidianmd/commands/no-command-in-command-id",
+			"obsidianmd/commands/no-command-in-command-name",
+			"obsidianmd/commands/no-default-hotkeys",
+			"obsidianmd/commands/no-plugin-id-in-command-id",
+			"obsidianmd/commands/no-plugin-name-in-command-name",
+			"obsidianmd/settings-tab/require-display",
+			"obsidianmd/vault/iterate",
+			"obsidianmd/editor-drop-paste",
+			"obsidianmd/hardcoded-config-path",
+			"obsidianmd/no-global-this",
+			"obsidianmd/no-tfile-tfolder-cast",
+			"obsidianmd/object-assign",
+			"obsidianmd/prefer-get-language",
+			"obsidianmd/prefer-abstract-input-suggest",
+			"obsidianmd/prefer-window-timers",
+			"obsidianmd/validate-manifest",
+			"obsidianmd/validate-license",
+			"obsidianmd/ui/sentence-case",
+		];
+		for (const rule of warnRules) {
+			assert.strictEqual(
+				getSeverity(jsRules[rule]),
+				"warn",
+				`non-escalated rule ${rule} should be 'warn'`
+			);
+		}
+	});
+
+	it("non-escalated type-checked rules should be at warn", () => {
+		const warnTypeChecked = [
+			"obsidianmd/prefer-create-el",
+			"obsidianmd/prefer-instanceof",
+			"@typescript-eslint/no-deprecated",
+		];
+		for (const rule of warnTypeChecked) {
+			assert.strictEqual(
+				getSeverity(tsRules[rule]),
+				"warn",
+				`non-escalated type-checked rule ${rule} should be 'warn'`
+			);
+		}
+	});
+
+	it("eslint-comments rules should be at error", () => {
+		const eslintCommentsRules = [
+			"eslint-comments/no-unlimited-disable",
+			"eslint-comments/require-description",
+			"eslint-comments/disable-enable-pair",
+			"eslint-comments/no-restricted-disable",
+		];
+		for (const rule of eslintCommentsRules) {
+			assert.strictEqual(
+				getSeverity(tsRules[rule]),
+				"error",
+				`eslint-comments rule ${rule} should be 'error'`
+			);
+		}
+	});
+
+	it("rule-custom-message should be at error", () => {
+		assert.strictEqual(
+			getSeverity(tsRules["obsidianmd/rule-custom-message"]),
+			"error",
+			"rule-custom-message should be 'error'"
+		);
+	});
+});
+
 describe("type-checked rule guard", () => {
 	let jsRules: Record<string, any>;
 	let tsRules: Record<string, any>;
