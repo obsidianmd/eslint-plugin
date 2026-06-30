@@ -45,6 +45,7 @@ import { fileURLToPath } from "node:url";
 import { Config, defineConfig } from "eslint/config";
 import type { RuleDefinition, RuleDefinitionTypeOptions, RulesConfig } from "@eslint/core";
 import noUnsanitizedPlugin from "eslint-plugin-no-unsanitized";
+import eslintComments from "@eslint-community/eslint-plugin-eslint-comments";
 
 interface PackageJson {
     name: string;
@@ -130,44 +131,44 @@ const recommendedPluginRulesConfigTypeChecked: RulesConfig = {
     "obsidianmd/no-plugin-as-component": "error",
     "obsidianmd/no-view-references-in-plugin": "error",
     "obsidianmd/no-unsupported-api": "error",
-    "obsidianmd/prefer-create-el": "error",
+    "obsidianmd/prefer-create-el": "warn",
     "obsidianmd/prefer-file-manager-trash-file": "warn",
-    "obsidianmd/prefer-instanceof": "error",
-    "@typescript-eslint/no-deprecated": "error",
+    "obsidianmd/prefer-instanceof": "warn",
+    "@typescript-eslint/no-deprecated": "warn",
 };
 
 const recommendedPluginRulesConfigBase: RulesConfig = {
-    "obsidianmd/commands/no-command-in-command-id": "error",
-    "obsidianmd/commands/no-command-in-command-name": "error",
-    "obsidianmd/commands/no-default-hotkeys": "error",
-    "obsidianmd/commands/no-plugin-id-in-command-id": "error",
-    "obsidianmd/commands/no-plugin-name-in-command-name": "error",
+    "obsidianmd/commands/no-command-in-command-id": "warn",
+    "obsidianmd/commands/no-command-in-command-name": "warn",
+    "obsidianmd/commands/no-default-hotkeys": "warn",
+    "obsidianmd/commands/no-plugin-id-in-command-id": "warn",
+    "obsidianmd/commands/no-plugin-name-in-command-name": "warn",
     "obsidianmd/settings-tab/no-manual-html-headings": "error",
     "obsidianmd/settings-tab/no-problematic-settings-headings": "error",
-    "obsidianmd/settings-tab/require-display": "error",
+    "obsidianmd/settings-tab/require-display": "warn",
     "obsidianmd/settings-tab/prefer-setting-definitions": "warn",
     "obsidianmd/settings-tab/prefer-update-over-display": "warn",
     "obsidianmd/settings-tab/no-deprecated-display": "warn",
-    "obsidianmd/vault/iterate": "error",
+    "obsidianmd/vault/iterate": "warn",
     "obsidianmd/detach-leaves": "error",
-    "obsidianmd/editor-drop-paste": "error",
-    "obsidianmd/hardcoded-config-path": "error",
+    "obsidianmd/editor-drop-paste": "warn",
+    "obsidianmd/hardcoded-config-path": "warn",
     "obsidianmd/no-forbidden-elements": "error",
-    "obsidianmd/no-global-this": "error",
+    "obsidianmd/no-global-this": "warn",
     "obsidianmd/no-sample-code": "error",
-    "obsidianmd/no-tfile-tfolder-cast": "error",
+    "obsidianmd/no-tfile-tfolder-cast": "warn",
     "obsidianmd/no-static-styles-assignment": "error",
-    "obsidianmd/object-assign": "error",
+    "obsidianmd/object-assign": "warn",
     "obsidianmd/platform": "error",
-    "obsidianmd/prefer-get-language": "error",
-    "obsidianmd/prefer-abstract-input-suggest": "error",
-    "obsidianmd/prefer-window-timers": "error",
+    "obsidianmd/prefer-get-language": "warn",
+    "obsidianmd/prefer-abstract-input-suggest": "warn",
+    "obsidianmd/prefer-window-timers": "warn",
     "obsidianmd/prefer-active-doc": "off",
     "obsidianmd/regex-lookbehind": "error",
     "obsidianmd/sample-names": "error",
-    "obsidianmd/validate-manifest": "error",
-    "obsidianmd/validate-license": ["error"],
-    "obsidianmd/ui/sentence-case": ["error", { enforceCamelCaseLower: true }],
+    "obsidianmd/validate-manifest": "warn",
+    "obsidianmd/validate-license": ["warn"],
+    "obsidianmd/ui/sentence-case": ["warn", { enforceCamelCaseLower: true }],
 }
 
 // Combined rules for TypeScript files
@@ -185,30 +186,31 @@ const flatRecommendedGeneralRules: RulesConfig = {
     "no-self-compare": "warn",
     "no-eval": "error",
     "no-implied-eval": "error",
+    "no-new-func": "off", // handled by obsidianmd/rule-custom-message
     "prefer-const": "off",
-    "no-implicit-globals": "error",
+    "no-implicit-globals": "warn",
     "no-console": "off", // overridden by obsidianmd/rule-custom-message
-    "no-restricted-globals": ["error", ...restrictedGlobalsOptions],
+    "no-restricted-globals": ["warn", ...restrictedGlobalsOptions],
     // Use the @typescript-eslint variant so `allowTypeImports` is honored
     // (the core rule has no such option). The base rule must be disabled to
     // avoid double-reporting. See https://github.com/obsidianmd/eslint-plugin/issues/143
     "no-restricted-imports": "off",
-    "@typescript-eslint/no-restricted-imports": ["error", ...restrictedImportsOptions],
-    "no-alert": "error",
-    "no-undef": "error",
+    "@typescript-eslint/no-restricted-imports": ["warn", ...restrictedImportsOptions],
+    "no-alert": "warn",
+    "no-undef": "warn",
     "@typescript-eslint/ban-ts-comment": "off",
     "@typescript-eslint/no-unused-vars": ["warn", { args: "none", ignoreRestSiblings: true }],
-    "@typescript-eslint/no-unused-expressions": ["error", ...noUnusedExpressionsOptions],
+    "@typescript-eslint/no-unused-expressions": ["warn", ...noUnusedExpressionsOptions],
     "@typescript-eslint/require-await": "off",
     "@typescript-eslint/no-explicit-any": [
-        "error",
+        "warn",
         { fixToUnknown: true },
     ],
-    "@microsoft/sdl/no-document-write": "error",
-    "@microsoft/sdl/no-inner-html": "error",
+    "@microsoft/sdl/no-document-write": "warn",
+    "@microsoft/sdl/no-inner-html": "warn",
     "obsidianmd/no-nodejs-modules":
-        manifest && manifest.isDesktopOnly ? "off" : "error",
-    "import/no-extraneous-dependencies": "error",
+        manifest && manifest.isDesktopOnly ? "off" : "warn",
+    "import/no-extraneous-dependencies": "warn",
     "obsidianmd/rule-custom-message": [
         "error",
         {
@@ -217,9 +219,17 @@ const flatRecommendedGeneralRules: RulesConfig = {
                     "Unexpected console statement. Only these console methods are allowed: warn, error, debug.": "Avoid unnecessary logging to console. See https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#Avoid+unnecessary+logging+to+console",
                 },
                 options: [{ allow: ["warn", "error", "debug"] }],
-            }
+            },
+            "no-new-func": {
+                messages: {
+                    "The Function constructor is eval": "Using the `Function` constructor is dangerous because it executes arbitrary code, similar to `eval()`",
+                },
+            },
         }
-    ]
+    ],
+    // Security: explicitly enforce no-unsanitized rules at error
+    "no-unsanitized/method": "error",
+    "no-unsanitized/property": "error",
 };
 
 const flatRecommendedConfig: Config[] = defineConfig([
@@ -234,7 +244,8 @@ const flatRecommendedConfig: Config[] = defineConfig([
             import: importPlugin as ESLint.Plugin,
             "@microsoft/sdl": sdl,
             depend,
-            noUnsanitizedPlugin
+            noUnsanitizedPlugin,
+            "eslint-comments": eslintComments,
         },
         files: ['**/*.{js,cjs,mjs,jsx}'],
         extends: [...(tseslint.configs.recommended as Config[]), noUnsanitizedPlugin.configs.recommended],
@@ -248,7 +259,8 @@ const flatRecommendedConfig: Config[] = defineConfig([
             import: importPlugin as ESLint.Plugin,
             "@microsoft/sdl": sdl,
             depend,
-            noUnsanitizedPlugin
+            noUnsanitizedPlugin,
+            "eslint-comments": eslintComments,
         },
         files: ['**/*.{ts,cts,mts,tsx}'],
         extends: [...(tseslint.configs.recommendedTypeChecked as Config[]), noUnsanitizedPlugin.configs.recommended],
@@ -273,6 +285,34 @@ const flatRecommendedConfig: Config[] = defineConfig([
                 }
             ]
         }
+    },
+    {
+        files: ['**/*.{ts,cts,mts,tsx,js,cjs,mjs,jsx}'],
+        rules: {
+            "eslint-comments/no-unlimited-disable": "error",
+            "eslint-comments/require-description": "error",
+            "eslint-comments/disable-enable-pair": ["error", { allowWholeFile: false }],
+            "eslint-comments/no-restricted-disable": [
+                "error",
+                "obsidianmd/*",
+                "no-console",
+                "no-restricted-globals",
+                "no-restricted-imports",
+                "no-alert",
+                "@typescript-eslint/no-deprecated",
+                "@typescript-eslint/no-explicit-any",
+                "@microsoft/sdl/no-document-write",
+                "@microsoft/sdl/no-eval",
+                "@microsoft/sdl/no-inner-html",
+                "import/no-nodejs-modules",
+            ],
+        },
+    },
+    {
+        linterOptions: {
+            reportUnusedDisableDirectives: "error",
+            reportUnusedInlineConfigs: "error",
+        },
     },
     {
         languageOptions: {
