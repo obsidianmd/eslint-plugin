@@ -2,7 +2,7 @@
 
 📝 Validate the structure of copyright notices in LICENSE files for Obsidian plugins.
 
-💼 This rule is enabled in the following configs: ✅ `recommended`, 🇬🇧 `recommendedWithLocalesEn`.
+⚠️ This rule _warns_ in the following configs: ✅ `recommended`, 🇬🇧 `recommendedWithLocalesEn`.
 
 <!-- end auto-generated rule header -->
 
