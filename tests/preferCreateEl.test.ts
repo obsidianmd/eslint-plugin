@@ -259,6 +259,12 @@ ruleTester.run("prefer-create-el", preferCreateEl, {
             output: "(cond ? a : b).createDiv();",
             errors: [{ messageId: "preferCreateEl" }],
         },
+        {
+            name: "super.createEl('div') → super.createDiv() (not parenthesized)",
+            code: "class C extends B { m() { super.createEl('div'); } }",
+            output: "class C extends B { m() { super.createDiv(); } }",
+            errors: [{ messageId: "preferCreateEl" }],
+        },
 
         // --- Without Obsidian augmentations: suggestion only ---
         {

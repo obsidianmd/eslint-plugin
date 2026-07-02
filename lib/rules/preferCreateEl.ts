@@ -11,11 +11,14 @@ const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
 // Node types whose text can be used as the base of a `.member` access without
 // parentheses. Anything else (conditional, binary, arrow, etc.) binds looser
 // than member access and must be wrapped, e.g. `(cond ? a : b).win.createEl()`.
+// `Super` is included because it is only valid bare (`super.foo`) — wrapping it
+// as `(super).foo` is a syntax error.
 const MEMBER_ACCESS_SAFE_NODE_TYPES = new Set<TSESTree.AST_NODE_TYPES>([
     TSESTree.AST_NODE_TYPES.CallExpression,
     TSESTree.AST_NODE_TYPES.Identifier,
     TSESTree.AST_NODE_TYPES.MemberExpression,
     TSESTree.AST_NODE_TYPES.NewExpression,
+    TSESTree.AST_NODE_TYPES.Super,
     TSESTree.AST_NODE_TYPES.ThisExpression,
     TSESTree.AST_NODE_TYPES.TSNonNullExpression,
 ]);
