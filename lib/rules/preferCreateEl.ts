@@ -8,6 +8,18 @@ const TAG_SHORTHANDS: Record<string, string> = {
 
 const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
 
+// Node types whose text can be used as the base of a `.member` access without
+// parentheses. Anything else (conditional, binary, arrow, etc.) binds looser
+// than member access and must be wrapped, e.g. `(cond ? a : b).win.createEl()`.
+const MEMBER_ACCESS_SAFE_NODE_TYPES = new Set<TSESTree.AST_NODE_TYPES>([
+    TSESTree.AST_NODE_TYPES.CallExpression,
+    TSESTree.AST_NODE_TYPES.Identifier,
+    TSESTree.AST_NODE_TYPES.MemberExpression,
+    TSESTree.AST_NODE_TYPES.NewExpression,
+    TSESTree.AST_NODE_TYPES.ThisExpression,
+    TSESTree.AST_NODE_TYPES.TSNonNullExpression,
+]);
+
 export default ruleCreator({
     meta: {
         type: "suggestion" as const,
@@ -35,6 +47,18 @@ export default ruleCreator({
             return type.getProperty("createEl") !== undefined;
         }
 
+        function winHasObsidianDomHelpers(node: TSESTree.Node): boolean {
+            const type = services.getTypeAtLocation(node);
+            const winSymbol = type.getProperty("win");
+            if (winSymbol === undefined) {
+                return false;
+            }
+            const winType = services.program
+                .getTypeChecker()
+                .getTypeOfSymbol(winSymbol);
+            return winType.getProperty("createEl") !== undefined;
+        }
+
         function isDocumentType(node: TSESTree.Node): boolean {
             const type = services.getTypeAtLocation(node);
             return (
@@ -60,8 +84,8 @@ export default ruleCreator({
 
             if (isDocumentType(obj)) {
                 return {
-                    prefix: `${getText(obj)}.win.`,
-                    canAutofix: hasObsidianDomHelpers(obj),
+                    prefix: `${getObjectText(obj)}.win.`,
+                    canAutofix: winHasObsidianDomHelpers(obj),
                 };
             }
 
@@ -167,7 +191,7 @@ export default ruleCreator({
                 return;
             }
 
-            const prefix = obj && !isDocGlobal ? getText(obj) + "." : "";
+            const prefix = obj && !isDocGlobal ? getObjectText(obj) + "." : "";
             const remainingArgs = node.arguments.slice(1);
             const argsText = remainingArgs
                 .map((arg) => getText(arg))
@@ -254,6 +278,14 @@ export default ruleCreator({
 
         function getText(node: TSESTree.Node): string {
             return context.sourceCode.getText(node);
+        }
+
+        function getObjectText(obj: TSESTree.Expression): string {
+            const text = getText(obj);
+            if (MEMBER_ACCESS_SAFE_NODE_TYPES.has(obj.type)) {
+                return text;
+            }
+            return `(${text})`;
         }
 
         function getStringLiteralValue(
