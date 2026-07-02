@@ -88,6 +88,10 @@ ruleTester.run("prefer-create-el", preferCreateEl, {
             name: "createElementNS on non-document object is not flagged",
             code: "React.createElementNS('http://www.w3.org/2000/svg', 'path');",
         },
+        {
+            name: "createElement on a non-Document typed object is not flagged",
+            code: "declare const notDoc: { createElement(tag: string): unknown; };\nnotDoc.createElement('p');",
+        },
     ],
     invalid: [
         // --- With Obsidian augmentations: autofix ---
@@ -128,33 +132,81 @@ ruleTester.run("prefer-create-el", preferCreateEl, {
 
         // --- activeDocument: always autofix (Obsidian-only identifier) ---
         {
-            name: "activeDocument.createElement(tag) → activeDocument.createEl(tag)",
+            name: "activeDocument.createElement(tag) → activeWindow.createEl(tag)",
             code: "activeDocument.createElement('p');",
-            output: "activeDocument.createEl('p');",
+            output: "activeWindow.createEl('p');",
             errors: [{ messageId: "preferCreateEl" }],
         },
         {
-            name: "activeDocument.createElement('div') → activeDocument.createDiv()",
+            name: "activeDocument.createElement('div') → activeWindow.createDiv()",
             code: "activeDocument.createElement('div');",
-            output: "activeDocument.createDiv();",
+            output: "activeWindow.createDiv();",
             errors: [{ messageId: "preferCreateEl" }],
         },
         {
-            name: "activeDocument.createElement('span') → activeDocument.createSpan()",
+            name: "activeDocument.createElement('span') → activeWindow.createSpan()",
             code: "activeDocument.createElement('span');",
-            output: "activeDocument.createSpan();",
+            output: "activeWindow.createSpan();",
             errors: [{ messageId: "preferCreateEl" }],
         },
         {
-            name: "activeDocument.createElementNS(SVG_NS, tag) → activeDocument.createSvg(tag)",
+            name: "activeDocument.createElementNS(SVG_NS, tag) → activeWindow.createSvg(tag)",
             code: "activeDocument.createElementNS('http://www.w3.org/2000/svg', 'svg');",
-            output: "activeDocument.createSvg('svg');",
+            output: "activeWindow.createSvg('svg');",
             errors: [{ messageId: "preferCreateEl" }],
         },
         {
             name: "activeDocument.createDocumentFragment() → activeWindow.createFragment()",
             code: "activeDocument.createDocumentFragment();",
             output: "activeWindow.createFragment();",
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+
+        // --- Document-typed variable: use `doc.win.<helper>()` ---
+        {
+            name: "doc.createElement(tag) → doc.win.createEl(tag) for a Document variable with Obsidian types",
+            code: `${MOCK_OBSIDIAN_DOM}\ndeclare const doc: Document & { win: typeof globalThis };\ndoc.createElement('p');`,
+            output: `${MOCK_OBSIDIAN_DOM}\ndeclare const doc: Document & { win: typeof globalThis };\ndoc.win.createEl('p');`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        {
+            name: "doc.createElement('div') → doc.win.createDiv() for a Document variable with Obsidian types",
+            code: `${MOCK_OBSIDIAN_DOM}\ndeclare const doc: Document & { win: typeof globalThis };\ndoc.createElement('div');`,
+            output: `${MOCK_OBSIDIAN_DOM}\ndeclare const doc: Document & { win: typeof globalThis };\ndoc.win.createDiv();`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        {
+            name: "doc.createElementNS(SVG_NS, tag) → doc.win.createSvg(tag) for a Document variable with Obsidian types",
+            code: `${MOCK_OBSIDIAN_DOM}\ndeclare const doc: Document & { win: typeof globalThis };\ndoc.createElementNS('http://www.w3.org/2000/svg', 'path');`,
+            output: `${MOCK_OBSIDIAN_DOM}\ndeclare const doc: Document & { win: typeof globalThis };\ndoc.win.createSvg('path');`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        {
+            name: "doc.createDocumentFragment() → doc.win.createFragment() for a Document variable with Obsidian types",
+            code: `${MOCK_OBSIDIAN_DOM}\ndeclare const doc: Document & { win: typeof globalThis };\ndoc.createDocumentFragment();`,
+            output: `${MOCK_OBSIDIAN_DOM}\ndeclare const doc: Document & { win: typeof globalThis };\ndoc.win.createFragment();`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        {
+            name: "doc.createElement without Obsidian types offers suggestion for a Document variable",
+            code: `declare const doc: Document;\ndoc.createElement('p');`,
+            errors: [
+                {
+                    messageId: "preferCreateEl",
+                    suggestions: [
+                        {
+                            messageId: "preferCreateElSuggestion",
+                            output: `declare const doc: Document;\ndoc.win.createEl('p');`,
+                        },
+                    ],
+                },
+            ],
+        },
+
+        {
+            name: "complex Document expression is parenthesized in autofix",
+            code: `${MOCK_OBSIDIAN_DOM}\ndeclare const cond: boolean;\ndeclare const a: Document & { win: typeof globalThis };\ndeclare const b: Document & { win: typeof globalThis };\n(cond ? a : b).createElement('p');`,
+            output: `${MOCK_OBSIDIAN_DOM}\ndeclare const cond: boolean;\ndeclare const a: Document & { win: typeof globalThis };\ndeclare const b: Document & { win: typeof globalThis };\n(cond ? a : b).win.createEl('p');`,
             errors: [{ messageId: "preferCreateEl" }],
         },
 
@@ -199,6 +251,18 @@ ruleTester.run("prefer-create-el", preferCreateEl, {
             name: "this.containerEl.createEl('div') → this.containerEl.createDiv()",
             code: "this.containerEl.createEl('div');",
             output: "this.containerEl.createDiv();",
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        {
+            name: "complex expression is parenthesized in createEl shorthand autofix",
+            code: "(cond ? a : b).createEl('div');",
+            output: "(cond ? a : b).createDiv();",
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        {
+            name: "super.createEl('div') → super.createDiv() (not parenthesized)",
+            code: "class C extends B { m() { super.createEl('div'); } }",
+            output: "class C extends B { m() { super.createDiv(); } }",
             errors: [{ messageId: "preferCreateEl" }],
         },
 

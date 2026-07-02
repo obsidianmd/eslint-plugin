@@ -35,6 +35,51 @@ export default ruleCreator({
             return type.getProperty("createEl") !== undefined;
         }
 
+        function winHasObsidianDomHelpers(node: TSESTree.Node): boolean {
+            const type = services.getTypeAtLocation(node);
+            const winSymbol = type.getProperty("win");
+            if (winSymbol === undefined) {
+                return false;
+            }
+            const winType = services.program
+                .getTypeChecker()
+                .getTypeOfSymbol(winSymbol);
+            return winType.getProperty("createEl") !== undefined;
+        }
+
+        function isDocumentType(node: TSESTree.Node): boolean {
+            const type = services.getTypeAtLocation(node);
+            return (
+                type.getProperty("defaultView") !== undefined &&
+                type.getProperty("createElementNS") !== undefined &&
+                type.getProperty("createDocumentFragment") !== undefined
+            );
+        }
+
+        function classifyDocumentTarget(
+            obj: TSESTree.Expression,
+        ): { prefix: string; canAutofix: boolean } | null {
+            if (isGlobalDocument(obj)) {
+                return { prefix: "", canAutofix: hasObsidianDomHelpers(obj) };
+            }
+
+            const isActiveDoc =
+                obj.type === TSESTree.AST_NODE_TYPES.Identifier &&
+                obj.name === "activeDocument";
+            if (isActiveDoc) {
+                return { prefix: "activeWindow.", canAutofix: true };
+            }
+
+            if (isDocumentType(obj)) {
+                return {
+                    prefix: `${getObjectText(obj)}.win.`,
+                    canAutofix: winHasObsidianDomHelpers(obj),
+                };
+            }
+
+            return null;
+        }
+
         return {
             CallExpression(node: TSESTree.CallExpression) {
                 checkCreateElement(node);
@@ -54,30 +99,19 @@ export default ruleCreator({
                 return;
             }
 
-            const obj = node.callee.object;
-            const isDocGlobal = isGlobalDocument(obj);
-            const isActiveDoc =
-                obj.type === TSESTree.AST_NODE_TYPES.Identifier &&
-                obj.name === "activeDocument";
-
-            if (!isDocGlobal && !isActiveDoc) {
+            const target = classifyDocumentTarget(node.callee.object);
+            if (!target) {
                 return;
             }
 
-            const canAutofix = isActiveDoc || hasObsidianDomHelpers(obj);
             const tagArg = node.arguments[0];
             const tagName = getStringLiteralValue(tagArg);
             const shorthand = tagName ? TAG_SHORTHANDS[tagName] : undefined;
 
-            if (shorthand) {
-                const prefix = isDocGlobal ? "" : getText(obj) + ".";
-                const replacement = `${prefix}${shorthand}()`;
-                report(node, replacement, canAutofix);
-            } else {
-                const prefix = isDocGlobal ? "" : getText(obj) + ".";
-                const replacement = `${prefix}createEl(${getText(tagArg)})`;
-                report(node, replacement, canAutofix);
-            }
+            const replacement = shorthand
+                ? `${target.prefix}${shorthand}()`
+                : `${target.prefix}createEl(${getText(tagArg)})`;
+            report(node, replacement, target.canAutofix);
         }
 
         function checkCreateElementNS(node: TSESTree.CallExpression): void {
@@ -96,24 +130,17 @@ export default ruleCreator({
                 return;
             }
 
-            const obj = node.callee.object;
-            const isDocGlobal = isGlobalDocument(obj);
-            const isActiveDoc =
-                obj.type === TSESTree.AST_NODE_TYPES.Identifier &&
-                obj.name === "activeDocument";
-
-            if (!isDocGlobal && !isActiveDoc) {
+            const target = classifyDocumentTarget(node.callee.object);
+            if (!target) {
                 return;
             }
 
-            const canAutofix = isActiveDoc || hasObsidianDomHelpers(obj);
             const tagArg = node.arguments[1];
             const remainingArgs = node.arguments.slice(2);
-            const prefix = isDocGlobal ? "" : getText(obj) + ".";
             const argsText = [getText(tagArg), ...remainingArgs.map((arg) => getText(arg))].join(", ");
-            const replacement = `${prefix}createSvg(${argsText})`;
+            const replacement = `${target.prefix}createSvg(${argsText})`;
 
-            report(node, replacement, canAutofix);
+            report(node, replacement, target.canAutofix);
         }
 
         function checkCreateElShorthand(node: TSESTree.CallExpression): void {
@@ -152,7 +179,7 @@ export default ruleCreator({
                 return;
             }
 
-            const prefix = obj && !isDocGlobal ? getText(obj) + "." : "";
+            const prefix = obj && !isDocGlobal ? getObjectText(obj) + "." : "";
             const remainingArgs = node.arguments.slice(1);
             const argsText = remainingArgs
                 .map((arg) => getText(arg))
@@ -172,22 +199,13 @@ export default ruleCreator({
                 return;
             }
 
-            const obj = node.callee.object;
-            const isDocGlobal = isGlobalDocument(obj);
-            const isActiveDoc =
-                obj.type === TSESTree.AST_NODE_TYPES.Identifier &&
-                obj.name === "activeDocument";
-
-            if (!isDocGlobal && !isActiveDoc) {
+            const target = classifyDocumentTarget(node.callee.object);
+            if (!target) {
                 return;
             }
 
-            const canAutofix = isActiveDoc || hasObsidianDomHelpers(obj);
-            const replacement = isDocGlobal
-                ? "createFragment()"
-                : "activeWindow.createFragment()";
-
-            report(node, replacement, canAutofix);
+            const replacement = `${target.prefix}createFragment()`;
+            report(node, replacement, target.canAutofix);
         }
 
         function report(node: TSESTree.CallExpression, replacement: string, canAutofix: boolean): void {
@@ -248,6 +266,31 @@ export default ruleCreator({
 
         function getText(node: TSESTree.Node): string {
             return context.sourceCode.getText(node);
+        }
+
+        // Returns the object's source text including any parentheses that
+        // already surrounded it. A member base binding looser than `.` (e.g.
+        // `cond ? a : b`) is always parenthesized in valid source, so preserving
+        // the original grouping keeps `(cond ? a : b).win.createEl()` correct
+        // without inventing new parentheses.
+        function getObjectText(obj: TSESTree.Expression): string {
+            const sourceCode = context.sourceCode;
+            let start = obj.range[0];
+            let end = obj.range[1];
+            let before = sourceCode.getTokenBefore(obj);
+            let after = sourceCode.getTokenAfter(obj);
+            while (
+                before !== null &&
+                after !== null &&
+                before.value === "(" &&
+                after.value === ")"
+            ) {
+                start = before.range[0];
+                end = after.range[1];
+                before = sourceCode.getTokenBefore(before);
+                after = sourceCode.getTokenAfter(after);
+            }
+            return sourceCode.getText().slice(start, end);
         }
 
         function getStringLiteralValue(
