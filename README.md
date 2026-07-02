@@ -1,5 +1,4 @@
 # eslint-plugin-obsidianmd
-
 ## Installation
 
 You'll first need to install [ESLint](https://eslint.org/):
@@ -24,17 +23,21 @@ To use the recommended configuration, add it to your `eslint.config.js` file. Th
 
 ```javascript
 // eslint.config.mjs
-import tsparser from "@typescript-eslint/parser";
 import { defineConfig } from "eslint/config";
 import obsidianmd from "eslint-plugin-obsidianmd";
 
 export default defineConfig([
-  ...obsidianmd.configs.recommended,
   {
     files: ["**/*.ts"],
+    extends: [obsidianmd.configs.recommended],
     languageOptions: {
-      parser: tsparser,
-      parserOptions: { project: "./tsconfig.json" },
+        parserOptions: {
+            projectService: {
+                allowDefaultProject: ["manifest.json"],
+            },
+            tsconfigRootDir: import.meta.dirname,
+            extraFileExtensions: [".json"], 
+        },
     },
 
     // You can add your own configuration to override or add rules
