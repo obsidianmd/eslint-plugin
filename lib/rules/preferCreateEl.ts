@@ -8,21 +8,6 @@ const TAG_SHORTHANDS: Record<string, string> = {
 
 const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
 
-// Node types whose text can be used as the base of a `.member` access without
-// parentheses. Anything else (conditional, binary, arrow, etc.) binds looser
-// than member access and must be wrapped, e.g. `(cond ? a : b).win.createEl()`.
-// `Super` is included because it is only valid bare (`super.foo`) — wrapping it
-// as `(super).foo` is a syntax error.
-const MEMBER_ACCESS_SAFE_NODE_TYPES = new Set<TSESTree.AST_NODE_TYPES>([
-    TSESTree.AST_NODE_TYPES.CallExpression,
-    TSESTree.AST_NODE_TYPES.Identifier,
-    TSESTree.AST_NODE_TYPES.MemberExpression,
-    TSESTree.AST_NODE_TYPES.NewExpression,
-    TSESTree.AST_NODE_TYPES.Super,
-    TSESTree.AST_NODE_TYPES.ThisExpression,
-    TSESTree.AST_NODE_TYPES.TSNonNullExpression,
-]);
-
 export default ruleCreator({
     meta: {
         type: "suggestion" as const,
@@ -283,12 +268,29 @@ export default ruleCreator({
             return context.sourceCode.getText(node);
         }
 
+        // Returns the object's source text including any parentheses that
+        // already surrounded it. A member base binding looser than `.` (e.g.
+        // `cond ? a : b`) is always parenthesized in valid source, so preserving
+        // the original grouping keeps `(cond ? a : b).win.createEl()` correct
+        // without inventing new parentheses.
         function getObjectText(obj: TSESTree.Expression): string {
-            const text = getText(obj);
-            if (MEMBER_ACCESS_SAFE_NODE_TYPES.has(obj.type)) {
-                return text;
+            const sourceCode = context.sourceCode;
+            let start = obj.range[0];
+            let end = obj.range[1];
+            let before = sourceCode.getTokenBefore(obj);
+            let after = sourceCode.getTokenAfter(obj);
+            while (
+                before !== null &&
+                after !== null &&
+                before.value === "(" &&
+                after.value === ")"
+            ) {
+                start = before.range[0];
+                end = after.range[1];
+                before = sourceCode.getTokenBefore(before);
+                after = sourceCode.getTokenAfter(after);
             }
-            return `(${text})`;
+            return sourceCode.getText().slice(start, end);
         }
 
         function getStringLiteralValue(
