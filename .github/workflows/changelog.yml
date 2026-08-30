@@ -1,0 +1,24 @@
+name: Changelog
+
+on:
+    pull_request:
+        branches: ["master"]
+
+jobs:
+    changelog:
+        name: Changelog updated
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Check for CHANGELOG.md changes
+              uses: dangoslen/changelog-enforcer@v3
+              with:
+                  changeLogPath: CHANGELOG.md
+                  skipLabels: "skip-changelog"
+                  missingUpdateErrorMessage: >
+                      Please add a changelog entry to CHANGELOG.md under the
+                      `## [Unreleased]` section.
+                      Follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) conventions.
+                      If this change does not need a changelog entry, add the `skip-changelog` label.
