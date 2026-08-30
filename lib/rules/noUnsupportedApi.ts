@@ -167,16 +167,39 @@ export default ruleCreator<Options, "apiNotAvailable">({
             }
         }
 
+        function getStringLiteralValue(
+            expr: TSESTree.CallExpressionArgument,
+        ): string | undefined {
+            if (expr.type === AST_NODE_TYPES.Literal) {
+                const value = expr.value;
+                if (typeof value === "string") {
+                    return value;
+                }
+            } else if (expr.type === AST_NODE_TYPES.Identifier) {
+                const typeInfo = checker.getTypeAtLocation(
+                    services.esTreeNodeToTSNodeMap.get(expr),
+                );
+                const literal = typeInfo.isStringLiteral()
+                    ? typeInfo.value
+                    : undefined;
+                return literal;
+            }
+            return undefined;
+        }
+
         function extractRequireApiVersion(expr: TSESTree.Expression): string | undefined {
             if (
                 expr.type === AST_NODE_TYPES.CallExpression &&
                 expr.callee.type === AST_NODE_TYPES.Identifier &&
                 expr.callee.name === "requireApiVersion" &&
-                expr.arguments.length >= 1 &&
-                expr.arguments[0].type === AST_NODE_TYPES.Literal &&
-                typeof (expr.arguments[0] as TSESTree.Literal).value === "string"
+                expr.arguments.length >= 1
             ) {
-                return (expr.arguments[0] as TSESTree.StringLiteral).value;
+                const potentialString = getStringLiteralValue(
+                    expr.arguments[0],
+                );
+                if (potentialString !== undefined) {
+                    return potentialString;
+                }
             }
             if (expr.type === AST_NODE_TYPES.LogicalExpression && expr.operator === "&&") {
                 return extractRequireApiVersion(expr.left);
