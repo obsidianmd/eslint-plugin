@@ -1,6 +1,6 @@
-import { TSESTree } from "@typescript-eslint/utils";
+import type { JSONRuleDefinition } from "@eslint/json/types";
 import path from "node:path";
-import { docsUrl, ruleCreator } from "../ruleCreator.js";
+import { docsUrl } from "../ruleCreator.js";
 
 const BASE_SCHEMA = {
     author: "string",
@@ -19,10 +19,95 @@ const OPTIONAL_SCHEMA = {
 
 const FORBIDDEN_WORDS = ["obsidian", "plugin"];
 
-function hasForbiddenWords(str: string): [boolean, string] {
+// The fields FORBIDDEN_WORDS applies to, and the only ones `allowedWords` can
+// name.
+const CHECKED_WORD_FIELDS = ["id", "name", "description"] as const;
+type CheckedWordField = (typeof CHECKED_WORD_FIELDS)[number];
+
+// Checks that can be switched off wholesale via the `ignore` option. Both are
+// judgement calls about listing text rather than structural errors, so a repo
+// may legitimately disagree with them; the structural checks are not ignorable.
+const IGNORABLE_CHECKS = ["noForbiddenWords", "descriptionFormat"] as const;
+type IgnorableCheck = (typeof IGNORABLE_CHECKS)[number];
+
+// A description may contain any ordinary punctuation -- backticks, em dashes,
+// parentheses, colons and slashes all appear in listings the directory has
+// passed. What it may not contain is emoji, or invisible characters that make
+// the text render differently than it reads.
+const DISALLOWED_DESCRIPTION_CHARS = /[\p{Extended_Pictographic}\p{Cc}\p{Cf}\p{Cs}]/u;
+
+interface ValidateManifestOptions {
+    /**
+     * Words to drop from the forbidden list, per field. Some findings can never
+     * be acted on -- a published plugin id can never change, so a plugin whose
+     * id contains "obsidian" carries it forever.
+     */
+    allowedWords?: Partial<Record<CheckedWordField, string[]>>;
+    /** Checks to skip entirely. */
+    ignore?: IgnorableCheck[];
+}
+
+type MessageIds =
+    | "missingKey"
+    | "invalidType"
+    | "disallowedKey"
+    | "duplicateKey"
+    | "invalidFundingUrl"
+    | "emptyFundingUrlObject"
+    | "mustBeRootObject"
+    | "noForbiddenWords"
+    | "descriptionFormat";
+
+// The manifest is strict JSON, so it is parsed by `@eslint/json` into a Momoa
+// AST (Document -> Object -> Member), not into the ESTree shape the rest of the
+// rules in this plugin see. `JSONRuleDefinition` types the visitor accordingly.
+type ValidateManifestRuleDefinition = JSONRuleDefinition<{
+    MessageIds: MessageIds;
+    RuleOptions: [ValidateManifestOptions?];
+}>;
+
+// Momoa node types are the JSON spelling of the type; map them onto the names
+// used by BASE_SCHEMA / OPTIONAL_SCHEMA. NaN and Infinity are JSON5-only, so
+// they can never appear in a manifest and fall through to "unknown".
+function getAstNodeType(node: { type: string }): string {
+    switch (node.type) {
+        case "String":
+            return "string";
+        case "Number":
+            return "number";
+        case "Boolean":
+            return "boolean";
+        case "Null":
+            return "null";
+        case "Object":
+            return "object";
+        case "Array":
+            return "array";
+        default:
+            return "unknown";
+    }
+}
+
+// A member key is a String in JSON and may be an Identifier in JSON5.
+function getMemberKey(member: {
+    name: { type: string; value?: string; name?: string };
+}): string {
+    return member.name.type === "Identifier"
+        ? (member.name.name ?? "")
+        : (member.name.value ?? "");
+}
+
+function isCheckedWordField(key: string): key is CheckedWordField {
+    return (CHECKED_WORD_FIELDS as readonly string[]).includes(key);
+}
+
+function hasForbiddenWords(str: string, allowed: string[] = []): [boolean, string] {
     const forbiddenWordsFound = new Set<string>();
     const strLower = str.toLowerCase();
     for (const word of FORBIDDEN_WORDS) {
+        if (allowed.includes(word)) {
+            continue;
+        }
         if (strLower.includes(word)) {
             forbiddenWordsFound.add(word);
         }
@@ -33,25 +118,44 @@ function hasForbiddenWords(str: string): [boolean, string] {
     return [false, ""];
 }
 
-function getAstNodeType(node: TSESTree.Node): string {
-    if (node.type === TSESTree.AST_NODE_TYPES.Literal) {
-        if (node.value === null) return "null";
-        return typeof node.value;
-    }
-    if (node.type === TSESTree.AST_NODE_TYPES.ObjectExpression) return "object";
-    if (node.type === TSESTree.AST_NODE_TYPES.ArrayExpression) return "array";
-    return "unknown";
-}
-
-export default ruleCreator({
+const rule: ValidateManifestRuleDefinition = {
     meta: {
-        type: "problem" as const,
+        type: "problem",
         docs: {
             description:
                 "Validate the structure of manifest.json for Obsidian plugins.",
             url: docsUrl("validate-manifest"),
         },
-        schema: [],
+        schema: [
+            {
+                type: "object",
+                properties: {
+                    allowedWords: {
+                        type: "object",
+                        description:
+                            "Words to drop from the forbidden list, per field. Use this for findings that can never be acted on, such as a published plugin id that will always contain 'obsidian'.",
+                        properties: Object.fromEntries(
+                            CHECKED_WORD_FIELDS.map((field) => [
+                                field,
+                                {
+                                    type: "array",
+                                    description: `Forbidden words to allow in the manifest's '${field}'.`,
+                                    items: { type: "string" },
+                                },
+                            ]),
+                        ),
+                        additionalProperties: false,
+                    },
+                    ignore: {
+                        type: "array",
+                        description:
+                            "Checks to skip entirely. A manifest cannot carry an ignore marker of its own: a comment is a JSON parse error and would stop Obsidian loading the plugin, and an ignore key ships to every user and is itself reported as a disallowed key.",
+                        items: { type: "string", enum: [...IGNORABLE_CHECKS] },
+                    },
+                },
+                additionalProperties: false,
+            },
+        ],
         messages: {
             missingKey:
                 "The manifest is missing the required '{{key}}' property.",
@@ -71,49 +175,45 @@ export default ruleCreator({
                 "The 'description' property should be concise and follow the submission requirements.",
         },
     },
-    defaultOptions: [],
     create(context) {
         const filename = context.physicalFilename;
         if (!path.basename(filename).endsWith("manifest.json")) {
             return {};
         }
 
+        const options = context.options[0] ?? {};
+        const ignored = new Set<IgnorableCheck>(options.ignore ?? []);
+        const allowedWords = options.allowedWords ?? {};
+
         const requiredKeys = BASE_SCHEMA;
         const allAllowedKeys = { ...requiredKeys, ...OPTIONAL_SCHEMA };
 
         return {
-            Program(programNode: TSESTree.Program) {
-                const body = programNode.body[0];
-                if (
-                    programNode.body.length !== 1 ||
-                    body.type !== TSESTree.AST_NODE_TYPES.ExpressionStatement ||
-                    body.expression.type !== TSESTree.AST_NODE_TYPES.ObjectExpression
-                ) {
+            Document(documentNode) {
+                const node = documentNode.body;
+                if (node.type !== "Object") {
                     context.report({
-                        node: programNode,
+                        node: documentNode,
                         messageId: "mustBeRootObject",
                     });
                     return;
                 }
 
-                const node = body.expression;
-                const properties = node.properties as TSESTree.Property[];
+                const members = node.members;
+                // A later duplicate wins, so the type/word checks below run on
+                // the last occurrence of each key.
                 const presentKeys = new Map(
-                    properties.map((prop) => [
-                        (prop.key as TSESTree.Literal).value,
-                        prop,
-                    ]),
+                    members.map((member) => [getMemberKey(member), member]),
                 );
 
                 // 1. Check for duplicate keys
-                if (properties.length !== presentKeys.size) {
+                if (members.length !== presentKeys.size) {
                     const seenKeys = new Set<string>();
-                    for (const prop of properties) {
-                        const key = (prop.key as TSESTree.Literal)
-                            .value as string;
+                    for (const member of members) {
+                        const key = getMemberKey(member);
                         if (seenKeys.has(key)) {
                             context.report({
-                                node: prop.key,
+                                node: member.name,
                                 messageId: "duplicateKey",
                                 data: { key },
                             });
@@ -135,12 +235,12 @@ export default ruleCreator({
                 }
 
                 // 3. Check types and disallowed keys
-                for (const [key, propNode] of presentKeys.entries()) {
-                    if (key && !((key as string) in allAllowedKeys)) {
+                for (const [key, member] of presentKeys.entries()) {
+                    if (key && !(key in allAllowedKeys)) {
                         context.report({
-                            node: propNode.key,
+                            node: member.name,
                             messageId: "disallowedKey",
-                            data: { key: key as string },
+                            data: { key },
                         });
                         continue;
                     }
@@ -149,26 +249,25 @@ export default ruleCreator({
                         allAllowedKeys[key as keyof typeof allAllowedKeys];
                     if (!expectedType) continue;
 
-                    const valueNode = propNode.value;
+                    const valueNode = member.value;
                     const actualType = getAstNodeType(valueNode);
 
                     if (expectedType.includes(actualType)) {
                         if (key === "fundingUrl") {
                             if (
                                 actualType === "object" &&
-                                valueNode.type === TSESTree.AST_NODE_TYPES.ObjectExpression
+                                valueNode.type === "Object"
                             ) {
-                                if (valueNode.properties.length > 0) {
+                                if (valueNode.members.length > 0) {
                                     // Check for duplicate keys in fundingUrl
                                     const fundingKeys = new Set<string>();
-                                    for (const prop of valueNode.properties as TSESTree.Property[]) {
-                                        const propKey = (
-                                            prop.key as TSESTree.Literal
-                                        ).value as string;
+                                    for (const fundingMember of valueNode.members) {
+                                        const propKey =
+                                            getMemberKey(fundingMember);
 
                                         if (fundingKeys.has(propKey)) {
                                             context.report({
-                                                node: prop.key,
+                                                node: fundingMember.name,
                                                 messageId: "duplicateKey",
                                                 data: { key: propKey },
                                             });
@@ -178,24 +277,25 @@ export default ruleCreator({
 
                                         // Check if each property in fundingUrl is a string
                                         if (
-                                            getAstNodeType(prop.value) !==
-                                            "string"
+                                            getAstNodeType(
+                                                fundingMember.value,
+                                            ) !== "string"
                                         ) {
                                             context.report({
-                                                node: prop.value,
+                                                node: fundingMember.value,
                                                 messageId: "invalidFundingUrl",
                                             });
                                         }
 
                                         // Check for empty string values
                                         if (
-                                            prop.value.type === TSESTree.AST_NODE_TYPES.Literal &&
-                                            typeof prop.value.value ===
-                                            "string" &&
-                                            prop.value.value.length === 0
+                                            fundingMember.value.type ===
+                                            "String" &&
+                                            fundingMember.value.value.length ===
+                                            0
                                         ) {
                                             context.report({
-                                                node: prop.value,
+                                                node: fundingMember.value,
                                                 messageId:
                                                     "emptyFundingUrlObject",
                                             });
@@ -210,8 +310,7 @@ export default ruleCreator({
                                 }
                             } else if (
                                 actualType === "string" &&
-                                valueNode.type === TSESTree.AST_NODE_TYPES.Literal &&
-                                typeof valueNode.value === "string" &&
+                                valueNode.type === "String" &&
                                 valueNode.value.length === 0
                             ) {
                                 context.report({
@@ -222,29 +321,33 @@ export default ruleCreator({
                         } else if (
                             // check for forbidden words in specific string fields
                             actualType === "string" &&
-                            valueNode.type === TSESTree.AST_NODE_TYPES.Literal &&
-                            typeof valueNode.value === "string" &&
-                            hasForbiddenWords(valueNode.value)[0] &&
-                            (key === "name" ||
-                                key === "description" ||
-                                key === "id")
+                            valueNode.type === "String" &&
+                            !ignored.has("noForbiddenWords") &&
+                            isCheckedWordField(key) &&
+                            hasForbiddenWords(
+                                valueNode.value,
+                                allowedWords[key],
+                            )[0]
                         ) {
                             context.report({
                                 node: valueNode,
                                 messageId: "noForbiddenWords",
                                 data: {
-                                    word: hasForbiddenWords(valueNode.value)[1],
-                                    key: key as string,
+                                    word: hasForbiddenWords(
+                                        valueNode.value,
+                                        allowedWords[key],
+                                    )[1],
+                                    key,
                                 },
                             });
                         } else if (
                             actualType === "string" &&
-                            valueNode.type === TSESTree.AST_NODE_TYPES.Literal &&
-                            typeof valueNode.value === "string" &&
-                            key === "description"
+                            valueNode.type === "String" &&
+                            key === "description" &&
+                            !ignored.has("descriptionFormat")
                         ) {
                             // Check description format
-                            const description = valueNode.value as string;
+                            const description = valueNode.value;
                             if (
                                 // 10 characters min
                                 description.length < 10 ||
@@ -254,8 +357,8 @@ export default ruleCreator({
                                 !description.match(/^[A-Z]/) ||
                                 // Should end with a period
                                 !description.endsWith(".") ||
-                                // Should not contain emoji or special characters
-                                !description.match(/^[A-Za-z0-9\s.,!?'"-]+$/)
+                                // Should not contain emoji or invisible characters
+                                DISALLOWED_DESCRIPTION_CHARS.test(description)
                             ) {
                                 context.report({
                                     node: valueNode,
@@ -268,7 +371,7 @@ export default ruleCreator({
                             node: valueNode,
                             messageId: "invalidType",
                             data: {
-                                key: key as string,
+                                key,
                                 expectedType: expectedType.replace("|", " or "),
                                 actualType,
                             },
@@ -278,4 +381,6 @@ export default ruleCreator({
             },
         };
     },
-});
+};
+
+export default rule;

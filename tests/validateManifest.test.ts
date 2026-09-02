@@ -1,9 +1,17 @@
-import { RuleTester } from "@typescript-eslint/rule-tester";
+import { RuleTester, type Rule } from "eslint";
+import json from "@eslint/json";
 import manifestRule from "../lib/rules/validateManifest.js";
 
-const ruleTester = new RuleTester();
+// manifest.json is strict JSON, so the rule is exercised through the JSON
+// language rather than through a JS/TS parser. Running it through
+// @typescript-eslint/parser would test an AST that no real lint run ever
+// produces for this file.
+const ruleTester = new RuleTester({
+    plugins: { json },
+    language: "json/json",
+});
 
-ruleTester.run("validate-manifest", manifestRule, {
+ruleTester.run("validate-manifest", manifestRule as unknown as Rule.RuleModule, {
     valid: [
         {
             name: "complete valid manifest is accepted",
@@ -74,6 +82,68 @@ ruleTester.run("validate-manifest", manifestRule, {
                     "description": "This description ends with a period.",
                     "isDesktopOnly": false
                 }`,
+        },
+        {
+            name: "a file that is not a manifest is ignored",
+            filename: "package.json",
+            code: `{ "name": "My Plugin" }`,
+        },
+        {
+            // Backticks, em dashes, parentheses, colons and slashes all appear
+            // in listings the directory passed untouched.
+            name: "ordinary punctuation in a description is accepted",
+            filename: "manifest.json",
+            code: `{
+                    "id": "punctuation",
+                    "name": "Punctuation",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Renders \`code\` blocks (inline and fenced) — see docs/readme: it/handles slashes.",
+                    "isDesktopOnly": false
+                }`,
+        },
+        {
+            name: "allowedWords lets a published id keep a forbidden word",
+            filename: "manifest.json",
+            code: `{
+                    "id": "obsidian-notes",
+                    "name": "Notes Manager",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Manage your notes efficiently.",
+                    "isDesktopOnly": false
+                }`,
+            options: [{ allowedWords: { id: ["obsidian"] } }],
+        },
+        {
+            name: "ignore skips the forbidden words check entirely",
+            filename: "manifest.json",
+            code: `{
+                    "id": "my-plugin",
+                    "name": "My Plugin",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "A great plugin.",
+                    "isDesktopOnly": false
+                }`,
+            options: [{ ignore: ["noForbiddenWords"] }],
+        },
+        {
+            name: "ignore skips the description format check entirely",
+            filename: "manifest.json",
+            code: `{
+                    "id": "short-description",
+                    "name": "Short description",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Short.",
+                    "isDesktopOnly": false
+                }`,
+            options: [{ ignore: ["descriptionFormat"] }],
         },
     ],
     invalid: [
@@ -259,7 +329,7 @@ ruleTester.run("validate-manifest", manifestRule, {
             ],
         },
         {
-            name: "forbidden word 'obsidian' in description",
+            name: "forbidden words 'obsidian' and 'plugin' in description",
             filename: "manifest.json",
             code: `{
                     "id": "my-tool",
@@ -299,6 +369,26 @@ ruleTester.run("validate-manifest", manifestRule, {
                 {
                     messageId: "noForbiddenWords",
                     data: { word: "obsidian", key: "id" },
+                },
+            ],
+        },
+        {
+            name: "unknown key is forbidden",
+            filename: "manifest.json",
+            code: `{
+                    "id": "test-id",
+                    "name": "Test name",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "A great test.",
+                    "isDesktopOnly": false,
+                    "eslintIgnore": true
+                }`,
+            errors: [
+                {
+                    messageId: "disallowedKey",
+                    data: { key: "eslintIgnore" },
                 },
             ],
         },
@@ -392,11 +482,6 @@ ruleTester.run("validate-manifest", manifestRule, {
             errors: [
                 {
                     messageId: "invalidFundingUrl",
-                    data: {
-                        key: "patreon",
-                        expectedType: "string",
-                        actualType: "number",
-                    },
                 },
             ],
         },
@@ -416,7 +501,6 @@ ruleTester.run("validate-manifest", manifestRule, {
             errors: [
                 {
                     messageId: "emptyFundingUrlObject",
-                    data: { key: "fundingUrl" },
                 },
             ],
         },
@@ -458,11 +542,6 @@ ruleTester.run("validate-manifest", manifestRule, {
             errors: [
                 {
                     messageId: "invalidFundingUrl",
-                    data: {
-                        key: "ko-fi",
-                        expectedType: "string",
-                        actualType: "number",
-                    },
                 },
             ],
         },
@@ -485,7 +564,6 @@ ruleTester.run("validate-manifest", manifestRule, {
             errors: [
                 {
                     messageId: "emptyFundingUrlObject",
-                    data: { key: "ko-fi" },
                 },
             ],
         },
@@ -510,11 +588,6 @@ ruleTester.run("validate-manifest", manifestRule, {
             errors: [
                 {
                     messageId: "invalidFundingUrl",
-                    data: {
-                        key: "ko-fi",
-                        expectedType: "string",
-                        actualType: "object",
-                    },
                 },
             ],
         },
@@ -531,7 +604,7 @@ ruleTester.run("validate-manifest", manifestRule, {
                     "isDesktopOnly": false,
                     "fundingUrl": {
                         "patreon": "https://patreon.com/test",
-                        "patreon": "https://patreon.com/test",
+                        "patreon": "https://patreon.com/test"
                     }
                 }`,
             errors: [
@@ -552,7 +625,7 @@ ruleTester.run("validate-manifest", manifestRule, {
                     "version": "1.0.0",
                     "minAppVersion": "1.0.0",
                     "description": "A great test.",
-                    "isDesktopOnly": false,
+                    "isDesktopOnly": false
                 }`,
             errors: [
                 {
@@ -612,9 +685,6 @@ ruleTester.run("validate-manifest", manifestRule, {
             errors: [
                 {
                     messageId: "descriptionFormat",
-                    data: {
-                        key: "description",
-                    },
                 },
             ],
         },
@@ -633,30 +703,67 @@ ruleTester.run("validate-manifest", manifestRule, {
             errors: [
                 {
                     messageId: "descriptionFormat",
-                    data: {
-                        key: "description",
-                    },
                 },
             ],
         },
         {
-            name: "description with special characters is forbidden",
+            name: "allowedWords is scoped to the field and word it names",
             filename: "manifest.json",
             code: `{
-                    "id": "more-special-characters",
-                    "name": "More special characters",
+                    "id": "obsidian-plugin-notes",
+                    "name": "Obsidian Notes",
                     "author": "Me",
                     "version": "1.0.0",
                     "minAppVersion": "1.0.0",
-                    "description": "This description contains special characters like @, #, $, %, ^, &, *, (, ), and more.",
+                    "description": "Manage your notes efficiently.",
+                    "isDesktopOnly": false
+                }`,
+            options: [{ allowedWords: { id: ["obsidian"] } }],
+            errors: [
+                {
+                    messageId: "noForbiddenWords",
+                    data: { word: "plugin", key: "id" },
+                },
+                {
+                    messageId: "noForbiddenWords",
+                    data: { word: "obsidian", key: "name" },
+                },
+            ],
+        },
+        {
+            name: "ignoring one check leaves the other reporting",
+            filename: "manifest.json",
+            code: `{
+                    "id": "my-plugin",
+                    "name": "My Plugin",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Short.",
+                    "isDesktopOnly": false
+                }`,
+            options: [{ ignore: ["noForbiddenWords"] }],
+            errors: [
+                {
+                    messageId: "descriptionFormat",
+                },
+            ],
+        },
+        {
+            name: "description with an invisible character is forbidden",
+            filename: "manifest.json",
+            code: `{
+                    "id": "zero-width",
+                    "name": "Zero width",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "This description hides a zero\\u200bwidth space.",
                     "isDesktopOnly": false
                 }`,
             errors: [
                 {
                     messageId: "descriptionFormat",
-                    data: {
-                        key: "description",
-                    },
                 },
             ],
         },
@@ -675,9 +782,6 @@ ruleTester.run("validate-manifest", manifestRule, {
             errors: [
                 {
                     messageId: "descriptionFormat",
-                    data: {
-                        key: "description",
-                    },
                 },
             ],
         },
