@@ -1,19 +1,22 @@
-import { RuleTester } from "@typescript-eslint/rule-tester";
+import { RuleTester, type Rule } from "eslint";
 import licenseRule from "../lib/rules/validateLicense.js";
-import { PlainTextParser } from "lib/plainTextParser.js";
+import { PlainTextLanguage } from "../lib/plainTextLanguage.js";
 
+// LICENSE is not code, so the rule is exercised through the plain text language
+// rather than through a JS/TS parser -- which is also how the recommended
+// config runs it.
 const ruleTester = new RuleTester({
-    languageOptions: {
-        parser: PlainTextParser,
-        parserOptions: {
-            extraFileExtensions: [""],
-        }
+    plugins: {
+        obsidianmd: {
+            languages: { "plain-text": PlainTextLanguage },
+        },
     },
-
+    language: "obsidianmd/plain-text",
 });
+
 const currentYear = new Date().getFullYear();
 
-ruleTester.run("validate-license", licenseRule, {
+ruleTester.run("validate-license", licenseRule as unknown as Rule.RuleModule, {
     valid: [
         {
             name: "copyright with year range ending at current year is valid",
@@ -49,6 +52,16 @@ ruleTester.run("validate-license", licenseRule, {
             options: [{ currentYear: currentYear, disableUnchangedYear: true }],
         },
         {
+            name: "conventional MIT line with lowercase marker and no 'by' is valid when current",
+            filename: "LICENSE",
+            code: `Copyright (c) ${currentYear} John Doe`,
+        },
+        {
+            name: "copyright sign marker is valid when current",
+            filename: "LICENSE",
+            code: `Copyright © ${currentYear} John Doe`,
+        },
+        {
             name: "copyright embedded in other text is valid",
             filename: "LICENSE",
             code: `foo\nCopyright (C) 2020-${currentYear} by John Doe\nbar`,
@@ -58,12 +71,45 @@ ruleTester.run("validate-license", licenseRule, {
             filename: "LICENSE",
             code: `foo\nbar\nbaz`,
         },
+        {
+            name: "a file that is not a licence is ignored",
+            filename: "NOTICE",
+            code: `Copyright (C) 2020 by Dynalist Inc.`,
+        },
     ],
     invalid: [
         {
             name: "unchanged Dynalist Inc copyright is forbidden",
             filename: "LICENSE",
             code: `Copyright (C) 2020-${currentYear} by Dynalist Inc.`,
+            errors: [
+                { messageId: "unchangedCopyright" }
+            ],
+        },
+        {
+            // This is the line the standard MIT template produces, and the one
+            // this repo's own LICENSE carries. The rule used to match nothing
+            // here, so it silently passed on every such repo.
+            name: "conventional MIT line with lowercase marker and no 'by' is checked",
+            filename: "LICENSE",
+            code: `Copyright (c) ${currentYear} Dynalist Inc.`,
+            errors: [
+                { messageId: "unchangedCopyright" }
+            ],
+        },
+        {
+            name: "copyright sign marker is checked",
+            filename: "LICENSE",
+            code: `Copyright © 2022 Dynalist Inc.`,
+            errors: [
+                { messageId: "unchangedYear", data: { expected: currentYear.toString(), actual: "2022" } },
+                { messageId: "unchangedCopyright" }
+            ],
+        },
+        {
+            name: "LICENSE.md is checked",
+            filename: "LICENSE.md",
+            code: `Copyright (c) ${currentYear} Dynalist Inc.`,
             errors: [
                 { messageId: "unchangedCopyright" }
             ],
@@ -108,6 +154,15 @@ ruleTester.run("validate-license", licenseRule, {
             code: `bar\nCopyright (C) 2020-${currentYear} by Dynalist Inc.\nbaz`,
             errors: [
                 { messageId: "unchangedCopyright" }
+            ],
+        },
+        {
+            name: "CRLF line endings are handled",
+            filename: "LICENSE",
+            code: `MIT License\r\n\r\nCopyright (c) 2022 Dynalist Inc.\r\n`,
+            errors: [
+                { messageId: "unchangedYear", data: { expected: currentYear.toString(), actual: "2022" }, line: 3 },
+                { messageId: "unchangedCopyright", line: 3 }
             ],
         },
         {

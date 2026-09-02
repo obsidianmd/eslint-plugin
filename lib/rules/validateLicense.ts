@@ -1,10 +1,46 @@
-import { AST_TOKEN_TYPES, TSESTree } from "@typescript-eslint/utils";
+import type { CustomRuleDefinitionType, CustomRuleTypeDefinitions } from "@eslint/core";
 import path from "path";
-import { docsUrl, ruleCreator } from "../ruleCreator.js";
+import type {
+    PlainTextLanguageOptions,
+    PlainTextNode,
+    PlainTextRuleVisitor,
+    PlainTextSourceCode,
+} from "../plainTextLanguage.js";
+import { docsUrl } from "../ruleCreator.js";
 
-export default ruleCreator({
+type MessageIds = "unchangedCopyright" | "unchangedYear";
+
+interface ValidateLicenseOptions {
+    currentYear?: number;
+    disableUnchangedYear?: boolean;
+}
+
+type PlainTextRuleDefinition<Options extends Partial<CustomRuleTypeDefinitions> = object> =
+    CustomRuleDefinitionType<
+        {
+            LangOptions: PlainTextLanguageOptions;
+            Code: PlainTextSourceCode;
+            Visitor: PlainTextRuleVisitor;
+            Node: PlainTextNode;
+        },
+        Options
+    >;
+
+// We want to parse: Copyright (C) 2020-2025 by Dynalist Inc.
+// We should check that the year is current and the holder is not "Dynalist Inc."
+//
+// The marker and the " by " are both optional in practice: the conventional MIT
+// line reads "Copyright (c) 2025 Dynalist Inc.", with a lowercase marker and no
+// " by ". Requiring the uppercase "(C) ... by" form meant this rule silently
+// matched nothing on every repo using the standard MIT text.
+const COPYRIGHT_REGEX = /^[ \t]*Copyright (?:\([Cc]\)|©) (\d{4})(?:\s*-\s*(\d{4}))? (?:by )?(.+)$/;
+
+const rule: PlainTextRuleDefinition<{
+    MessageIds: MessageIds;
+    RuleOptions: [ValidateLicenseOptions?];
+}> = {
     meta: {
-        type: "problem" as const,
+        type: "problem",
         docs: {
             description: "Validate the structure of copyright notices in LICENSE files for Obsidian plugins.",
             url: docsUrl("validate-license"),
@@ -30,53 +66,48 @@ export default ruleCreator({
             unchangedYear: "Please change the copyright year from {{actual}} to the current year ({{expected}}).",
         },
     },
-    defaultOptions: [{
-        currentYear: new Date().getFullYear(),
-        disableUnchangedYear: false,
-    }],
-    create(context, [options]) {
+    create(context) {
         const filename = context.physicalFilename;
-        if (!path.basename(filename).endsWith("LICENSE")) {
+        // Matches LICENSE as well as the equally common LICENSE.md / LICENSE.txt.
+        if (!/LICENSE(\.(?:md|txt))?$/.test(path.basename(filename))) {
             return {};
         }
 
+        const options = context.options[0] ?? {};
+        const currentYear = options.currentYear ?? new Date().getFullYear();
+        const disableUnchangedYear = options.disableUnchangedYear ?? false;
+
         return {
-            Program(programNode: TSESTree.Program) {
-                // We want to parse: Copyright (C) 2020-2025 by Dynalist Inc.
-                // We should check that the year is current and the holder is not "Dynalist Inc."
+            Line(node) {
+                const match = node.value.match(COPYRIGHT_REGEX);
+                if (!match) {
+                    return;
+                }
 
-                const copyrightRegex = /^(?: |\t)*Copyright \(C\) (\d{4})(?:-(\d{4}))? by (.+)$/;
+                const startYear = parseInt(match[1], 10);
+                const endYear = match[2] ? parseInt(match[2], 10) : startYear;
+                const holder = match[3].trim();
 
-                // we rely on our plain text parser to give us tokens as Line tokens
-                for (const token of programNode.tokens ?? []) {
-                    if (token.type !== AST_TOKEN_TYPES.Line) continue;
-
-                    const match = token.value.match(copyrightRegex);
-                    if (match) {
-                        const startYear = parseInt(match[1], 10);
-                        const endYear = match[2] ? parseInt(match[2], 10) : startYear;
-                        const holder = match[3].trim();
-
-                        if (!options.disableUnchangedYear && endYear < options.currentYear) {
-                            context.report({
-                                messageId: "unchangedYear",
-                                loc: token.loc,
-                                data: {
-                                    expected: options.currentYear.toString(),
-                                    actual: endYear.toString(),
-                                }
-                            });
+                if (!disableUnchangedYear && endYear < currentYear) {
+                    context.report({
+                        messageId: "unchangedYear",
+                        loc: node.loc,
+                        data: {
+                            expected: currentYear.toString(),
+                            actual: endYear.toString(),
                         }
+                    });
+                }
 
-                        if (holder === "Dynalist Inc.") {
-                            context.report({
-                                messageId: "unchangedCopyright",
-                                loc: token.loc,
-                            });
-                        }
-                    }
+                if (holder === "Dynalist Inc.") {
+                    context.report({
+                        messageId: "unchangedCopyright",
+                        loc: node.loc,
+                    });
                 }
             }
         };
     },
-});
+};
+
+export default rule;

@@ -1,5 +1,6 @@
 import assert from "node:assert";
-import { ESLint } from "eslint";
+import { ESLint, type Linter } from "eslint";
+import tseslint from "typescript-eslint";
 import plugin from "../lib/index.js";
 
 async function rulesFor(configName: keyof typeof plugin.configs, filename: string): Promise<Record<string, any>> {
@@ -82,6 +83,9 @@ describe("recommended config", () => {
 			const fileSpecificRules = new Set([
 				"obsidianmd/ui/sentence-case-json",
 				"obsidianmd/ui/sentence-case-locale-module",
+				// Scoped to LICENSE, which can never match a JS/TS glob.
+				// Asserted separately in "file-scoped rules" below.
+				"obsidianmd/validate-license",
 			]);
 			const registeredRules = Object.keys(plugin.rules);
 			for (const rule of registeredRules) {
@@ -195,6 +199,82 @@ describe("recommendedWithLocalesEn config", () => {
 	});
 });
 
+// Regression guard for the defect these tests did not catch: validate-license
+// used to live in the block spread into the JS and TS globs, so no LICENSE could
+// ever match and the rule never ran. Resolving the config for the file the rule
+// actually targets is the only assertion that notices.
+describe("file-scoped rules", () => {
+	for (const configName of ["recommended", "recommendedWithLocalesEn"] as const) {
+		describe(configName, () => {
+			let licenseRules: Record<string, any>;
+			let tsRules: Record<string, any>;
+
+			before(async () => {
+				licenseRules = await rulesFor(configName, "LICENSE");
+				tsRules = await rulesFor(configName, "src/main.ts");
+			});
+
+			it("validate-license should be 'warn' for LICENSE", () => {
+				assert.strictEqual(
+					getSeverity(licenseRules["obsidianmd/validate-license"]),
+					"warn"
+				);
+			});
+
+			it("validate-license should not apply to source files", () => {
+				const rule = "obsidianmd/validate-license";
+				const severity = getSeverity(tsRules[rule]);
+				assert.ok(
+					severity === "off" || !(rule in tsRules),
+					`${rule} targets a non-source file but is enabled for .ts, got: ${severity}`
+				);
+			});
+		});
+	}
+});
+
+// LICENSE is read with a `language`, not a `parser`, and that is load-bearing:
+// `languageOptions.parser` is merged by key, so a config object that sets a
+// parser without restricting its `files` would replace it for every file.
+// LICENSE would then reach the TypeScript parser and fail with "was not found
+// by the project service because the extension for the file (``) is
+// non-standard" -- a fatal error on a file the user never asked to lint.
+describe("LICENSE survives a global parser override", () => {
+	const withGlobalParser: Linter.Config[] = [
+		...(plugin.configs.recommended as Linter.Config[]),
+		{
+			languageOptions: {
+				parser: tseslint.parser,
+				parserOptions: {
+					projectService: { allowDefaultProject: ["eslint.config.*"] },
+				},
+			},
+		},
+	];
+
+	async function lint(filePath: string, code: string) {
+		const eslint = new ESLint({
+			overrideConfigFile: true,
+			overrideConfig: withGlobalParser,
+		});
+		const [result] = await eslint.lintText(code, { filePath });
+		return result;
+	}
+
+	it("LICENSE is still read by the plain text language", async () => {
+		const result = await lint("LICENSE", "Copyright (c) 2020 Dynalist Inc.\n");
+		assert.deepStrictEqual(
+			result.messages.filter(m => m.fatal).map(m => m.message),
+			[],
+			"a global parser must not reach LICENSE"
+		);
+		assert.ok(
+			result.messages.some(m => m.ruleId === "obsidianmd/validate-license"),
+			"validate-license should still report"
+		);
+	});
+});
+
 describe("scanner-aligned severities", () => {
 	let tsRules: Record<string, any>;
 	let jsRules: Record<string, any>;
@@ -274,7 +354,6 @@ describe("scanner-aligned severities", () => {
 			"obsidianmd/prefer-abstract-input-suggest",
 			"obsidianmd/prefer-window-timers",
 			"obsidianmd/validate-manifest",
-			"obsidianmd/validate-license",
 			"obsidianmd/ui/sentence-case",
 		];
 		for (const rule of warnRules) {

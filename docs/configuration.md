@@ -55,8 +55,43 @@ The recommended config is an array of flat config objects that sets up:
 - **Third-party plugins**: `@microsoft/eslint-plugin-sdl`, `eslint-plugin-import`, `eslint-plugin-no-unsanitized`, `eslint-plugin-depend`, `@eslint-community/eslint-plugin-eslint-comments`
 - **Obsidian globals** (`activeDocument`, `activeWindow`, `createEl`, etc.)
 - **`package.json` linting** via `eslint-plugin-depend` (ban common micro-utilities)
+- **`LICENSE` linting** via `validate-license`, read with the plugin's `obsidianmd/plain-text` language
 
 Because of this, you do **not** need to separately add `eslint.configs.recommended` or `tseslint.configs.recommended` — they are already included.
+
+### Files linted beyond your source
+
+The recommended config lints more than `.ts` and `.js`. It matches `package.json` and `LICENSE` by
+name, each read with its own language, so **ESLint has to be pointed at the project root for those
+checks to run at all**. A lint script scoped to your sources — `eslint src` — will never visit
+them, and the rules covering them silently do nothing:
+
+```jsonc
+// package.json
+"scripts": {
+  "lint": "eslint .",       // package.json and LICENSE are checked
+  "lint:src": "eslint src"  // they are not
+}
+```
+
+`LICENSE` is matched exactly, alongside `LICENSE.md` and `LICENSE.txt`. A licence file under any
+other name is not linted; point `validate-license` at it with your own `files` entry, using the
+language the plugin contributes:
+
+```js
+{
+  files: ["COPYING"],
+  language: "obsidianmd/plain-text",
+  rules: { "obsidianmd/validate-license": "warn" },
+}
+```
+
+`plain-text` is a **language**, not a parser, and that distinction matters for more than tidiness.
+`languageOptions.parser` is merged by key, so a config object that sets a parser **without
+restricting its `files`** replaces it for every file — including `LICENSE`, which would then reach
+(say) the TypeScript parser and fail with *"was not found by the project service because the
+extension for the file (``) is non-standard"*. A `language` is only replaced by another `language`,
+so that cannot happen. The same reasoning is why `package.json` uses `language: "json/json"`.
 
 ## Using alongside stricter typescript-eslint configs
 
@@ -288,7 +323,17 @@ A few things to keep in mind with this approach:
 
 - **Obsidian globals** must be declared manually. The recommended config does this for you; here you need to add them yourself. The list above covers the most common ones. `DomElementInfo`, `SvgElementInfo`, `isBoolean`, `nextFrame`, and `ready` are also available.
 - **Third-party plugins** bundled by the recommended config (`@microsoft/eslint-plugin-sdl`, `eslint-plugin-import`, `eslint-plugin-no-unsanitized`, `eslint-plugin-depend`, `eslint-plugin-eslint-comments`) are not included. Add them separately if you want them.
-- **`package.json` and `manifest.json` linting** (`validate-manifest`, `validate-license`, `depend/ban-dependencies`) is not set up. The `validate-manifest` and `validate-license` rules will work on `.json` files only if you have a JSON parser configured.
+- **`package.json` and `manifest.json` linting** (`validate-manifest`, `depend/ban-dependencies`) is not set up. The `validate-manifest` rule will work on `.json` files only if you have a JSON parser configured.
+- **`LICENSE` linting** (`validate-license`) is not set up either, and is not covered by `ruleConfigs` — those presets only carry rules that apply to source files. `validate-license` needs its own config block, because `LICENSE` matches no source glob and needs its own language:
+
+  ```js
+  {
+    files: ["LICENSE", "LICENSE.md", "LICENSE.txt"],
+    language: "obsidianmd/plain-text",
+    plugins: { obsidianmd },
+    rules: { "obsidianmd/validate-license": "warn" },
+  }
+  ```
 
 ## Community plugin scanner configuration
 
@@ -384,13 +429,22 @@ export default defineConfig([
       "@typescript-eslint/no-base-to-string": "off",
       "import/no-unresolved": "off",
 
-      // Scanner handles these separately
+      // Scanner handles this separately
       "obsidianmd/validate-manifest": "off",
-      "obsidianmd/validate-license": "off",
 
       // Old plugins should not change their command ids
       "obsidianmd/commands/no-command-in-command-id": "off",
       "obsidianmd/commands/no-plugin-id-in-command-id": "off",
+    },
+  },
+
+  {
+    // Scanner handles this separately. It must be switched off under the glob
+    // the rule actually runs on -- LICENSE matches no source glob, so an "off"
+    // in the block above would not reach it.
+    files: ["LICENSE", "LICENSE.md", "LICENSE.txt"],
+    rules: {
+      "obsidianmd/validate-license": "off",
     },
   },
 
