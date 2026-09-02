@@ -167,6 +167,27 @@ export default defineConfig([
 ]);
 ```
 
+### Code that only runs on desktop
+
+`no-nodejs-modules` reports because Node APIs are unavailable on mobile. Where that does not apply —
+a desktop-only plugin, or code that never runs inside Obsidian at all — say so with the rule's
+option rather than switching it off, so guarded and unguarded imports are still distinguished
+everywhere else:
+
+```js
+{
+  rules: {
+    "obsidianmd/no-nodejs-modules": ["warn", { isDesktopOnly: true }],
+  },
+}
+```
+
+The option defaults to the `isDesktopOnly` value of a `manifest.json` in the working directory, so a
+desktop-only plugin needs no configuration at all. It exists for the case where there is no manifest
+to read it from — a library, tooling, or a standalone CLI in the same repo — which previously meant
+adding a `manifest.json` that served no other purpose. Note that this rule is listed in
+`eslint-comments/no-restricted-disable`, so a disable comment is not an available escape.
+
 ESLint does not support disabling all rules from a plugin with a single glob like `"obsidianmd/*": "off"`. You can set each rule to `"off"` individually, or use `ruleConfigs` to generate the overrides programmatically:
 
 ```js

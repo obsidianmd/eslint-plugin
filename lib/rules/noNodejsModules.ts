@@ -1,23 +1,50 @@
 import { AST_NODE_TYPES } from "@typescript-eslint/utils";
 import type { TSESTree } from "@typescript-eslint/utils";
 import { isBuiltin } from "node:module";
+import { getManifest } from "../manifest.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
-export default ruleCreator({
+interface NoNodejsModulesOptions {
+    isDesktopOnly?: boolean;
+}
+
+export default ruleCreator<[NoNodejsModulesOptions?], "noNodejs">({
     meta: {
         type: "problem",
         docs: {
             description: "Disallow importing Node.js built-in modules unless guarded by Platform.isDesktop",
             url: docsUrl("no-nodejs-modules"),
         },
-        schema: [],
+        schema: [
+            {
+                type: "object",
+                properties: {
+                    isDesktopOnly: {
+                        type: "boolean",
+                        description:
+                            "Whether the code being linted only ever runs on desktop, which makes Node.js APIs available. Defaults to the isDesktopOnly value of a manifest.json in the working directory, so a repo with no manifest -- a library, tooling, a standalone CLI -- can say so without shipping a fake one.",
+                    },
+                },
+                additionalProperties: false,
+            },
+        ],
         messages: {
             noNodejs:
                 "Do not import Node.js built-in module \"{{module}}\". Node.js APIs are not available on mobile. Use a dynamic import() or require() guarded by Platform.isDesktop instead.",
         },
     },
-    defaultOptions: [],
-    create(context) {
+    // Must be [{}] rather than []: applyDefault iterates the defaults array, so
+    // an empty one discards the user's options instead of merging them.
+    defaultOptions: [{}],
+    create(context, [options]) {
+        // The rule is listed in eslint-comments/no-restricted-disable, so a
+        // disable comment is not an available escape; this option is.
+        const isDesktopOnly =
+            options?.isDesktopOnly ?? getManifest()?.isDesktopOnly ?? false;
+        if (isDesktopOnly) {
+            return {};
+        }
+
         return {
             // Static import declarations can never be guarded at runtime
             ImportDeclaration(node: TSESTree.ImportDeclaration) {

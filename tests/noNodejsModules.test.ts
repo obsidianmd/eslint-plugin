@@ -18,6 +18,18 @@ ruleTester.run("no-nodejs-modules", noNodejsModules, {
             code: "import _ from 'lodash';",
         },
         {
+            // A library, tooling repo or standalone CLI has no manifest to
+            // carry isDesktopOnly, and used to need a fake one to say so.
+            name: "static import is allowed when isDesktopOnly is set",
+            code: "import fs from 'node:fs';",
+            options: [{ isDesktopOnly: true }],
+        },
+        {
+            name: "unguarded dynamic import() is allowed when isDesktopOnly is set",
+            code: "const fs = await import('fs');",
+            options: [{ isDesktopOnly: true }],
+        },
+        {
             name: "dynamic import() inside if (Platform.isDesktop) is allowed",
             code: "if (Platform.isDesktop) { const fs = await import('fs'); }",
         },
@@ -260,6 +272,12 @@ ruleTester.run("no-nodejs-modules", noNodejsModules, {
                     }
                 }
             `,
+            errors: [{ messageId: "noNodejs" }],
+        },
+        {
+            name: "explicitly setting isDesktopOnly false still reports",
+            code: "import fs from 'node:fs';",
+            options: [{ isDesktopOnly: false }],
             errors: [{ messageId: "noNodejs" }],
         },
         {
