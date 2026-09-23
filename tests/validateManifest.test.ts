@@ -392,6 +392,90 @@ ruleTester.run("validate-manifest", manifestRule as unknown as Rule.RuleModule, 
                 },
             ],
         },
+        // A key naming an `Object.prototype` member is an unknown key like any
+        // other, but a plain-object lookup answers with the inherited member
+        // rather than `undefined`. These pin that the own-property check
+        // rejects such a key before the lookup runs.
+        {
+            name: "prototype-named key '__proto__' is forbidden",
+            filename: "manifest.json",
+            code: `{
+                    "id": "test-id",
+                    "name": "Test name",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "A great test.",
+                    "isDesktopOnly": false,
+                    "__proto__": {}
+                }`,
+            errors: [
+                {
+                    messageId: "disallowedKey",
+                    data: { key: "__proto__" },
+                },
+            ],
+        },
+        {
+            name: "prototype-named key 'constructor' is forbidden",
+            filename: "manifest.json",
+            code: `{
+                    "id": "test-id",
+                    "name": "Test name",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "A great test.",
+                    "isDesktopOnly": false,
+                    "constructor": 1
+                }`,
+            errors: [
+                {
+                    messageId: "disallowedKey",
+                    data: { key: "constructor" },
+                },
+            ],
+        },
+        {
+            name: "prototype-named key 'toString' is forbidden",
+            filename: "manifest.json",
+            code: `{
+                    "id": "test-id",
+                    "name": "Test name",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "A great test.",
+                    "isDesktopOnly": false,
+                    "toString": "x"
+                }`,
+            errors: [
+                {
+                    messageId: "disallowedKey",
+                    data: { key: "toString" },
+                },
+            ],
+        },
+        {
+            name: "prototype-named key 'hasOwnProperty' is forbidden",
+            filename: "manifest.json",
+            code: `{
+                    "id": "test-id",
+                    "name": "Test name",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "A great test.",
+                    "isDesktopOnly": false,
+                    "hasOwnProperty": true
+                }`,
+            errors: [
+                {
+                    messageId: "disallowedKey",
+                    data: { key: "hasOwnProperty" },
+                },
+            ],
+        },
         {
             name: "authorUrl with number type is forbidden",
             filename: "manifest.json",

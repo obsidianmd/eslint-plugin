@@ -31,6 +31,7 @@ to live in the ESLint config:
 {
     files: ["manifest.json"],
     language: "json/json",
+    plugins: { json, obsidianmd },
     rules: {
         // A published plugin id can never change, so this finding can never be acted on.
         "obsidianmd/validate-manifest": ["warn", { allowedWords: { id: ["obsidian"] } }],

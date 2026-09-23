@@ -101,7 +101,10 @@ function isCheckedWordField(key: string): key is CheckedWordField {
     return (CHECKED_WORD_FIELDS as readonly string[]).includes(key);
 }
 
-function hasForbiddenWords(str: string, allowed: string[] = []): [boolean, string] {
+// Returns the forbidden words found in `str`, spelled as the `noForbiddenWords`
+// message wants them, or `null` when there are none. One call answers both
+// "is this field reportable?" and "what does the report say?".
+function findForbiddenWords(str: string, allowed: string[] = []): string | null {
     const forbiddenWordsFound = new Set<string>();
     const strLower = str.toLowerCase();
     for (const word of FORBIDDEN_WORDS) {
@@ -112,10 +115,10 @@ function hasForbiddenWords(str: string, allowed: string[] = []): [boolean, strin
             forbiddenWordsFound.add(word);
         }
     }
-    if (forbiddenWordsFound.size > 0) {
-        return [true, Array.from(forbiddenWordsFound).sort().join("' or '")];
+    if (forbiddenWordsFound.size === 0) {
+        return null;
     }
-    return [false, ""];
+    return Array.from(forbiddenWordsFound).sort().join("' or '");
 }
 
 const rule: ValidateManifestRuleDefinition = {
@@ -186,7 +189,14 @@ const rule: ValidateManifestRuleDefinition = {
         const allowedWords = options.allowedWords ?? {};
 
         const requiredKeys = BASE_SCHEMA;
-        const allAllowedKeys = { ...requiredKeys, ...OPTIONAL_SCHEMA };
+        // Null-prototype, so a manifest key naming an `Object.prototype`
+        // member cannot resolve to one. The own-property check below is what
+        // rejects such a key; this is the second line of defence.
+        const allAllowedKeys: Record<string, string | undefined> = Object.assign(
+            Object.create(null) as Record<string, string | undefined>,
+            requiredKeys,
+            OPTIONAL_SCHEMA,
+        );
 
         return {
             Document(documentNode) {
@@ -236,7 +246,7 @@ const rule: ValidateManifestRuleDefinition = {
 
                 // 3. Check types and disallowed keys
                 for (const [key, member] of presentKeys.entries()) {
-                    if (key && !(key in allAllowedKeys)) {
+                    if (key && !Object.hasOwn(allAllowedKeys, key)) {
                         context.report({
                             node: member.name,
                             messageId: "disallowedKey",
@@ -245,14 +255,26 @@ const rule: ValidateManifestRuleDefinition = {
                         continue;
                     }
 
-                    const expectedType =
-                        allAllowedKeys[key as keyof typeof allAllowedKeys];
+                    const expectedType = allAllowedKeys[key];
                     if (!expectedType) continue;
 
                     const valueNode = member.value;
                     const actualType = getAstNodeType(valueNode);
 
                     if (expectedType.includes(actualType)) {
+                        // Hoisted out of the branch chain below so the check
+                        // runs once and its result is both the condition and
+                        // the reported word.
+                        const forbiddenWords =
+                            valueNode.type === "String" &&
+                            !ignored.has("noForbiddenWords") &&
+                            isCheckedWordField(key)
+                                ? findForbiddenWords(
+                                      valueNode.value,
+                                      allowedWords[key],
+                                  )
+                                : null;
+
                         if (key === "fundingUrl") {
                             if (
                                 actualType === "object" &&
@@ -318,27 +340,11 @@ const rule: ValidateManifestRuleDefinition = {
                                     messageId: "emptyFundingUrlObject",
                                 });
                             }
-                        } else if (
-                            // check for forbidden words in specific string fields
-                            actualType === "string" &&
-                            valueNode.type === "String" &&
-                            !ignored.has("noForbiddenWords") &&
-                            isCheckedWordField(key) &&
-                            hasForbiddenWords(
-                                valueNode.value,
-                                allowedWords[key],
-                            )[0]
-                        ) {
+                        } else if (forbiddenWords !== null) {
                             context.report({
                                 node: valueNode,
                                 messageId: "noForbiddenWords",
-                                data: {
-                                    word: hasForbiddenWords(
-                                        valueNode.value,
-                                        allowedWords[key],
-                                    )[1],
-                                    key,
-                                },
+                                data: { word: forbiddenWords, key },
                             });
                         } else if (
                             actualType === "string" &&
