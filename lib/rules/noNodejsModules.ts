@@ -1,7 +1,7 @@
 import { AST_NODE_TYPES } from "@typescript-eslint/utils";
 import type { TSESTree } from "@typescript-eslint/utils";
 import { isBuiltin } from "node:module";
-import { getManifest } from "../manifest.js";
+import { isManifestDesktopOnly } from "../manifest.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 interface NoNodejsModulesOptions {
@@ -40,7 +40,7 @@ export default ruleCreator<[NoNodejsModulesOptions?], "noNodejs">({
         // The rule is listed in eslint-comments/no-restricted-disable, so a
         // disable comment is not an available escape; this option is.
         const isDesktopOnly =
-            options?.isDesktopOnly ?? getManifest()?.isDesktopOnly ?? false;
+            options?.isDesktopOnly ?? isManifestDesktopOnly();
         if (isDesktopOnly) {
             return {};
         }

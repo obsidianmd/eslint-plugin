@@ -29,5 +29,10 @@ need a fake one purely to keep this rule quiet. Set the option instead:
 }
 ```
 
+Only a literal `true` in that manifest counts. The file belongs to the repo
+being linted, so its `isDesktopOnly` is whatever JSON it holds: a non-boolean
+value -- `"false"`, `1`, `[]` -- is read as *not* desktop-only and the rule
+keeps reporting, rather than being turned off by a malformed field.
+
 This rule is listed in `eslint-comments/no-restricted-disable`, so a disable
 comment is not an available escape.

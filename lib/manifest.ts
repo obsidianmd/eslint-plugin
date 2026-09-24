@@ -28,3 +28,18 @@ export function getManifest(): PluginManifest | null {
         return cachedManifest;
     }
 }
+
+/**
+ * Whether a manifest says its plugin is desktop-only.
+ *
+ * A manifest.json belongs to the repo being linted, so `isDesktopOnly` is a
+ * `boolean` only to TypeScript -- at runtime it is whatever the file holds.
+ * `"false"`, `1`, `[]` and `{}` are all truthy, so a truthiness test lets a
+ * malformed field turn a rule off for the very repo that shipped it. Only a
+ * real `true` counts.
+ */
+export function isManifestDesktopOnly(
+    manifest: PluginManifest | null = getManifest(),
+): boolean {
+    return (manifest as { isDesktopOnly?: unknown } | null)?.isDesktopOnly === true;
+}
