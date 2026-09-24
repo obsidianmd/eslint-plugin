@@ -56,3 +56,6 @@ export const restrictedImportsOptions = [
 ] as const;
 
 export const noUnusedExpressionsOptions = [{ allowShortCircuit: true, allowTernary: true }] as const;
+
+// `using` declarations are consumed through `Symbol.dispose` at block exit, but the syntax still requires a name.
+export const noUnusedVarsOptions = [{ args: "none", ignoreRestSiblings: true, ignoreUsingDeclarations: true }] as const;

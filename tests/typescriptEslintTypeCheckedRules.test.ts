@@ -14,7 +14,7 @@ ruleTester.run("ts-await-thenable", tseslintPlugin.rules["await-thenable"], {
         {
             name: "awaiting a non-thenable is forbidden",
             code: "async function f() { await 1; }",
-            errors: [{ messageId: "await", suggestions: [{ messageId: "removeAwait", output: "async function f() {  1; }" }] }],
+            errors: [{ messageId: "await", suggestions: [{ messageId: "removeAwait", output: "async function f() { 1; }" }] }],
         },
     ],
 });
