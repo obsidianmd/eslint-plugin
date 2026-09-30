@@ -1,5 +1,4 @@
 import type { CustomRuleDefinitionType, CustomRuleTypeDefinitions } from "@eslint/core";
-import path from "path";
 import type {
     PlainTextLanguageOptions,
     PlainTextNode,
@@ -67,12 +66,6 @@ const rule: PlainTextRuleDefinition<{
         },
     },
     create(context) {
-        const filename = context.physicalFilename;
-        // Matches LICENSE as well as the equally common LICENSE.md / LICENSE.txt.
-        if (!/LICENSE(\.(?:md|txt))?$/.test(path.basename(filename))) {
-            return {};
-        }
-
         const options = context.options[0] ?? {};
         const currentYear = options.currentYear ?? new Date().getFullYear();
         const disableUnchangedYear = options.disableUnchangedYear ?? false;
