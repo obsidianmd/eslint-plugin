@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** `recommended` and `recommendedWithLocalesEn` no longer lint `package.json`. `depend/ban-dependencies` moved to the new `packageJson` config; add `...obsidianmd.configs.packageJson` as the last entry to keep it. Matching `package.json` made type-checked configs added after `recommended` abort the run on it ([#80](https://github.com/obsidianmd/eslint-plugin/pull/80)).
+
 ## [0.5.1] - 2026-11-06
 
 Fixes for findings on correct code, and for fixes and suggestions that changed what correct
