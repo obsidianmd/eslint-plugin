@@ -170,12 +170,12 @@ export default defineConfig([
 ### Code that only runs on desktop
 
 `no-nodejs-modules` reports because Node APIs are unavailable on mobile. Where that does not apply —
-a desktop-only plugin, or code that never runs inside Obsidian at all — say so with the rule's
-option rather than switching it off, so guarded and unguarded imports are still distinguished
-everywhere else:
+code that never runs inside Obsidian at all, such as a standalone CLI — say so with the rule's
+option, scoped with `files` to that code, so the plugin source beside it is still checked:
 
 ```js
 {
+  files: ["cli/**"],
   rules: {
     "obsidianmd/no-nodejs-modules": ["warn", { isDesktopOnly: true }],
   },
