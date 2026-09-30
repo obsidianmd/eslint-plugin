@@ -751,7 +751,7 @@ describe("core JS rules apply only to JS and TS files", () => {
 
 	for (const configName of ["recommended", "recommendedWithLocalesEn"] as const) {
 		describe(configName, () => {
-			const nonCode = ["package.json", "manifest.json", "LICENSE"];
+			const nonCode = ["manifest.json", "LICENSE"];
 			// Only recommendedWithLocalesEn lints locale JSON at all.
 			if (configName === "recommendedWithLocalesEn") nonCode.push("locales/en.json");
 			for (const filename of nonCode) {
@@ -1367,8 +1367,8 @@ describe("disable comments", () => {
 });
 
 describe("package.json", () => {
-	it("is checked by depend/ban-dependencies at error, with every preset", async () => {
-		const eslint = new ESLint({ overrideConfigFile: true, overrideConfig: plugin.configs.recommended });
+	it("is checked by the packageJson config's depend/ban-dependencies at error, with every preset", async () => {
+		const eslint = new ESLint({ overrideConfigFile: true, overrideConfig: [...plugin.configs.recommended, ...plugin.configs.packageJson] });
 		const [result] = await eslint.lintText(
 			JSON.stringify({ dependencies: { "is-number": "1.0.0", "array-includes": "1.0.0", axios: "1.0.0" } }),
 			{ filePath: "package.json" }
@@ -1397,11 +1397,17 @@ describe("files linted by name, only at the root", () => {
 			});
 		}
 	}
+
+	it("packages/a/package.json is not linted by packageJson", async () => {
+		const eslint = new ESLint({ overrideConfigFile: true, overrideConfig: plugin.configs.packageJson });
+		const linted = (await eslint.calculateConfigForFile("packages/a/package.json")) !== undefined;
+		assert.strictEqual(linted, false);
+	});
 });
 
 // A type-checked config spread before the recommended config, without `files`,
-// reaches the files the recommended config lints by name too. Their blocks
-// switch the type-checked rules off again, so the run does not abort.
+// reaches the files the recommended and packageJson configs lint by name too.
+// Their blocks switch the type-checked rules off again, so the run does not abort.
 describe("a type-checked config before the recommended config", () => {
 	const files: Record<string, string> = {
 		"package.json": "{ \"name\": \"word-tally\" }\n",
@@ -1415,6 +1421,7 @@ describe("a type-checked config before the recommended config", () => {
 				overrideConfig: [
 					...(tseslint.configs.recommendedTypeChecked as Linter.Config[]),
 					...plugin.configs.recommended,
+					...plugin.configs.packageJson,
 					{ languageOptions: { parserOptions: { projectService: true, tsconfigRootDir: process.cwd() } } },
 				],
 			});
@@ -1422,4 +1429,42 @@ describe("a type-checked config before the recommended config", () => {
 			assert.deepStrictEqual(result.messages.filter(m => m.fatal).map(m => m.message), []);
 		});
 	}
+});
+
+describe("packageJson config", () => {
+	const packageJsonText = '{"dependencies": {"is-number": "1.0.0"}}';
+
+	it("recommended should not lint package.json", async () => {
+		const eslint = new ESLint({
+			overrideConfigFile: true,
+			overrideConfig: plugin.configs.recommended,
+		});
+		const config: unknown = await eslint.calculateConfigForFile("package.json");
+		assert.ok(config === undefined, "package.json should match no config object");
+	});
+
+	it("recommended should not apply a type-checked config without files to package.json", async () => {
+		const eslint = new ESLint({
+			overrideConfigFile: true,
+			overrideConfig: [
+				...plugin.configs.recommended,
+				...(tseslint.configs.strictTypeChecked as Linter.Config[]),
+			],
+		});
+		const [result] = await eslint.lintText(packageJsonText, { filePath: "package.json" });
+		assert.deepStrictEqual(result.messages.map((m) => m.ruleId), [null]);
+	});
+
+	it("should report banned dependencies when spread after a type-checked config", async () => {
+		const eslint = new ESLint({
+			overrideConfigFile: true,
+			overrideConfig: [
+				...plugin.configs.recommended,
+				...(tseslint.configs.strictTypeChecked as Linter.Config[]),
+				...plugin.configs.packageJson,
+			],
+		});
+		const [result] = await eslint.lintText(packageJsonText, { filePath: "package.json" });
+		assert.deepStrictEqual(result.messages.map((m) => m.ruleId), ["depend/ban-dependencies"]);
+	});
 });

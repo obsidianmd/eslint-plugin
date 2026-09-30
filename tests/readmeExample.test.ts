@@ -83,17 +83,17 @@ async function eslintDot(dir: string): Promise<LintResult[]> {
 	}
 }
 
-const ALL_LINTED = ["eslint.config.mjs", "manifest.json", "package.json", "src/main.ts"];
+const ALL_LINTED = ["eslint.config.mjs", "manifest.json", "src/main.ts"];
 
 for (const [file, heading, linted] of [
 	["README.md", "## Usage", ALL_LINTED],
 	["README.md", "### Usage (flat config)", ALL_LINTED],
 	["docs/configuration.md", "## Quick start", ALL_LINTED],
 	["docs/configuration.md", "## Using alongside stricter typescript-eslint configs", ALL_LINTED],
-	// Without the recommended config nothing lints package.json or manifest.json.
+	// Without the recommended config nothing lints manifest.json.
 	["docs/configuration.md", "## Using only obsidianmd rules (without the recommended config)", ["eslint.config.mjs", "src/main.ts"]],
 	// The scanner leaves out every .mjs file, the config among them.
-	["docs/configuration.md", "## Community plugin scanner configuration", ["manifest.json", "package.json", "src/main.ts"]],
+	["docs/configuration.md", "## Community plugin scanner configuration", ["manifest.json", "src/main.ts"]],
 ] as const) {
 	describe(`${file} ${heading} example on the sample plugin's layout`, () => {
 		let dir: string;
@@ -218,7 +218,7 @@ describe("docs/configuration.md ## Plugins written in JavaScript examples on a J
 
 			it("lints the plugin source, but not the build output or scripts", () => {
 				const lintedFiles = results.map((result) => path.relative(dir, result.filePath)).sort();
-				assert.deepStrictEqual(lintedFiles, ["eslint.config.mjs", "manifest.json", "package.json", "src/main.js"]);
+				assert.deepStrictEqual(lintedFiles, ["eslint.config.mjs", "manifest.json", "src/main.js"]);
 			});
 
 			it(typed ? "runs the type-aware rules on the source" : "does not run the type-aware rules", () => {
