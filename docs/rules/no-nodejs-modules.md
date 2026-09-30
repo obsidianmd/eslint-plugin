@@ -19,10 +19,13 @@
 `isDesktopOnly` defaults to the `isDesktopOnly` value of a `manifest.json` in the
 working directory. A repo that is not a plugin — a library, tooling, a
 standalone CLI in the same repo — has no manifest to carry that flag, and used to
-need a fake one purely to keep this rule quiet. Set the option instead:
+need a fake one purely to keep this rule quiet. Set the option instead, scoped to
+the files that only run on desktop, so plugin code in the same repo is still
+checked:
 
 ```js
 {
+    files: ["cli/**"],
     rules: {
         "obsidianmd/no-nodejs-modules": ["warn", { isDesktopOnly: true }],
     },
