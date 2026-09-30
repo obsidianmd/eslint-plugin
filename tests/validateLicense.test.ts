@@ -71,13 +71,14 @@ ruleTester.run("validate-license", licenseRule as unknown as Rule.RuleModule, {
             filename: "LICENSE",
             code: `foo\nbar\nbaz`,
         },
-        {
-            name: "a file that is not a licence is ignored",
-            filename: "NOTICE",
-            code: `Copyright (C) 2020 by Dynalist Inc.`,
-        },
     ],
     invalid: [
+        {
+            name: "a licence file under another name is checked too",
+            filename: "COPYING",
+            code: `Copyright (C) ${currentYear} by Dynalist Inc.`,
+            errors: [{ messageId: "unchangedCopyright" }],
+        },
         {
             name: "unchanged Dynalist Inc copyright is forbidden",
             filename: "LICENSE",

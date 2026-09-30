@@ -82,7 +82,10 @@ language the plugin contributes:
 {
   files: ["COPYING"],
   language: "obsidianmd/plain-text",
-  rules: { "obsidianmd/validate-license": "warn" },
+  rules: {
+    "no-irregular-whitespace": "off",
+    "obsidianmd/validate-license": "warn",
+  },
 }
 ```
 

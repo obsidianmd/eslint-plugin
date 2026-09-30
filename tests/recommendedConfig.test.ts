@@ -275,6 +275,35 @@ describe("LICENSE survives a global parser override", () => {
 	});
 });
 
+// The block docs/configuration.md tells users to add for a licence file under
+// another name.
+describe("validate-license on a user-configured filename", () => {
+	it("reports on COPYING", async () => {
+		const eslint = new ESLint({
+			overrideConfigFile: true,
+			overrideConfig: [
+				...(plugin.configs.recommended as Linter.Config[]),
+				{
+					files: ["COPYING"],
+					language: "obsidianmd/plain-text",
+					rules: {
+						"no-irregular-whitespace": "off",
+						"obsidianmd/validate-license": "warn",
+					},
+				},
+			],
+		});
+		const [result] = await eslint.lintText(
+			"Copyright (c) 2020 Dynalist Inc.\n",
+			{ filePath: "COPYING" }
+		);
+		assert.deepStrictEqual(
+			result.messages.map(m => m.messageId),
+			["unchangedYear", "unchangedCopyright"]
+		);
+	});
+});
+
 describe("scanner-aligned severities", () => {
 	let tsRules: Record<string, any>;
 	let jsRules: Record<string, any>;
