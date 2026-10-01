@@ -82,6 +82,9 @@ describe("recommended config", () => {
 			const fileSpecificRules = new Set([
 				"obsidianmd/ui/sentence-case-json",
 				"obsidianmd/ui/sentence-case-locale-module",
+				// Scoped to manifest.json, which can never match a JS/TS glob.
+				// Asserted separately in "file-scoped rules" below.
+				"obsidianmd/validate-manifest",
 			]);
 			const registeredRules = Object.keys(plugin.rules);
 			for (const rule of registeredRules) {
@@ -195,6 +198,40 @@ describe("recommendedWithLocalesEn config", () => {
 	});
 });
 
+// Regression guard for the defect these tests did not catch: validate-manifest
+// used to live in the block spread into the JS and TS globs, so no manifest.json
+// could ever match and the rule never ran. Resolving the config for the file the
+// rule actually targets is the only assertion that notices.
+describe("file-scoped rules", () => {
+	for (const configName of ["recommended", "recommendedWithLocalesEn"] as const) {
+		describe(configName, () => {
+			let manifestRules: Record<string, any>;
+			let tsRules: Record<string, any>;
+
+			before(async () => {
+				manifestRules = await rulesFor(configName, "manifest.json");
+				tsRules = await rulesFor(configName, "src/main.ts");
+			});
+
+			it("validate-manifest should be 'warn' for manifest.json", () => {
+				assert.strictEqual(
+					getSeverity(manifestRules["obsidianmd/validate-manifest"]),
+					"warn"
+				);
+			});
+
+			it("validate-manifest should not apply to source files", () => {
+				const rule = "obsidianmd/validate-manifest";
+				const severity = getSeverity(tsRules[rule]);
+				assert.ok(
+					severity === "off" || !(rule in tsRules),
+					`${rule} targets a non-source file but is enabled for .ts, got: ${severity}`
+				);
+			});
+		});
+	}
+});
+
 describe("scanner-aligned severities", () => {
 	let tsRules: Record<string, any>;
 	let jsRules: Record<string, any>;
@@ -273,7 +310,6 @@ describe("scanner-aligned severities", () => {
 			"obsidianmd/prefer-get-language",
 			"obsidianmd/prefer-abstract-input-suggest",
 			"obsidianmd/prefer-window-timers",
-			"obsidianmd/validate-manifest",
 			"obsidianmd/validate-license",
 			"obsidianmd/ui/sentence-case",
 		];

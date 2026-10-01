@@ -55,8 +55,24 @@ The recommended config is an array of flat config objects that sets up:
 - **Third-party plugins**: `@microsoft/eslint-plugin-sdl`, `eslint-plugin-import`, `eslint-plugin-no-unsanitized`, `eslint-plugin-depend`, `@eslint-community/eslint-plugin-eslint-comments`
 - **Obsidian globals** (`activeDocument`, `activeWindow`, `createEl`, etc.)
 - **`package.json` linting** via `eslint-plugin-depend` (ban common micro-utilities)
+- **`manifest.json` linting** via `validate-manifest`, parsed with `@eslint/json`
 
 Because of this, you do **not** need to separately add `eslint.configs.recommended` or `tseslint.configs.recommended` — they are already included.
+
+### Files linted beyond your source
+
+The recommended config lints more than `.ts` and `.js`. It matches `package.json` and `manifest.json`
+by name, reading both with the `json/json` language, so **ESLint has to be pointed at the project
+root for those checks to run at all**. A lint script scoped to your sources — `eslint src` — will
+never visit `manifest.json`, and the rules covering it silently do nothing:
+
+```jsonc
+// package.json
+"scripts": {
+  "lint": "eslint .",       // manifest.json is checked
+  "lint:src": "eslint src"  // it is not
+}
+```
 
 ## Using alongside stricter typescript-eslint configs
 
@@ -288,7 +304,16 @@ A few things to keep in mind with this approach:
 
 - **Obsidian globals** must be declared manually. The recommended config does this for you; here you need to add them yourself. The list above covers the most common ones. `DomElementInfo`, `SvgElementInfo`, `isBoolean`, `nextFrame`, and `ready` are also available.
 - **Third-party plugins** bundled by the recommended config (`@microsoft/eslint-plugin-sdl`, `eslint-plugin-import`, `eslint-plugin-no-unsanitized`, `eslint-plugin-depend`, `eslint-plugin-eslint-comments`) are not included. Add them separately if you want them.
-- **`package.json` and `manifest.json` linting** (`validate-manifest`, `validate-license`, `depend/ban-dependencies`) is not set up. The `validate-manifest` and `validate-license` rules will work on `.json` files only if you have a JSON parser configured.
+- **`package.json` and `manifest.json` linting** (`validate-manifest`, `depend/ban-dependencies`) is not set up, and is not covered by `ruleConfigs` — those presets only carry rules that apply to source files. `validate-manifest` needs its own config block, because `manifest.json` matches no source glob and needs the JSON language to be parsed at all:
+
+  ```js
+  {
+    files: ["manifest.json"],
+    language: "json/json",
+    plugins: { json, obsidianmd },
+    rules: { "obsidianmd/validate-manifest": "warn" },
+  }
+  ```
 
 ## Community plugin scanner configuration
 
@@ -384,13 +409,22 @@ export default defineConfig([
       "@typescript-eslint/no-base-to-string": "off",
       "import/no-unresolved": "off",
 
-      // Scanner handles these separately
-      "obsidianmd/validate-manifest": "off",
+      // Scanner handles this separately
       "obsidianmd/validate-license": "off",
 
       // Old plugins should not change their command ids
       "obsidianmd/commands/no-command-in-command-id": "off",
       "obsidianmd/commands/no-plugin-id-in-command-id": "off",
+    },
+  },
+
+  {
+    // Scanner handles this separately. It must be switched off under the glob
+    // the rule actually runs on -- manifest.json matches no source glob, so an
+    // "off" in the block above would not reach it.
+    files: ["manifest.json"],
+    rules: {
+      "obsidianmd/validate-manifest": "off",
     },
   },
 

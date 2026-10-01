@@ -170,7 +170,9 @@ const recommendedPluginRulesConfigBase: RulesConfig = {
     "obsidianmd/prefer-active-doc": "off",
     "obsidianmd/regex-lookbehind": "error",
     "obsidianmd/sample-names": "error",
-    "obsidianmd/validate-manifest": "warn",
+    // validate-manifest is NOT here: it lints manifest.json, which cannot match
+    // the JS/TS globs this block is spread into. It gets its own file-scoped
+    // block below.
     "obsidianmd/validate-license": ["warn"],
     "obsidianmd/ui/sentence-case": ["warn", { enforceCamelCaseLower: true }],
 }
@@ -288,6 +290,21 @@ const flatRecommendedConfig: Config[] = defineConfig([
                     "presets": ["native", "microutilities", "preferred"]
                 }
             ]
+        }
+    },
+    // manifest.json is strict JSON, so it needs the JSON language to be parsed
+    // at all — under the JS/TS globs above it was never linted.
+    {
+        files: ['manifest.json'],
+        language: 'json/json',
+        extends: [tseslint.configs.disableTypeChecked as Config],
+        plugins: {
+            json,
+            obsidianmd: plugin
+        },
+        rules: {
+            "no-irregular-whitespace": "off",
+            "obsidianmd/validate-manifest": "warn"
         }
     },
     {
