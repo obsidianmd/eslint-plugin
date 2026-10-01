@@ -34,3 +34,6 @@ ij_continuation_indent_size = 4
 ij_typescript_use_double_quotes = false
 ij_typescript_force_quote_style = true
 ij_typescript_force_semicolon_style = true
+
+[*.md]
+end_of_line = lf
