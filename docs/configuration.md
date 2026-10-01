@@ -54,9 +54,30 @@ The recommended config is an array of flat config objects that sets up:
 - **All obsidianmd rules** at their default severities
 - **Third-party plugins**: `@microsoft/eslint-plugin-sdl`, `eslint-plugin-import`, `eslint-plugin-no-unsanitized`, `eslint-plugin-depend`, `@eslint-community/eslint-plugin-eslint-comments`
 - **Obsidian globals** (`activeDocument`, `activeWindow`, `createEl`, etc.)
-- **`package.json` linting** via `eslint-plugin-depend` (ban common micro-utilities)
 
 Because of this, you do **not** need to separately add `eslint.configs.recommended` or `tseslint.configs.recommended` — they are already included.
+
+## Linting `package.json`
+
+`package.json` linting (`depend/ban-dependencies`, which bans common micro-utilities) is a separate config, `packageJson`. Spread it **last**:
+
+```js
+export default defineConfig([
+  ...obsidianmd.configs.recommended,
+  {
+    languageOptions: {
+      parserOptions: {
+        projectService: {
+          allowDefaultProject: ["eslint.config.*"],
+        },
+      },
+    },
+  },
+  ...obsidianmd.configs.packageJson,
+]);
+```
+
+It is not part of `recommended` because once any config object matches `package.json`, ESLint lints that file, and every config object without `files` applies to it as well. Type-checked configs such as `tseslint.configs.strictTypeChecked` then throw "You have used a rule which requires type information" on `package.json`. `packageJson` turns the type-checked rules off for `package.json`, so it has to come after every config object that turns them on.
 
 ## Using alongside stricter typescript-eslint configs
 
@@ -288,7 +309,7 @@ A few things to keep in mind with this approach:
 
 - **Obsidian globals** must be declared manually. The recommended config does this for you; here you need to add them yourself. The list above covers the most common ones. `DomElementInfo`, `SvgElementInfo`, `isBoolean`, `nextFrame`, and `ready` are also available.
 - **Third-party plugins** bundled by the recommended config (`@microsoft/eslint-plugin-sdl`, `eslint-plugin-import`, `eslint-plugin-no-unsanitized`, `eslint-plugin-depend`, `eslint-plugin-eslint-comments`) are not included. Add them separately if you want them.
-- **`package.json` and `manifest.json` linting** (`validate-manifest`, `validate-license`, `depend/ban-dependencies`) is not set up. The `validate-manifest` and `validate-license` rules will work on `.json` files only if you have a JSON parser configured.
+- **`manifest.json` linting** (`validate-manifest`, `validate-license`) is not set up. These rules will work on `.json` files only if you have a JSON parser configured. For `package.json`, spread `obsidianmd.configs.packageJson` last, as described in [Linting `package.json`](#linting-packagejson).
 
 ## Community plugin scanner configuration
 
