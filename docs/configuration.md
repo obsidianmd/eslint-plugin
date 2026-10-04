@@ -334,7 +334,10 @@ A few things to keep in mind with this approach:
     files: ["LICENSE", "LICENSE.md", "LICENSE.txt"],
     language: "obsidianmd/plain-text",
     plugins: { obsidianmd },
-    rules: { "obsidianmd/validate-license": "warn" },
+    rules: {
+      "no-irregular-whitespace": "off",
+      "obsidianmd/validate-license": "warn",
+    },
   }
   ```
 
