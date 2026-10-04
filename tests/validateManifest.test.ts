@@ -477,6 +477,26 @@ ruleTester.run("validate-manifest", manifestRule as unknown as Rule.RuleModule, 
             ],
         },
         {
+            name: "empty-string key is forbidden",
+            filename: "manifest.json",
+            code: `{
+                    "id": "test-id",
+                    "name": "Test name",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "A great test.",
+                    "isDesktopOnly": false,
+                    "": 1
+                }`,
+            errors: [
+                {
+                    messageId: "disallowedKey",
+                    data: { key: "" },
+                },
+            ],
+        },
+        {
             name: "authorUrl with number type is forbidden",
             filename: "manifest.json",
             code: `{
@@ -861,6 +881,45 @@ ruleTester.run("validate-manifest", manifestRule as unknown as Rule.RuleModule, 
                     "version": "1.0.0",
                     "minAppVersion": "1.0.0",
                     "description": "This description contains emojis 😊, which are not allowed in the description field.",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                {
+                    messageId: "descriptionFormat",
+                },
+            ],
+        },
+        // Neither a flag nor a keycap contains an Extended_Pictographic code
+        // point: a flag is two regional indicators, a keycap is a digit, U+FE0F
+        // and U+20E3.
+        {
+            name: "description with a flag emoji is forbidden",
+            filename: "manifest.json",
+            code: `{
+                    "id": "test-id",
+                    "name": "Test name",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Made with care in the 🇺🇸.",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                {
+                    messageId: "descriptionFormat",
+                },
+            ],
+        },
+        {
+            name: "description with a keycap emoji is forbidden",
+            filename: "manifest.json",
+            code: `{
+                    "id": "test-id",
+                    "name": "Test name",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Step 1️⃣ is to open the vault.",
                     "isDesktopOnly": false
                 }`,
             errors: [

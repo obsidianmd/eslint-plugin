@@ -307,6 +307,9 @@ A few things to keep in mind with this approach:
 - **`package.json` and `manifest.json` linting** (`validate-manifest`, `depend/ban-dependencies`) is not set up, and is not covered by `ruleConfigs` — those presets only carry rules that apply to source files. `validate-manifest` needs its own config block, because `manifest.json` matches no source glob and needs the JSON language to be parsed at all:
 
   ```js
+  import json from "@eslint/json";
+
+  // in the defineConfig([...]) array:
   {
     files: ["manifest.json"],
     language: "json/json",

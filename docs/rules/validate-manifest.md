@@ -28,6 +28,10 @@ to every user and is itself reported as a disallowed key. So the escape hatch ha
 to live in the ESLint config:
 
 ```js
+import json from "@eslint/json";
+import obsidianmd from "eslint-plugin-obsidianmd";
+
+// in the defineConfig([...]) array:
 {
     files: ["manifest.json"],
     language: "json/json",

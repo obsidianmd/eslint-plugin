@@ -33,8 +33,11 @@ type IgnorableCheck = (typeof IGNORABLE_CHECKS)[number];
 // A description may contain any ordinary punctuation -- backticks, em dashes,
 // parentheses, colons and slashes all appear in listings the directory has
 // passed. What it may not contain is emoji, or invisible characters that make
-// the text render differently than it reads.
-const DISALLOWED_DESCRIPTION_CHARS = /[\p{Extended_Pictographic}\p{Cc}\p{Cf}\p{Cs}]/u;
+// the text render differently than it reads. Flags and keycaps contain no
+// Extended_Pictographic code point, so their parts are listed separately:
+// regional indicators, U+FE0F (emoji presentation) and U+20E3 (keycap).
+const DISALLOWED_DESCRIPTION_CHARS =
+    /[\p{Extended_Pictographic}\p{Regional_Indicator}️⃣\p{Cc}\p{Cf}\p{Cs}]/u;
 
 interface ValidateManifestOptions {
     /**
@@ -246,7 +249,7 @@ const rule: ValidateManifestRuleDefinition = {
 
                 // 3. Check types and disallowed keys
                 for (const [key, member] of presentKeys.entries()) {
-                    if (key && !Object.hasOwn(allAllowedKeys, key)) {
+                    if (!Object.hasOwn(allAllowedKeys, key)) {
                         context.report({
                             node: member.name,
                             messageId: "disallowedKey",
