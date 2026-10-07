@@ -181,7 +181,7 @@ const recommendedPluginRulesConfig: RulesConfig = {
     ...recommendedPluginRulesConfigTypeChecked,
 };
 
-import { restrictedGlobalsOptions, restrictedImportsOptions, noUnusedExpressionsOptions } from "./ruleOptions.js";
+import { restrictedGlobalsOptions, restrictedImportsOptions, noUnusedExpressionsOptions, noUnusedVarsOptions } from "./ruleOptions.js";
 
 const flatRecommendedGeneralRules: RulesConfig = {
     "no-unused-vars": "off",
@@ -203,7 +203,7 @@ const flatRecommendedGeneralRules: RulesConfig = {
     "no-alert": "warn",
     "no-undef": "warn",
     "@typescript-eslint/ban-ts-comment": "off",
-    "@typescript-eslint/no-unused-vars": ["warn", { args: "none", ignoreRestSiblings: true }],
+    "@typescript-eslint/no-unused-vars": ["warn", ...noUnusedVarsOptions],
     "@typescript-eslint/no-unused-expressions": ["warn", ...noUnusedExpressionsOptions],
     "@typescript-eslint/require-await": "off",
     "@typescript-eslint/no-explicit-any": [
