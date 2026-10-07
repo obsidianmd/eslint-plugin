@@ -14,6 +14,14 @@ Next, install `eslint-plugin-obsidianmd`:
 npm install eslint-plugin-obsidianmd --save-dev
 ```
 
+The plugin reads Obsidian's own type definitions rather than bundling a copy, so your project needs `obsidian` installed as well. Plugin projects generated from the sample plugin already have it:
+
+```sh
+npm install obsidian --save-dev
+```
+
+Without it, [`no-unsupported-api`](docs/rules/no-unsupported-api.md) silently reports nothing. See that rule's docs for which `obsidian` versions give useful results.
+
 ## Usage
 
 Add the recommended configuration to your `eslint.config.mjs`. This enables all recommended rules, including ESLint core, typescript-eslint type-checked rules, and Obsidian-specific rules.
