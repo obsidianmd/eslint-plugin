@@ -29,6 +29,7 @@ import ruleCustomMessage from "./rules/ruleCustomMessage.js";
 import noNodejsModules from "./rules/noNodejsModules.js";
 import noUnsupportedApi from "./rules/noUnsupportedApi.js";
 import { getManifest } from "./manifest.js";
+import { PlainTextLanguage } from "./plainTextLanguage.js";
 import { ui } from "./rules/ui/index.js";
 
 // --- Import plugins and configs for the recommended config ---
@@ -67,6 +68,13 @@ const plugin = {
     meta: {
         name: packageJson.name,
         version: packageJson.version,
+    },
+    // A language, not a parser: `languageOptions.parser` is merged by key, so
+    // any later config object without a `files` restriction replaces it, and
+    // LICENSE then reaches whatever parser that block names. `language` is only
+    // replaced by another `language`.
+    languages: {
+        "plain-text": PlainTextLanguage
     },
     rules: {
         "commands/no-command-in-command-id": commands.noCommandInCommandId,
@@ -171,7 +179,9 @@ const recommendedPluginRulesConfigBase: RulesConfig = {
     "obsidianmd/regex-lookbehind": "error",
     "obsidianmd/sample-names": "error",
     "obsidianmd/validate-manifest": "warn",
-    "obsidianmd/validate-license": ["warn"],
+    // validate-license is NOT here: it lints LICENSE, which cannot match the
+    // JS/TS globs this block is spread into. It gets its own file-scoped block
+    // below.
     "obsidianmd/ui/sentence-case": ["warn", { enforceCamelCaseLower: true }],
 }
 
@@ -288,6 +298,20 @@ const flatRecommendedConfig: Config[] = defineConfig([
                     "presets": ["native", "microutilities", "preferred"]
                 }
             ]
+        }
+    },
+    // LICENSE has no extension and is not code, so it needs both an explicit
+    // glob and a language that can read it.
+    {
+        files: ['LICENSE', 'LICENSE.md', 'LICENSE.txt'],
+        language: 'obsidianmd/plain-text',
+        extends: [tseslint.configs.disableTypeChecked as Config],
+        plugins: {
+            obsidianmd: plugin
+        },
+        rules: {
+            "no-irregular-whitespace": "off",
+            "obsidianmd/validate-license": "warn"
         }
     },
     {
