@@ -212,8 +212,9 @@ const flatRecommendedGeneralRules: RulesConfig = {
     ],
     "@microsoft/sdl/no-document-write": "warn",
     "@microsoft/sdl/no-inner-html": "warn",
-    "obsidianmd/no-nodejs-modules":
-        manifest && manifest.isDesktopOnly ? "off" : "warn",
+    // The rule resolves the desktop-only signal itself, defaulting to the
+    // manifest, so the severity no longer has to be computed here.
+    "obsidianmd/no-nodejs-modules": "warn",
     "import/no-extraneous-dependencies": "warn",
     "obsidianmd/rule-custom-message": [
         "error",
