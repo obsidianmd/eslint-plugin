@@ -2,6 +2,7 @@ import type { ESLint } from "eslint";
 import { commands } from "./rules/commands/index.js";
 import { settingsTab } from "./rules/settingsTab/index.js";
 import { vault } from "./rules/vault/index.js";
+import { behavior } from "./rules/behavior/index.js";
 import detachLeaves from "./rules/detachLeaves.js";
 import editorDropPaste from "./rules/editorDropPaste.js";
 import hardcodedConfigPath from "./rules/hardcodedConfigPath.js";
@@ -87,6 +88,19 @@ const plugin = {
         "settings-tab/no-deprecated-display":
             settingsTab.noDeprecatedDisplay,
         "vault/iterate": vault.iterate,
+        "behavior/no-hardware-fingerprinting": behavior.noHardwareFingerprinting,
+        "behavior/no-system-identity": behavior.noSystemIdentity,
+        "behavior/no-electron-ipc": behavior.noElectronIpc,
+        "behavior/clipboard-access": behavior.clipboardAccess,
+        "behavior/no-local-storage": behavior.noLocalStorage,
+        "behavior/vault-read": behavior.vaultRead,
+        "behavior/vault-write": behavior.vaultWrite,
+        "behavior/vault-enumeration": behavior.vaultEnumeration,
+        "behavior/no-self-disable-enable": behavior.noSelfDisableEnable,
+        "behavior/no-self-update": behavior.noSelfUpdate,
+        "behavior/no-periodic-network": behavior.noPeriodicNetwork,
+        "behavior/no-filesystem-access": behavior.noFilesystemAccess,
+        "behavior/no-shell-execution": behavior.noShellExecution,
         "detach-leaves": detachLeaves,
         "editor-drop-paste": editorDropPaste,
         "hardcoded-config-path": hardcodedConfigPath,
@@ -173,6 +187,19 @@ const recommendedPluginRulesConfigBase: RulesConfig = {
     "obsidianmd/validate-manifest": "warn",
     "obsidianmd/validate-license": ["warn"],
     "obsidianmd/ui/sentence-case": ["warn", { enforceCamelCaseLower: true }],
+    "obsidianmd/behavior/no-hardware-fingerprinting": "off",
+    "obsidianmd/behavior/no-system-identity": "off",
+    "obsidianmd/behavior/no-electron-ipc": "off",
+    "obsidianmd/behavior/clipboard-access": "off",
+    "obsidianmd/behavior/no-local-storage": "off",
+    "obsidianmd/behavior/vault-read": "off",
+    "obsidianmd/behavior/vault-write": "off",
+    "obsidianmd/behavior/vault-enumeration": "off",
+    "obsidianmd/behavior/no-self-disable-enable": "off",
+    "obsidianmd/behavior/no-self-update": "off",
+    "obsidianmd/behavior/no-periodic-network": "off",
+    "obsidianmd/behavior/no-filesystem-access": "off",
+    "obsidianmd/behavior/no-shell-execution": "off",
 }
 
 // Combined rules for TypeScript files

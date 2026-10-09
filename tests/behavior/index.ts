@@ -1,0 +1,13 @@
+import "./noHardwareFingerprinting.test";
+import "./noSystemIdentity.test";
+import "./noElectronIpc.test";
+import "./clipboardAccess.test";
+import "./noLocalStorage.test";
+import "./vaultRead.test";
+import "./vaultWrite.test";
+import "./vaultEnumeration.test";
+import "./noSelfDisableEnable.test";
+import "./noSelfUpdate.test";
+import "./noPeriodicNetwork.test";
+import "./noFilesystemAccess.test";
+import "./noShellExecution.test";
