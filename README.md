@@ -45,6 +45,8 @@ The `parserOptions` block is required because the recommended config includes ty
 
 > **Note:** You do not need to separately add `eslint.configs.recommended` or `tseslint.configs.recommended` — both are already included in the recommended config.
 
+To also lint `package.json` (`depend/ban-dependencies`), add `...obsidianmd.configs.packageJson` as the last entry. See [Linting `package.json`](docs/configuration.md#linting-packagejson) for why it is separate and must come last.
+
 For advanced usage — layering stricter typescript-eslint configs, ignoring files, disabling rules for non-plugin code, and troubleshooting common errors — see the [configuration guide](docs/configuration.md).
 
 ## Configurations
@@ -53,6 +55,7 @@ For advanced usage — layering stricter typescript-eslint configs, ignoring fil
 
 |      | Name                       |
 | :--- | :------------------------- |
+|      | `packageJson`              |
 | ✅    | `recommended`              |
 | 🇬🇧 | `recommendedWithLocalesEn` |
 

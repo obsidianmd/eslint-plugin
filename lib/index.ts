@@ -119,7 +119,8 @@ const plugin = {
     } as unknown as Record<string, RuleDefinition<RuleDefinitionTypeOptions>>,
     configs: {
         recommended: [] as Config[],
-        recommendedWithLocalesEn: [] as Config[]
+        recommendedWithLocalesEn: [] as Config[],
+        packageJson: [] as Config[]
     },
     ruleConfigs: {
         recommended: {} as RulesConfig,
@@ -274,23 +275,6 @@ const flatRecommendedConfig: Config[] = defineConfig([
         },
     },
     {
-        files: ['package.json'],
-        language: 'json/json',
-        extends: [tseslint.configs.disableTypeChecked as Config],
-        plugins: {
-            depend,
-            json
-        },
-        rules: {
-            "no-irregular-whitespace": "off",
-            "depend/ban-dependencies": [
-                "error", {
-                    "presets": ["native", "microutilities", "preferred"]
-                }
-            ]
-        }
-    },
-    {
         files: ['**/*.{ts,cts,mts,tsx,js,cjs,mjs,jsx}'],
         rules: {
             "eslint-comments/no-unlimited-disable": "error",
@@ -393,9 +377,33 @@ const recommendedWithLocalesEn: Config[] = defineConfig([
     }
 ]);
 
+// Kept out of `recommended`: once any config object matches package.json,
+// ESLint lints it, and every user config object without `files` applies to it
+// too, so JS/TS-only settings there throw on package.json.
+const packageJsonConfig: Config[] = defineConfig([
+    {
+        files: ['package.json'],
+        language: 'json/json',
+        extends: [tseslint.configs.disableTypeChecked as Config],
+        plugins: {
+            depend,
+            json
+        },
+        rules: {
+            "no-irregular-whitespace": "off",
+            "depend/ban-dependencies": [
+                "error", {
+                    "presets": ["native", "microutilities", "preferred"]
+                }
+            ]
+        }
+    },
+]);
+
 plugin.configs = {
     recommended: flatRecommendedConfig,
-    recommendedWithLocalesEn
+    recommendedWithLocalesEn,
+    packageJson: packageJsonConfig
 };
 
 plugin.ruleConfigs = {

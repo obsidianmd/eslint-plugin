@@ -1,5 +1,6 @@
 import assert from "node:assert";
-import { ESLint } from "eslint";
+import { ESLint, type Linter } from "eslint";
+import tseslint from "typescript-eslint";
 import plugin from "../lib/index.js";
 
 async function rulesFor(configName: keyof typeof plugin.configs, filename: string): Promise<Record<string, any>> {
@@ -351,5 +352,43 @@ describe("type-checked rule guard", () => {
 				`${rule} requires type info but is missing from TS config — add it to recommendedPluginRulesConfigTypeChecked`
 			);
 		}
+	});
+});
+
+describe("packageJson config", () => {
+	const packageJsonText = '{"dependencies": {"is-number": "1.0.0"}}';
+
+	it("recommended should not lint package.json", async () => {
+		const eslint = new ESLint({
+			overrideConfigFile: true,
+			overrideConfig: plugin.configs.recommended,
+		});
+		const config: unknown = await eslint.calculateConfigForFile("package.json");
+		assert.ok(config === undefined, "package.json should match no config object");
+	});
+
+	it("recommended should not apply a type-checked config without files to package.json", async () => {
+		const eslint = new ESLint({
+			overrideConfigFile: true,
+			overrideConfig: [
+				...plugin.configs.recommended,
+				...(tseslint.configs.strictTypeChecked as Linter.Config[]),
+			],
+		});
+		const [result] = await eslint.lintText(packageJsonText, { filePath: "package.json" });
+		assert.deepStrictEqual(result.messages.map((m) => m.ruleId), [null]);
+	});
+
+	it("should report banned dependencies when spread after a type-checked config", async () => {
+		const eslint = new ESLint({
+			overrideConfigFile: true,
+			overrideConfig: [
+				...plugin.configs.recommended,
+				...(tseslint.configs.strictTypeChecked as Linter.Config[]),
+				...plugin.configs.packageJson,
+			],
+		});
+		const [result] = await eslint.lintText(packageJsonText, { filePath: "package.json" });
+		assert.deepStrictEqual(result.messages.map((m) => m.ruleId), ["depend/ban-dependencies"]);
 	});
 });
