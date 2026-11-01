@@ -10,6 +10,8 @@
 
 `Setting` and the UI components (`ButtonComponent`, `TextComponent`, `ToggleComponent` and the rest of `BaseComponent`'s subclasses) have a `then(cb)` method for chaining: it calls `cb` with the object and returns the object. That makes them thenables, so `await` and an async function's `return` treat them as promises. The resolution calls `then` again with the same object, forever, so the `await` never finishes and the app stops responding.
 
+Type-checking with `tsc` reports this as error TS1062. This rule also catches it in JavaScript and in builds that skip type-checking.
+
 ## Examples
 
 Incorrect:
