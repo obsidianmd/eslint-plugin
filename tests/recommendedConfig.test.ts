@@ -39,6 +39,7 @@ const VALID_SEVERITIES = new Set(["off", "warn", "error"]);
 // These rules MUST be in recommendedPluginRulesConfigTypeChecked (TS only),
 // NOT in recommendedPluginRulesConfigBase (which also applies to JS).
 const TYPE_CHECKED_RULES = [
+	"obsidianmd/no-await-chainable",
 	"obsidianmd/no-plugin-as-component",
 	"obsidianmd/no-view-references-in-plugin",
 	"obsidianmd/no-unsupported-api",
@@ -417,6 +418,7 @@ const ESCALATED_RULES = [
 	"obsidianmd/regex-lookbehind",
 ];
 const ESCALATED_TYPE_CHECKED_RULES = [
+	"obsidianmd/no-await-chainable",
 	"obsidianmd/no-plugin-as-component",
 	"obsidianmd/no-view-references-in-plugin",
 	"obsidianmd/no-unsupported-api",
