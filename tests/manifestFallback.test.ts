@@ -22,6 +22,9 @@ interface ChildResult {
         tsEntry: unknown;
         jsEntry: unknown;
     };
+    regexLookbehind: {
+        unset: number;
+    };
 }
 
 interface ChildRun {
@@ -81,6 +84,20 @@ describe("manifest fallback in the linted repo's working directory", () => {
             // The rule reads the manifest itself; the config no longer turns it off.
             assert.deepStrictEqual(desktopOnly.result.noNodejsModules.tsEntry, [1]);
             assert.deepStrictEqual(desktopOnly.result.noNodejsModules.jsEntry, [1]);
+        });
+    });
+
+    describe("regex-lookbehind", () => {
+        it("is quiet with the option unset when the manifest is desktop-only", () => {
+            assert.strictEqual(desktopOnly.result.regexLookbehind.unset, 0);
+        });
+
+        it("reports with the option unset when isDesktopOnly is the string \"false\"", () => {
+            assert.strictEqual(stringFalse.result.regexLookbehind.unset, 1);
+        });
+
+        it("reports with the option unset when there is no manifest", () => {
+            assert.strictEqual(noManifest.result.regexLookbehind.unset, 1);
         });
     });
 

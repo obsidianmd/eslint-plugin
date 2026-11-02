@@ -1,4 +1,4 @@
-import { getManifest } from "../manifest.js";
+import { isManifestDesktopOnly } from "../manifest.js";
 import { TSESTree } from "@typescript-eslint/utils";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
@@ -32,7 +32,7 @@ export default ruleCreator<Options, "lookbehind">({
     defaultOptions: [{}],
     create(context) {
         const options = context.options[0] || {};
-        const isDesktopOnly = options.isDesktopOnly ?? getManifest()?.isDesktopOnly;
+        const isDesktopOnly = options.isDesktopOnly ?? isManifestDesktopOnly();
         return {
             Literal(node: TSESTree.Literal) {
                 // Check RegExp literals

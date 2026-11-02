@@ -37,4 +37,7 @@ console.log(JSON.stringify({
         tsEntry: ts.rules?.["obsidianmd/no-nodejs-modules"],
         jsEntry: js.rules?.["obsidianmd/no-nodejs-modules"],
     },
+    regexLookbehind: {
+        unset: reports("regex-lookbehind", "error", "const re = /(?<=a)b/;"),
+    },
 }));
