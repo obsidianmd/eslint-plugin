@@ -7,8 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-02
+
 Upgrading from 0.4.x? The breaking changes below each have a fix in
-[Upgrading to 0.5.0](docs/configuration.md#upgrading-to-050).
+[Upgrading to 0.5.0](docs/configuration.md#upgrading-to-050). Rules that never ran
+before now do, so expect new findings, mostly from `prefer-active-doc` (often in test
+files you can ignore) and from `validate-manifest` on a published id containing
+"obsidian", which its `allowedWords` option accepts. Across ten popular plugins the
+total number of findings still fell by about half, mainly because `no-undef` no longer
+runs on TypeScript files.
 
 ### Changed
 
@@ -362,7 +369,9 @@ _Version bump only._
 - CLA enforcement.
 - Automatic documentation generation.
 
-[Unreleased]: https://github.com/obsidianmd/eslint-plugin/compare/0.4.1...HEAD
+[Unreleased]: https://github.com/obsidianmd/eslint-plugin/compare/0.5.0...HEAD
+[0.5.0]: https://github.com/obsidianmd/eslint-plugin/compare/0.4.2...0.5.0
+[0.4.2]: https://github.com/obsidianmd/eslint-plugin/compare/0.4.1...0.4.2
 [0.4.1]: https://github.com/obsidianmd/eslint-plugin/compare/0.4.0...0.4.1
 [0.4.0]: https://github.com/obsidianmd/eslint-plugin/compare/0.3.0...0.4.0
 [0.3.0]: https://github.com/obsidianmd/eslint-plugin/compare/0.2.9...0.3.0
