@@ -239,6 +239,10 @@ const recommendedTypeCheckedGeneralRules: RulesConfig = {
     // upstream rule reports them as promises (#181). obsidianmd/no-misused-promises
     // is the same rule with that declaration ignored, and replaces it.
     "@typescript-eslint/no-misused-promises": "off",
+    // TypeScript already reports undefined names, and no-undef cannot see globals
+    // declared in a `declare global` block or a .d.ts, so typescript-eslint
+    // advises turning it off for TypeScript. JavaScript files keep it.
+    "no-undef": "off",
 };
 
 // Combined rules for TypeScript files

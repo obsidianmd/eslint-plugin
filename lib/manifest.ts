@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import { PluginManifest } from "../types/manifest.js";
+import type { PluginManifest } from "./types/manifest.js";
 
 let cachedManifest: PluginManifest | null | undefined;
 

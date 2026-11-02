@@ -13,7 +13,6 @@ export default ruleCreator({
             iterate: "Avoid iterating all files to find a file by its path\n",
         },
         schema: [],
-        fixable: "code" as const,
     },
     defaultOptions: [],
     create: (context) => {

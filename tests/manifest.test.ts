@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { after, afterEach, beforeEach, describe, it } from "mocha";
-import type { PluginManifest } from "../types/manifest.js";
+import type { PluginManifest } from "../lib/types/manifest.js";
 import { isManifestDesktopOnly, loadManifest } from "../lib/manifest.js";
 
 // A manifest.json is supplied by the repo being linted -- in the community

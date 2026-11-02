@@ -71,7 +71,13 @@ export default ruleCreator({
                 obj.type === TSESTree.AST_NODE_TYPES.Identifier &&
                 obj.name === "activeDocument";
             if (isActiveDoc) {
-                return { prefix: "activeWindow.", canAutofix: true };
+                // activeWindow is activeDocument.win, so the same check decides it:
+                // obsidian.d.ts types both as a plain Window, which has no DOM
+                // helpers, so a fix to activeWindow.createSpan() would not compile.
+                return {
+                    prefix: "activeWindow.",
+                    canAutofix: winHasObsidianDomHelpers(obj),
+                };
             }
 
             if (isDocumentType(obj)) {

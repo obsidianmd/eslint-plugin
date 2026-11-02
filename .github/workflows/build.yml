@@ -6,6 +6,10 @@ on:
     pull_request:
         branches: ["master"]
 
+# Checks out, builds and tests; nothing is written back.
+permissions:
+    contents: read
+
 jobs:
     build:
         runs-on: ubuntu-latest
@@ -25,3 +29,6 @@ jobs:
             - run: npm ci
             - run: npm run build --if-present
             - run: npm test
+            # The generated rule docs and README table must match the rules; the
+            # Rebuild documentation workflow only regenerates them after merge.
+            - run: npm run check:eslint-docs

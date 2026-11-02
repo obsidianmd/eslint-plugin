@@ -65,7 +65,8 @@ const rule: PlainTextRuleDefinition<{
                         description: "If true, do not report the year of an unedited sample-plugin copyright line.",
                         default: false,
                     }
-                }
+                },
+                additionalProperties: false,
             }
         ],
         messages: {

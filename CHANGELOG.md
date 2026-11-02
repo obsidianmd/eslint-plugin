@@ -29,6 +29,8 @@ Upgrading from 0.4.x? The breaking changes below each have a fix in
 - Web worker files (`**/*.worker.*`, `**/workers/**`) no longer get the window-only rules and get worker globals instead; security rules still apply ([#207](https://github.com/obsidianmd/eslint-plugin/pull/207)).
 - Peer dependencies are ranges: `eslint >=9.19.0`, `typescript >=4.8.4` and `typescript-eslint ^8.35.1`. `@eslint/js`, `@eslint/json` and `obsidian` are no longer peers, and `@eslint/json` and `eslint-plugin-depend` use caret ranges so a project using them directly shares one copy ([#201](https://github.com/obsidianmd/eslint-plugin/pull/201), [#212](https://github.com/obsidianmd/eslint-plugin/pull/212)).
 - `typescript-eslint` 8.70.1 or later is recommended: it fixes a `no-unnecessary-type-assertion` false positive on a `Record` type alias (typescript-eslint/typescript-eslint#12856). The minimum stays 8.35.1, because a higher one makes npm install a second copy next to an older pinned one and fails with `Cannot redefine plugin "@typescript-eslint"` ([#212](https://github.com/obsidianmd/eslint-plugin/pull/212)).
+- `no-undef` is off for TypeScript files, as typescript-eslint advises: the compiler reports undefined names itself, and `no-undef` misreported globals declared in a `.d.ts` or `declare global` block. JavaScript files keep it at `warn` ([#213](https://github.com/obsidianmd/eslint-plugin/pull/213)).
+- CI also runs `check:eslint-docs` on every pull request, and the build and docs workflows declare the token permissions they need ([#213](https://github.com/obsidianmd/eslint-plugin/pull/213)).
 
 ### Added
 
@@ -43,6 +45,7 @@ Upgrading from 0.4.x? The breaking changes below each have a fix in
 
 - The unused `eslint-plugin-security`, `eslint-plugin-json-schema-validator` and `@typescript-eslint/types` dependencies ([#201](https://github.com/obsidianmd/eslint-plugin/pull/201), [#212](https://github.com/obsidianmd/eslint-plugin/pull/212)).
 - The hand-written root `index.d.ts`, which was never published; the package's types are unchanged ([#206](https://github.com/obsidianmd/eslint-plugin/pull/206)).
+- The compiled tests and the non-working `eslint-plugin-obsidian` executable from the published package, which drops from 249 files and 685 kB to 115 files and 300 kB unpacked ([#213](https://github.com/obsidianmd/eslint-plugin/pull/213)).
 
 ### Fixed
 
@@ -64,6 +67,11 @@ Upgrading from 0.4.x? The breaking changes below each have a fix in
 - The plugin loads on ESLint 9.19 to 9.21: since 0.3.0 it imported `eslint/config`, which arrived in 9.22 ([#201](https://github.com/obsidianmd/eslint-plugin/pull/201)).
 - Removed a misspelled `no-prototype-bultins` override that never applied; `no-prototype-builtins` stays at `error` ([#209](https://github.com/obsidianmd/eslint-plugin/pull/209)).
 - `check:eslint-docs` passes on Windows checkouts (contributors) ([#200](https://github.com/obsidianmd/eslint-plugin/pull/200)).
+- obsidianmd's JavaScript rules return nothing for files in other languages, so a type-aware one enabled without `files` (say, to raise its severity) no longer aborts the run on `LICENSE`, `manifest.json` or `package.json` ([#213](https://github.com/obsidianmd/eslint-plugin/pull/213)).
+- `prefer-create-el` no longer autofixes `activeDocument.createElement()` to `activeWindow.createEl()` when `Window` does not declare the helper, which Obsidian's types do not, so the fix no longer breaks `tsc`; it is offered as a suggestion ([#213](https://github.com/obsidianmd/eslint-plugin/pull/213)).
+- `vault/iterate` no longer claims to be autofixable; it never fixed anything ([#213](https://github.com/obsidianmd/eslint-plugin/pull/213)).
+- `validate-license` rejects unknown options instead of silently ignoring a misspelled one ([#213](https://github.com/obsidianmd/eslint-plugin/pull/213)).
+- The published `dist/lib/manifest.d.ts` imported a `PluginManifest` type file the package never shipped; the type now lives in `lib/` and is published with it ([#213](https://github.com/obsidianmd/eslint-plugin/pull/213)).
 
 ### Documentation
 

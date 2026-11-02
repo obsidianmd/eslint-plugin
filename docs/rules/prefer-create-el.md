@@ -8,6 +8,14 @@
 
 <!-- end auto-generated rule header -->
 
+## Fix or suggestion
+
+`--fix` applies a replacement only when the types say it exists: `createEl()` for the global
+`document` when the global helpers are declared, `doc.win.createEl()` when the document's `win`
+declares them, and `activeWindow.createEl()` when `Window` declares them. Otherwise the replacement
+is offered as a suggestion. Obsidian's own types declare `activeWindow` as a plain `Window`, so
+`activeDocument.createElement()` gets a suggestion rather than a fix that would not compile.
+
 ## Iframe documents
 
 An iframe's document belongs to the iframe's own window, which Obsidian never gives its DOM helpers,

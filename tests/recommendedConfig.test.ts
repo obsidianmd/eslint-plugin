@@ -925,3 +925,35 @@ describe("no-misused-promises swap", () => {
 		assert.ok(!messages.some(m => m.ruleId === "obsidianmd/no-misused-promises"));
 	});
 });
+
+// typescript-eslint advises turning no-undef off for TypeScript: the compiler
+// reports undefined names itself, and no-undef cannot see globals declared in a
+// .d.ts or a `declare global` block. JavaScript files keep it.
+describe("no-undef", () => {
+	for (const filename of ["src/main.ts", "src/view.tsx", "src/a.mts", "src/a.cts"]) {
+		it(`is off for ${filename}`, async () => {
+			const rules = await rulesFor("recommended", filename);
+			assert.strictEqual(getSeverity(rules["no-undef"]), "off");
+		});
+	}
+
+	for (const filename of ["src/main.js", "src/a.mjs", "src/a.cjs", "src/view.jsx"]) {
+		it(`stays at warn for ${filename}`, async () => {
+			const rules = await rulesFor("recommended", filename);
+			assert.strictEqual(getSeverity(rules["no-undef"]), "warn");
+		});
+	}
+
+	it("does not report a global declared elsewhere in a TypeScript file", async () => {
+		const messages = await lintRecommended("file.ts", "export const id: unknown = __BUILD_ID__;\n");
+		assert.deepStrictEqual(messages.filter(m => m.ruleId === "no-undef").map(m => m.message), []);
+	});
+
+	it("still reports an undefined name in a JavaScript file", async () => {
+		const messages = await lintRecommended("src/main.js", "export const id = __BUILD_ID__;\n");
+		assert.deepStrictEqual(
+			messages.filter(m => m.ruleId === "no-undef").map(m => m.message),
+			["'__BUILD_ID__' is not defined."]
+		);
+	});
+});

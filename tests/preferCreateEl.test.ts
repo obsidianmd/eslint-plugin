@@ -26,6 +26,38 @@ const MOCK_OBSIDIAN_DOM = `
     export {};
 `;
 
+// Obsidian's own declarations: activeDocument.win and activeWindow are a plain
+// Window, without the DOM helpers.
+const MOCK_ACTIVE_WINDOW_PLAIN = `
+    declare global {
+        interface Document {
+            win: Window;
+        }
+        var activeDocument: Document;
+        var activeWindow: Window;
+    }
+    export {};
+`;
+
+// A project that declares the helpers on Window itself.
+const MOCK_ACTIVE_WINDOW_WITH_HELPERS = `
+    declare global {
+        interface Document {
+            win: Window;
+        }
+        interface Window {
+            createEl(tag: string, o?: any): HTMLElement;
+            createDiv(o?: any): HTMLDivElement;
+            createSpan(o?: any): HTMLSpanElement;
+            createSvg(tag: string, o?: any): SVGElement;
+            createFragment(): DocumentFragment;
+        }
+        var activeDocument: Document;
+        var activeWindow: Window;
+    }
+    export {};
+`;
+
 ruleTester.run("prefer-create-el", preferCreateEl, {
     valid: [
         {
@@ -168,36 +200,127 @@ ruleTester.run("prefer-create-el", preferCreateEl, {
             errors: [{ messageId: "preferCreateEl" }],
         },
 
-        // --- activeDocument: always autofix (Obsidian-only identifier) ---
+        // --- activeDocument: activeWindow.<helper>() when activeWindow's type has the helpers ---
         {
-            name: "activeDocument.createElement(tag) → activeWindow.createEl(tag)",
-            code: "activeDocument.createElement('p');",
-            output: "activeWindow.createEl('p');",
+            name: "activeDocument.createElement(tag) → activeWindow.createEl('p') when Window declares the helpers",
+            code: `${MOCK_ACTIVE_WINDOW_WITH_HELPERS}\nactiveDocument.createElement('p');`,
+            output: `${MOCK_ACTIVE_WINDOW_WITH_HELPERS}\nactiveWindow.createEl('p');`,
             errors: [{ messageId: "preferCreateEl" }],
         },
         {
-            name: "activeDocument.createElement('div') → activeWindow.createDiv()",
-            code: "activeDocument.createElement('div');",
-            output: "activeWindow.createDiv();",
+            name: "activeDocument.createElement('div') → activeWindow.createDiv() when Window declares the helpers",
+            code: `${MOCK_ACTIVE_WINDOW_WITH_HELPERS}\nactiveDocument.createElement('div');`,
+            output: `${MOCK_ACTIVE_WINDOW_WITH_HELPERS}\nactiveWindow.createDiv();`,
             errors: [{ messageId: "preferCreateEl" }],
         },
         {
-            name: "activeDocument.createElement('span') → activeWindow.createSpan()",
+            name: "activeDocument.createElement('span') → activeWindow.createSpan() when Window declares the helpers",
+            code: `${MOCK_ACTIVE_WINDOW_WITH_HELPERS}\nactiveDocument.createElement('span');`,
+            output: `${MOCK_ACTIVE_WINDOW_WITH_HELPERS}\nactiveWindow.createSpan();`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        {
+            name: "activeDocument.createElementNS(SVG_NS, tag) → activeWindow.createSvg('svg') when Window declares the helpers",
+            code: `${MOCK_ACTIVE_WINDOW_WITH_HELPERS}\nactiveDocument.createElementNS('http://www.w3.org/2000/svg', 'svg');`,
+            output: `${MOCK_ACTIVE_WINDOW_WITH_HELPERS}\nactiveWindow.createSvg('svg');`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        {
+            name: "activeDocument.createDocumentFragment() → activeWindow.createFragment() when Window declares the helpers",
+            code: `${MOCK_ACTIVE_WINDOW_WITH_HELPERS}\nactiveDocument.createDocumentFragment();`,
+            output: `${MOCK_ACTIVE_WINDOW_WITH_HELPERS}\nactiveWindow.createFragment();`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        // obsidian.d.ts types activeWindow as a plain Window, so the fix would not compile.
+        {
+            name: "activeDocument.createElement(tag) with Obsidian's own types offers activeWindow.createEl('p') as a suggestion",
+            code: `${MOCK_ACTIVE_WINDOW_PLAIN}\nactiveDocument.createElement('p');`,
+            errors: [
+                {
+                    messageId: "preferCreateEl",
+                    suggestions: [
+                        {
+                            messageId: "preferCreateElSuggestion",
+                            output: `${MOCK_ACTIVE_WINDOW_PLAIN}\nactiveWindow.createEl('p');`,
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "activeDocument.createElement('div') with Obsidian's own types offers activeWindow.createDiv() as a suggestion",
+            code: `${MOCK_ACTIVE_WINDOW_PLAIN}\nactiveDocument.createElement('div');`,
+            errors: [
+                {
+                    messageId: "preferCreateEl",
+                    suggestions: [
+                        {
+                            messageId: "preferCreateElSuggestion",
+                            output: `${MOCK_ACTIVE_WINDOW_PLAIN}\nactiveWindow.createDiv();`,
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "activeDocument.createElement('span') with Obsidian's own types offers activeWindow.createSpan() as a suggestion",
+            code: `${MOCK_ACTIVE_WINDOW_PLAIN}\nactiveDocument.createElement('span');`,
+            errors: [
+                {
+                    messageId: "preferCreateEl",
+                    suggestions: [
+                        {
+                            messageId: "preferCreateElSuggestion",
+                            output: `${MOCK_ACTIVE_WINDOW_PLAIN}\nactiveWindow.createSpan();`,
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "activeDocument.createElementNS(SVG_NS, tag) with Obsidian's own types offers activeWindow.createSvg('svg') as a suggestion",
+            code: `${MOCK_ACTIVE_WINDOW_PLAIN}\nactiveDocument.createElementNS('http://www.w3.org/2000/svg', 'svg');`,
+            errors: [
+                {
+                    messageId: "preferCreateEl",
+                    suggestions: [
+                        {
+                            messageId: "preferCreateElSuggestion",
+                            output: `${MOCK_ACTIVE_WINDOW_PLAIN}\nactiveWindow.createSvg('svg');`,
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "activeDocument.createDocumentFragment() with Obsidian's own types offers activeWindow.createFragment() as a suggestion",
+            code: `${MOCK_ACTIVE_WINDOW_PLAIN}\nactiveDocument.createDocumentFragment();`,
+            errors: [
+                {
+                    messageId: "preferCreateEl",
+                    suggestions: [
+                        {
+                            messageId: "preferCreateElSuggestion",
+                            output: `${MOCK_ACTIVE_WINDOW_PLAIN}\nactiveWindow.createFragment();`,
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "activeDocument without any types offers a suggestion",
             code: "activeDocument.createElement('span');",
-            output: "activeWindow.createSpan();",
-            errors: [{ messageId: "preferCreateEl" }],
-        },
-        {
-            name: "activeDocument.createElementNS(SVG_NS, tag) → activeWindow.createSvg(tag)",
-            code: "activeDocument.createElementNS('http://www.w3.org/2000/svg', 'svg');",
-            output: "activeWindow.createSvg('svg');",
-            errors: [{ messageId: "preferCreateEl" }],
-        },
-        {
-            name: "activeDocument.createDocumentFragment() → activeWindow.createFragment()",
-            code: "activeDocument.createDocumentFragment();",
-            output: "activeWindow.createFragment();",
-            errors: [{ messageId: "preferCreateEl" }],
+            errors: [
+                {
+                    messageId: "preferCreateEl",
+                    suggestions: [
+                        {
+                            messageId: "preferCreateElSuggestion",
+                            output: "activeWindow.createSpan();",
+                        },
+                    ],
+                },
+            ],
         },
 
         // --- Document-typed variable: use `doc.win.<helper>()` ---
