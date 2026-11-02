@@ -8,14 +8,31 @@
 
 Allows redefining error messages from other ESLint rules that don't provide this functionality natively.
 
-## Rule Details
+## What is reported
 
-This rule acts as a wrapper around other ESLint rules, allowing you to customize their error messages while preserving all other functionality (including fixes). The custom message will be displayed with the original rule name in brackets (e.g., `[no-console] Your custom message`).
+Each configured rule runs inside this one. A report from it whose message equals, or contains, a
+key of `messages` is reported again as `[rule-name] custom message`, at this rule's severity; the
+first matching key wins. A report that matches no key is dropped, so list every message you want
+to keep.
 
 This is particularly useful when you want to:
 - Provide team-specific guidance or documentation links
 - Make error messages more context-appropriate for your project
 - Maintain consistent messaging across your codebase
+
+To match, a `messageId` report's template is filled in from its string data only; a number or other
+value stays as `{{placeholder}}`, so match on the fixed wording ("has too many parameters" rather
+than the whole sentence).
+
+Limitations of the wrapper as it stands:
+
+- `options` go to the wrapped rule as given; its own defaults are not applied. A core rule that
+  expects options, such as `no-console`, does not run without them, so pass `options: [{}]` at
+  least.
+- Suggestions are dropped. A matched report that carries a fix, or that gives a location without a
+  node (as `max-lines` does), stops ESLint with an error, so wrap rules that report a node without a
+  fix, as the recommended config does for `no-console` and `no-new-func`.
+- A rule name that is neither a core rule nor given with `rule` logs a warning and is skipped.
 
 ## Options
 
@@ -23,7 +40,7 @@ The rule takes a single configuration object where:
 - Keys are the names of rules you want to wrap
 - Values are objects containing:
   - `messages`: Map of original error messages to custom messages
-  - `options`: (optional) Array of options to pass to the wrapped rule
+  - `options`: (optional) Array of options to pass to the wrapped rule, as given (see above)
   - `rule`: (optional) For plugin rules, the rule object from the plugin
 
 ```json
@@ -149,15 +166,6 @@ This will match any `no-console` error message that includes "Unexpected console
 - If the original rule already supports custom messages (check the rule's documentation first)
 - If you just want to disable a rule (use ESLint's built-in configuration instead)
 - If you're wrapping many rules with the same message (consider creating a custom rule instead)
-
-## Implementation Notes
-
-- The wrapper preserves auto-fixes from the original rule
-- Suggestions are not preserved (they reference the original rule's message IDs)
-- The rule creates a wrapped context that intercepts `report()` calls
-- Message matching is done via exact match or substring inclusion
-- For built-in ESLint rules, no additional configuration is needed beyond `messages` and `options`
-- For plugin rules, provide the rule object via the `rule` property
 
 ## Severity Configuration
 
