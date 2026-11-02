@@ -1,5 +1,6 @@
 import assert from "node:assert";
 import { ESLint } from "eslint";
+import tseslint from "typescript-eslint";
 import plugin from "../lib/index.js";
 
 async function rulesFor(configName: keyof typeof plugin.configs, filename: string): Promise<Record<string, any>> {
@@ -387,5 +388,44 @@ describe("type-checked rule guard", () => {
 				`${rule} requires type info but is missing from TS config — add it to recommendedPluginRulesConfigTypeChecked`
 			);
 		}
+	});
+});
+
+// The README's own setup ends with a global block that sets parser options
+// without restricting `files`. manifest.json is read with the `json/json`
+// language, which a global `languageOptions.parser` cannot replace; if the block
+// used a parser instead, the TypeScript parser would reach manifest.json and
+// fail fatally.
+describe("manifest.json survives a global parser override", () => {
+	async function lint(filePath: string, code: string) {
+		const eslint = new ESLint({
+			overrideConfigFile: true,
+			overrideConfig: [
+				...plugin.configs.recommended,
+				{
+					languageOptions: {
+						parser: tseslint.parser,
+						parserOptions: {
+							projectService: { allowDefaultProject: ["eslint.config.*"] },
+						},
+					},
+				},
+			],
+		});
+		const [result] = await eslint.lintText(code, { filePath });
+		return result;
+	}
+
+	it("manifest.json is still read by the JSON language", async () => {
+		const result = await lint("manifest.json", '{ "id": "sample-plugin" }\n');
+		assert.deepStrictEqual(
+			result.messages.filter(m => m.fatal).map(m => m.message),
+			[],
+			"a global parser must not reach manifest.json"
+		);
+		assert.ok(
+			result.messages.some(m => m.ruleId === "obsidianmd/validate-manifest"),
+			"validate-manifest should still report"
+		);
 	});
 });
