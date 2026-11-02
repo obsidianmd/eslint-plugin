@@ -58,6 +58,22 @@ ruleTester.run("require-display", requireDisplayRule, {
             options: [{ minAppVersion: "1.12.0" }],
             code: `class Foo {}`,
         },
+        {
+            name: "a class extending obsidian.PluginSettingTab is not matched",
+            options: [{ minAppVersion: "1.12.0" }],
+            code: `
+                declare const obsidian: { PluginSettingTab: new () => object };
+                class MyTab extends obsidian.PluginSettingTab {}
+            `,
+        },
+        {
+            name: "an unknown minAppVersion option is a no-op",
+            options: [{ minAppVersion: "1.12" }],
+            code: `
+                ${MOCK_CLASS}
+                class MyTab extends PluginSettingTab {}
+            `,
+        },
     ],
     invalid: [
         {
@@ -75,6 +91,23 @@ ruleTester.run("require-display", requireDisplayRule, {
                     data: { minAppVersion: "1.12.0" },
                 },
             ],
+        },
+        {
+            name: "minAppVersion defaults to manifest.json (0.15.0 in this repository)",
+            code: `
+                ${MOCK_CLASS}
+                class MyTab extends PluginSettingTab {}
+            `,
+            errors: [{ messageId: "missingDisplay" }],
+        },
+        {
+            name: "a class expression without display() is an error",
+            options: [{ minAppVersion: "1.12.0" }],
+            code: `
+                ${MOCK_CLASS}
+                const MyTab = class extends PluginSettingTab {};
+            `,
+            errors: [{ messageId: "missingDisplay" }],
         },
     ],
 });
