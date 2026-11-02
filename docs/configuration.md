@@ -255,6 +255,31 @@ ESLint does not support disabling all rules from a plugin with a single glob lik
 }
 ```
 
+### Web worker files
+
+A web worker has no `window`: `window`, `activeWindow`, `activeDocument` and Obsidian's DOM helpers
+do not exist there, and `globalThis` is the right way to reach the worker's own scope. The
+recommended config therefore treats files matching `**/*.worker.*` and anything under a `workers/`
+directory as worker code: it adds the worker globals (`importScripts`, `postMessage`, …) and switches
+off the rules whose fix needs a window — `no-global-this`, `prefer-active-doc`, `prefer-create-el`,
+`prefer-instanceof` and `prefer-window-timers`. Every other rule, including the security rules, still
+applies.
+
+For worker code under another name, add the same overrides for its path:
+
+```js
+{
+  files: ["src/background/**"],
+  rules: {
+    "obsidianmd/no-global-this": "off",
+    "obsidianmd/prefer-active-doc": "off",
+    "obsidianmd/prefer-create-el": "off",
+    "obsidianmd/prefer-instanceof": "off",
+    "obsidianmd/prefer-window-timers": "off",
+  },
+}
+```
+
 ## Common errors
 
 ### "You have used a rule which requires type information"

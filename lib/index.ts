@@ -201,6 +201,34 @@ const recommendedPluginRulesConfig: RulesConfig = {
     ...recommendedPluginRulesConfigTypeChecked,
 };
 
+// Web worker code runs without a window: `window`, `activeWindow`,
+// `activeDocument` and Obsidian's DOM helpers do not exist there, so these
+// rules' advice cannot be followed and their autofixes (`globalThis` ->
+// `window`, `setTimeout` -> `window.setTimeout`) break it. They apply to every
+// JS/TS file except worker code. A file path is all it takes to match
+// WORKER_FILES, so no security rule may be listed here.
+const WINDOW_ONLY_RULES = new Set([
+    "obsidianmd/no-global-this",
+    "obsidianmd/prefer-active-doc",
+    "obsidianmd/prefer-create-el",
+    "obsidianmd/prefer-instanceof",
+    "obsidianmd/prefer-window-timers",
+]);
+const WORKER_FILES = [
+    '**/*.worker.{ts,cts,mts,tsx,js,cjs,mjs,jsx}',
+    '**/workers/**/*.{ts,cts,mts,tsx,js,cjs,mjs,jsx}',
+];
+
+// The rules of `config` that are (or are not) window-only. Applying the
+// window-only ones in their own block with `ignores` keeps every block's
+// severities honest: an "off" in a worker-only block would read, to anything
+// merging the config's rules without regard to `files`, as the rule being off.
+function splitWindowOnlyRules(config: RulesConfig, windowOnly: boolean): RulesConfig {
+    return Object.fromEntries(
+        Object.entries(config).filter(([rule]) => WINDOW_ONLY_RULES.has(rule) === windowOnly),
+    );
+}
+
 import { restrictedGlobalsOptions, restrictedImportsOptions, noUnusedExpressionsOptions, noUnusedVarsOptions } from "./ruleOptions.js";
 
 const flatRecommendedGeneralRules: RulesConfig = {
@@ -283,7 +311,7 @@ const flatRecommendedConfig: Config[] = defineConfig([
         extends: [...(tseslint.configs.recommended as Config[]), noUnsanitizedPlugin.configs.recommended],
         rules: {
             ...flatRecommendedGeneralRules,
-            ...recommendedPluginRulesConfigBase
+            ...splitWindowOnlyRules(recommendedPluginRulesConfigBase, false)
         }
     },
     {
@@ -298,7 +326,23 @@ const flatRecommendedConfig: Config[] = defineConfig([
         extends: [...(tseslint.configs.recommendedTypeChecked as Config[]), noUnsanitizedPlugin.configs.recommended],
         rules: {
             ...flatRecommendedGeneralRules,
-            ...recommendedPluginRulesConfig
+            ...splitWindowOnlyRules(recommendedPluginRulesConfig, false)
+        },
+    },
+    {
+        files: ['**/*.{js,cjs,mjs,jsx}'],
+        ignores: WORKER_FILES,
+        rules: splitWindowOnlyRules(recommendedPluginRulesConfigBase, true),
+    },
+    {
+        files: ['**/*.{ts,cts,mts,tsx}'],
+        ignores: WORKER_FILES,
+        rules: splitWindowOnlyRules(recommendedPluginRulesConfig, true),
+    },
+    {
+        files: WORKER_FILES,
+        languageOptions: {
+            globals: globals.worker,
         },
     },
     {

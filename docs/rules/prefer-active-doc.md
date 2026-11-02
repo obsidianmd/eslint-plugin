@@ -46,3 +46,6 @@ Only the bare global `document` is reported; `window.document` and
 `globalThis.document` are not. Runtime code inside a plain `namespace` is still
 checked; an ambient `declare module`, `declare namespace` or `declare global` is
 not.
+
+The recommended config switches this rule off for web worker files, which have no `activeDocument`;
+see [Web worker files](../configuration.md#web-worker-files).
