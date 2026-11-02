@@ -65,6 +65,7 @@ Upgrading from 0.4.x? The breaking changes below each have a fix in
 - Removed a misspelled `no-prototype-bultins` override that never applied; `no-prototype-builtins` stays at `error` ([#209](https://github.com/obsidianmd/eslint-plugin/pull/209)).
 - `check:eslint-docs` passes on Windows checkouts (contributors) ([#200](https://github.com/obsidianmd/eslint-plugin/pull/200)).
 - obsidianmd's JavaScript rules return nothing for files in other languages, so a type-aware one enabled without `files` (say, to raise its severity) no longer aborts the run on `LICENSE`, `manifest.json` or `package.json` ([#PRE](https://github.com/obsidianmd/eslint-plugin/pull/PRE)).
+- `prefer-create-el` no longer autofixes `activeDocument.createElement()` to `activeWindow.createEl()` when `Window` does not declare the helper, which Obsidian's types do not, so the fix no longer breaks `tsc`; it is offered as a suggestion ([#PRE](https://github.com/obsidianmd/eslint-plugin/pull/PRE)).
 
 ### Documentation
 
