@@ -223,6 +223,225 @@ ruleTester.run("no-unsupported-api", rule, {
             options: [{ minAppVersion: "1.0.0" }],
         },
         {
+            name: "API after an early return on a failed requireApiVersion is allowed",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                function f() {
+                    if (!requireApiVersion("1.10.0")) return;
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "API after an early-exit block on a failed requireApiVersion is allowed",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                declare function log(): void;
+                function f() {
+                    if (!requireApiVersion("1.10.0")) {
+                        log();
+                        return;
+                    }
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "API after a top-level throw on a failed requireApiVersion is allowed",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                if (!requireApiVersion("1.10.0")) throw new Error("Obsidian is too old");
+                app.renderContext;
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "API after a continue on a failed requireApiVersion is allowed",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                declare const items: string[];
+                for (const item of items) {
+                    if (!requireApiVersion("1.10.0")) continue;
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "API after a break out of a switch on a failed requireApiVersion is allowed",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                declare const mode: number;
+                switch (mode) {
+                    case 1:
+                        if (!requireApiVersion("1.10.0")) break;
+                        app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "API after an early exit in the else branch of requireApiVersion is allowed",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                function f() {
+                    if (requireApiVersion("1.10.0")) {
+                        // supported
+                    } else {
+                        return;
+                    }
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "API in an arrow function created after an early exit is allowed",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                function f() {
+                    if (!requireApiVersion("1.10.0")) return;
+                    const read = () => app.renderContext;
+                    return read;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "API in the else branch of a negated requireApiVersion is allowed",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                if (!requireApiVersion("1.10.0")) {
+                    // unsupported
+                } else {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "API in the alternate of a negated requireApiVersion ternary is allowed",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                !requireApiVersion("1.10.0") ? undefined : app.renderContext;
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "API to the right of a negated requireApiVersion with || is allowed",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                !requireApiVersion("1.10.0") || app.renderContext;
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "API guarded by a const requireApiVersion result is allowed",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                const supported = requireApiVersion("1.10.0");
+                if (supported) {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "API to the right of a const requireApiVersion result with && is allowed",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                const supported = requireApiVersion("1.10.0");
+                supported && app.renderContext;
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "API after an early exit on a const requireApiVersion result is allowed",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                const supported = requireApiVersion("1.10.0");
+                function f() {
+                    if (!supported) return;
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "API guarded by a const combining two requireApiVersion calls is allowed",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                const supported = requireApiVersion("1.0.0") && requireApiVersion("1.10.0");
+                if (supported) {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "API guarded by requireApiVersion over versions all new enough is allowed",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                declare const late: boolean;
+                if (requireApiVersion(late ? "1.10.0" : "1.11.0")) {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "API guarded by two requireApiVersion calls with && uses the higher version",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                if (requireApiVersion("1.0.0") && requireApiVersion("1.11.4")) {
+                    app.secretStorage;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "API guarded by two requireApiVersion calls with || uses the lower version",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                if (requireApiVersion("1.10.0") || requireApiVersion("1.11.0")) {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "API after an early exit on a negated parenthesised && is allowed",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                declare const enabled: boolean;
+                function f() {
+                    if (!(requireApiVersion("1.10.0") && enabled)) return;
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
             name: "minAppVersion without a patch version covers APIs up to x.y.0",
             code: `
                 import { requireApiVersion, App } from 'obsidian';
@@ -401,7 +620,7 @@ ruleTester.run("no-unsupported-api", rule, {
             errors: [{ messageId: "apiNotAvailable" }],
         },
         {
-            name: "requireApiVersion with a union-typed variable is not a guard",
+            name: "requireApiVersion with a union-typed variable proves only its lowest version",
             code: `
                 import { requireApiVersion, App } from 'obsidian';
                 declare const app: App;
@@ -452,7 +671,7 @@ ruleTester.run("no-unsupported-api", rule, {
             errors: [{ messageId: "apiNotAvailable" }],
         },
         {
-            name: "requireApiVersion with a conditional between two versions is not a guard",
+            name: "requireApiVersion with a conditional between two versions proves only the lower one",
             code: `
                 import { requireApiVersion, App } from 'obsidian';
                 declare const app: App;
@@ -491,6 +710,192 @@ ruleTester.run("no-unsupported-api", rule, {
             errors: [{ messageId: "apiNotAvailable" }],
         },
         {
+            name: "an exit only inside a nested if is not an early exit",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                declare const cond: boolean;
+                function f() {
+                    if (!requireApiVersion("1.10.0")) {
+                        if (cond) return;
+                    }
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "a break out of a nested loop is not an early exit",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                function f() {
+                    if (!requireApiVersion("1.10.0")) {
+                        for (;;) {
+                            break;
+                        }
+                    }
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "a break out of a labelled if is not an early exit",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                check: if (!requireApiVersion("1.10.0")) break check;
+                app.renderContext;
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "an early exit when requireApiVersion succeeds is not a guard",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                function f() {
+                    if (requireApiVersion("1.10.0")) return;
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "an early exit after the API is not a guard",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                function f() {
+                    app.renderContext;
+                    if (!requireApiVersion("1.10.0")) return;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "a function declaration after an early exit is hoisted and not guarded",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                function f() {
+                    if (!requireApiVersion("1.10.0")) return;
+                    function read() {
+                        return app.renderContext;
+                    }
+                    return read;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "API in the else branch of a successful requireApiVersion is not guarded",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                if (requireApiVersion("1.10.0")) {
+                    // supported
+                } else {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "API in the alternate of a requireApiVersion ternary is not guarded",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                requireApiVersion("1.10.0") ? undefined : app.renderContext;
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "API to the right of requireApiVersion with || is not guarded",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                requireApiVersion("1.10.0") || app.renderContext;
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "API guarded by requireApiVersion or an unrelated condition is not guarded",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                declare const enabled: boolean;
+                if (requireApiVersion("1.10.0") || enabled) {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "a let requireApiVersion result is not a guard",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                let supported = requireApiVersion("1.10.0");
+                if (supported) {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "a parameter shadowing a const requireApiVersion result is not a guard",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                const supported = requireApiVersion("1.10.0");
+                function f(supported: boolean) {
+                    if (supported) {
+                        app.renderContext;
+                    }
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "a destructured requireApiVersion result is not a guard",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                const [supported] = [requireApiVersion("1.10.0")];
+                if (supported) {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "two requireApiVersion calls with && both below the API version are not a guard",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                if (requireApiVersion("1.0.0") && requireApiVersion("1.10.0")) {
+                    app.secretStorage;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
             name: "minAppVersion without a patch version is read as x.y.0",
             code: `
                 import { requireApiVersion, App } from 'obsidian';
@@ -509,6 +914,32 @@ ruleTester.run("no-unsupported-api", rule, {
             `,
             options: [{ minAppVersion: "latest" }],
             errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "App.renderContext", sinceVersion: "1.10.0", minAppVersion: "latest" } }],
+        },
+        {
+            name: "a continue outside a loop is not an early exit",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                if (!requireApiVersion("1.10.0")) continue;
+                app.renderContext;
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "a continue whose loop is outside its function is not an early exit",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                for (;;) {
+                    function f() {
+                        if (!requireApiVersion("1.10.0")) continue;
+                        app.renderContext;
+                    }
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
         },
     ],
 });
