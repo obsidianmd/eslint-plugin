@@ -256,9 +256,9 @@ const flatRecommendedConfig: Config[] = defineConfig([
     {
         plugins: {
             import: importPlugin as ESLint.Plugin,
-            "@microsoft/sdl": sdl,
+            "@microsoft/sdl": sdl as ESLint.Plugin,
             depend,
-            noUnsanitizedPlugin,
+            noUnsanitizedPlugin: noUnsanitizedPlugin as ESLint.Plugin,
             "eslint-comments": eslintComments,
         },
         files: ['**/*.{js,cjs,mjs,jsx}'],
@@ -271,9 +271,9 @@ const flatRecommendedConfig: Config[] = defineConfig([
     {
         plugins: {
             import: importPlugin as ESLint.Plugin,
-            "@microsoft/sdl": sdl,
+            "@microsoft/sdl": sdl as ESLint.Plugin,
             depend,
-            noUnsanitizedPlugin,
+            noUnsanitizedPlugin: noUnsanitizedPlugin as ESLint.Plugin,
             "eslint-comments": eslintComments,
         },
         files: ['**/*.{ts,cts,mts,tsx}'],
