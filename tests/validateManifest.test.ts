@@ -887,6 +887,64 @@ ruleTester.run("validate-manifest", manifestRule as unknown as Rule.RuleModule, 
                 },
             ],
         },
+        // A newline or tab is a control character (Cc). The directory shows
+        // the description on one line, so neither belongs in it.
+        {
+            name: "description with a newline is forbidden",
+            filename: "manifest.json",
+            code: `{
+                    "id": "test-id",
+                    "name": "Test name",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "This description spans\\ntwo lines.",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                {
+                    messageId: "descriptionFormat",
+                },
+            ],
+        },
+        {
+            name: "description with a tab is forbidden",
+            filename: "manifest.json",
+            code: `{
+                    "id": "test-id",
+                    "name": "Test name",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "This description has a\\ttab in it.",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                {
+                    messageId: "descriptionFormat",
+                },
+            ],
+        },
+        // JSON can escape half of a surrogate pair on its own. The result is
+        // not a character at all (Cs), and renders as a replacement glyph.
+        {
+            name: "description with a lone surrogate is forbidden",
+            filename: "manifest.json",
+            code: `{
+                    "id": "test-id",
+                    "name": "Test name",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "This description has a lone \\ud83d surrogate.",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                {
+                    messageId: "descriptionFormat",
+                },
+            ],
+        },
         {
             name: "description with emojis is forbidden",
             filename: "manifest.json",
