@@ -127,6 +127,7 @@ describe("recommended config", () => {
 				"obsidianmd/detach-leaves",
 				"obsidianmd/no-forbidden-elements",
 				"obsidianmd/no-global-this",
+				"obsidianmd/prefer-active-doc",
 				"obsidianmd/prefer-window-timers",
 			];
 			for (const rule of baseRules) {
@@ -470,6 +471,7 @@ describe("scanner-aligned severities", () => {
 			"obsidianmd/object-assign",
 			"obsidianmd/prefer-get-language",
 			"obsidianmd/prefer-abstract-input-suggest",
+			"obsidianmd/prefer-active-doc",
 			"obsidianmd/prefer-window-timers",
 			"obsidianmd/ui/sentence-case",
 		];
