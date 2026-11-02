@@ -286,6 +286,13 @@ describe("scanner-aligned severities", () => {
 		}
 	});
 
+	it("no-nodejs-modules should be at warn for both TS and JS", () => {
+		// The rule reads the manifest's isDesktopOnly itself, so the config no
+		// longer switches it off; manifestFallback.test.ts covers a desktop-only manifest.
+		assert.strictEqual(getSeverity(tsRules["obsidianmd/no-nodejs-modules"]), "warn");
+		assert.strictEqual(getSeverity(jsRules["obsidianmd/no-nodejs-modules"]), "warn");
+	});
+
 	it("non-escalated type-checked rules should be at warn", () => {
 		const warnTypeChecked = [
 			"obsidianmd/prefer-create-el",

@@ -12,4 +12,4 @@
 
 ## Options
 
-- **`isDesktopOnly`** (`boolean`, optional): Whether the plugin is desktop-only. Defaults to `manifest.json` `isDesktopOnly`.
+- **`isDesktopOnly`** (`boolean`, optional): Whether the plugin is desktop-only. Defaults to `manifest.json` `isDesktopOnly`. Only a literal `true` there counts: a non-boolean value — `"false"`, `1`, `[]` — is read as *not* desktop-only, so the rule keeps reporting rather than being turned off by a malformed field.

@@ -28,7 +28,7 @@ import validateLicense from "./rules/validateLicense.js";
 import ruleCustomMessage from "./rules/ruleCustomMessage.js";
 import noNodejsModules from "./rules/noNodejsModules.js";
 import noUnsupportedApi from "./rules/noUnsupportedApi.js";
-import { getManifest } from "./manifest.js";
+import { getManifest, isManifestDesktopOnly } from "./manifest.js";
 import { ui } from "./rules/ui/index.js";
 
 // --- Import plugins and configs for the recommended config ---
@@ -212,8 +212,9 @@ const flatRecommendedGeneralRules: RulesConfig = {
     ],
     "@microsoft/sdl/no-document-write": "warn",
     "@microsoft/sdl/no-inner-html": "warn",
-    "obsidianmd/no-nodejs-modules":
-        manifest && manifest.isDesktopOnly ? "off" : "warn",
+    // The rule resolves the desktop-only signal itself, defaulting to the
+    // manifest, so the severity no longer has to be computed here.
+    "obsidianmd/no-nodejs-modules": "warn",
     "import/no-extraneous-dependencies": "warn",
     "obsidianmd/rule-custom-message": [
         "error",
@@ -322,7 +323,7 @@ const flatRecommendedConfig: Config[] = defineConfig([
         languageOptions: {
             globals: {
                 ...globals.browser,
-                ...(manifest?.isDesktopOnly ? {
+                ...(isManifestDesktopOnly(manifest) ? {
                     ...globals.node,
                     NodeJS: "readonly"
                 } : {}),
