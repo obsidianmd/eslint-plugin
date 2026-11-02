@@ -17,6 +17,9 @@ const file = this.app.vault.getFiles().find((f) => f.path === path); // reported
 const file = this.app.vault.getFileByPath(path); // use this instead
 ```
 
+Not reported: a predicate that does not compare `path`, and a computed access such as
+`this.app["vault"]`. There is no fix; use `getFileByPath()` or `getAbstractFileByPath()`.
+
 ## Further reading
 
 - [Avoid iterating all files to find a file by its path - Plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#Avoid+iterating+all+files+to+find+a+file+by+its+path)
