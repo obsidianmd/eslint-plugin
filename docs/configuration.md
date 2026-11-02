@@ -327,6 +327,20 @@ For worker code under another name, add the same overrides for its path:
 }
 ```
 
+### Test files
+
+Tests run in Node or a DOM emulation such as jsdom, not inside Obsidian, so the rules about code that
+runs in Obsidian do not fit them: there is no popout window, Node.js modules are available, mocks cast
+to `TFile`, and fixtures name `.obsidian`. The recommended config treats files matching
+`**/*.{test,spec}.*` and anything under a `test/`, `tests/`, `__tests__/` or `__mocks__/` directory as
+tests, and switches off `no-global-this`, `prefer-active-doc`, `prefer-create-el`, `prefer-instanceof`,
+`prefer-window-timers`, `no-nodejs-modules`, `no-tfile-tfolder-cast` and `hardcoded-config-path` for
+them. Every other rule, including the security rules, still applies. The community scanner does not
+lint tests at all.
+
+For tests under another name, such as an `e2e/` directory, add the same overrides for its path, or
+leave the directory out with `globalIgnores`.
+
 ## Upgrading to 0.5.0
 
 0.5.0 lints more files than 0.4 did and needs newer tooling. Work through the items below that
