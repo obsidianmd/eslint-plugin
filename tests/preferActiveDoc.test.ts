@@ -137,6 +137,26 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
             name: "document in declare module is allowed",
             code: "declare module 'foo' { const document: string; }",
         },
+        {
+            name: "typeof document in declare global is allowed",
+            code: "declare global { interface Window { doc: typeof document } }",
+        },
+        {
+            name: "abstract class property named document is allowed",
+            code: "abstract class Foo { abstract document: string; }",
+        },
+        {
+            name: "abstract class method named document is allowed",
+            code: "abstract class Foo { abstract document(): void; }",
+        },
+        {
+            name: "class accessor named document is allowed",
+            code: "class Foo { accessor document = ''; }",
+        },
+        {
+            name: "renamed destructured document is allowed",
+            code: "const { document: doc } = someObj;",
+        },
     ],
     invalid: [
         {
@@ -177,6 +197,31 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
         {
             name: "document in enum initializer is still flagged",
             code: "enum Foo { bar = document.title }",
+            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+        },
+        {
+            name: "document inside a non-ambient namespace is still flagged",
+            code: "namespace Foo { export const el = document.body; }",
+            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+        },
+        {
+            name: "document as a computed member key is still flagged",
+            code: "obj[document];",
+            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+        },
+        {
+            name: "document as a computed object key is still flagged",
+            code: "const x = { [document]: 1 };",
+            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+        },
+        {
+            name: "document as a computed class key is still flagged",
+            code: "class Foo { [document] = 1; }",
+            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+        },
+        {
+            name: "shorthand object property document is still flagged",
+            code: "const x = { document };",
             errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
         },
     ],

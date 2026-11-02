@@ -46,18 +46,22 @@ export default ruleCreator({
                     return;
                 }
 
-                // Skip if this is a property access (e.g., `obj.document`)
+                // Skip if this is a property access (e.g., `obj.document`), but not a
+                // computed one (`obj[document]` reads the global)
                 if (
                     node.parent.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
-                    node.parent.property === node
+                    node.parent.property === node &&
+                    !node.parent.computed
                 ) {
                     return;
                 }
 
-                // Skip if this is a property key in an object literal
+                // Skip if this is a property key in an object literal, but not a
+                // computed one (`{ [document]: 1 }` reads the global)
                 if (
                     node.parent.type === TSESTree.AST_NODE_TYPES.Property &&
-                    node.parent.key === node
+                    node.parent.key === node &&
+                    !node.parent.computed
                 ) {
                     return;
                 }
@@ -75,11 +79,17 @@ export default ruleCreator({
                     return;
                 }
 
-                // Skip class property/method declarations (key position)
+                // Skip class member names (key position), including abstract members and
+                // accessors, but not computed keys (`[document]` reads the global)
                 if (
                     (node.parent.type === TSESTree.AST_NODE_TYPES.PropertyDefinition ||
-                     node.parent.type === TSESTree.AST_NODE_TYPES.MethodDefinition) &&
-                    node.parent.key === node
+                     node.parent.type === TSESTree.AST_NODE_TYPES.MethodDefinition ||
+                     node.parent.type === TSESTree.AST_NODE_TYPES.AccessorProperty ||
+                     node.parent.type === TSESTree.AST_NODE_TYPES.TSAbstractPropertyDefinition ||
+                     node.parent.type === TSESTree.AST_NODE_TYPES.TSAbstractMethodDefinition ||
+                     node.parent.type === TSESTree.AST_NODE_TYPES.TSAbstractAccessorProperty) &&
+                    node.parent.key === node &&
+                    !node.parent.computed
                 ) {
                     return;
                 }
@@ -163,8 +173,14 @@ export default ruleCreator({
                     case TSESTree.AST_NODE_TYPES.TSConditionalType:
                     case TSESTree.AST_NODE_TYPES.TSTypeParameterDeclaration:
                     case TSESTree.AST_NODE_TYPES.TSTypeParameterInstantiation:
-                    case TSESTree.AST_NODE_TYPES.TSModuleDeclaration:
                         return true;
+                    // Only an ambient `declare module`/`declare namespace`/`declare global`
+                    // is type-level; a plain `namespace Foo { ... }` body is runtime code.
+                    case TSESTree.AST_NODE_TYPES.TSModuleDeclaration:
+                        if (current.declare) {
+                            return true;
+                        }
+                        break;
                     default:
                         break;
                 }
