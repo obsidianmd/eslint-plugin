@@ -4,10 +4,12 @@
 
 ```js
 // eslint.config.mjs
-import { defineConfig } from "eslint/config";
+import { defineConfig, globalIgnores } from "eslint/config";
 import obsidianmd from "eslint-plugin-obsidianmd";
 
 export default defineConfig([
+  // Build output and the sample plugin's Node build scripts are not plugin code.
+  globalIgnores(["node_modules", "dist", "main.js", "esbuild.config.mjs", "version-bump.mjs"]),
   ...obsidianmd.configs.recommended,
   {
     languageOptions: {
@@ -21,7 +23,7 @@ export default defineConfig([
 ]);
 ```
 
-The recommended config includes ESLint core rules, typescript-eslint, and all obsidianmd rules. You only need to provide the TypeScript parser options, as described below.
+The recommended config includes ESLint core rules, typescript-eslint, and all obsidianmd rules. You only need to provide the TypeScript parser options, as described below, and ignore what is not plugin source: the `globalIgnores` entry above matches the official sample plugin's layout (see [Ignoring files](#ignoring-files)).
 
 ## Why you need `parserOptions`
 
@@ -170,13 +172,11 @@ export default defineConfig([
 
 ## Ignoring files
 
-ESLint's default ignores already exclude `node_modules/`. If your build output is in `dist/` (the standard for Obsidian plugins), it is also excluded by default.
-
-To ignore additional files, add a global ignores entry **before** the recommended spread:
+ESLint itself only ignores `node_modules/` and `.git/`. Your build output is linted unless you ignore it: the sample plugin bundles to `main.js` in the project root, and other setups write to `dist/` or `build/`. Node scripts such as the sample plugin's `esbuild.config.mjs` and `version-bump.mjs` are not plugin code either. Ignore them with a global ignores entry **before** the recommended spread:
 
 ```js
 export default defineConfig([
-  { ignores: ["some-other-output.js"] },
+  globalIgnores(["node_modules", "dist", "main.js", "esbuild.config.mjs", "version-bump.mjs"]),
   ...obsidianmd.configs.recommended,
   {
     languageOptions: {
@@ -303,6 +303,14 @@ The fix is to use `allowDefaultProject` so these files are linted with default c
 ```
 
 If you are using `project` instead of `projectService`, ensure the path to your `tsconfig.json` is correct relative to where you run ESLint.
+
+### "… was not found by the project service"
+
+A file ESLint lints is in no `tsconfig.json` and not matched by `allowDefaultProject`. With the
+sample plugin's layout this is the bundled `main.js` and the Node scripts `esbuild.config.mjs` and
+`version-bump.mjs`. If the file is build output or a script rather than plugin source, ignore it (see
+[Ignoring files](#ignoring-files)); otherwise add it to your `tsconfig.json`'s `include`, or for a
+few loose files, to `allowDefaultProject`.
 
 ### "Configuration for rule '0' is invalid"
 
