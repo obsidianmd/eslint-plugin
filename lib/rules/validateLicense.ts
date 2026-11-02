@@ -26,13 +26,21 @@ type PlainTextRuleDefinition<Options extends Partial<CustomRuleTypeDefinitions> 
     >;
 
 // We want to parse: Copyright (C) 2020-2025 by Dynalist Inc.
-// We should check that the year is current and the holder is not "Dynalist Inc."
+// That is the sample plugin's LICENSE, and the rule exists to catch it left
+// unedited: the holder must not be "Dynalist Inc.", and while it still is, the
+// year is reported too. A line with any other holder is not checked at all. It
+// is either the author's own notice, which need not carry the current year, or
+// one that belongs to the licence text itself, such as the FSF's
+// "Copyright (C) 2007 Free Software Foundation, Inc." heading every GPL-family
+// licence, which the author cannot edit.
 //
 // The marker and the " by " are both optional in practice: the conventional MIT
 // line reads "Copyright (c) 2025 Dynalist Inc.", with a lowercase marker and no
 // " by ". Requiring the uppercase "(C) ... by" form meant this rule silently
 // matched nothing on every repo using the standard MIT text.
 const COPYRIGHT_REGEX = /^[ \t]*Copyright (?:\([Cc]\)|©) (\d{4})(?:\s*-\s*(\d{4}))? (?:by )?(.+)$/;
+
+const SAMPLE_HOLDER = "Dynalist Inc.";
 
 const rule: PlainTextRuleDefinition<{
     MessageIds: MessageIds;
@@ -50,11 +58,11 @@ const rule: PlainTextRuleDefinition<{
                 properties: {
                     currentYear: {
                         type: "number",
-                        description: "The current year to validate against.",
+                        description: "The current year to compare an unedited sample-plugin copyright line against.",
                     },
                     disableUnchangedYear: {
                         type: "boolean",
-                        description: "If true, do not report errors for unchanged years.",
+                        description: "If true, do not report the year of an unedited sample-plugin copyright line.",
                         default: false,
                     }
                 }
@@ -80,6 +88,9 @@ const rule: PlainTextRuleDefinition<{
                 const startYear = parseInt(match[1], 10);
                 const endYear = match[2] ? parseInt(match[2], 10) : startYear;
                 const holder = match[3].trim();
+                if (holder !== SAMPLE_HOLDER) {
+                    return;
+                }
 
                 if (!disableUnchangedYear && endYear < currentYear) {
                     context.report({
@@ -92,12 +103,10 @@ const rule: PlainTextRuleDefinition<{
                     });
                 }
 
-                if (holder === "Dynalist Inc.") {
-                    context.report({
-                        messageId: "unchangedCopyright",
-                        loc: node.loc,
-                    });
-                }
+                context.report({
+                    messageId: "unchangedCopyright",
+                    loc: node.loc,
+                });
             }
         };
     },
