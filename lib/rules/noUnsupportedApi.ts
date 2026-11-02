@@ -2,7 +2,7 @@ import { AST_NODE_TYPES, ASTUtils, ESLintUtils, TSESLint } from "@typescript-esl
 import type { TSESTree } from "@typescript-eslint/utils";
 import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
-import { coerce, gt, lt, valid } from "semver";
+import { gt, lt, valid } from "semver";
 import ts from "typescript";
 import { getManifest } from "../manifest.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
@@ -59,9 +59,9 @@ export default ruleCreator<Options, "apiNotAvailable">({
         const minAppVersion: string = String(resolvedVersion);
         // A minAppVersion semver cannot parse would make `gt` throw and abort the
         // whole lint run. "0.15" means 0.15.0, as a dotted version with missing
-        // parts read as 0; anything with no version in it at all proves nothing
-        // about the app, so it is checked as 0.0.0 and every versioned API is
-        // reported rather than the check being skipped.
+        // parts read as 0; anything else proves nothing about the app, so it is
+        // checked as 0.0.0 and every versioned API is reported rather than the
+        // check being skipped.
         const minVersion = toVersion(minAppVersion) ?? "0.0.0";
 
         const services = ESLintUtils.getParserServices(context);
@@ -331,10 +331,17 @@ export default ruleCreator<Options, "apiNotAvailable">({
     }
 });
 
-// A version semver can compare: as written when valid, else coerced ("0.15" is
-// 0.15.0), else undefined.
+// A version semver can compare: as written when valid, a bare "x" or "x.y" with
+// the missing parts read as 0 ("0.15" is 0.15.0), else undefined. Nothing looser:
+// semver's coerce would read "x99.0.0" as 99.0.0, and a manifest could then
+// switch the rule off with a minAppVersion Obsidian does not read that way.
 function toVersion(raw: string): Version | undefined {
-    return valid(raw) ?? coerce(raw)?.version ?? undefined;
+    const version = valid(raw);
+    if (version) {
+        return version;
+    }
+    const partial = /^(\d+)(?:\.(\d+))?$/.exec(raw.trim());
+    return partial ? `${Number(partial[1])}.${Number(partial[2] ?? 0)}.0` : undefined;
 }
 
 function higherOf(a: Version | undefined, b: Version | undefined): Version | undefined {

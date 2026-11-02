@@ -450,6 +450,15 @@ ruleTester.run("no-unsupported-api", rule, {
             `,
             options: [{ minAppVersion: "1.10" }],
         },
+        {
+            name: "a partial minAppVersion reads its missing parts as 0",
+            code: `
+                import { App } from 'obsidian';
+                declare const app: App;
+                app.renderContext;
+            `,
+            options: [{ minAppVersion: "1.10" }],
+        },
     ],
     invalid: [
         {
@@ -904,6 +913,16 @@ ruleTester.run("no-unsupported-api", rule, {
             `,
             options: [{ minAppVersion: "0.15" }],
             errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "App.renderContext", sinceVersion: "1.10.0", minAppVersion: "0.15" } }],
+        },
+        {
+            name: "minAppVersion with a version buried in other text is checked as 0.0.0",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                app.renderContext;
+            `,
+            options: [{ minAppVersion: "x99.0.0" }],
+            errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "App.renderContext", sinceVersion: "1.10.0", minAppVersion: "x99.0.0" } }],
         },
         {
             name: "minAppVersion with no version in it is checked as 0.0.0",
