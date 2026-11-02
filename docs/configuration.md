@@ -434,6 +434,18 @@ reports only an unchanged copy of the sample plugin's license. `prefer-active-do
 `activeDocument` instead of `document` so your code works in popout windows. Fix the findings, or
 switch a rule off for specific files (see [Disabling rules for specific files](#disabling-rules-for-specific-files)).
 
+A few of these are worth knowing in advance:
+
+- `prefer-active-doc` findings often come from test files. Tests that run outside Obsidian can use
+  `document`; ignore them, or switch the rule off for them.
+- A published plugin id that contains "obsidian" cannot change. Accept it with
+  `"obsidianmd/validate-manifest": ["warn", { allowedWords: { id: ["obsidian"] } }]` in a block with
+  `files: ["manifest.json"]` (see [`validate-manifest`](rules/validate-manifest.md)).
+- `regex-lookbehind` now also reports negative lookbehinds such as `(?<!x)`, which fail on iOS before
+  16.4 just like `(?<=x)`.
+- `@typescript-eslint/no-require-imports` is off again, so a disable comment for it is reported as
+  unused; delete the comment.
+
 ### Install `obsidian` yourself
 
 The plugin no longer installs `obsidian` for you. Without it, `no-unsupported-api` reports nothing.
