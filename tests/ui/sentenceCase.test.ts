@@ -140,7 +140,66 @@ tester.run("ui-sentence-case", rule, {
         },
         {
             code: "new Notice('WebDAV CalDAV');",
-        }
+        },
+        {
+            name: "a URL keeps its casing",
+            code: "new Setting(el).setDesc('Visit https://obsidian.md/help for more.');",
+            options: [{ enforceCamelCaseLower: true }],
+        },
+        {
+            name: "an acronym-like URL path segment keeps its casing",
+            code: "new Notice('See https://example.com/api for details');",
+        },
+        {
+            name: "a www address keeps its casing",
+            code: "new Notice('Visit www.example.com/Docs today');",
+        },
+        {
+            name: "a date format keeps its casing",
+            code: "new Setting(el).setDesc('Format: YYYY-MM-DD HH:mm');",
+        },
+        {
+            name: "REST in capitals is allowed",
+            code: "new Notice('Use the REST API to sync.');",
+        },
+        {
+            name: "REST in capitals opening a sentence is allowed",
+            code: "new Notice('REST in peace');",
+        },
+        {
+            name: "rest as an ordinary word is allowed",
+            code: "new Notice('Take a rest');",
+        },
+        {
+            name: "a hyphenated word opening with REST keeps its capitals",
+            code: "new Notice('REST-based sync');",
+            options: [{ enforceCamelCaseLower: true }],
+        },
+        {
+            name: "a hyphenated word opening with an acronym keeps it under enforceCamelCaseLower",
+            code: "new Notice('API-based sync');",
+            options: [{ enforceCamelCaseLower: true }],
+        },
+        {
+            name: "a whitespace-free placeholder value is allowed",
+            code: "text.setPlaceholder('sk-123…');",
+        },
+        {
+            name: "an e.g. placeholder example is allowed",
+            code: "text.setPlaceholder('e.g. My Vault');",
+        },
+        {
+            name: "a placeholder attribute example is allowed",
+            code: "el.setAttribute('placeholder', 'sk-123');",
+        },
+        {
+            name: "a createEl placeholder attribute example is allowed",
+            code: "createEl('input', { attr: { placeholder: 'e.g. My Vault' } });",
+        },
+        {
+            name: "a placeholder property example is allowed",
+            code: "input.placeholder = 'ex. My Vault';",
+        },
     ],
     invalid: [
         {
@@ -243,6 +302,30 @@ tester.run("ui-sentence-case", rule, {
             code: "new Notice('Visit U.S. EMBASSY');",
             options: [{ allowAutoFix: true }],
             output: "new Notice('Visit U.S. Embassy');",
+            errors: [{ messageId: "useSentenceCase" }],
+        },
+        {
+            name: "a prose placeholder is still checked",
+            code: "text.setPlaceholder('Enter Your Name');",
+            errors: [{ messageId: "useSentenceCase" }],
+        },
+        {
+            name: "an e.g. example outside a placeholder is still checked",
+            code: "new Setting(el).setDesc('e.g. My Vault');",
+            errors: [{ messageId: "useSentenceCase" }],
+        },
+        {
+            name: "Rest in title case is lowered like any word",
+            code: "new Notice('Use the Rest API');",
+            options: [{ allowAutoFix: true }],
+            output: "new Notice('Use the rest API');",
+            errors: [{ messageId: "useSentenceCase" }],
+        },
+        {
+            name: "text around a URL is still checked",
+            code: "new Notice('Visit https://obsidian.md/help For Details');",
+            options: [{ allowAutoFix: true }],
+            output: "new Notice('Visit https://obsidian.md/help for details');",
             errors: [{ messageId: "useSentenceCase" }],
         },
     ],

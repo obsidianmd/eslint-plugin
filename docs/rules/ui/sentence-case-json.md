@@ -21,7 +21,8 @@ and neither are array elements. Values in nested objects are.
 ```
 
 Here `"Open Settings"` is reported; `"Open settings"` would pass. With `allowAutoFix: true`,
-`--fix` rewrites it.
+`--fix` rewrites it. URLs, date formats such as `YYYY-MM-DD`, and "REST" written in capitals keep
+their casing.
 
 The rule reads the file with the `json/json` language from `@eslint/json`, which
 `recommendedWithLocalesEn` sets up for these files. To enable it without that config, do the same:

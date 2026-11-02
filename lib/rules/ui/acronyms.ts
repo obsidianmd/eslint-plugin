@@ -41,7 +41,6 @@ export const DEFAULT_ACRONYMS: string[] = [
     "CLI",
     "GUI",
     "CRUD",
-    // "REST", // Ignored to avoid confusion with normal word `rest`
     "SOAP",
     // Hardware
     "CPU",
@@ -71,4 +70,11 @@ export const DEFAULT_ACRONYMS: string[] = [
     "AI",
     "ML",
     "LLM"
+];
+
+// Acronyms that are also ordinary words, such as "REST" and "rest". They are
+// kept as written when all caps, and otherwise treated as the ordinary word,
+// so neither "Use the REST API" nor "Take a rest" is reported.
+export const DEFAULT_CASE_AGNOSTIC_ACRONYMS: string[] = [
+    "REST",
 ];

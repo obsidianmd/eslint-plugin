@@ -210,7 +210,9 @@ const recommendedPluginRulesConfigBase: RulesConfig = {
     // validate-manifest and validate-license are NOT here: they lint
     // manifest.json and LICENSE, neither of which can match the JS/TS globs this
     // block is spread into. They get their own file-scoped blocks below.
-    "obsidianmd/ui/sentence-case": ["warn", { enforceCamelCaseLower: true }],
+    // Off since 0.3.0 decided the rule reports too much ordinary text to be on
+    // by default; opt in with ["warn", { enforceCamelCaseLower: true }].
+    "obsidianmd/ui/sentence-case": "off",
 }
 
 // Rules from other plugins that need type information. Like the type-checked

@@ -474,7 +474,6 @@ describe("scanner-aligned severities", () => {
 			"obsidianmd/prefer-abstract-input-suggest",
 			"obsidianmd/prefer-active-doc",
 			"obsidianmd/prefer-window-timers",
-			"obsidianmd/ui/sentence-case",
 		];
 		for (const rule of warnRules) {
 			assert.strictEqual(
@@ -483,6 +482,13 @@ describe("scanner-aligned severities", () => {
 				`non-escalated rule ${rule} should be 'warn'`
 			);
 		}
+	});
+
+	it("ui/sentence-case should be off for both TS and JS", () => {
+		// Off since 0.3.0 decided it reports too much ordinary text to be on by
+		// default; plugins opt in themselves.
+		assert.strictEqual(getSeverity(tsRules["obsidianmd/ui/sentence-case"]), "off");
+		assert.strictEqual(getSeverity(jsRules["obsidianmd/ui/sentence-case"]), "off");
 	});
 
 	it("no-nodejs-modules should be at warn for both TS and JS", () => {
