@@ -10,8 +10,9 @@
 
 An API newer than `minAppVersion` is allowed where a `requireApiVersion(...)` check proves the
 running app is new enough: inside the `if` or ternary branch it guards, or to the right of `&&`.
-The version can be a string literal, or a constant whose type is a single string literal, such as a
-`const` declared in the same file or imported from another module:
+The version can be a string literal, or any expression whose type is a single string literal: a
+`const` declared in the same file or imported from another module, a member of an `as const` object,
+an enum member, or a template literal built from such constants:
 
 ```ts
 import { requireApiVersion } from "obsidian";
@@ -23,8 +24,9 @@ if (requireApiVersion(RENDER_CONTEXT_VERSION)) {
 }
 ```
 
-A `let` variable, a `string`-typed value, or a version that is not a full `x.y.z` does not count as
-a guard, so the API is still reported.
+A `let` variable, a `string`-typed value, a choice between versions such as `late ? "1.10.0" :
+"1.0.0"`, or a version that is not a full `x.y.z` does not count as a guard, so the API is still
+reported.
 
 ## Options
 

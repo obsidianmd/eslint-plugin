@@ -175,7 +175,10 @@ export default ruleCreator<Options, "apiNotAvailable">({
                 if (typeof value === "string") {
                     return value;
                 }
-            } else if (expr.type === AST_NODE_TYPES.Identifier) {
+            } else if (expr.type !== AST_NODE_TYPES.SpreadElement) {
+                // Any other expression counts when its type is a single string
+                // literal: a const, an `as const` member, an enum member or a
+                // template built from constants. let, unions and string don't.
                 const typeInfo = checker.getTypeAtLocation(
                     services.esTreeNodeToTSNodeMap.get(expr),
                 );

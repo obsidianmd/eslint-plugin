@@ -175,6 +175,53 @@ ruleTester.run("no-unsupported-api", rule, {
             `,
             options: [{ minAppVersion: "1.0.0" }],
         },
+        {
+            name: "API guarded by requireApiVersion with an as-const object member is allowed",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                const VERSIONS = { renderContext: "1.10.0" } as const;
+                if (requireApiVersion(VERSIONS.renderContext)) {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "API guarded by requireApiVersion with an enum member is allowed",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                enum Version { RenderContext = "1.10.0" }
+                if (requireApiVersion(Version.RenderContext)) {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "API guarded by requireApiVersion with a template literal without substitutions is allowed",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                if (requireApiVersion(\`1.10.0\`)) {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "API guarded by requireApiVersion with a template literal over constants is allowed",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                const major = "1";
+                if (requireApiVersion(\`\${major}.10.0\`)) {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
     ],
     invalid: [
         {
@@ -376,6 +423,58 @@ ruleTester.run("no-unsupported-api", rule, {
                 import { requireApiVersion, App } from 'obsidian';
                 declare const app: App;
                 if (requireApiVersion("1.10")) {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "requireApiVersion with a mutable object member is not a guard",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                const VERSIONS = { renderContext: "1.10.0" };
+                if (requireApiVersion(VERSIONS.renderContext)) {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "requireApiVersion with a conditional between two versions is not a guard",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                declare const late: boolean;
+                if (requireApiVersion(late ? "1.10.0" : "1.0.0")) {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "requireApiVersion with a template literal over a string-typed substitution is not a guard",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                declare const major: string;
+                if (requireApiVersion(\`\${major}.10.0\`)) {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "requireApiVersion with a call returning string is not a guard",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                declare function version(): string;
+                if (requireApiVersion(version())) {
                     app.renderContext;
                 }
             `,
