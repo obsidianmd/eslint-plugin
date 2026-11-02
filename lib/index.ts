@@ -28,6 +28,7 @@ import validateLicense from "./rules/validateLicense.js";
 import ruleCustomMessage from "./rules/ruleCustomMessage.js";
 import noNodejsModules from "./rules/noNodejsModules.js";
 import noUnsupportedApi from "./rules/noUnsupportedApi.js";
+import noMisusedPromises from "./rules/noMisusedPromises.js";
 import { getManifest, isManifestDesktopOnly } from "./manifest.js";
 import { PlainTextLanguage } from "./plainTextLanguage.js";
 import { ui } from "./rules/ui/index.js";
@@ -132,6 +133,7 @@ const plugin: ObsidianmdPlugin = {
         "rule-custom-message": ruleCustomMessage,
         "no-nodejs-modules": noNodejsModules,
         "no-unsupported-api": noUnsupportedApi,
+        "no-misused-promises": noMisusedPromises,
         "ui/sentence-case": ui.sentenceCase,
         "ui/sentence-case-json": ui.sentenceCaseJson,
         "ui/sentence-case-locale-module": ui.sentenceCaseLocaleModule,
@@ -157,6 +159,7 @@ const recommendedPluginRulesConfigTypeChecked: RulesConfig = {
     "obsidianmd/prefer-create-el": "warn",
     "obsidianmd/prefer-file-manager-trash-file": "warn",
     "obsidianmd/prefer-instanceof": "warn",
+    "obsidianmd/no-misused-promises": "error",
 };
 
 const recommendedPluginRulesConfigBase: RulesConfig = {
@@ -232,6 +235,10 @@ const recommendedTypeCheckedGeneralRules: RulesConfig = {
             ],
         },
     ],
+    // Obsidian's Setting and BaseComponent declare a chaining `then`, so the
+    // upstream rule reports them as promises (#181). obsidianmd/no-misused-promises
+    // is the same rule with that declaration ignored, and replaces it.
+    "@typescript-eslint/no-misused-promises": "off",
 };
 
 // Combined rules for TypeScript files
@@ -421,6 +428,8 @@ const flatRecommendedConfig: Config[] = defineConfig([
             "eslint-comments/no-restricted-disable": [
                 "error",
                 "obsidianmd/*",
+                // Disableable like the typescript-eslint rule it replaces.
+                "!obsidianmd/no-misused-promises",
                 "no-console",
                 "no-restricted-globals",
                 "@typescript-eslint/no-restricted-imports",

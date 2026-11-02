@@ -42,6 +42,7 @@ const TYPE_CHECKED_RULES = [
 	"obsidianmd/prefer-create-el",
 	"obsidianmd/prefer-file-manager-trash-file",
 	"obsidianmd/prefer-instanceof",
+	"obsidianmd/no-misused-promises",
 ];
 
 describe("recommended config", () => {
@@ -848,4 +849,79 @@ describe("no-prototype-builtins", () => {
 			);
 		});
 	}
+});
+
+// Obsidian's Setting and BaseComponent declare a chaining `then`, so
+// @typescript-eslint/no-misused-promises reports them as promises (#181). The
+// recommended config swaps in obsidianmd/no-misused-promises, which ignores
+// that declaration only.
+describe("no-misused-promises swap", () => {
+	let tsRules: Record<string, any>;
+
+	before(async () => {
+		tsRules = await rulesFor("recommended", "src/main.ts");
+	});
+
+	it("the upstream rule is off and the obsidianmd rule is at error for TS", () => {
+		assert.strictEqual(getSeverity(tsRules["@typescript-eslint/no-misused-promises"]), "off");
+		assert.strictEqual(getSeverity(tsRules["obsidianmd/no-misused-promises"]), "error");
+	});
+
+	it("ruleConfigs carries no typescript-eslint rule for it", () => {
+		for (const preset of Object.values(plugin.ruleConfigs)) {
+			assert.ok(!("@typescript-eslint/no-misused-promises" in preset));
+		}
+	});
+
+	async function lintTs(code: string) {
+		const eslint = new ESLint({
+			overrideConfigFile: true,
+			overrideConfig: [
+				...plugin.configs.recommended,
+				{
+					languageOptions: {
+						parserOptions: { projectService: true, tsconfigRootDir: process.cwd() },
+					},
+				},
+			],
+		});
+		const [result] = await eslint.lintText(code, { filePath: "file.ts" });
+		return result.messages;
+	}
+
+	it("reports a real promise but not a Setting chain, end to end", async () => {
+		const messages = await lintTs(
+			[
+				'import { Setting } from "obsidian";',
+				"declare const el: HTMLElement;",
+				'["a"].forEach((name) => new Setting(el).setName(name));',
+				'["a"].forEach(async (name) => { await Promise.resolve(name); });',
+				"",
+			].join("\n")
+		);
+		assert.deepStrictEqual(messages.filter(m => m.fatal), []);
+		assert.deepStrictEqual(
+			messages.filter(m => m.ruleId?.endsWith("no-misused-promises")).map(m => [m.ruleId, m.line]),
+			[["obsidianmd/no-misused-promises", 4]]
+		);
+	});
+
+	it("can be disabled inline, unlike the other obsidianmd rules", async () => {
+		const messages = await lintTs(
+			[
+				"// eslint-disable-next-line obsidianmd/no-misused-promises",
+				'["a"].forEach(async (name) => { await Promise.resolve(name); });',
+				"// eslint-disable-next-line obsidianmd/no-global-this",
+				"globalThis.toString();",
+				"",
+			].join("\n")
+		);
+		assert.deepStrictEqual(
+			messages
+				.filter(m => m.ruleId === "eslint-comments/no-restricted-disable")
+				.map(m => m.line),
+			[3]
+		);
+		assert.ok(!messages.some(m => m.ruleId === "obsidianmd/no-misused-promises"));
+	});
 });

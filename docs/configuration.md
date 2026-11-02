@@ -343,6 +343,13 @@ The plugin exports `ruleConfigs` with two presets you can spread into your `rule
 Between them they hold every obsidianmd rule the recommended config sets for source files, at the same
 severity and options, and nothing else.
 
+Both carry only obsidianmd's own rules. The recommended config also replaces
+`@typescript-eslint/no-misused-promises` with [`obsidianmd/no-misused-promises`](rules/no-misused-promises.md),
+which does not report Obsidian's chaining `then` (on `Setting` and every component) as a Promise. If
+your own setup extends typescript-eslint's type-checked configs, make the same swap in your
+TypeScript block: `"@typescript-eslint/no-misused-promises": "off"` and
+`"obsidianmd/no-misused-promises": "error"`.
+
 ```js
 // eslint.config.mjs
 import { defineConfig } from "eslint/config";
@@ -399,7 +406,7 @@ If your tseslint setup does not include type checking (e.g., you use `tseslint.c
 A few things to keep in mind with this approach:
 
 - **Obsidian globals** must be declared manually. The recommended config does this for you; here you need to add them yourself. The list above covers the most common ones. `DomElementInfo`, `SvgElementInfo`, `isBoolean`, `nextFrame`, and `ready` are also available.
-- **Rules from other plugins** that the recommended config sets are not in `ruleConfigs` — notably typescript-eslint's `no-deprecated`, which it runs at `warn` with `caretRangeFromPoint` allowed. Add them yourself if you want them.
+- **Rules from other plugins** that the recommended config sets are not in `ruleConfigs` — notably typescript-eslint's `no-deprecated`, which it runs at `warn` with `caretRangeFromPoint` allowed. Add them yourself if you want them. The recommended config also turns typescript-eslint's `no-misused-promises` off in favour of `obsidianmd/no-misused-promises` (in `recommendedTypeChecked`), so turn it off too if you extend typescript-eslint's type-checked config.
 - **Third-party plugins** bundled by the recommended config (`@microsoft/eslint-plugin-sdl`, `eslint-plugin-import`, `eslint-plugin-no-unsanitized`, `eslint-plugin-depend`, `eslint-plugin-eslint-comments`) are not included. Add them separately if you want them.
 - **`package.json` and `manifest.json` linting** (`validate-manifest`, `depend/ban-dependencies`) is not set up, and is not covered by `ruleConfigs` — those presets only carry rules that apply to source files. `validate-manifest` needs its own config block, because `manifest.json` matches no source glob and needs the JSON language to be parsed at all:
 
@@ -462,6 +469,10 @@ The scanner only lints plugin source code. The following patterns are excluded:
 
 - Most rules are downgraded to `warn` (advisory). Only security-critical rules remain at `error`: `no-eval`, `no-implied-eval`, `no-unsanitized/method`, `no-unsanitized/property`, `obsidianmd/regex-lookbehind`, and `obsidianmd/no-forbidden-elements`.
 - Some rules are disabled because the scanner handles them separately or they produce too many false positives at scale: `no-undef`, `@typescript-eslint/no-unsafe-*`, `@typescript-eslint/restrict-template-expressions`, `@typescript-eslint/no-base-to-string`, `import/no-unresolved`, `obsidianmd/validate-manifest`, `obsidianmd/validate-license`, `obsidianmd/commands/no-command-in-command-id`, `obsidianmd/commands/no-plugin-id-in-command-id`.
+
+**Rule replacements:**
+
+- `@typescript-eslint/no-misused-promises` is replaced by `obsidianmd/no-misused-promises`, the same rule without Obsidian's chaining `then` counted as a Promise. A scanner configuration built on the recommended config inherits the swap; one that enables `@typescript-eslint/no-misused-promises` itself should enable the obsidianmd rule instead, or every `Setting` chain in a callback is reported.
 
 **Parser options:**
 
