@@ -11,7 +11,7 @@ global `document` always belongs to the main window, so code that creates or
 queries elements through it misbehaves in a popout. `activeDocument` is the
 document of the window the user is currently working in.
 
-## Examples
+## What is reported
 
 Reported — the global `document`, wherever it is read at runtime:
 
@@ -47,5 +47,9 @@ Only the bare global `document` is reported; `window.document` and
 checked; an ambient `declare module`, `declare namespace` or `declare global` is
 not.
 
-The recommended config switches this rule off for web worker files, which have no `activeDocument`;
-see [Web worker files](../configuration.md#web-worker-files).
+There is no fix: whether a piece of code should follow the active window or a specific element's
+window (`el.doc`) depends on what it does.
+
+The recommended config switches this rule off for web worker files, which have no `activeDocument`,
+and for test files, which do not run in Obsidian; see
+[Web worker files](../configuration.md#web-worker-files) and [Test files](../configuration.md#test-files).

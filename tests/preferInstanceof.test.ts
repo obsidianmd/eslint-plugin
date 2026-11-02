@@ -54,6 +54,14 @@ ruleTester.run("prefer-instanceof", preferInstanceofRule, {
                 if (p instanceof MyPlugin) {}
             `,
         },
+        {
+            name: "instanceof on an any value is not reported",
+            code: `
+                ${MOCK_DOM}
+                declare const value: any;
+                if (value instanceof HTMLElement) {}
+            `,
+        },
     ],
     invalid: [
         {

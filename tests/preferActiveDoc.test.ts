@@ -157,6 +157,10 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
             name: "renamed destructured document is allowed",
             code: "const { document: doc } = someObj;",
         },
+        {
+            name: "window.document and globalThis.document are not reported",
+            code: "window.document.body; globalThis.document.body;",
+        },
     ],
     invalid: [
         {
