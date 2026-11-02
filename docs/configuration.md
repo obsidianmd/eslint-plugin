@@ -364,6 +364,8 @@ languageOptions: {
 }
 ```
 
+The `manifest.json` entry and `extraFileExtensions` exist to let the TypeScript parser read `manifest.json`. The recommended config reads it with the `json/json` language instead, so neither setting reaches it, and the configuration below leaves both out.
+
 You do not need to replicate this configuration. The recommended config with the [quick start](#quick-start) setup is sufficient for local development. This section is provided for transparency so plugin authors understand what the scanner checks and what it skips.
 
 <details>
@@ -381,9 +383,8 @@ export default defineConfig([
     languageOptions: {
       parserOptions: {
         projectService: {
-          allowDefaultProject: ["eslint.config.*", "manifest.json"],
+          allowDefaultProject: ["eslint.config.*"],
         },
-        extraFileExtensions: [".json"],
       },
     },
   },
