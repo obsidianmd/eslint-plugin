@@ -175,7 +175,7 @@ const recommendedPluginRulesConfigBase: RulesConfig = {
     "obsidianmd/prefer-get-language": "warn",
     "obsidianmd/prefer-abstract-input-suggest": "warn",
     "obsidianmd/prefer-window-timers": "warn",
-    "obsidianmd/prefer-active-doc": "off",
+    "obsidianmd/prefer-active-doc": "warn",
     "obsidianmd/regex-lookbehind": "error",
     "obsidianmd/sample-names": "error",
     // validate-manifest and validate-license are NOT here: they lint
