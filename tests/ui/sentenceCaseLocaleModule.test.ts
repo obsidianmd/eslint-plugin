@@ -1,3 +1,5 @@
+import assert from "node:assert";
+import { Linter, type Rule } from "eslint";
 import { RuleTester } from "@typescript-eslint/rule-tester";
 import parser from "@typescript-eslint/parser";
 import rule from "../../lib/rules/ui/sentenceCaseLocaleModule.js";
@@ -50,6 +52,11 @@ try {
           items: ["Open settings"],
         };`,
             },
+            {
+                name: "URLs and REST in capitals keep their casing",
+                filename: "en.ts",
+                code: `export default { help: "Visit https://obsidian.md/help", rest: "Use the REST API" };`,
+            },
         ],
         invalid: [
             {
@@ -101,3 +108,24 @@ try {
     RuleTester.resetDefaultConfig();
     RuleTester.setDefaultConfig(typedRuleTesterConfig);
 }
+
+// The rule tester only matches messageId and data, so the message text itself
+// is checked through a plain lint run.
+describe("ui-sentence-case-locale-module message", () => {
+    it("gives the expected text", () => {
+        const messages = new Linter().verify(
+            `export default { title: "Open Settings" };`,
+            [{
+                files: ["**/*.ts"],
+                languageOptions: { parser },
+                plugins: { obsidianmd: { rules: { "sentence-case-locale-module": rule as unknown as Rule.RuleModule } } },
+                rules: { "obsidianmd/sentence-case-locale-module": "warn" },
+            }],
+            "en.ts",
+        );
+        assert.deepStrictEqual(
+            messages.map((message) => message.message),
+            ["Use sentence case for UI text. Expected: 'Open settings'"],
+        );
+    });
+});

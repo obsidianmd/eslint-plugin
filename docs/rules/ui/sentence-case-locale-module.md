@@ -8,6 +8,10 @@
 
 <!-- end auto-generated rule header -->
 
+Checks the strings of an English locale module, such as `en.ts` or a module under an `en/` directory,
+and reports those not in sentence case. URLs, date formats such as `YYYY-MM-DD`, and "REST" written
+in capitals keep their casing.
+
 ## Options
 
 <!-- begin auto-generated rule options list -->

@@ -62,6 +62,11 @@ tester.run("ui-sentence-case-json", rule as unknown as Rule.RuleModule, {
             filename: "entries.json",
             code: '{"open":"Open Settings"}',
         },
+        {
+            name: "URLs, date formats and REST in capitals keep their casing",
+            filename: "en.json",
+            code: '{"help":"Visit https://obsidian.md/help","date":"Format: YYYY-MM-DD","rest":"Use the REST API"}',
+        },
     ],
     invalid: [
         {
@@ -103,6 +108,12 @@ tester.run("ui-sentence-case-json", rule as unknown as Rule.RuleModule, {
             output: '{"quote":"Say \\"hello world\\" now"}',
             options: [{ allowAutoFix: true }],
             errors: [{ messageId: "useSentenceCase" }],
+        },
+        {
+            name: "the message gives the expected text",
+            filename: "en.json",
+            code: '{"title":"Open Settings"}',
+            errors: [{ message: "Use sentence case for UI text. Expected: 'Open settings'" }],
         },
     ],
 });

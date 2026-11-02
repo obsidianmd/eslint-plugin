@@ -118,6 +118,15 @@ const METHOD_STRING_ARG_POS: Record<string, number> = {
 // HTML attributes that contain user-facing text
 const ATTR_TEXT_KEYS = new Set(["aria-label", "aria-description", "title", "placeholder"]);
 
+// Whether placeholder text shows an example value rather than prose: a single
+// token with no whitespace ("sk-123…", "YYYY-MM-DD", "my-vault"), or text
+// introduced by "e.g." or "ex." ("e.g. My Vault"). The value's casing is data,
+// so it is not held to sentence case.
+function isPlaceholderExample(text: string): boolean {
+    const trimmed = text.trim();
+    return !/\s/.test(trimmed) || /^(?:e\.\s?g\.|eg\.|ex\.)\s/i.test(trimmed);
+}
+
 // Recursively inspects createEl options object for text properties
 function inspectCreateElOptions(
     node: TSESTree.Expression,
@@ -144,7 +153,9 @@ function inspectCreateElOptions(
                 const normalized = normalizeAttributeName(attrName);
                 if (!ATTR_TEXT_KEYS.has(normalized)) continue;
                 const attrValue = getStringFromNode(attrProp.value);
-                if (attrValue != null) report(attrProp.value, attrValue);
+                if (attrValue == null) continue;
+                if (normalized === "placeholder" && isPlaceholderExample(attrValue)) continue;
+                report(attrProp.value, attrValue);
             }
             continue;
         }
@@ -296,6 +307,7 @@ export default ruleCreator({
             const value = getStringFromNode(valArg);
             if (!name || !value) return;
             const normalized = normalizeAttributeName(name);
+            if (normalized === "placeholder" && isPlaceholderExample(value)) return;
             if (ATTR_TEXT_KEYS.has(normalized)) {
                 reportIfNeeded(valArg, value);
             }
@@ -332,7 +344,9 @@ export default ruleCreator({
                 const arg = node.arguments[idx];
                 if (!arg || arg.type === TSESTree.AST_NODE_TYPES.SpreadElement) return;
                 const str = getStringFromNode(arg);
-                if (str != null) reportIfNeeded(arg, str);
+                if (str != null && !(name === "setPlaceholder" && isPlaceholderExample(str))) {
+                    reportIfNeeded(arg, str);
+                }
             }
 
             if (name === "setAttribute") checkSetAttribute(node);
@@ -373,7 +387,9 @@ export default ruleCreator({
                     return;
                 }
                 const str = getStringFromNode(node.right);
-                if (str != null) reportIfNeeded(node.right, str);
+                if (str == null) return;
+                if (normalized === "placeholder" && isPlaceholderExample(str)) return;
+                reportIfNeeded(node.right, str);
             },
             MethodDefinition: checkGetDisplayTextReturns,
         };

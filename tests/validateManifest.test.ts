@@ -1004,3 +1004,72 @@ ruleTester.run("validate-manifest", manifestRule as unknown as Rule.RuleModule, 
         },
     ],
 });
+
+// Nothing stops a repo from linting manifest.json with `json/json5` instead,
+// and there an unquoted key is an Identifier rather than a String. The rule
+// has to read those keys too, or every unquoted key looks missing.
+const json5RuleTester = new RuleTester({
+    plugins: { json },
+    language: "json/json5",
+});
+
+json5RuleTester.run("validate-manifest (json5)", manifestRule as unknown as Rule.RuleModule, {
+    valid: [
+        {
+            name: "manifest with unquoted keys is accepted",
+            filename: "manifest.json",
+            code: `{
+                    id: "foo-bar",
+                    name: "Foo bar",
+                    author: "Me",
+                    version: "1.0.0",
+                    minAppVersion: "1.0.0",
+                    description: "A way to foo bar your life.",
+                    isDesktopOnly: false,
+                    fundingUrl: { patreon: "https://patreon.com/test" },
+                }`,
+        },
+    ],
+    invalid: [
+        {
+            name: "unquoted disallowed key is reported by name",
+            filename: "manifest.json",
+            code: `{
+                    id: "foo-bar",
+                    name: "Foo bar",
+                    author: "Me",
+                    version: "1.0.0",
+                    minAppVersion: "1.0.0",
+                    description: "A way to foo bar your life.",
+                    isDesktopOnly: false,
+                    eslintIgnore: true,
+                }`,
+            errors: [
+                {
+                    messageId: "disallowedKey",
+                    data: { key: "eslintIgnore" },
+                },
+            ],
+        },
+        {
+            name: "unquoted key duplicating a quoted one is reported",
+            filename: "manifest.json",
+            code: `{
+                    "id": "foo-bar",
+                    id: "foo-baz",
+                    name: "Foo bar",
+                    author: "Me",
+                    version: "1.0.0",
+                    minAppVersion: "1.0.0",
+                    description: "A way to foo bar your life.",
+                    isDesktopOnly: false,
+                }`,
+            errors: [
+                {
+                    messageId: "duplicateKey",
+                    data: { key: "id" },
+                },
+            ],
+        },
+    ],
+});

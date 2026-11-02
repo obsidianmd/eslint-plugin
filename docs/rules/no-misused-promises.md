@@ -45,12 +45,13 @@ Disable comments for the upstream rule no longer match anything, so
 rules, this one may be disabled inline, as the upstream rule could.
 
 If you build your own configuration from `ruleConfigs` instead of using the recommended config,
-swap the rules yourself in your TypeScript block:
+`ruleConfigs.recommendedTypeChecked` already turns this rule on, so turn the upstream rule off in your
+TypeScript block, or both report every real promise:
 
 ```js
 rules: {
+  ...obsidianmd.ruleConfigs.recommendedTypeChecked,
   "@typescript-eslint/no-misused-promises": "off",
-  "obsidianmd/no-misused-promises": "error",
 },
 ```
 

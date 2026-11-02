@@ -4,10 +4,12 @@
 
 ```js
 // eslint.config.mjs
-import { defineConfig } from "eslint/config";
+import { defineConfig, globalIgnores } from "eslint/config";
 import obsidianmd from "eslint-plugin-obsidianmd";
 
 export default defineConfig([
+  // Build output and the sample plugin's Node build scripts are not plugin code.
+  globalIgnores(["node_modules", "dist", "main.js", "esbuild.config.mjs", "version-bump.mjs"]),
   ...obsidianmd.configs.recommended,
   {
     languageOptions: {
@@ -21,7 +23,7 @@ export default defineConfig([
 ]);
 ```
 
-The recommended config includes ESLint core rules, typescript-eslint, and all obsidianmd rules. You only need to provide the TypeScript parser options, as described below.
+The recommended config includes ESLint core rules, typescript-eslint, and all obsidianmd rules. You only need to provide the TypeScript parser options, as described below, and ignore what is not plugin source: the `globalIgnores` entry above matches the official sample plugin's layout (see [Ignoring files](#ignoring-files)).
 
 ## Why you need `parserOptions`
 
@@ -170,13 +172,11 @@ export default defineConfig([
 
 ## Ignoring files
 
-ESLint's default ignores already exclude `node_modules/`. If your build output is in `dist/` (the standard for Obsidian plugins), it is also excluded by default.
-
-To ignore additional files, add a global ignores entry **before** the recommended spread:
+ESLint itself only ignores `node_modules/` and `.git/`. Your build output is linted unless you ignore it: the sample plugin bundles to `main.js` in the project root, and other setups write to `dist/` or `build/`. Node scripts such as the sample plugin's `esbuild.config.mjs` and `version-bump.mjs` are not plugin code either. Ignore them with a global ignores entry **before** the recommended spread:
 
 ```js
 export default defineConfig([
-  { ignores: ["some-other-output.js"] },
+  globalIgnores(["node_modules", "dist", "main.js", "esbuild.config.mjs", "version-bump.mjs"]),
   ...obsidianmd.configs.recommended,
   {
     languageOptions: {
@@ -255,6 +255,31 @@ ESLint does not support disabling all rules from a plugin with a single glob lik
 }
 ```
 
+### Web worker files
+
+A web worker has no `window`: `window`, `activeWindow`, `activeDocument` and Obsidian's DOM helpers
+do not exist there, and `globalThis` is the right way to reach the worker's own scope. The
+recommended config therefore treats files matching `**/*.worker.*` and anything under a `workers/`
+directory as worker code: it adds the worker globals (`importScripts`, `postMessage`, …) and switches
+off the rules whose fix needs a window — `no-global-this`, `prefer-active-doc`, `prefer-create-el`,
+`prefer-instanceof` and `prefer-window-timers`. Every other rule, including the security rules, still
+applies.
+
+For worker code under another name, add the same overrides for its path:
+
+```js
+{
+  files: ["src/background/**"],
+  rules: {
+    "obsidianmd/no-global-this": "off",
+    "obsidianmd/prefer-active-doc": "off",
+    "obsidianmd/prefer-create-el": "off",
+    "obsidianmd/prefer-instanceof": "off",
+    "obsidianmd/prefer-window-timers": "off",
+  },
+}
+```
+
 ## Common errors
 
 ### "You have used a rule which requires type information"
@@ -278,6 +303,14 @@ The fix is to use `allowDefaultProject` so these files are linted with default c
 ```
 
 If you are using `project` instead of `projectService`, ensure the path to your `tsconfig.json` is correct relative to where you run ESLint.
+
+### "… was not found by the project service"
+
+A file ESLint lints is in no `tsconfig.json` and not matched by `allowDefaultProject`. With the
+sample plugin's layout this is the bundled `main.js` and the Node scripts `esbuild.config.mjs` and
+`version-bump.mjs`. If the file is build output or a script rather than plugin source, ignore it (see
+[Ignoring files](#ignoring-files)); otherwise add it to your `tsconfig.json`'s `include`, or for a
+few loose files, to `allowDefaultProject`.
 
 ### "Configuration for rule '0' is invalid"
 
@@ -304,8 +337,11 @@ Most users should use the recommended config and [override individual rules](#ov
 
 The plugin exports `ruleConfigs` with two presets you can spread into your `rules` block:
 
-- `obsidianmd.ruleConfigs.recommended` — base rules that do not require type information
-- `obsidianmd.ruleConfigs.recommendedTypeChecked` — rules that require typescript-eslint type-aware linting
+- `obsidianmd.ruleConfigs.recommended` — the obsidianmd rules that do not require type information
+- `obsidianmd.ruleConfigs.recommendedTypeChecked` — the obsidianmd rules that require typescript-eslint type-aware linting
+
+Between them they hold every obsidianmd rule the recommended config sets for source files, at the same
+severity and options, and nothing else.
 
 Both carry only obsidianmd's own rules. The recommended config also replaces
 `@typescript-eslint/no-misused-promises` with [`obsidianmd/no-misused-promises`](rules/no-misused-promises.md),
@@ -370,6 +406,7 @@ If your tseslint setup does not include type checking (e.g., you use `tseslint.c
 A few things to keep in mind with this approach:
 
 - **Obsidian globals** must be declared manually. The recommended config does this for you; here you need to add them yourself. The list above covers the most common ones. `DomElementInfo`, `SvgElementInfo`, `isBoolean`, `nextFrame`, and `ready` are also available.
+- **Rules from other plugins** that the recommended config sets are not in `ruleConfigs` — notably typescript-eslint's `no-deprecated`, which it runs at `warn` with `caretRangeFromPoint` allowed. Add them yourself if you want them. The recommended config also turns typescript-eslint's `no-misused-promises` off in favour of `obsidianmd/no-misused-promises` (in `recommendedTypeChecked`), so turn it off too if you extend typescript-eslint's type-checked config.
 - **Third-party plugins** bundled by the recommended config (`@microsoft/eslint-plugin-sdl`, `eslint-plugin-import`, `eslint-plugin-no-unsanitized`, `eslint-plugin-depend`, `eslint-plugin-eslint-comments`) are not included. Add them separately if you want them.
 - **`package.json` and `manifest.json` linting** (`validate-manifest`, `depend/ban-dependencies`) is not set up, and is not covered by `ruleConfigs` — those presets only carry rules that apply to source files. `validate-manifest` needs its own config block, because `manifest.json` matches no source glob and needs the JSON language to be parsed at all:
 
@@ -381,7 +418,12 @@ A few things to keep in mind with this approach:
     files: ["manifest.json"],
     language: "json/json",
     plugins: { json, obsidianmd },
-    rules: { "obsidianmd/validate-manifest": "warn" },
+    rules: {
+      // eslint.configs.recommended above has no `files`, so it reaches
+      // manifest.json too, and this core rule cannot read JSON.
+      "no-irregular-whitespace": "off",
+      "obsidianmd/validate-manifest": "warn",
+    },
   }
   ```
 - **`LICENSE` linting** (`validate-license`) is not set up either, and is not covered by `ruleConfigs` — those presets only carry rules that apply to source files. `validate-license` needs its own config block, because `LICENSE` matches no source glob and needs its own language:
