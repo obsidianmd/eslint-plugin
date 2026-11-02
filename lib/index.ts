@@ -206,7 +206,6 @@ import { restrictedGlobalsOptions, restrictedImportsOptions, noUnusedExpressions
 const flatRecommendedGeneralRules: RulesConfig = {
     "no-unused-vars": "off",
     "no-unused-expressions": "off",
-    "no-prototype-bultins": "off",
     "no-self-compare": "warn",
     "no-eval": "error",
     "no-implied-eval": "error",

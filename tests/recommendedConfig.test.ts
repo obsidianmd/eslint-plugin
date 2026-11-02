@@ -824,3 +824,22 @@ describe("underscore-prefixed unused bindings", () => {
 		});
 	}
 });
+
+// The config carried a misspelled "no-prototype-bultins": "off" from 2024 until
+// 0.5.0, so it never applied. The rule has run at error from
+// js.configs.recommended since, with no reports against it, and stays there.
+describe("no-prototype-builtins", () => {
+	const sources = {
+		"file.ts": "export function has(obj: object, k: string): boolean {\n\treturn obj.hasOwnProperty(k);\n}\n",
+		"src/main.js": "export function has(obj, k) {\n\treturn obj.hasOwnProperty(k);\n}\n",
+	};
+	for (const [filePath, code] of Object.entries(sources)) {
+		it(`reports obj.hasOwnProperty(k) in ${filePath}`, async () => {
+			const messages = await lintRecommended(filePath, code);
+			assert.deepStrictEqual(
+				messages.filter(m => m.ruleId === "no-prototype-builtins").map(m => m.severity),
+				[2]
+			);
+		});
+	}
+});
