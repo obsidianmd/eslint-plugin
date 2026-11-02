@@ -118,6 +118,22 @@ ruleTester.run("validate-manifest", manifestRule as unknown as Rule.RuleModule, 
             options: [{ allowedWords: { id: ["obsidian"] } }],
         },
         {
+            // The field is matched case-insensitively, so the allowed words
+            // are too: "Obsidian" as written in the config still un-bans it.
+            name: "allowedWords is case-insensitive",
+            filename: "manifest.json",
+            code: `{
+                    "id": "obsidian-notes",
+                    "name": "Obsidian Notes",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Manage your notes efficiently.",
+                    "isDesktopOnly": false
+                }`,
+            options: [{ allowedWords: { id: ["Obsidian"], name: ["OBSIDIAN"] } }],
+        },
+        {
             name: "ignore skips the forbidden words check entirely",
             filename: "manifest.json",
             code: `{

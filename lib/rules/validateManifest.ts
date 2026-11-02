@@ -106,12 +106,14 @@ function isCheckedWordField(key: string): key is CheckedWordField {
 
 // Returns the forbidden words found in `str`, spelled as the `noForbiddenWords`
 // message wants them, or `null` when there are none. One call answers both
-// "is this field reportable?" and "what does the report say?".
+// "is this field reportable?" and "what does the report say?". The field is
+// matched case-insensitively, so the allowed words are too.
 function findForbiddenWords(str: string, allowed: string[] = []): string | null {
     const forbiddenWordsFound = new Set<string>();
     const strLower = str.toLowerCase();
+    const allowedLower = allowed.map((word) => word.toLowerCase());
     for (const word of FORBIDDEN_WORDS) {
-        if (allowed.includes(word)) {
+        if (allowedLower.includes(word)) {
             continue;
         }
         if (strLower.includes(word)) {
