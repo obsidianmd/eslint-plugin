@@ -92,6 +92,44 @@ ruleTester.run("prefer-create-el", preferCreateEl, {
             name: "createElement on a non-Document typed object is not flagged",
             code: "declare const notDoc: { createElement(tag: string): unknown; };\nnotDoc.createElement('p');",
         },
+
+        // --- An iframe's document has no Obsidian DOM helpers (#196) ---
+        {
+            name: "iframe.contentDocument!.createElement is not flagged",
+            code: `${MOCK_OBSIDIAN_DOM}\ndeclare global { interface Document { win: typeof globalThis } }\ndeclare const iframe: HTMLIFrameElement;\niframe.contentDocument!.createElement('style');`,
+        },
+        {
+            name: "iframe.contentDocument?.createElement is not flagged",
+            code: `${MOCK_OBSIDIAN_DOM}\ndeclare global { interface Document { win: typeof globalThis } }\ndeclare const iframe: HTMLIFrameElement;\niframe.contentDocument?.createElement('style');`,
+        },
+        {
+            name: "a const holding iframe.contentDocument is not flagged",
+            code: `${MOCK_OBSIDIAN_DOM}\ndeclare global { interface Document { win: typeof globalThis } }\ndeclare const iframe: HTMLIFrameElement;\nconst doc = iframe.contentDocument!;\ndoc.createElement('style');`,
+        },
+        {
+            name: "a nullable const holding iframe.contentDocument is not flagged",
+            code: `${MOCK_OBSIDIAN_DOM}\ndeclare global { interface Document { win: typeof globalThis } }\ndeclare const iframe: HTMLIFrameElement;\nconst doc = iframe.contentDocument;\nif (doc) { doc.head.appendChild(doc.createElement('style')); }`,
+        },
+        {
+            name: "iframe.contentWindow.document is not flagged",
+            code: `${MOCK_OBSIDIAN_DOM}\ndeclare global { interface Document { win: typeof globalThis } }\ndeclare const iframe: HTMLIFrameElement;\niframe.contentWindow!.document.createElement('style');`,
+        },
+        {
+            name: "a destructured contentDocument is not flagged",
+            code: `${MOCK_OBSIDIAN_DOM}\ndeclare global { interface Document { win: typeof globalThis } }\ndeclare const iframe: HTMLIFrameElement;\nconst { contentDocument } = iframe;\ncontentDocument!.createElement('style');`,
+        },
+        {
+            name: "a renamed destructured contentDocument is not flagged",
+            code: `${MOCK_OBSIDIAN_DOM}\ndeclare global { interface Document { win: typeof globalThis } }\ndeclare const iframe: HTMLIFrameElement;\nconst { contentDocument: frameDoc } = iframe;\nframeDoc!.createDocumentFragment();`,
+        },
+        {
+            name: "an asserted iframe document is not flagged for createElementNS",
+            code: `${MOCK_OBSIDIAN_DOM}\ndeclare global { interface Document { win: typeof globalThis } }\ndeclare const iframe: HTMLIFrameElement;\n(iframe.contentDocument as Document).createElementNS('http://www.w3.org/2000/svg', 'path');`,
+        },
+        {
+            name: "an iframe document is not flagged without Obsidian types",
+            code: `declare global { interface Document { win: typeof globalThis } }\ndeclare const iframe: HTMLIFrameElement;\niframe.contentDocument!.createElement('div');`,
+        },
     ],
     invalid: [
         // --- With Obsidian augmentations: autofix ---
@@ -341,6 +379,26 @@ ruleTester.run("prefer-create-el", preferCreateEl, {
                     ],
                 },
             ],
+        },
+
+        // --- Near misses: documents that do have Obsidian DOM helpers (#196) ---
+        {
+            name: "the iframe's ownerDocument is still flagged",
+            code: `${MOCK_OBSIDIAN_DOM}\ndeclare global { interface Document { win: typeof globalThis } }\ndeclare const iframe: HTMLIFrameElement;\niframe.ownerDocument.createElement('p');`,
+            output: `${MOCK_OBSIDIAN_DOM}\ndeclare global { interface Document { win: typeof globalThis } }\ndeclare const iframe: HTMLIFrameElement;\niframe.ownerDocument.win.createEl('p');`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        {
+            name: "a let holding iframe.contentDocument is still flagged",
+            code: `${MOCK_OBSIDIAN_DOM}\ndeclare global { interface Document { win: typeof globalThis } }\ndeclare const iframe: HTMLIFrameElement;\nlet doc = iframe.contentDocument!;\ndoc.createElement('p');`,
+            output: `${MOCK_OBSIDIAN_DOM}\ndeclare global { interface Document { win: typeof globalThis } }\ndeclare const iframe: HTMLIFrameElement;\nlet doc = iframe.contentDocument!;\ndoc.win.createEl('p');`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        {
+            name: "a document that is not an iframe's is still flagged",
+            code: `${MOCK_OBSIDIAN_DOM}\ndeclare global { interface Document { win: typeof globalThis } }\ndeclare const iframe: HTMLIFrameElement;\ndeclare const other: { document: Document };\nother.document.createElement('p');`,
+            output: `${MOCK_OBSIDIAN_DOM}\ndeclare global { interface Document { win: typeof globalThis } }\ndeclare const iframe: HTMLIFrameElement;\ndeclare const other: { document: Document };\nother.document.win.createEl('p');`,
+            errors: [{ messageId: "preferCreateEl" }],
         },
     ],
 });

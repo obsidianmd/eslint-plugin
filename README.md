@@ -30,10 +30,12 @@ Add the recommended configuration to your `eslint.config.mjs`. This enables all 
 
 ```js
 // eslint.config.mjs
-import { defineConfig } from "eslint/config";
+import { defineConfig, globalIgnores } from "eslint/config";
 import obsidianmd from "eslint-plugin-obsidianmd";
 
 export default defineConfig([
+  // Build output and the sample plugin's Node build scripts are not plugin code.
+  globalIgnores(["node_modules", "dist", "main.js", "esbuild.config.mjs", "version-bump.mjs"]),
   ...obsidianmd.configs.recommended,
   {
     languageOptions: {
@@ -50,6 +52,8 @@ export default defineConfig([
   },
 ]);
 ```
+
+The `globalIgnores` entry follows the official sample plugin's layout: `main.js` is the bundled build, and `esbuild.config.mjs` and `version-bump.mjs` are Node scripts. None of them is plugin source or in your `tsconfig.json`, so without it ESLint fails on them with "was not found by the project service". List your own build output and scripts there.
 
 The `parserOptions` block is required because the recommended config includes type-checked rules that need access to your TypeScript project. `allowDefaultProject` ensures files not listed in your `tsconfig.json` (like the ESLint config file itself) are still linted without errors. See the [configuration guide](docs/configuration.md) for details on why this is needed and how to customize it.
 
@@ -146,10 +150,12 @@ Checks UI strings for sentence case. The rule reports warnings but doesn't chang
 
 ```js
 // eslint.config.mjs
-import { defineConfig } from "eslint/config";
+import { defineConfig, globalIgnores } from "eslint/config";
 import obsidianmd from "eslint-plugin-obsidianmd";
 
 export default defineConfig([
+  // Build output and the sample plugin's Node build scripts are not plugin code.
+  globalIgnores(["node_modules", "dist", "main.js", "esbuild.config.mjs", "version-bump.mjs"]),
   ...obsidianmd.configs.recommended,
   // Or include English locale files (JSON and TS/JS modules)
   // ...obsidianmd.configs.recommendedWithLocalesEn,

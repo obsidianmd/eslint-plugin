@@ -157,7 +157,6 @@ const recommendedPluginRulesConfigTypeChecked: RulesConfig = {
     "obsidianmd/prefer-create-el": "warn",
     "obsidianmd/prefer-file-manager-trash-file": "warn",
     "obsidianmd/prefer-instanceof": "warn",
-    "@typescript-eslint/no-deprecated": "warn",
 };
 
 const recommendedPluginRulesConfigBase: RulesConfig = {
@@ -178,6 +177,9 @@ const recommendedPluginRulesConfigBase: RulesConfig = {
     "obsidianmd/hardcoded-config-path": "warn",
     "obsidianmd/no-forbidden-elements": "error",
     "obsidianmd/no-global-this": "warn",
+    // The rule resolves the desktop-only signal itself, defaulting to the
+    // manifest, so the severity no longer has to be computed here.
+    "obsidianmd/no-nodejs-modules": "warn",
     "obsidianmd/no-sample-code": "error",
     "obsidianmd/no-tfile-tfolder-cast": "warn",
     "obsidianmd/no-static-styles-assignment": "error",
@@ -188,6 +190,22 @@ const recommendedPluginRulesConfigBase: RulesConfig = {
     "obsidianmd/prefer-window-timers": "warn",
     "obsidianmd/prefer-active-doc": "warn",
     "obsidianmd/regex-lookbehind": "error",
+    "obsidianmd/rule-custom-message": [
+        "error",
+        {
+            "no-console": {
+                messages: {
+                    "Unexpected console statement. Only these console methods are allowed: warn, error, debug.": "Avoid unnecessary logging to console. See https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#Avoid+unnecessary+logging+to+console",
+                },
+                options: [{ allow: ["warn", "error", "debug"] }],
+            },
+            "no-new-func": {
+                messages: {
+                    "The Function constructor is eval": "Using the `Function` constructor is dangerous because it executes arbitrary code, similar to `eval()`",
+                },
+            },
+        }
+    ],
     "obsidianmd/sample-names": "error",
     // validate-manifest and validate-license are NOT here: they lint
     // manifest.json and LICENSE, neither of which can match the JS/TS globs this
@@ -195,11 +213,58 @@ const recommendedPluginRulesConfigBase: RulesConfig = {
     "obsidianmd/ui/sentence-case": ["warn", { enforceCamelCaseLower: true }],
 }
 
+// Rules from other plugins that need type information. Like the type-checked
+// obsidianmd rules they only run on TS files, but they are not obsidianmd rules,
+// so they stay out of `ruleConfigs`.
+const recommendedTypeCheckedGeneralRules: RulesConfig = {
+    "@typescript-eslint/no-deprecated": [
+        "warn",
+        {
+            allow: [
+                // The standard caretPositionFromPoint only reached WebKit in
+                // Safari/iOS 17.4, so caretRangeFromPoint is still the fallback
+                // that keeps caret lookup working on older iOS and Electron.
+                // typescript-eslint matches a value specifier by name, so any
+                // deprecated `caretRangeFromPoint` is allowed, not only the DOM's.
+                { from: "lib", name: "caretRangeFromPoint" },
+            ],
+        },
+    ],
+};
+
 // Combined rules for TypeScript files
 const recommendedPluginRulesConfig: RulesConfig = {
     ...recommendedPluginRulesConfigBase,
     ...recommendedPluginRulesConfigTypeChecked,
 };
+
+// Web worker code runs without a window: `window`, `activeWindow`,
+// `activeDocument` and Obsidian's DOM helpers do not exist there, so these
+// rules' advice cannot be followed and their autofixes (`globalThis` ->
+// `window`, `setTimeout` -> `window.setTimeout`) break it. They apply to every
+// JS/TS file except worker code. A file path is all it takes to match
+// WORKER_FILES, so no security rule may be listed here.
+const WINDOW_ONLY_RULES = new Set([
+    "obsidianmd/no-global-this",
+    "obsidianmd/prefer-active-doc",
+    "obsidianmd/prefer-create-el",
+    "obsidianmd/prefer-instanceof",
+    "obsidianmd/prefer-window-timers",
+]);
+const WORKER_FILES = [
+    '**/*.worker.{ts,cts,mts,tsx,js,cjs,mjs,jsx}',
+    '**/workers/**/*.{ts,cts,mts,tsx,js,cjs,mjs,jsx}',
+];
+
+// The rules of `config` that are (or are not) window-only. Applying the
+// window-only ones in their own block with `ignores` keeps every block's
+// severities honest: an "off" in a worker-only block would read, to anything
+// merging the config's rules without regard to `files`, as the rule being off.
+function splitWindowOnlyRules(config: RulesConfig, windowOnly: boolean): RulesConfig {
+    return Object.fromEntries(
+        Object.entries(config).filter(([rule]) => WINDOW_ONLY_RULES.has(rule) === windowOnly),
+    );
+}
 
 import { restrictedGlobalsOptions, restrictedImportsOptions, noUnusedExpressionsOptions, noUnusedVarsOptions } from "./ruleOptions.js";
 
@@ -232,26 +297,7 @@ const flatRecommendedGeneralRules: RulesConfig = {
     ],
     "@microsoft/sdl/no-document-write": "warn",
     "@microsoft/sdl/no-inner-html": "warn",
-    // The rule resolves the desktop-only signal itself, defaulting to the
-    // manifest, so the severity no longer has to be computed here.
-    "obsidianmd/no-nodejs-modules": "warn",
     "import/no-extraneous-dependencies": "warn",
-    "obsidianmd/rule-custom-message": [
-        "error",
-        {
-            "no-console": {
-                messages: {
-                    "Unexpected console statement. Only these console methods are allowed: warn, error, debug.": "Avoid unnecessary logging to console. See https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#Avoid+unnecessary+logging+to+console",
-                },
-                options: [{ allow: ["warn", "error", "debug"] }],
-            },
-            "no-new-func": {
-                messages: {
-                    "The Function constructor is eval": "Using the `Function` constructor is dangerous because it executes arbitrary code, similar to `eval()`",
-                },
-            },
-        }
-    ],
     // Security: explicitly enforce no-unsanitized rules at error
     "no-unsanitized/method": "error",
     "no-unsanitized/property": "error",
@@ -283,7 +329,7 @@ const flatRecommendedConfig: Config[] = defineConfig([
         extends: [...(tseslint.configs.recommended as Config[]), noUnsanitizedPlugin.configs.recommended],
         rules: {
             ...flatRecommendedGeneralRules,
-            ...recommendedPluginRulesConfigBase
+            ...splitWindowOnlyRules(recommendedPluginRulesConfigBase, false)
         }
     },
     {
@@ -298,7 +344,24 @@ const flatRecommendedConfig: Config[] = defineConfig([
         extends: [...(tseslint.configs.recommendedTypeChecked as Config[]), noUnsanitizedPlugin.configs.recommended],
         rules: {
             ...flatRecommendedGeneralRules,
-            ...recommendedPluginRulesConfig
+            ...recommendedTypeCheckedGeneralRules,
+            ...splitWindowOnlyRules(recommendedPluginRulesConfig, false)
+        },
+    },
+    {
+        files: ['**/*.{js,cjs,mjs,jsx}'],
+        ignores: WORKER_FILES,
+        rules: splitWindowOnlyRules(recommendedPluginRulesConfigBase, true),
+    },
+    {
+        files: ['**/*.{ts,cts,mts,tsx}'],
+        ignores: WORKER_FILES,
+        rules: splitWindowOnlyRules(recommendedPluginRulesConfig, true),
+    },
+    {
+        files: WORKER_FILES,
+        languageOptions: {
+            globals: globals.worker,
         },
     },
     {

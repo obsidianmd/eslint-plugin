@@ -1,4 +1,4 @@
-import { ESLintUtils, TSESTree } from "@typescript-eslint/utils";
+import { ASTUtils, ESLintUtils, TSESTree } from "@typescript-eslint/utils";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 const TAG_SHORTHANDS: Record<string, string> = {
@@ -59,6 +59,10 @@ export default ruleCreator({
         function classifyDocumentTarget(
             obj: TSESTree.Expression,
         ): { prefix: string; canAutofix: boolean } | null {
+            if (isIframeDocument(obj)) {
+                return null;
+            }
+
             if (isGlobalDocument(obj)) {
                 return { prefix: "", canAutofix: hasObsidianDomHelpers(obj) };
             }
@@ -232,6 +236,80 @@ export default ruleCreator({
                         ],
                     }),
             });
+        }
+
+        // An iframe's document belongs to the iframe's own window, which Obsidian
+        // never gives its DOM helpers: `doc.win.createEl()` throws there, so the
+        // native method is the only way to create an element in that document.
+        // Recognised: `x.contentDocument`, `x.contentWindow.document` (also with
+        // `!`, `?.` or a type assertion), and a `const` holding either.
+        function isIframeDocument(node: TSESTree.Node, seen = new Set<TSESTree.Node>()): boolean {
+            const expr = unwrapExpression(node);
+            if (expr.type === TSESTree.AST_NODE_TYPES.MemberExpression) {
+                const name = getPropertyName(expr);
+                if (name === "contentDocument") {
+                    return true;
+                }
+                const owner = unwrapExpression(expr.object);
+                return (
+                    name === "document" &&
+                    owner.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
+                    getPropertyName(owner) === "contentWindow"
+                );
+            }
+            if (expr.type !== TSESTree.AST_NODE_TYPES.Identifier || seen.has(expr)) {
+                return false;
+            }
+            seen.add(expr);
+            const variable = ASTUtils.findVariable(context.sourceCode.getScope(expr), expr);
+            if (!variable || variable.defs.length !== 1) {
+                return false;
+            }
+            const def = variable.defs[0];
+            if (
+                def.type !== "Variable" ||
+                def.parent.kind !== "const" ||
+                def.node.init === null
+            ) {
+                return false;
+            }
+            if (def.node.id.type === TSESTree.AST_NODE_TYPES.Identifier) {
+                return isIframeDocument(def.node.init, seen);
+            }
+            // `const { contentDocument } = iframe` or `{ contentDocument: doc }`
+            return (
+                def.node.id.type === TSESTree.AST_NODE_TYPES.ObjectPattern &&
+                def.node.id.properties.some(
+                    (property) =>
+                        property.type === TSESTree.AST_NODE_TYPES.Property &&
+                        property.value === def.name &&
+                        getPropertyName(property) === "contentDocument",
+                )
+            );
+        }
+
+        function unwrapExpression(node: TSESTree.Node): TSESTree.Node {
+            let current = node;
+            while (
+                current.type === TSESTree.AST_NODE_TYPES.TSNonNullExpression ||
+                current.type === TSESTree.AST_NODE_TYPES.TSAsExpression ||
+                current.type === TSESTree.AST_NODE_TYPES.TSTypeAssertion ||
+                current.type === TSESTree.AST_NODE_TYPES.TSSatisfiesExpression ||
+                current.type === TSESTree.AST_NODE_TYPES.ChainExpression
+            ) {
+                current = current.expression;
+            }
+            return current;
+        }
+
+        function getPropertyName(
+            node: TSESTree.MemberExpression | TSESTree.Property,
+        ): string | undefined {
+            const key = node.type === TSESTree.AST_NODE_TYPES.MemberExpression ? node.property : node.key;
+            if (!node.computed && key.type === TSESTree.AST_NODE_TYPES.Identifier) {
+                return key.name;
+            }
+            return node.computed ? getStringLiteralValue(key) : undefined;
         }
 
         function isGlobalDocument(node: TSESTree.Node): boolean {
