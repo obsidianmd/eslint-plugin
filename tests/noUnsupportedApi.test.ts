@@ -143,6 +143,38 @@ ruleTester.run("no-unsupported-api", rule, {
             `,
             options: [{ minAppVersion: "1.0.0" }],
         },
+        {
+            name: "API guarded by requireApiVersion with an imported constant is allowed",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                import { RENDER_CONTEXT_VERSION } from "./tests/fixtures/noUnsupportedApiVersions.js";
+                if (requireApiVersion(RENDER_CONTEXT_VERSION)) {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "API guarded by requireApiVersion with a constant variable in && is allowed",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                const version = "1.10.0";
+                const ctx = requireApiVersion(version) && app.renderContext;
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "API guarded by requireApiVersion with a constant variable in a ternary is allowed",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                const version = "1.10.0";
+                const ctx = requireApiVersion(version) ? app.renderContext : null;
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
     ],
     invalid: [
         {
@@ -268,6 +300,61 @@ ruleTester.run("no-unsupported-api", rule, {
                 storage.setSecret('key', 'value');
             `,
             options: [{ minAppVersion: "1.11.1" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "requireApiVersion with a let variable is not a guard",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                let version = "1.10.0";
+                if (requireApiVersion(version)) {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "requireApiVersion with a constant variable below the API version is not a guard",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                const version = "1.0.0";
+                if (requireApiVersion(version)) {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "requireApiVersion with a shadowing lower constant is not a guard",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                const version = "1.10.0";
+                function f() {
+                    const version = "1.0.0";
+                    if (requireApiVersion(version)) {
+                        app.renderContext;
+                    }
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "requireApiVersion with a union-typed variable is not a guard",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                declare const version: "1.10.0" | "1.0.0";
+                if (requireApiVersion(version)) {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
             errors: [{ messageId: "apiNotAvailable" }],
         },
         {
