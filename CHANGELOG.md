@@ -81,7 +81,7 @@ Upgrading from 0.4.x? The breaking changes below each have a fix in
 
 ### Documentation
 
-- Every rule doc has a "What is reported" section: what the rule reports, what it deliberately leaves alone, its fix or suggestion, and the config scoping that applies. Each statement is backed by a test ([#WIR](https://github.com/obsidianmd/eslint-plugin/pull/WIR)).
+- Every rule doc has a "What is reported" section: what the rule reports, what it deliberately leaves alone, its fix or suggestion, and the config scoping that applies. Each statement is backed by a test ([#218](https://github.com/obsidianmd/eslint-plugin/pull/218)).
 - An [Upgrading to 0.5.0](docs/configuration.md#upgrading-to-050) section, and a common-errors entry for type-checked configs reaching `LICENSE` and `manifest.json` ([#188](https://github.com/obsidianmd/eslint-plugin/pull/188)).
 - The README and quick-start examples ignore build output and Node build scripts as the sample plugin does, and say what to do when there is no build step and `main.js` is your source ([#207](https://github.com/obsidianmd/eslint-plugin/pull/207), [#188](https://github.com/obsidianmd/eslint-plugin/pull/188)).
 - "Files linted beyond your source" explains that `package.json`, `manifest.json` and `LICENSE` are matched by name, so ESLint must run from the project root ([#191](https://github.com/obsidianmd/eslint-plugin/pull/191), [#192](https://github.com/obsidianmd/eslint-plugin/pull/192)).
