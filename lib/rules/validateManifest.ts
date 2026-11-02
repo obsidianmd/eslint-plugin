@@ -141,7 +141,7 @@ const rule: ValidateManifestRuleDefinition = {
                     allowedWords: {
                         type: "object",
                         description:
-                            "Words to drop from the forbidden list, per field. Use this for findings that can never be acted on, such as a published plugin id that will always contain 'obsidian'.",
+                            "Words to drop from the forbidden list, per field, matched case-insensitively. Use this for findings that can never be acted on, such as a published plugin id that will always contain 'obsidian'.",
                         properties: Object.fromEntries(
                             CHECKED_WORD_FIELDS.map((field) => [
                                 field,
