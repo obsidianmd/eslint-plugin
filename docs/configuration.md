@@ -337,8 +337,11 @@ Most users should use the recommended config and [override individual rules](#ov
 
 The plugin exports `ruleConfigs` with two presets you can spread into your `rules` block:
 
-- `obsidianmd.ruleConfigs.recommended` — base rules that do not require type information
-- `obsidianmd.ruleConfigs.recommendedTypeChecked` — rules that require typescript-eslint type-aware linting
+- `obsidianmd.ruleConfigs.recommended` — the obsidianmd rules that do not require type information
+- `obsidianmd.ruleConfigs.recommendedTypeChecked` — the obsidianmd rules that require typescript-eslint type-aware linting
+
+Between them they hold every obsidianmd rule the recommended config sets for source files, at the same
+severity and options, and nothing else.
 
 ```js
 // eslint.config.mjs
@@ -396,6 +399,7 @@ If your tseslint setup does not include type checking (e.g., you use `tseslint.c
 A few things to keep in mind with this approach:
 
 - **Obsidian globals** must be declared manually. The recommended config does this for you; here you need to add them yourself. The list above covers the most common ones. `DomElementInfo`, `SvgElementInfo`, `isBoolean`, `nextFrame`, and `ready` are also available.
+- **Rules from other plugins** that the recommended config sets are not in `ruleConfigs` — notably typescript-eslint's `no-deprecated`, which it runs at `warn` with `caretRangeFromPoint` allowed. Add them yourself if you want them.
 - **Third-party plugins** bundled by the recommended config (`@microsoft/eslint-plugin-sdl`, `eslint-plugin-import`, `eslint-plugin-no-unsanitized`, `eslint-plugin-depend`, `eslint-plugin-eslint-comments`) are not included. Add them separately if you want them.
 - **`package.json` and `manifest.json` linting** (`validate-manifest`, `depend/ban-dependencies`) is not set up, and is not covered by `ruleConfigs` — those presets only carry rules that apply to source files. `validate-manifest` needs its own config block, because `manifest.json` matches no source glob and needs the JSON language to be parsed at all:
 
