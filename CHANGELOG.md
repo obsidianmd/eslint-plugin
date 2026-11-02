@@ -64,6 +64,7 @@ Upgrading from 0.4.x? The breaking changes below each have a fix in
 - The plugin loads on ESLint 9.19 to 9.21: since 0.3.0 it imported `eslint/config`, which arrived in 9.22 ([#201](https://github.com/obsidianmd/eslint-plugin/pull/201)).
 - Removed a misspelled `no-prototype-bultins` override that never applied; `no-prototype-builtins` stays at `error` ([#209](https://github.com/obsidianmd/eslint-plugin/pull/209)).
 - `check:eslint-docs` passes on Windows checkouts (contributors) ([#200](https://github.com/obsidianmd/eslint-plugin/pull/200)).
+- obsidianmd's JavaScript rules return nothing for files in other languages, so a type-aware one enabled without `files` (say, to raise its severity) no longer aborts the run on `LICENSE`, `manifest.json` or `package.json` ([#PRE](https://github.com/obsidianmd/eslint-plugin/pull/PRE)).
 
 ### Documentation
 

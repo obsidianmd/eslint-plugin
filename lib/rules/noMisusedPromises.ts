@@ -1,7 +1,7 @@
 import { ESLintUtils, type TSESLint } from "@typescript-eslint/utils";
 import type ts from "typescript";
 import tseslint from "typescript-eslint";
-import { docsUrl } from "../ruleCreator.js";
+import { docsUrl, isJsProgram } from "../ruleCreator.js";
 
 type RuleModule = TSESLint.RuleModule<string, readonly unknown[]>;
 type RuleContext = TSESLint.RuleContext<string, readonly unknown[]>;
@@ -37,6 +37,11 @@ const rule: RuleModule = {
         },
     },
     create(context) {
+        // Not built with ruleCreator, so it needs the same guard: another
+        // language's file has no type program to wrap.
+        if (!isJsProgram(context)) {
+            return {};
+        }
         return upstream.create(withObsidianChainingIgnored(context));
     },
 };

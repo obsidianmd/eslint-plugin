@@ -1,4 +1,4 @@
-import { ESLintUtils } from "@typescript-eslint/utils";
+import { ESLintUtils, type TSESLint } from "@typescript-eslint/utils";
 
 /**
  * Base URL for rule documentation.
@@ -12,4 +12,31 @@ export function docsUrl(name: string, subdir?: string) {
 	return `${prefix}/${name}.md`;
 }
 
-export const ruleCreator = ESLintUtils.RuleCreator.withoutDocs;
+/**
+ * Whether ESLint parsed the file being linted as JavaScript or TypeScript.
+ *
+ * The recommended config also lints package.json, manifest.json and LICENSE
+ * with other languages, and a rule enabled without `files` reaches them too.
+ * Their AST is a `Document`, not a `Program`. A TS file without type
+ * information is still a `Program`, so a type-aware rule keeps throwing there.
+ */
+export function isJsProgram(context: { sourceCode: { ast: unknown } }): boolean {
+	return (context.sourceCode.ast as { type?: unknown }).type === "Program";
+}
+
+/**
+ * Creates a JavaScript/TypeScript rule. Every rule made here returns no
+ * visitors for a file in another language, so a type-aware rule does not throw
+ * from getParserServices() and abort the whole lint run on LICENSE or
+ * manifest.json.
+ */
+export function ruleCreator<Options extends readonly unknown[], MessageIds extends string>(
+	rule: Readonly<ESLintUtils.RuleWithMeta<Options, MessageIds>>,
+): TSESLint.RuleModule<MessageIds, Options> {
+	return ESLintUtils.RuleCreator.withoutDocs<Options, MessageIds>({
+		...rule,
+		create(context, optionsWithDefault) {
+			return isJsProgram(context) ? rule.create(context, optionsWithDefault) : {};
+		},
+	});
+}
