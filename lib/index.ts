@@ -43,7 +43,7 @@ import globals from "globals";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { Config, defineConfig } from "eslint/config";
+import { type Config, defineConfig } from "@eslint/config-helpers";
 import type { RuleDefinition, RuleDefinitionTypeOptions, RulesConfig } from "@eslint/core";
 import noUnsanitizedPlugin from "eslint-plugin-no-unsanitized";
 import eslintComments from "@eslint-community/eslint-plugin-eslint-comments";
