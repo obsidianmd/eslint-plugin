@@ -21,6 +21,14 @@ ruleTester.run("hardcoded-config-path", hardcodedConfigPathRule, {
             name: "URL string is allowed",
             code: 'const config = "https://publish.obsidian.md/";',
         },
+        {
+            name: ".obsidianrc string is allowed",
+            code: 'const config = ".obsidianrc";',
+        },
+        {
+            name: "template literals are not checked",
+            code: "const config = `${base}/.obsidian/plugins`;",
+        },
     ],
     invalid: [
         {
@@ -31,6 +39,11 @@ ruleTester.run("hardcoded-config-path", hardcodedConfigPathRule, {
         {
             name: ".obsidian/ path is forbidden",
             code: 'const config = ".obsidian/workspace.json";',
+            errors: [{ messageId: "configPath" }],
+        },
+        {
+            name: ".obsidian in the middle of a path is forbidden",
+            code: 'const config = "vault/.obsidian/workspace.json";',
             errors: [{ messageId: "configPath" }],
         },
     ],
