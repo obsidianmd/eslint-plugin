@@ -778,3 +778,49 @@ describe("require() in plugin code", () => {
 		});
 	}
 });
+
+// 0.2.9 ignored `_`-prefixed caught errors and destructured elements; rebase
+// commit f088476 dropped the patterns in 0.3.0. A dead `_x` variable stays
+// reported (#199), and function arguments stay covered by args: "none".
+describe("underscore-prefixed unused bindings", () => {
+	const code = [
+		"export function run(pair: [number, number]): number {",
+		"\tconst [_first, second] = pair;",
+		"\ttry { JSON.parse(\"x\"); } catch (_error) { /* ignored */ }",
+		"\treturn second;",
+		"}",
+		"",
+	].join("\n");
+	const control = "export function run(): void {\n\tconst unused = 1;\n\ttry { JSON.parse(\"x\"); } catch (error) { /* ignored */ }\n}\n";
+
+	for (const filePath of ["file.ts", "src/main.js"]) {
+		// JavaScript has no tuple annotations.
+		const source = filePath.endsWith(".js") ? code.replace(": [number, number]): number", ")") : code;
+		const controlSource = filePath.endsWith(".js") ? control.replace("(): void", "()") : control;
+
+		it(`are not reported in ${filePath}`, async () => {
+			const messages = await lintRecommended(filePath, source);
+			assert.deepStrictEqual(
+				messages.filter(m => m.ruleId === "@typescript-eslint/no-unused-vars").map(m => m.message),
+				[]
+			);
+		});
+
+		it(`a dead _-prefixed variable is still reported in ${filePath}`, async () => {
+			const signature = filePath.endsWith(".js") ? "run()" : "run(): void";
+			const messages = await lintRecommended(filePath, `export function ${signature} {\n\tconst _unused = 1;\n}\n`);
+			assert.strictEqual(
+				messages.filter(m => m.ruleId === "@typescript-eslint/no-unused-vars").length,
+				1
+			);
+		});
+
+		it(`without the underscore are still reported in ${filePath}`, async () => {
+			const messages = await lintRecommended(filePath, controlSource);
+			assert.strictEqual(
+				messages.filter(m => m.ruleId === "@typescript-eslint/no-unused-vars").length,
+				2
+			);
+		});
+	}
+});

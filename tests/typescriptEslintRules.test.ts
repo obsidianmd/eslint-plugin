@@ -27,6 +27,16 @@ ruleTester.run("ts-no-unused-vars", tseslintPlugin.rules["no-unused-vars"], {
             options: noUnusedVarsOptions,
         },
         {
+            name: "unused underscore-prefixed caught error is allowed",
+            code: "try { JSON.parse('x'); } catch (_error) { /* ignored */ }",
+            options: noUnusedVarsOptions,
+        },
+        {
+            name: "unused underscore-prefixed destructured array element is allowed",
+            code: "const [_first, second] = [1, 2]; console.log(second);",
+            options: noUnusedVarsOptions,
+        },
+        {
             name: "unused await using declaration is allowed",
             code: "declare function lock(): AsyncDisposable; async function run() { await using asyncLock = lock(); } run();",
             options: noUnusedVarsOptions,
@@ -42,6 +52,18 @@ ruleTester.run("ts-no-unused-vars", tseslintPlugin.rules["no-unused-vars"], {
         {
             name: "unused underscore-prefixed variable is still forbidden",
             code: "const _unused = 1;",
+            options: noUnusedVarsOptions,
+            errors: [{ messageId: "unusedVar" }],
+        },
+        {
+            name: "unused caught error without an underscore is forbidden",
+            code: "try { JSON.parse('x'); } catch (error) { /* ignored */ }",
+            options: noUnusedVarsOptions,
+            errors: [{ messageId: "unusedVar" }],
+        },
+        {
+            name: "unused destructured array element without an underscore is forbidden",
+            code: "const [first, second] = [1, 2]; console.log(second);",
             options: noUnusedVarsOptions,
             errors: [{ messageId: "unusedVar" }],
         },
