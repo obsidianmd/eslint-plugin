@@ -47,6 +47,19 @@ export default ruleCreator({
             return winType.getProperty("createEl") !== undefined;
         }
 
+        // Whether the call resolved to lib.dom's overload for a known tag name, the
+        // one whose type parameter is `K extends keyof <tagMap>`. createEl() and
+        // createSvg() accept exactly those names, so only then does the replacement
+        // compile: a `string`, a custom element or a deprecated tag picks another
+        // overload, and createEl(tag) fails with TS2345.
+        function resolvesToTagMapOverload(node: TSESTree.CallExpression, tagMap: string): boolean {
+            const signature = services.program
+                .getTypeChecker()
+                .getResolvedSignature(services.esTreeNodeToTSNodeMap.get(node));
+            const typeParameter = signature?.getDeclaration()?.typeParameters?.[0];
+            return typeParameter?.constraint?.getText() === `keyof ${tagMap}`;
+        }
+
         function isDocumentType(node: TSESTree.Node): boolean {
             const type = services.getTypeAtLocation(node);
             return (
@@ -121,7 +134,8 @@ export default ruleCreator({
             const replacement = shorthand
                 ? `${target.prefix}${shorthand}()`
                 : `${target.prefix}createEl(${getText(tagArg)})`;
-            report(node, replacement, target.canAutofix);
+            const compiles = shorthand !== undefined || resolvesToTagMapOverload(node, "HTMLElementTagNameMap");
+            report(node, replacement, compiles ? target.canAutofix : null);
         }
 
         function checkCreateElementNS(node: TSESTree.CallExpression): void {
@@ -149,8 +163,8 @@ export default ruleCreator({
             const remainingArgs = node.arguments.slice(2);
             const argsText = [getText(tagArg), ...remainingArgs.map((arg) => getText(arg))].join(", ");
             const replacement = `${target.prefix}createSvg(${argsText})`;
-
-            report(node, replacement, target.canAutofix);
+            const compiles = resolvesToTagMapOverload(node, "SVGElementTagNameMap");
+            report(node, replacement, compiles ? target.canAutofix : null);
         }
 
         function checkCreateElShorthand(node: TSESTree.CallExpression): void {
@@ -218,8 +232,14 @@ export default ruleCreator({
             report(node, replacement, target.canAutofix);
         }
 
-        function report(node: TSESTree.CallExpression, replacement: string, canAutofix: boolean): void {
+        // `canAutofix` is null when the replacement would not compile at all: the
+        // finding is reported without a fix or a suggestion.
+        function report(node: TSESTree.CallExpression, replacement: string, canAutofix: boolean | null): void {
             const original = getText(node);
+            if (canAutofix === null) {
+                context.report({ node, messageId: "preferCreateEl", data: { replacement, original } });
+                return;
+            }
             context.report({
                 node,
                 messageId: "preferCreateEl",

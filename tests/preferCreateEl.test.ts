@@ -200,6 +200,46 @@ ruleTester.run("prefer-create-el", preferCreateEl, {
             errors: [{ messageId: "preferCreateEl" }],
         },
 
+        // --- Tags createEl()/createSvg() do not accept: reported, no fix or suggestion ---
+        // createEl<K extends keyof HTMLElementTagNameMap>(tag: K) rejects these, so
+        // createEl(tag) would fail tsc with TS2345.
+        {
+            name: "document.createElement(tag) with a string tag is reported without a fix",
+            code: `${MOCK_OBSIDIAN_DOM}\ndeclare const tag: string;\ndocument.createElement(tag);`,
+            output: null,
+            errors: [{ messageId: "preferCreateEl", suggestions: [] }],
+        },
+        {
+            name: "document.createElement() with a custom element name is reported without a fix",
+            code: `${MOCK_OBSIDIAN_DOM}\ndocument.createElement('my-element');`,
+            output: null,
+            errors: [{ messageId: "preferCreateEl", suggestions: [] }],
+        },
+        {
+            name: "document.createElement() with a deprecated tag is reported without a fix",
+            code: `${MOCK_OBSIDIAN_DOM}\ndocument.createElement('xmp');`,
+            output: null,
+            errors: [{ messageId: "preferCreateEl", suggestions: [] }],
+        },
+        {
+            name: "document.createElement(tag) with a union of known tags still autofixes",
+            code: `${MOCK_OBSIDIAN_DOM}\ndeclare const tag: 'p' | 'section';\ndocument.createElement(tag);`,
+            output: `${MOCK_OBSIDIAN_DOM}\ndeclare const tag: 'p' | 'section';\ncreateEl(tag);`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        {
+            name: "document.createElementNS(SVG_NS, name) with a string name is reported without a fix",
+            code: `${MOCK_OBSIDIAN_DOM}\ndeclare const name: string;\ndocument.createElementNS('http://www.w3.org/2000/svg', name);`,
+            output: null,
+            errors: [{ messageId: "preferCreateEl", suggestions: [] }],
+        },
+        {
+            name: "document.createElementNS(SVG_NS, tag, options) is reported without a fix",
+            code: `${MOCK_OBSIDIAN_DOM}\ndocument.createElementNS('http://www.w3.org/2000/svg', 'path', { is: 'x-path' });`,
+            output: null,
+            errors: [{ messageId: "preferCreateEl", suggestions: [] }],
+        },
+
         // --- activeDocument: activeWindow.<helper>() when activeWindow's type has the helpers ---
         {
             name: "activeDocument.createElement(tag) → activeWindow.createEl('p') when Window declares the helpers",
