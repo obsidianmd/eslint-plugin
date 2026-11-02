@@ -45,8 +45,8 @@ The `parserOptions` block is required because the recommended config includes ty
 
 > **Note:** You do not need to separately add `eslint.configs.recommended` or `tseslint.configs.recommended` — both are already included in the recommended config.
 
-The recommended config also lints files that are not source, matching `package.json` and
-`manifest.json` by name. **Run ESLint from the project root**: a lint script scoped to your sources —
+The recommended config also lints files that are not source, matching `package.json`,
+`manifest.json` and `LICENSE` by name. **Run ESLint from the project root**: a lint script scoped to your sources —
 `eslint src` — never visits them, and their checks silently do nothing. See
 [Files linted beyond your source](docs/configuration.md#files-linted-beyond-your-source).
 

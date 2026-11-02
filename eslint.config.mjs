@@ -37,4 +37,10 @@ export default [
         files: ["manifest.json"],
         rules: { "obsidianmd/validate-manifest": "off" },
     },
+    // This repo is the plugin, not an Obsidian plugin. Its LICENSE is Dynalist's
+    // own, so the rule is correct to fire here and the finding is unactionable.
+    {
+        files: ["LICENSE"],
+        rules: { "obsidianmd/validate-license": "off" },
+    },
 ];
