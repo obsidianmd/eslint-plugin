@@ -217,22 +217,6 @@ ruleTester.run("ts-no-non-null-asserted-optional-chain", tseslintPlugin.rules["n
     ],
 });
 
-ruleTester.run("ts-no-require-imports", tseslintPlugin.rules["no-require-imports"], {
-    valid: [
-        {
-            name: "import statement is allowed",
-            code: "import x from 'x';",
-        },
-    ],
-    invalid: [
-        {
-            name: "require() is forbidden",
-            code: "const x = require('x');",
-            errors: [{ messageId: "noRequireImports" }],
-        },
-    ],
-});
-
 ruleTester.run("ts-no-this-alias", tseslintPlugin.rules["no-this-alias"], {
     valid: [
         {

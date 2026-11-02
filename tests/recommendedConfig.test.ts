@@ -732,3 +732,49 @@ describe("a user's own JSON block", () => {
 		});
 	}
 });
+
+// Lints `code` through the recommended config as `filePath`. TypeScript files
+// get type information from this repo's tsconfig, which includes `file.ts`.
+async function lintRecommended(filePath: string, code: string) {
+	const eslint = new ESLint({
+		overrideConfigFile: true,
+		overrideConfig: [
+			...plugin.configs.recommended,
+			{
+				files: ["**/*.ts"],
+				languageOptions: {
+					parserOptions: { project: "./tsconfig.json", tsconfigRootDir: process.cwd() },
+				},
+			},
+		],
+	});
+	const [result] = await eslint.lintText(code, { filePath });
+	assert.deepStrictEqual(result.messages.filter(m => m.fatal).map(m => m.message), []);
+	return result.messages;
+}
+
+// 0.2.9 turned no-require-imports off and declared `require`; rebase commit
+// f088476 dropped both in 0.3.0. obsidianmd/no-nodejs-modules checks require()
+// itself and suggests a guarded require() as its fix.
+describe("require() in plugin code", () => {
+	for (const filePath of ["file.ts", "src/main.js"]) {
+		describe(filePath, () => {
+			it("no-require-imports is off and require is a readonly global", async () => {
+				const eslint = new ESLint({ overrideConfigFile: true, overrideConfig: plugin.configs.recommended });
+				const config = await eslint.calculateConfigForFile(filePath);
+				assert.strictEqual(getSeverity(config.rules?.["@typescript-eslint/no-require-imports"]), "off");
+				assert.strictEqual(config.languageOptions?.globals?.require, "readonly");
+			});
+
+			it("a require() call is reported by neither no-require-imports nor no-undef", async () => {
+				const messages = await lintRecommended(filePath, 'const x = require("x");\nexport default x;\n');
+				assert.deepStrictEqual(
+					messages
+						.filter(m => m.ruleId === "@typescript-eslint/no-require-imports" || m.ruleId === "no-undef")
+						.map(m => m.message),
+					[]
+				);
+			});
+		});
+	}
+});
