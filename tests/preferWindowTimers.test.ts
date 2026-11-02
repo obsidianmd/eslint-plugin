@@ -29,6 +29,14 @@ ruleTester.run("prefer-window-timers", preferWindowTimersRule, {
             name: "local function named setTimeout is allowed",
             code: "function setTimeout() {} setTimeout();",
         },
+        {
+            name: "an imported function named setTimeout is not reported",
+            code: "import { setTimeout } from 'node:timers/promises'; await setTimeout(10);",
+        },
+        {
+            name: "cancelAnimationFrame is not reported",
+            code: "cancelAnimationFrame(handle);",
+        },
     ],
     invalid: [
         {
