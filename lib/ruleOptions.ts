@@ -1,3 +1,6 @@
+import type { ESLint } from "eslint";
+import tseslint from "typescript-eslint";
+
 export const restrictedGlobalsOptions = [
     {
         name: "app",
@@ -56,3 +59,19 @@ export const restrictedImportsOptions = [
 ] as const;
 
 export const noUnusedExpressionsOptions = [{ allowShortCircuit: true, allowTernary: true }] as const;
+
+// `ignoreUsingDeclarations` first shipped in typescript-eslint 8.46.0, and older versions reject unknown options.
+const supportsIgnoreUsingDeclarations = JSON.stringify((tseslint.plugin as ESLint.Plugin).rules?.["no-unused-vars"]?.meta?.schema ?? [])
+    .includes('"ignoreUsingDeclarations"');
+
+// `using` declarations are consumed through `Symbol.dispose` at block exit, but the syntax still requires a name.
+// An `_` prefix marks a binding that has to exist but is deliberately unused: a caught error, a skipped array element.
+// A dead `_x` variable is still reported (#199).
+export const noUnusedVarsOptions = [{
+    args: "none",
+    caughtErrors: "all",
+    caughtErrorsIgnorePattern: "^_",
+    destructuredArrayIgnorePattern: "^_",
+    ignoreRestSiblings: true,
+    ...(supportsIgnoreUsingDeclarations ? { ignoreUsingDeclarations: true } : {}),
+}] as const;

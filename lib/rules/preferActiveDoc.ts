@@ -41,18 +41,27 @@ export default ruleCreator({
                     return;
                 }
 
-                // Skip if this is a property access (e.g., `obj.document`)
+                // Skip identifiers in type-level constructs (interfaces, type aliases, type annotations, etc.)
+                if (isInTypeContext(node)) {
+                    return;
+                }
+
+                // Skip if this is a property access (e.g., `obj.document`), but not a
+                // computed one (`obj[document]` reads the global)
                 if (
                     node.parent.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
-                    node.parent.property === node
+                    node.parent.property === node &&
+                    !node.parent.computed
                 ) {
                     return;
                 }
 
-                // Skip if this is a property key in an object literal
+                // Skip if this is a property key in an object literal, but not a
+                // computed one (`{ [document]: 1 }` reads the global)
                 if (
                     node.parent.type === TSESTree.AST_NODE_TYPES.Property &&
-                    node.parent.key === node
+                    node.parent.key === node &&
+                    !node.parent.computed
                 ) {
                     return;
                 }
@@ -67,6 +76,40 @@ export default ruleCreator({
 
                 // Skip typeof expressions (typeof window === 'undefined')
                 if (node.parent.type === TSESTree.AST_NODE_TYPES.UnaryExpression && node.parent.operator === "typeof") {
+                    return;
+                }
+
+                // Skip class member names (key position), including abstract members and
+                // accessors, but not computed keys (`[document]` reads the global)
+                if (
+                    (node.parent.type === TSESTree.AST_NODE_TYPES.PropertyDefinition ||
+                     node.parent.type === TSESTree.AST_NODE_TYPES.MethodDefinition ||
+                     node.parent.type === TSESTree.AST_NODE_TYPES.AccessorProperty ||
+                     node.parent.type === TSESTree.AST_NODE_TYPES.TSAbstractPropertyDefinition ||
+                     node.parent.type === TSESTree.AST_NODE_TYPES.TSAbstractMethodDefinition ||
+                     node.parent.type === TSESTree.AST_NODE_TYPES.TSAbstractAccessorProperty) &&
+                    node.parent.key === node &&
+                    !node.parent.computed
+                ) {
+                    return;
+                }
+
+                // Skip enum member names (but NOT initializers — enum initializers are runtime code)
+                if (
+                    node.parent.type === TSESTree.AST_NODE_TYPES.TSEnumMember &&
+                    node.parent.id === node
+                ) {
+                    return;
+                }
+
+                // Skip labeled statements and break/continue label references
+                if (
+                    (node.parent.type === TSESTree.AST_NODE_TYPES.LabeledStatement &&
+                     node.parent.label === node) ||
+                    ((node.parent.type === TSESTree.AST_NODE_TYPES.BreakStatement ||
+                      node.parent.type === TSESTree.AST_NODE_TYPES.ContinueStatement) &&
+                     node.parent.label === node)
+                ) {
                     return;
                 }
 
@@ -109,6 +152,41 @@ export default ruleCreator({
                 current = current.upper;
             }
             return null;
+        }
+
+        function isInTypeContext(node: TSESTree.Node): boolean {
+            let current: TSESTree.Node | undefined = node.parent;
+            while (current) {
+                switch (current.type) {
+                    case TSESTree.AST_NODE_TYPES.TSTypeAnnotation:
+                    case TSESTree.AST_NODE_TYPES.TSTypeQuery:
+                    case TSESTree.AST_NODE_TYPES.TSQualifiedName:
+                    case TSESTree.AST_NODE_TYPES.TSPropertySignature:
+                    case TSESTree.AST_NODE_TYPES.TSMethodSignature:
+                    case TSESTree.AST_NODE_TYPES.TSIndexSignature:
+                    case TSESTree.AST_NODE_TYPES.TSTypeLiteral:
+                    case TSESTree.AST_NODE_TYPES.TSInterfaceBody:
+                    case TSESTree.AST_NODE_TYPES.TSInterfaceDeclaration:
+                    case TSESTree.AST_NODE_TYPES.TSTypeAliasDeclaration:
+                    case TSESTree.AST_NODE_TYPES.TSTypeReference:
+                    case TSESTree.AST_NODE_TYPES.TSMappedType:
+                    case TSESTree.AST_NODE_TYPES.TSConditionalType:
+                    case TSESTree.AST_NODE_TYPES.TSTypeParameterDeclaration:
+                    case TSESTree.AST_NODE_TYPES.TSTypeParameterInstantiation:
+                        return true;
+                    // Only an ambient `declare module`/`declare namespace`/`declare global`
+                    // is type-level; a plain `namespace Foo { ... }` body is runtime code.
+                    case TSESTree.AST_NODE_TYPES.TSModuleDeclaration:
+                        if (current.declare) {
+                            return true;
+                        }
+                        break;
+                    default:
+                        break;
+                }
+                current = current.parent;
+            }
+            return false;
         }
     },
 });

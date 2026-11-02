@@ -1,6 +1,6 @@
 import { TSESLint, TSESTree } from "@typescript-eslint/utils";
 import { DEFAULT_BRANDS } from "./brands.js";
-import { DEFAULT_ACRONYMS } from "./acronyms.js";
+import { DEFAULT_ACRONYMS, DEFAULT_CASE_AGNOSTIC_ACRONYMS } from "./acronyms.js";
 
 export type Mode = "loose" | "strict";
 
@@ -57,23 +57,35 @@ export function resolveSentenceCaseConfig(options: SentenceCaseRuleOptions): {
     };
 }
 
+// Creates a cached evaluator that returns the sentence-case suggestion for a
+// string that needs one, and undefined for a string that is already fine. It
+// is independent of the AST, so the JSON rule shares it with the ESTree rules.
+export function createSentenceCaseEvaluator(
+    evaluatorOptions: EvaluatorOptions,
+): (value: string) => string | undefined {
+    const cache = new Map<string, EvaluationResult>();
+
+    return (value) => {
+        const cached = cache.get(value);
+        const result = cached ?? evaluateSentenceCase(value, evaluatorOptions);
+        if (!cached) {
+            cache.set(value, result);
+        }
+        return result.ok || !result.suggestion ? undefined : result.suggestion;
+    };
+}
+
 // Creates a reporter function for sentence case violations with caching and auto-fix support
 export function createSentenceCaseReporter<MessageId extends string>(
     params: SentenceCaseReporterParams<MessageId>,
 ): SentenceCaseReport {
-    const cache = new Map<string, EvaluationResult>();
+    const suggestFor = createSentenceCaseEvaluator(params.evaluatorOptions);
 
     return (node, value) => {
-        const cached = cache.get(value);
-        const result = cached ?? evaluateSentenceCase(value, params.evaluatorOptions);
-        if (!cached) {
-            cache.set(value, result);
-        }
-        if (result.ok || !result.suggestion) {
+        const suggestion = suggestFor(value);
+        if (suggestion === undefined) {
             return;
         }
-
-        const suggestion = result.suggestion;
 
         if (!params.allowAutoFix) {
             params.context.report({
@@ -219,11 +231,12 @@ export function isSkippableString(text: string): boolean {
 function normalizeOptions(options?: EvaluatorOptions) {
     const brands = (options?.brands ?? DEFAULT_BRANDS).slice().sort((a, b) => b.length - a.length);
     const acronyms = new Set((options?.acronyms ?? DEFAULT_ACRONYMS).map((s) => s.toUpperCase()));
+    const caseAgnosticAcronyms = new Set(DEFAULT_CASE_AGNOSTIC_ACRONYMS);
     const ignoreWords = new Set((options?.ignoreWords ?? []).map((s) => s));
     const ignoreRegex = (options?.ignoreRegex ?? []).map((p) => new RegExp(p));
     const mode: Mode = options?.mode ?? "loose";
     const enforceCamelCaseLower = options?.enforceCamelCaseLower === true;
-    return { brands, acronyms, ignoreWords, ignoreRegex, mode, enforceCamelCaseLower } as const;
+    return { brands, acronyms, caseAgnosticAcronyms, ignoreWords, ignoreRegex, mode, enforceCamelCaseLower } as const;
 }
 
 // Tests if text matches any of the ignore regex patterns
@@ -300,10 +313,58 @@ function writeToken(chars: string[], start: number, replacement: string, length:
     }
 }
 
+// Moment-style date and time format tokens, as in "YYYY-MM-DD" or "HH:mm".
+const DATE_FORMAT_TOKEN = "(?:YYYY|YY|MMMM|MMM|MM|M|Do|DD|D|dddd|ddd|HH|H|hh|h|mm|ss|SSS|A|a)";
+
+// Text whose casing is data, not prose, so it is never re-cased: URLs, and two
+// or more date format tokens joined by separators. Each pattern is global.
+const PROTECTED_PATTERNS: readonly RegExp[] = [
+    // Examples: "https://obsidian.md/help", "obsidian://open?vault=Notes"
+    /\b[a-z][a-z0-9+.-]*:\/\/\S+/gi,
+    // Examples: "www.example.com/API"
+    /\bwww\.\S+/gi,
+    // Examples: "YYYY-MM-DD", "DD/MM/YYYY", "HH:mm:ss"
+    new RegExp(
+        `(?<![A-Za-z0-9])${DATE_FORMAT_TOKEN}(?:[-/.:_]${DATE_FORMAT_TOKEN})+(?![A-Za-z0-9])`,
+        "g",
+    ),
+];
+
+// Finds the character ranges of text that must keep its casing
+function collectProtectedRanges(sentence: string): number[][] {
+    const ranges: number[][] = [];
+    for (const pattern of PROTECTED_PATTERNS) {
+        pattern.lastIndex = 0;
+        let m: RegExpExecArray | null;
+        while ((m = pattern.exec(sentence))) {
+            ranges.push([m.index, m.index + m[0].length]);
+        }
+    }
+    return mergeRanges(ranges);
+}
+
+// Checks if the range [start, end) overlaps any of the given ranges
+function rangeOverlaps(ranges: number[][], start: number, end: number): boolean {
+    return ranges.some((r) => start < r[1] && end > r[0]);
+}
+
+// Cases one part of a hyphenated word: acronyms upper, all-caps case-agnostic
+// acronyms and brands as written, anything else lower
+function caseHyphenPart(part: string, opts: ReturnType<typeof normalizeOptions>): string {
+    const partUpper = part.toUpperCase();
+    if (opts.acronyms.has(partUpper)) return partUpper;
+    if (opts.caseAgnosticAcronyms.has(partUpper) && part === partUpper) return part;
+    if (opts.brands.includes(part)) return part;
+    return part.toLowerCase();
+}
+
 // Applies sentence case transformation to a single sentence
 function transformSentence(sentence: string, opts: ReturnType<typeof normalizeOptions>, prefixPunctuation: string): string {
+    // URLs and format strings keep their casing, brand names inside them included
+    const protectedRanges = collectProtectedRanges(sentence);
     // Find all brand occurrences to preserve their casing
-    const brandMatches = collectBrandMatches(sentence, opts.brands);
+    const brandMatches = collectBrandMatches(sentence, opts.brands)
+        .filter((match) => !rangeOverlaps(protectedRanges, match.start, match.end));
     const brandRanges = mergeRanges(brandMatches.map((match) => [match.start, match.end]));
     const anyCasePunctuations = new Set([':', ';']);
 
@@ -317,7 +378,12 @@ function transformSentence(sentence: string, opts: ReturnType<typeof normalizeOp
             break;
         }
     }
-    if (firstAlpha >= 0 && !rangeContains(brandRanges, firstAlpha) && !anyCasePunctuations.has(prefixPunctuation)) {
+    if (
+        firstAlpha >= 0 &&
+        !rangeContains(brandRanges, firstAlpha) &&
+        !rangeContains(protectedRanges, firstAlpha) &&
+        !anyCasePunctuations.has(prefixPunctuation)
+    ) {
         // Find the token containing firstAlpha
         const tokenRe = /[A-Za-z0-9][A-Za-z0-9.\-]*/g;
         let tokenStart = firstAlpha;
@@ -339,8 +405,21 @@ function transformSentence(sentence: string, opts: ReturnType<typeof normalizeOp
             .replace(/\p{Emoji}/gu, '')
             .replaceAll('(', '')
             .trim();
+        const firstPart = firstToken.split("-")[0];
+        const firstPartUpper = firstPart.toUpperCase();
         if (opts.acronyms.has(upperToken)) {
             writeToken(chars, tokenStart, upperToken, firstToken.length);
+        } else if (
+            firstToken.includes("-") &&
+            (opts.acronyms.has(firstPartUpper) ||
+                (opts.caseAgnosticAcronyms.has(firstPartUpper) && firstPart === firstPartUpper))
+        ) {
+            // "API-based", "REST-based": the opening acronym keeps its caps and
+            // the other parts are cased like any hyphenated word
+            const cased = firstToken.split("-").map((part) => caseHyphenPart(part, opts)).join("-");
+            writeToken(chars, tokenStart, cased, firstToken.length);
+        } else if (opts.caseAgnosticAcronyms.has(upperToken) && firstToken === upperToken) {
+            // An all-caps "REST" opening the sentence stays as written
         } else if (!opts.enforceCamelCaseLower && opts.mode === "loose" && isCamelOrPascal(firstToken)) {
             // Preserve camelCase/PascalCase tokens when loose mode allows it
         } else if (leadingContent) {
@@ -365,6 +444,8 @@ function transformSentence(sentence: string, opts: ReturnType<typeof normalizeOp
 
         // Skip if token overlaps brand
         if (brandMatches.some((match) => !(end <= match.start || start >= match.end))) continue;
+        // Skip if token is part of a URL or format string
+        if (rangeOverlaps(protectedRanges, start, end)) continue;
 
         // Skip first token if it's the first alpha token (already handled above)
         if (firstAlpha >= 0 && start <= firstAlpha && firstAlpha < end) continue;
@@ -374,6 +455,8 @@ function transformSentence(sentence: string, opts: ReturnType<typeof normalizeOp
             writeToken(chars, start, upperToken, token.length);
             continue;
         }
+        // An acronym that is also a word keeps all caps when written that way
+        if (opts.caseAgnosticAcronyms.has(upperToken) && token === upperToken) continue;
 
         const dottedMatch = token.match(/^([A-Za-z](?:\.[A-Za-z])+)(\.)?$/);
         if (dottedMatch) {
@@ -394,16 +477,7 @@ function transformSentence(sentence: string, opts: ReturnType<typeof normalizeOp
         const hasHyphen = token.includes("-");
         // Handle hyphenated words
         if (hasHyphen) {
-            const hyphenParts = token.split("-");
-            const newParts = hyphenParts.map((part) => {
-                const partUpper = part.toUpperCase();
-                if (opts.acronyms.has(partUpper)) return partUpper;
-                // Preserve brand casing
-                if (opts.brands.includes(part)) return part;
-                // Lowercase other parts
-                return part.toLowerCase();
-            });
-            const newToken = newParts.join("-");
+            const newToken = token.split("-").map((part) => caseHyphenPart(part, opts)).join("-");
             if (newToken !== token) {
                 for (let i = 0; i < token.length; i++) {
                     chars[start + i] = newToken[i] ?? chars[start + i];

@@ -15,11 +15,44 @@ ruleTester.run("regex-lookbehind", regexLookbehindRule, {
             code: "const re = /(?<=foo)bar/;",
             options: [{ isDesktopOnly: true }],
         },
+        {
+            name: "lookbehind-like characters inside a character class are allowed",
+            code: "const re = /[(?<!]/; const re2 = /[(?<=]/;",
+            options: [{ isDesktopOnly: false }],
+        },
+        {
+            name: "an escaped parenthesis is not a lookbehind",
+            code: "const re = /\\(?<=a/;",
+            options: [{ isDesktopOnly: false }],
+        },
+        {
+            name: "a named group is not a lookbehind",
+            code: "const re = /(?<name>a)/;",
+            options: [{ isDesktopOnly: false }],
+        },
     ],
     invalid: [
         {
             name: "lookbehind in non-desktop mode is forbidden",
             code: "const re = /(?<=foo)bar/;",
+            options: [{ isDesktopOnly: false }],
+            errors: [{ messageId: "lookbehind" }],
+        },
+        {
+            name: "negative lookbehind in non-desktop mode is forbidden",
+            code: "const re = /(?<!a)b/;",
+            options: [{ isDesktopOnly: false }],
+            errors: [{ messageId: "lookbehind" }],
+        },
+        {
+            name: "lookbehind after a character class is forbidden",
+            code: "const re = /[a](?<=b)c/;",
+            options: [{ isDesktopOnly: false }],
+            errors: [{ messageId: "lookbehind" }],
+        },
+        {
+            name: "negative lookbehind in a RegExp string is forbidden",
+            code: "const re = new RegExp('(?<!a)b');",
             options: [{ isDesktopOnly: false }],
             errors: [{ messageId: "lookbehind" }],
         },

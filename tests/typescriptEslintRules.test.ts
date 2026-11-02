@@ -1,6 +1,6 @@
 import { RuleTester } from "@typescript-eslint/rule-tester";
 import tseslintPlugin from "@typescript-eslint/eslint-plugin";
-import { noUnusedExpressionsOptions } from "../lib/ruleOptions.js";
+import { noUnusedExpressionsOptions, noUnusedVarsOptions } from "../lib/ruleOptions.js";
 
 const ruleTester = new RuleTester();
 
@@ -9,24 +9,62 @@ ruleTester.run("ts-no-unused-vars", tseslintPlugin.rules["no-unused-vars"], {
         {
             name: "used variable is allowed",
             code: "const x = 1; console.log(x);",
-            options: [{ args: "none", ignoreRestSiblings: true }],
+            options: noUnusedVarsOptions,
         },
         {
             name: "unused function argument is allowed with args: none",
             code: "function foo(unusedParam: string) { return 1; }; foo('test');",
-            options: [{ args: "none", ignoreRestSiblings: true }],
+            options: noUnusedVarsOptions,
         },
         {
             name: "rest sibling destructuring is allowed with ignoreRestSiblings: true",
             code: "const settings = { toRemove: 'x', other: 'y' }; const { toRemove, ...rest } = settings; console.log(rest);",
-            options: [{ args: "none", ignoreRestSiblings: true }],
+            options: noUnusedVarsOptions,
+        },
+        {
+            name: "unused using declaration is allowed",
+            code: "declare function lock(): Disposable; function run() { using _sourceLock = lock(); } run();",
+            options: noUnusedVarsOptions,
+        },
+        {
+            name: "unused underscore-prefixed caught error is allowed",
+            code: "try { JSON.parse('x'); } catch (_error) { /* ignored */ }",
+            options: noUnusedVarsOptions,
+        },
+        {
+            name: "unused underscore-prefixed destructured array element is allowed",
+            code: "const [_first, second] = [1, 2]; console.log(second);",
+            options: noUnusedVarsOptions,
+        },
+        {
+            name: "unused await using declaration is allowed",
+            code: "declare function lock(): AsyncDisposable; async function run() { await using asyncLock = lock(); } run();",
+            options: noUnusedVarsOptions,
         },
     ],
     invalid: [
         {
             name: "unused variable is forbidden",
             code: "const unused = 1;",
-            options: [{ args: "none", ignoreRestSiblings: true }],
+            options: noUnusedVarsOptions,
+            errors: [{ messageId: "unusedVar" }],
+        },
+        {
+            name: "unused underscore-prefixed variable is still forbidden",
+            code: "const _unused = 1;",
+            options: noUnusedVarsOptions,
+            errors: [{ messageId: "unusedVar" }],
+        },
+        {
+            name: "unused caught error without an underscore is forbidden",
+            code: "try { JSON.parse('x'); } catch (error) { /* ignored */ }",
+            options: noUnusedVarsOptions,
+            errors: [{ messageId: "unusedVar" }],
+        },
+        {
+            name: "unused destructured array element without an underscore is forbidden",
+            code: "const [first, second] = [1, 2]; console.log(second);",
+            options: noUnusedVarsOptions,
             errors: [{ messageId: "unusedVar" }],
         },
     ],
@@ -197,22 +235,6 @@ ruleTester.run("ts-no-non-null-asserted-optional-chain", tseslintPlugin.rules["n
             name: "non-null assertion after optional chain is forbidden",
             code: "const x = obj?.foo!;",
             errors: [{ messageId: "noNonNullOptionalChain", suggestions: [{ messageId: "suggestRemovingNonNull", output: "const x = obj?.foo;" }] }],
-        },
-    ],
-});
-
-ruleTester.run("ts-no-require-imports", tseslintPlugin.rules["no-require-imports"], {
-    valid: [
-        {
-            name: "import statement is allowed",
-            code: "import x from 'x';",
-        },
-    ],
-    invalid: [
-        {
-            name: "require() is forbidden",
-            code: "const x = require('x');",
-            errors: [{ messageId: "noRequireImports" }],
         },
     ],
 });

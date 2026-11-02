@@ -116,7 +116,7 @@ export default ruleCreator({
             },
         ],
         messages: {
-            useSentenceCase: "Use sentence case for UI text.",
+            useSentenceCase: "Use sentence case for UI text. Expected: '{{suggestion}}'",
         },
     },
     defaultOptions,

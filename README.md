@@ -14,67 +14,57 @@ Next, install `eslint-plugin-obsidianmd`:
 npm install eslint-plugin-obsidianmd --save-dev
 ```
 
+The plugin needs Node.js 20.19+, 22.13+ or 24+, ESLint 9.19 or later, and `typescript-eslint` 8.70.1 or later. npm installs `typescript` and `typescript-eslint` alongside the plugin if your project does not already have them; if it pins an older `typescript-eslint`, upgrade it. The configuration examples below import `defineConfig` from `eslint/config`, which ESLint added in 9.22; on an older ESLint, export the array without it.
+
+The plugin reads Obsidian's own type definitions rather than bundling a copy, so your project needs `obsidian` installed as well. Plugin projects generated from the sample plugin already have it:
+
+```sh
+npm install obsidian --save-dev
+```
+
+Without it, [`no-unsupported-api`](docs/rules/no-unsupported-api.md) silently reports nothing. See that rule's docs for which `obsidian` versions give useful results.
+
 ## Usage
 
-With the release of ESLint v9, the default configuration file is now `eslint.config.js`.
+Add the recommended configuration to your `eslint.config.mjs`. This enables all recommended rules, including ESLint core, typescript-eslint type-checked rules, and Obsidian-specific rules.
 
-### Flat Config (`eslint.config.js`) - Recommended for ESLint v9+
-
-To use the recommended configuration, add it to your `eslint.config.js` file. This will enable all the recommended rules.
-
-```javascript
+```js
 // eslint.config.mjs
-import tsparser from "@typescript-eslint/parser";
-import { defineConfig } from "eslint/config";
+import { defineConfig, globalIgnores } from "eslint/config";
 import obsidianmd from "eslint-plugin-obsidianmd";
 
 export default defineConfig([
+  // Build output and the sample plugin's Node build scripts are not plugin code.
+  globalIgnores(["node_modules", "dist", "main.js", "esbuild.config.mjs", "version-bump.mjs"]),
   ...obsidianmd.configs.recommended,
   {
-    files: ["**/*.ts"],
     languageOptions: {
-      parser: tsparser,
-      parserOptions: { project: "./tsconfig.json" },
+      parserOptions: {
+        projectService: {
+          allowDefaultProject: ["eslint.config.*"],
+        },
+      },
     },
-
-    // You can add your own configuration to override or add rules
     rules: {
       // example: turn off a rule from the recommended set
       "obsidianmd/sample-names": "off",
-      // example: add a rule not in the recommended set and set its severity
-      "obsidianmd/prefer-file-manager-trash": "error",
     },
   },
 ]);
-
 ```
 
-### Legacy Config (`.eslintrc`)
+The `globalIgnores` entry follows the official sample plugin's layout: `main.js` is the bundled build, and `esbuild.config.mjs` and `version-bump.mjs` are Node scripts. None of them is plugin source or in your `tsconfig.json`, so without it ESLint fails on them with "was not found by the project service". List your own build output and scripts there.
 
-<details>
-<summary>Click here for ESLint v8 and older</summary>
+The `parserOptions` block is required because the recommended config includes type-checked rules that need access to your TypeScript project. `allowDefaultProject` ensures files not listed in your `tsconfig.json` (like the ESLint config file itself) are still linted without errors. See the [configuration guide](docs/configuration.md) for details on why this is needed and how to customize it.
 
-To use the recommended configuration, extend it in your `.eslintrc` file:
+> **Note:** You do not need to separately add `eslint.configs.recommended` or `tseslint.configs.recommended` — both are already included in the recommended config.
 
-```json
-{
-  "extends": ["plugin:obsidianmd/recommended"]
-}
-```
+The recommended config also lints files that are not source, matching `package.json`,
+`manifest.json` and `LICENSE` by name. **Run ESLint from the project root**: a lint script scoped to your sources —
+`eslint src` — never visits them, and their checks silently do nothing. See
+[Files linted beyond your source](docs/configuration.md#files-linted-beyond-your-source).
 
-You can also override or add rules:
-
-```json
-{
-  "extends": ["plugin:obsidianmd/recommended"],
-  "rules": {
-    "obsidianmd/sample-names": "off",
-    "obsidianmd/prefer-file-manager-trash": "error"
-  }
-}
-```
-
-</details>
+For advanced usage — layering stricter typescript-eslint configs, ignoring files, disabling rules for non-plugin code, and troubleshooting common errors — see the [configuration guide](docs/configuration.md).
 
 ## Configurations
 
@@ -113,6 +103,7 @@ You can also override or add rules:
 | [hardcoded-config-path](docs/rules/hardcoded-config-path.md)                                                 | Disallow hardcoded `.obsidian` config paths. Use `Vault#configDir` instead.                                                                           |        | ✅ 🇬🇧 |        |    |    |
 | [no-forbidden-elements](docs/rules/no-forbidden-elements.md)                                                 | Disallow attachment of forbidden elements to the DOM in Obsidian plugins.                                                                             | ✅ 🇬🇧 |        |        |    |    |
 | [no-global-this](docs/rules/no-global-this.md)                                                               | Disallow `global` and `globalThis`. Use `window` or `activeWindow` for popout window compatibility.                                                   |        | ✅ 🇬🇧 |        | 🔧 |    |
+| [no-misused-promises](docs/rules/no-misused-promises.md)                                                     | Disallow Promises in places not designed to handle them, without treating Obsidian's chaining `then` as a Promise                                     | ✅ 🇬🇧 |        |        |    |    |
 | [no-nodejs-modules](docs/rules/no-nodejs-modules.md)                                                         | Disallow importing Node.js built-in modules unless guarded by Platform.isDesktop                                                                      |        | ✅ 🇬🇧 |        |    |    |
 | [no-plugin-as-component](docs/rules/no-plugin-as-component.md)                                               | Disallow anti-patterns when passing a component to MarkdownRenderer.render to prevent memory leaks.                                                   | ✅ 🇬🇧 |        |        |    |    |
 | [no-sample-code](docs/rules/no-sample-code.md)                                                               | Disallow sample code snippets from the Obsidian plugin template.                                                                                      | ✅ 🇬🇧 |        |        | 🔧 |    |
@@ -123,7 +114,7 @@ You can also override or add rules:
 | [object-assign](docs/rules/object-assign.md)                                                                 | Discourage using `Object.assign` with two arguments                                                                                                   |        | ✅ 🇬🇧 |        |    |    |
 | [platform](docs/rules/platform.md)                                                                           | Disallow use of navigator API for OS detection                                                                                                        | ✅ 🇬🇧 |        |        |    |    |
 | [prefer-abstract-input-suggest](docs/rules/prefer-abstract-input-suggest.md)                                 | Disallow Liam's frequently copied `TextInputSuggest` implementation in favor of the built-in `AbstractInputSuggest`.                                  |        | ✅ 🇬🇧 |        |    |    |
-| [prefer-active-doc](docs/rules/prefer-active-doc.md)                                                         | Prefer `activeDocument` over `document` for popout window compatibility.                                                                              |        |        | ✅ 🇬🇧 |    |    |
+| [prefer-active-doc](docs/rules/prefer-active-doc.md)                                                         | Prefer `activeDocument` over `document` for popout window compatibility.                                                                              |        | ✅ 🇬🇧 |        |    |    |
 | [prefer-create-el](docs/rules/prefer-create-el.md)                                                           | Prefer Obsidian DOM helpers (`createEl`, `createDiv`, `createSpan`, `createSvg`, `createFragment`) over native DOM methods.                           |        | ✅ 🇬🇧 |        | 🔧 | 💡 |
 | [prefer-file-manager-trash-file](docs/rules/prefer-file-manager-trash-file.md)                               | Prefer FileManager.trashFile() over Vault.trash() or Vault.delete() to respect user settings.                                                         |        | ✅ 🇬🇧 |        |    |    |
 | [prefer-get-language](docs/rules/prefer-get-language.md)                                                     | Prefer Obsidian's `getLanguage()` over `localStorage.getItem('language')` and `i18next-browser-languagedetector` for detecting the user's language.   |        | ✅ 🇬🇧 |        |    |    |
@@ -138,7 +129,7 @@ You can also override or add rules:
 | [settings-tab/prefer-setting-definitions](docs/rules/settings-tab/prefer-setting-definitions.md)             | Encourage PluginSettingTab subclasses to implement getSettingDefinitions() so settings appear in Obsidian 1.13+ settings search.                      |        | ✅ 🇬🇧 |        |    |    |
 | [settings-tab/prefer-update-over-display](docs/rules/settings-tab/prefer-update-over-display.md)             | Prefer this.update() over this.display() to refresh a PluginSettingTab on Obsidian 1.13+.                                                             |        | ✅ 🇬🇧 |        | 🔧 |    |
 | [settings-tab/require-display](docs/rules/settings-tab/require-display.md)                                   | Require a display() method on PluginSettingTab subclasses when minAppVersion is below 1.13.0.                                                         |        | ✅ 🇬🇧 |        |    |    |
-| [ui/sentence-case](docs/rules/ui/sentence-case.md)                                                           | Enforce sentence case for UI strings                                                                                                                  |        | ✅ 🇬🇧 |        | 🔧 |    |
+| [ui/sentence-case](docs/rules/ui/sentence-case.md)                                                           | Enforce sentence case for UI strings                                                                                                                  |        |        | ✅ 🇬🇧 | 🔧 |    |
 | [ui/sentence-case-json](docs/rules/ui/sentence-case-json.md)                                                 | Enforce sentence case for English JSON locale strings                                                                                                 |        | 🇬🇧   |        | 🔧 |    |
 | [ui/sentence-case-locale-module](docs/rules/ui/sentence-case-locale-module.md)                               | Enforce sentence case for English TS/JS locale module strings                                                                                         |        | 🇬🇧   |        | 🔧 |    |
 | [validate-license](docs/rules/validate-license.md)                                                           | Validate the structure of copyright notices in LICENSE files for Obsidian plugins.                                                                    |        | ✅ 🇬🇧 |        |    |    |
@@ -152,8 +143,8 @@ You can also override or add rules:
 
 Checks UI strings for sentence case. The rule reports warnings but doesn't change text unless you run ESLint with `--fix` and enable `allowAutoFix`.
 
-- Included at warn level in `recommended` config
-- Extended locale checks available via `recommendedWithLocalesEn`
+- Off in the `recommended` configs since 0.3.0; turn it on yourself, as in the example below
+- Locale checks for English JSON and TS/JS modules are on in `recommendedWithLocalesEn`
 - By default allows CamelCase words like `AutoReveal`
 - Set `enforceCamelCaseLower: true` to flag CamelCase as incorrect
 
@@ -161,20 +152,23 @@ Checks UI strings for sentence case. The rule reports warnings but doesn't chang
 
 ```js
 // eslint.config.mjs
-import tsparser from "@typescript-eslint/parser";
-import { defineConfig } from "eslint/config";
+import { defineConfig, globalIgnores } from "eslint/config";
 import obsidianmd from "eslint-plugin-obsidianmd";
 
 export default defineConfig([
+  // Build output and the sample plugin's Node build scripts are not plugin code.
+  globalIgnores(["node_modules", "dist", "main.js", "esbuild.config.mjs", "version-bump.mjs"]),
   ...obsidianmd.configs.recommended,
   // Or include English locale files (JSON and TS/JS modules)
   // ...obsidianmd.configs.recommendedWithLocalesEn,
 
   {
-    files: ["**/*.ts"],
     languageOptions: {
-      parser: tsparser,
-      parserOptions: { project: "./tsconfig.json" },
+      parserOptions: {
+        projectService: {
+          allowDefaultProject: ["eslint.config.*"],
+        },
+      },
     },
 
     // Optional project overrides

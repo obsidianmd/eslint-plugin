@@ -77,6 +77,86 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
             name: "window.requestAnimationFrame is allowed",
             code: "window.requestAnimationFrame(() => {});",
         },
+        {
+            name: "interface property named document is allowed",
+            code: "interface Foo { document: string; }",
+        },
+        {
+            name: "typeof property access in type position is allowed",
+            code: "let html: ReturnType<typeof mathjax.document> | null = null;",
+        },
+        {
+            name: "type alias property named document is allowed",
+            code: "type Foo = { document: string; };",
+        },
+        {
+            name: "interface method named document is allowed",
+            code: "interface Foo { document(): void; }",
+        },
+        {
+            name: "class property named document is allowed",
+            code: "class Foo { document: string = ''; }",
+        },
+        {
+            name: "class method named document is allowed",
+            code: "class Foo { document() { return ''; } }",
+        },
+        {
+            name: "enum member named document is allowed",
+            code: "enum Foo { document = 'doc' }",
+        },
+        {
+            name: "document in type annotation is allowed",
+            code: "const x: { document: string } = { document: '' };",
+        },
+        {
+            name: "document in index signature is allowed",
+            code: "interface Foo { [document: string]: number; }",
+        },
+        {
+            name: "function parameter named document is allowed",
+            code: "function foo(document: Document) { document.title; }",
+        },
+        {
+            name: "destructured document is allowed",
+            code: "const { document } = someObj;",
+        },
+        {
+            name: "for-of binding named document is allowed",
+            code: "for (const document of docs) { document.title; }",
+        },
+        {
+            name: "label named document is allowed",
+            code: "document: while(true) { break document; }",
+        },
+        {
+            name: "typeof in type position is allowed",
+            code: "type T = typeof document;",
+        },
+        {
+            name: "document in declare module is allowed",
+            code: "declare module 'foo' { const document: string; }",
+        },
+        {
+            name: "typeof document in declare global is allowed",
+            code: "declare global { interface Window { doc: typeof document } }",
+        },
+        {
+            name: "abstract class property named document is allowed",
+            code: "abstract class Foo { abstract document: string; }",
+        },
+        {
+            name: "abstract class method named document is allowed",
+            code: "abstract class Foo { abstract document(): void; }",
+        },
+        {
+            name: "class accessor named document is allowed",
+            code: "class Foo { accessor document = ''; }",
+        },
+        {
+            name: "renamed destructured document is allowed",
+            code: "const { document: doc } = someObj;",
+        },
     ],
     invalid: [
         {
@@ -98,6 +178,51 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
             name: "document.addEventListener is forbidden",
             code: "document.addEventListener('click', handler);",
             errors: [{ messageId: "preferActive" }],
+        },
+        {
+            name: "document in as-expression is still flagged",
+            code: "const el = (document as any).body;",
+            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+        },
+        {
+            name: "document in satisfies-expression is still flagged",
+            code: "const el = (document satisfies Document).body;",
+            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+        },
+        {
+            name: "document in non-null assertion is still flagged",
+            code: "const el = document!.body;",
+            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+        },
+        {
+            name: "document in enum initializer is still flagged",
+            code: "enum Foo { bar = document.title }",
+            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+        },
+        {
+            name: "document inside a non-ambient namespace is still flagged",
+            code: "namespace Foo { export const el = document.body; }",
+            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+        },
+        {
+            name: "document as a computed member key is still flagged",
+            code: "obj[document];",
+            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+        },
+        {
+            name: "document as a computed object key is still flagged",
+            code: "const x = { [document]: 1 };",
+            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+        },
+        {
+            name: "document as a computed class key is still flagged",
+            code: "class Foo { [document] = 1; }",
+            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+        },
+        {
+            name: "shorthand object property document is still flagged",
+            code: "const x = { document };",
+            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
         },
     ],
 });
