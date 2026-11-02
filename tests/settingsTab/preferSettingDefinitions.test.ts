@@ -37,6 +37,13 @@ ruleTester.run("prefer-setting-definitions", preferSettingDefinitionsRule, {
             name: "class not extending PluginSettingTab is ignored",
             code: `class Foo { display() {} }`,
         },
+        {
+            name: "a class extending obsidian.PluginSettingTab is not matched",
+            code: `
+                declare const obsidian: { PluginSettingTab: new () => object };
+                class MyTab extends obsidian.PluginSettingTab { display() {} }
+            `,
+        },
     ],
     invalid: [
         {
@@ -46,6 +53,14 @@ ruleTester.run("prefer-setting-definitions", preferSettingDefinitionsRule, {
                 class MyTab extends PluginSettingTab {
                     display() {}
                 }
+            `,
+            errors: [{ messageId: "missingSettingDefinitions" }],
+        },
+        {
+            name: "a class expression without getSettingDefinitions() is reported",
+            code: `
+                ${MOCK_CLASS}
+                const MyTab = class extends PluginSettingTab { display() {} };
             `,
             errors: [{ messageId: "missingSettingDefinitions" }],
         },
