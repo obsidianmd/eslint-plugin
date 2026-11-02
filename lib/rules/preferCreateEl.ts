@@ -8,6 +8,9 @@ const TAG_SHORTHANDS: Record<string, string> = {
 
 const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
 
+// A replacement that calls one of Obsidian's global helpers by its bare name.
+const BARE_HELPER_CALL = /^(createEl|createDiv|createSpan|createSvg|createFragment)\(/;
+
 export default ruleCreator({
     meta: {
         type: "suggestion" as const,
@@ -232,10 +235,43 @@ export default ruleCreator({
             report(node, replacement, target.canAutofix);
         }
 
+        // Whether `name`, called bare at `node`, resolves to a binding of the
+        // file's own -- a function, variable, parameter, class or import -- rather
+        // than to Obsidian's global helper. Inside `function createDiv() { ... }`
+        // the replacement `createDiv()` would call the enclosing function. Methods
+        // and object keys are not bindings, and an ambient declaration (`declare
+        // function createDiv(): HTMLDivElement;`) has no body, so the call still
+        // reaches the global. (`declare global { ... }` gets a scope of its own that
+        // no call is inside of, so it is never found here.)
+        function shadowsGlobalHelper(node: TSESTree.Node, name: string): boolean {
+            const variable = ASTUtils.findVariable(context.sourceCode.getScope(node), name);
+            return variable !== null && variable.defs.some((def) => !isAmbient(def.node));
+        }
+
+        function isAmbient(node: TSESTree.Node): boolean {
+            for (let current: TSESTree.Node | undefined = node; current; current = current.parent) {
+                if (
+                    (current.type === TSESTree.AST_NODE_TYPES.TSDeclareFunction ||
+                        current.type === TSESTree.AST_NODE_TYPES.VariableDeclaration ||
+                        current.type === TSESTree.AST_NODE_TYPES.ClassDeclaration ||
+                        current.type === TSESTree.AST_NODE_TYPES.TSModuleDeclaration) &&
+                    current.declare
+                ) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         // `canAutofix` is null when the replacement would not compile at all: the
         // finding is reported without a fix or a suggestion.
         function report(node: TSESTree.CallExpression, replacement: string, canAutofix: boolean | null): void {
             const original = getText(node);
+            const bareHelper = BARE_HELPER_CALL.exec(replacement)?.[1];
+            if (bareHelper !== undefined && shadowsGlobalHelper(node, bareHelper)) {
+                // The bare call would reach the local binding instead.
+                canAutofix = null;
+            }
             if (canAutofix === null) {
                 context.report({ node, messageId: "preferCreateEl", data: { replacement, original } });
                 return;

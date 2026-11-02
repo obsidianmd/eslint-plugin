@@ -161,36 +161,146 @@ ruleTester.run("validate-manifest", manifestRule as unknown as Rule.RuleModule, 
                 }`,
             options: [{ ignore: ["descriptionFormat"] }],
         },
-    ],
-    invalid: [
         {
-            name: "forbidden word 'plugin' in id, name, and description",
+            // Not in the developer docs' manifest reference, but the community scanner
+            // accepts it and many published plugins carry it.
+            name: "helpUrl is accepted",
             filename: "manifest.json",
             code: `{
-                    "id": "my-plugin",
-                    "name": "My Plugin",
+                    "id": "word-tally",
+                    "name": "Word tally",
                     "author": "Me",
                     "version": "1.0.0",
                     "minAppVersion": "1.0.0",
-                    "description": "A great plugin.",
+                    "description": "Counts words in the active note.",
                     "isDesktopOnly": false,
-                    "authorUrl": "https://example.com"
+                    "helpUrl": "https://example.com/docs"
                 }`,
-            errors: [
-                {
-                    messageId: "noForbiddenWords",
-                    data: { word: "plugin", key: "id" },
-                },
-                {
-                    messageId: "noForbiddenWords",
-                    data: { word: "plugin", key: "name" },
-                },
-                {
-                    messageId: "noForbiddenWords",
-                    data: { word: "plugin", key: "description" },
-                },
-            ],
         },
+        {
+            // Only a description referring to itself is reported, not the word.
+            name: "a description that mentions plugins is accepted",
+            filename: "manifest.json",
+            code: `{
+                    "id": "hot-reload",
+                    "name": "Hot reload",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Automatically reload plugins in development.",
+                    "isDesktopOnly": false
+                }`,
+        },
+        {
+            name: "an id that contains 'plugin' without ending with it is accepted",
+            filename: "manifest.json",
+            code: `{
+                    "id": "plugin-manager",
+                    "name": "Manager of extensions",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Counts words in the active note.",
+                    "isDesktopOnly": false
+                }`,
+        },
+        {
+            name: "a description ending with an exclamation mark is accepted",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Word tally",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Counts every word you write!",
+                    "isDesktopOnly": false
+                }`,
+        },
+        {
+            name: "a description ending with a question mark is accepted",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Word tally",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Ever wondered how long your notes are?",
+                    "isDesktopOnly": false
+                }`,
+        },
+        {
+            name: "a description starting with a lowercase letter is accepted",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Word tally",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "iCloud sync for every vault you open.",
+                    "isDesktopOnly": false
+                }`,
+        },
+        {
+            // The community scanner does not restrict the characters of a description.
+            name: "a description with emoji or a line break is accepted",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Word tally",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Track habits ✅ every day.\\nAnd weekly.",
+                    "isDesktopOnly": false
+                }`,
+        },
+        {
+            name: "allowedWords 'plugin' accepts an id ending with 'plugin'",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally-plugin",
+                    "name": "Word tally",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Counts words in the active note.",
+                    "isDesktopOnly": false
+                }`,
+            options: [{ allowedWords: { id: ["plugin"] } }],
+        },
+        {
+            name: "allowedWords 'obsidian' on the name also accepts its fragments",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Obsi tally",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Counts words in the active note.",
+                    "isDesktopOnly": false
+                }`,
+            options: [{ allowedWords: { name: ["obsidian"] } }],
+        },
+        {
+            name: "allowedWords 'plugin' on the description accepts a self-reference",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Word tally",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "This plugin counts words in your notes.",
+                    "isDesktopOnly": false
+                }`,
+            options: [{ allowedWords: { description: ["plugin"] } }],
+        },
+    ],
+    invalid: [
         {
             name: "missing required keys reports all missing",
             filename: "manifest.json",
@@ -202,165 +312,334 @@ ruleTester.run("validate-manifest", manifestRule as unknown as Rule.RuleModule, 
                 { messageId: "missingKey", data: { key: "id" } },
                 { messageId: "missingKey", data: { key: "description" } },
                 { messageId: "missingKey", data: { key: "isDesktopOnly" } },
-                {
-                    messageId: "noForbiddenWords",
-                    data: { word: "plugin", key: "name" },
-                },
+                { messageId: "namePlugin" },
             ],
         },
         {
-            name: "forbidden words 'obsidian' and 'plugin' in name",
+            name: "an id containing 'obsidian' is reported",
             filename: "manifest.json",
             code: `{
-                    "id": "my-plugin",
-                    "name": "My Obsidian Plugin",
+                    "id": "obsidian-git",
+                    "name": "Git",
                     "author": "Me",
                     "version": "1.0.0",
                     "minAppVersion": "1.0.0",
-                    "description": "A great plugin.",
-                    "isDesktopOnly": false,
-                    "authorUrl": "https://example.com"
-                }`,
-            errors: [
-                {
-                    messageId: "noForbiddenWords",
-                    data: { word: "plugin", key: "id" },
-                },
-                {
-                    messageId: "noForbiddenWords",
-                    data: { word: "obsidian' or 'plugin", key: "name" },
-                },
-                {
-                    messageId: "noForbiddenWords",
-                    data: { word: "plugin", key: "description" },
-                },
-            ],
-        },
-        {
-            name: "forbidden words 'obsidian' and 'plugin' in id and description",
-            filename: "manifest.json",
-            code: `{
-                    "id": "my-obsidian-plugin",
-                    "name": "My Plugin",
-                    "author": "Me",
-                    "version": "1.0.0",
-                    "minAppVersion": "1.0.0",
-                    "description": "A great tool for Obsidian.",
-                    "isDesktopOnly": false,
-                    "authorUrl": "https://example.com"
-                }`,
-            errors: [
-                {
-                    messageId: "noForbiddenWords",
-                    data: { word: "obsidian' or 'plugin", key: "id" },
-                },
-                {
-                    messageId: "noForbiddenWords",
-                    data: { word: "plugin", key: "name" },
-                },
-                {
-                    messageId: "noForbiddenWords",
-                    data: { word: "obsidian", key: "description" },
-                },
-            ],
-        },
-        {
-            name: "forbidden word 'PLUGIN' is case insensitive",
-            filename: "manifest.json",
-            code: `{
-                    "id": "my-PLUGIN-tool",
-                    "name": "My Tool",
-                    "author": "Me",
-                    "version": "1.0.0",
-                    "minAppVersion": "1.0.0",
-                    "description": "A great tool.",
+                    "description": "Counts words in the active note.",
                     "isDesktopOnly": false
                 }`,
             errors: [
-                {
-                    messageId: "noForbiddenWords",
-                    data: { word: "plugin", key: "id" },
-                },
+                { messageId: "idObsidian" },
             ],
         },
         {
-            name: "forbidden word 'obsidian' in name",
+            name: "an id ending with 'plugin' is reported",
             filename: "manifest.json",
             code: `{
-                    "id": "my-tool",
-                    "name": "Obsidian Helper",
+                    "id": "my-tool-plugin",
+                    "name": "My tool",
                     "author": "Me",
                     "version": "1.0.0",
                     "minAppVersion": "1.0.0",
-                    "description": "A great tool.",
+                    "description": "Counts words in the active note.",
                     "isDesktopOnly": false
                 }`,
             errors: [
-                {
-                    messageId: "noForbiddenWords",
-                    data: { word: "obsidian", key: "name" },
-                },
+                { messageId: "idEndsWithPlugin" },
             ],
         },
         {
-            name: "forbidden word 'plugin' matched as substring",
+            name: "an id containing 'obsidian' and ending with 'plugin' reports both",
             filename: "manifest.json",
             code: `{
-                    "id": "myplugin",
-                    "name": "MyPlugin",
+                    "id": "obsidian-tasks-plugin",
+                    "name": "Tasks",
                     "author": "Me",
                     "version": "1.0.0",
                     "minAppVersion": "1.0.0",
-                    "description": "A great tool.",
+                    "description": "Counts words in the active note.",
                     "isDesktopOnly": false
                 }`,
             errors: [
-                {
-                    messageId: "noForbiddenWords",
-                    data: { word: "plugin", key: "id" },
-                },
-                {
-                    messageId: "noForbiddenWords",
-                    data: { word: "plugin", key: "name" },
-                },
+                { messageId: "idObsidian" },
+                { messageId: "idEndsWithPlugin" },
             ],
         },
         {
-            name: "forbidden word 'obsidian' in description",
+            name: "a name containing 'Obsidian' is reported",
             filename: "manifest.json",
             code: `{
-                    "id": "my-tool",
-                    "name": "My Tool",
+                    "id": "word-tally",
+                    "name": "Obsidian Notes",
                     "author": "Me",
                     "version": "1.0.0",
                     "minAppVersion": "1.0.0",
-                    "description": "The best obsidian companion.",
+                    "description": "Counts words in the active note.",
                     "isDesktopOnly": false
                 }`,
             errors: [
-                {
-                    messageId: "noForbiddenWords",
-                    data: { word: "obsidian", key: "description" },
-                },
+                { messageId: "nameObsidian" },
             ],
         },
         {
-            name: "forbidden words 'obsidian' and 'plugin' in description",
+            name: "a name containing a fragment of 'Obsidian' is reported",
             filename: "manifest.json",
             code: `{
-                    "id": "my-tool",
-                    "name": "My Tool",
+                    "id": "word-tally",
+                    "name": "Notesidian",
                     "author": "Me",
                     "version": "1.0.0",
                     "minAppVersion": "1.0.0",
-                    "description": "An Obsidian plugin for notes.",
+                    "description": "Counts words in the active note.",
                     "isDesktopOnly": false
                 }`,
             errors: [
-                {
-                    messageId: "noForbiddenWords",
-                    data: { word: "obsidian' or 'plugin", key: "description" },
-                },
+                { messageId: "nameObsidianFragment" },
+            ],
+        },
+        {
+            name: "a name starting with 'ob' is reported",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Obvious tally",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Counts words in the active note.",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                { messageId: "nameObsidianFragment" },
+            ],
+        },
+        {
+            name: "a name containing 'Plugin' is reported, case-insensitively",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Word tally PLUGIN",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Counts words in the active note.",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                { messageId: "namePlugin" },
+            ],
+        },
+        {
+            name: "a name containing 'Obsidian' and 'Plugin' reports both",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Obsidian Plugin",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Counts words in the active note.",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                { messageId: "nameObsidian" },
+                { messageId: "namePlugin" },
+            ],
+        },
+        {
+            name: "a description containing 'Obsidian' is reported",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Word tally",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Counts words in Obsidian notes.",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                { messageId: "descriptionObsidian" },
+            ],
+        },
+        {
+            name: "a description saying 'this plugin' is reported",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Word tally",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "This plugin counts words.",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                { messageId: "descriptionSelfReference" },
+            ],
+        },
+        {
+            name: "a description saying 'a plugin that' is reported",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Word tally",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "A plugin that counts words.",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                { messageId: "descriptionSelfReference" },
+            ],
+        },
+        {
+            name: "a description saying 'the plugin' is reported",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Word tally",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "The plugin counts words.",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                { messageId: "descriptionSelfReference" },
+            ],
+        },
+        {
+            name: "a description shorter than 10 characters is reported",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Word tally",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Counts.",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                { messageId: "descriptionTooShort" },
+            ],
+        },
+        {
+            name: "a description over 250 characters is reported",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Word tally",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Counts words. Counts words. Counts words. Counts words. Counts words. Counts words. Counts words. Counts words. Counts words. Counts words. Counts words. Counts words. Counts words. Counts words. Counts words. Counts words. Counts words. Counts words.",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                { messageId: "descriptionTooLong", data: { length: "251" } },
+            ],
+        },
+        {
+            name: "a description without ending punctuation is reported",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Word tally",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Counts words in the active note",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                { messageId: "descriptionPunctuation" },
+            ],
+        },
+        {
+            name: "a description equal to the name is reported",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Counts words fast",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Counts words fast",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                { messageId: "descriptionPunctuation" },
+                { messageId: "descriptionSameAsName" },
+            ],
+        },
+        {
+            name: "a description starting with the name is reported",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Word tally",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Word tally counts words in the active note.",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                { messageId: "descriptionStartsWithName" },
+            ],
+        },
+        {
+            name: "allowedWords is scoped to the field and word it names",
+            filename: "manifest.json",
+            code: `{
+                    "id": "obsidian-tally",
+                    "name": "Obsidian tally",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Counts words in the active note.",
+                    "isDesktopOnly": false
+                }`,
+            options: [{ allowedWords: { id: ["obsidian"] } }],
+            errors: [
+                { messageId: "nameObsidian" },
+            ],
+        },
+        {
+            name: "ignoring the word checks leaves the description format reporting",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Obsidian tally",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Counts obsidian words",
+                    "isDesktopOnly": false
+                }`,
+            options: [{ ignore: ["noForbiddenWords"] }],
+            errors: [
+                { messageId: "descriptionPunctuation" },
+            ],
+        },
+        {
+            name: "ignoring the description format leaves the word checks reporting",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Obsidian tally",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Counts obsidian words",
+                    "isDesktopOnly": false
+                }`,
+            options: [{ ignore: ["descriptionFormat"] }],
+            errors: [
+                { messageId: "nameObsidian" },
+                { messageId: "descriptionObsidian" },
             ],
         },
         {
@@ -368,25 +647,6 @@ ruleTester.run("validate-manifest", manifestRule as unknown as Rule.RuleModule, 
             filename: "manifest.json",
             code: `[]`,
             errors: [{ messageId: "mustBeRootObject" }],
-        },
-        {
-            name: "forbidden word only in id with clean name and description",
-            filename: "manifest.json",
-            code: `{
-                    "id": "obsidian-notes",
-                    "name": "Notes Manager",
-                    "author": "Me",
-                    "version": "1.0.0",
-                    "minAppVersion": "1.0.0",
-                    "description": "Manage your notes efficiently.",
-                    "isDesktopOnly": false
-                }`,
-            errors: [
-                {
-                    messageId: "noForbiddenWords",
-                    data: { word: "obsidian", key: "id" },
-                },
-            ],
         },
         {
             name: "unknown key is forbidden",
@@ -754,254 +1014,13 @@ ruleTester.run("validate-manifest", manifestRule as unknown as Rule.RuleModule, 
                 },
             ],
         },
-        {
-            name: "too short description is forbidden",
-            filename: "manifest.json",
-            code: `{
-                    "id": "short-description",
-                    "name": "Short description",
-                    "author": "Me",
-                    "version": "1.0.0",
-                    "minAppVersion": "1.0.0",
-                    "description": "Short.",
-                    "isDesktopOnly": false
-                }`,
-            errors: [
-                {
-                    messageId: "descriptionFormat",
-                },
-            ],
-        },
-        {
-            name: "too long description is forbidden",
-            filename: "manifest.json",
-            code: `{
-                    "id": "long-description",
-                    "name": "Long description",
-                    "author": "Me",
-                    "version": "1.0.0",
-                    "minAppVersion": "1.0.0",
-                    "description": "I'd just like to interject for a moment. What you're refering to as Linux, is in fact, GNU/Linux, or as I've recently taken to calling it, GNU plus Linux. Linux is not an operating system unto itself, but rather another free component of a fully functioning GNU system made useful by the GNU corelibs, shell utilities and vital system components comprising a full OS as defined by POSIX.",
-                    "isDesktopOnly": false
-                }`,
-            errors: [
-                {
-                    messageId: "descriptionFormat",
-                },
-            ],
-        },
-        {
-            name: "description without ending period is forbidden",
-            filename: "manifest.json",
-            code: `{
-                    "id": "remove-periods",
-                    "name": "Removes all periods from your life",
-                    "author": "Me",
-                    "version": "1.0.0",
-                    "minAppVersion": "1.0.0",
-                    "description": "Even removes them from this sentence",
-                    "isDesktopOnly": false
-                }`,
-            errors: [
-                {
-                    messageId: "descriptionFormat",
-                },
-            ],
-        },
-        {
-            name: "all lowercase description is forbidden",
-            filename: "manifest.json",
-            code: `{
-                    "id": "all-lowercase",
-                    "name": "all lowercase",
-                    "author": "Me",
-                    "version": "1.0.0",
-                    "minAppVersion": "1.0.0",
-                    "description": "this description is all lowercase. it should be capitalized.",
-                    "isDesktopOnly": false
-                }`,
-            errors: [
-                {
-                    messageId: "descriptionFormat",
-                },
-            ],
-        },
-        {
-            name: "allowedWords is scoped to the field and word it names",
-            filename: "manifest.json",
-            code: `{
-                    "id": "obsidian-plugin-notes",
-                    "name": "Obsidian Notes",
-                    "author": "Me",
-                    "version": "1.0.0",
-                    "minAppVersion": "1.0.0",
-                    "description": "Manage your notes efficiently.",
-                    "isDesktopOnly": false
-                }`,
-            options: [{ allowedWords: { id: ["obsidian"] } }],
-            errors: [
-                {
-                    messageId: "noForbiddenWords",
-                    data: { word: "plugin", key: "id" },
-                },
-                {
-                    messageId: "noForbiddenWords",
-                    data: { word: "obsidian", key: "name" },
-                },
-            ],
-        },
-        {
-            name: "ignoring one check leaves the other reporting",
-            filename: "manifest.json",
-            code: `{
-                    "id": "my-plugin",
-                    "name": "My Plugin",
-                    "author": "Me",
-                    "version": "1.0.0",
-                    "minAppVersion": "1.0.0",
-                    "description": "Short.",
-                    "isDesktopOnly": false
-                }`,
-            options: [{ ignore: ["noForbiddenWords"] }],
-            errors: [
-                {
-                    messageId: "descriptionFormat",
-                },
-            ],
-        },
-        {
-            name: "description with an invisible character is forbidden",
-            filename: "manifest.json",
-            code: `{
-                    "id": "zero-width",
-                    "name": "Zero width",
-                    "author": "Me",
-                    "version": "1.0.0",
-                    "minAppVersion": "1.0.0",
-                    "description": "This description hides a zero\\u200bwidth space.",
-                    "isDesktopOnly": false
-                }`,
-            errors: [
-                {
-                    messageId: "descriptionFormat",
-                },
-            ],
-        },
         // A newline or tab is a control character (Cc). The directory shows
         // the description on one line, so neither belongs in it.
-        {
-            name: "description with a newline is forbidden",
-            filename: "manifest.json",
-            code: `{
-                    "id": "test-id",
-                    "name": "Test name",
-                    "author": "Me",
-                    "version": "1.0.0",
-                    "minAppVersion": "1.0.0",
-                    "description": "This description spans\\ntwo lines.",
-                    "isDesktopOnly": false
-                }`,
-            errors: [
-                {
-                    messageId: "descriptionFormat",
-                },
-            ],
-        },
-        {
-            name: "description with a tab is forbidden",
-            filename: "manifest.json",
-            code: `{
-                    "id": "test-id",
-                    "name": "Test name",
-                    "author": "Me",
-                    "version": "1.0.0",
-                    "minAppVersion": "1.0.0",
-                    "description": "This description has a\\ttab in it.",
-                    "isDesktopOnly": false
-                }`,
-            errors: [
-                {
-                    messageId: "descriptionFormat",
-                },
-            ],
-        },
         // JSON can escape half of a surrogate pair on its own. The result is
         // not a character at all (Cs), and renders as a replacement glyph.
-        {
-            name: "description with a lone surrogate is forbidden",
-            filename: "manifest.json",
-            code: `{
-                    "id": "test-id",
-                    "name": "Test name",
-                    "author": "Me",
-                    "version": "1.0.0",
-                    "minAppVersion": "1.0.0",
-                    "description": "This description has a lone \\ud83d surrogate.",
-                    "isDesktopOnly": false
-                }`,
-            errors: [
-                {
-                    messageId: "descriptionFormat",
-                },
-            ],
-        },
-        {
-            name: "description with emojis is forbidden",
-            filename: "manifest.json",
-            code: `{
-                    "id": "emojis-are-my-culture",
-                    "name": "Emojis are my culture",
-                    "author": "Me",
-                    "version": "1.0.0",
-                    "minAppVersion": "1.0.0",
-                    "description": "This description contains emojis 😊, which are not allowed in the description field.",
-                    "isDesktopOnly": false
-                }`,
-            errors: [
-                {
-                    messageId: "descriptionFormat",
-                },
-            ],
-        },
         // Neither a flag nor a keycap contains an Extended_Pictographic code
         // point: a flag is two regional indicators, a keycap is a digit, U+FE0F
         // and U+20E3.
-        {
-            name: "description with a flag emoji is forbidden",
-            filename: "manifest.json",
-            code: `{
-                    "id": "test-id",
-                    "name": "Test name",
-                    "author": "Me",
-                    "version": "1.0.0",
-                    "minAppVersion": "1.0.0",
-                    "description": "Made with care in the 🇺🇸.",
-                    "isDesktopOnly": false
-                }`,
-            errors: [
-                {
-                    messageId: "descriptionFormat",
-                },
-            ],
-        },
-        {
-            name: "description with a keycap emoji is forbidden",
-            filename: "manifest.json",
-            code: `{
-                    "id": "test-id",
-                    "name": "Test name",
-                    "author": "Me",
-                    "version": "1.0.0",
-                    "minAppVersion": "1.0.0",
-                    "description": "Step 1️⃣ is to open the vault.",
-                    "isDesktopOnly": false
-                }`,
-            errors: [
-                {
-                    messageId: "descriptionFormat",
-                },
-            ],
-        },
     ],
 });
 

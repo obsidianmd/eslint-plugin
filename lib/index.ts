@@ -269,15 +269,33 @@ const WORKER_FILES = [
     '**/workers/**/*.{ts,cts,mts,tsx,js,cjs,mjs,jsx}',
 ];
 
-// The rules of `config` that are (or are not) window-only. Applying the
-// window-only ones in their own block with `ignores` keeps every block's
-// severities honest: an "off" in a worker-only block would read, to anything
-// merging the config's rules without regard to `files`, as the rule being off.
-function splitWindowOnlyRules(config: RulesConfig, windowOnly: boolean): RulesConfig {
-    return Object.fromEntries(
-        Object.entries(config).filter(([rule]) => WINDOW_ONLY_RULES.has(rule) === windowOnly),
-    );
+// Tests run in Node or a DOM emulation, not inside Obsidian, so the rules about
+// code that runs in Obsidian do not apply to them: there is no popout window,
+// Node.js modules are available, mocks cast to TFile, and fixtures name
+// `.obsidian`. They are the window-only rules plus these. A file path is all it
+// takes to match TEST_FILES, so no security rule may be listed here; the
+// community scanner does not lint tests at all.
+const OBSIDIAN_RUNTIME_RULES = new Set([
+    ...WINDOW_ONLY_RULES,
+    "obsidianmd/hardcoded-config-path",
+    "obsidianmd/no-nodejs-modules",
+    "obsidianmd/no-tfile-tfolder-cast",
+]);
+const TEST_FILES = [
+    '**/*.{test,spec}.{ts,cts,mts,tsx,js,cjs,mjs,jsx}',
+    '**/{test,tests,__tests__,__mocks__}/**/*.{ts,cts,mts,tsx,js,cjs,mjs,jsx}',
+];
+
+// The rules of `config` that `keep` accepts. The window-only and Obsidian-runtime
+// rules go in their own blocks with `ignores` rather than being switched off in
+// a worker or test block: an "off" there would read, to anything merging the
+// config's rules without regard to `files`, as the rule being off.
+function pickRules(config: RulesConfig, keep: (rule: string) => boolean): RulesConfig {
+    return Object.fromEntries(Object.entries(config).filter(([rule]) => keep(rule)));
 }
+const isRuntimeOnly = (rule: string) => OBSIDIAN_RUNTIME_RULES.has(rule);
+const isWindowOnly = (rule: string) => WINDOW_ONLY_RULES.has(rule);
+const isRuntimeNotWindowOnly = (rule: string) => isRuntimeOnly(rule) && !isWindowOnly(rule);
 
 import { restrictedGlobalsOptions, restrictedImportsOptions, noUnusedExpressionsOptions, noUnusedVarsOptions } from "./ruleOptions.js";
 
@@ -345,7 +363,7 @@ const flatRecommendedConfig: Config[] = defineConfig([
         extends: [...(tseslint.configs.recommended as Config[]), noUnsanitizedPlugin.configs.recommended],
         rules: {
             ...flatRecommendedGeneralRules,
-            ...splitWindowOnlyRules(recommendedPluginRulesConfigBase, false)
+            ...pickRules(recommendedPluginRulesConfigBase, (rule) => !isRuntimeOnly(rule))
         }
     },
     {
@@ -361,18 +379,28 @@ const flatRecommendedConfig: Config[] = defineConfig([
         rules: {
             ...flatRecommendedGeneralRules,
             ...recommendedTypeCheckedGeneralRules,
-            ...splitWindowOnlyRules(recommendedPluginRulesConfig, false)
+            ...pickRules(recommendedPluginRulesConfig, (rule) => !isRuntimeOnly(rule))
         },
     },
     {
         files: ['**/*.{js,cjs,mjs,jsx}'],
-        ignores: WORKER_FILES,
-        rules: splitWindowOnlyRules(recommendedPluginRulesConfigBase, true),
+        ignores: [...WORKER_FILES, ...TEST_FILES],
+        rules: pickRules(recommendedPluginRulesConfigBase, isWindowOnly),
     },
     {
         files: ['**/*.{ts,cts,mts,tsx}'],
-        ignores: WORKER_FILES,
-        rules: splitWindowOnlyRules(recommendedPluginRulesConfig, true),
+        ignores: [...WORKER_FILES, ...TEST_FILES],
+        rules: pickRules(recommendedPluginRulesConfig, isWindowOnly),
+    },
+    {
+        files: ['**/*.{js,cjs,mjs,jsx}'],
+        ignores: TEST_FILES,
+        rules: pickRules(recommendedPluginRulesConfigBase, isRuntimeNotWindowOnly),
+    },
+    {
+        files: ['**/*.{ts,cts,mts,tsx}'],
+        ignores: TEST_FILES,
+        rules: pickRules(recommendedPluginRulesConfig, isRuntimeNotWindowOnly),
     },
     {
         files: WORKER_FILES,

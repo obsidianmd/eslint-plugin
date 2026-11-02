@@ -12,14 +12,28 @@ const BASE_SCHEMA = {
     isDesktopOnly: "boolean",
 };
 
+// The optional fields the community directory knows. `helpUrl` is not in the
+// developer docs' manifest reference, but the community scanner accepts it and
+// many published plugins carry it.
 const OPTIONAL_SCHEMA = {
     authorUrl: "string",
     fundingUrl: "string|object",
+    helpUrl: "string",
 };
 
-const FORBIDDEN_WORDS = ["obsidian", "plugin"];
+// The text checks below follow the community scanner's manifest validation
+// (obsidianmd/community-workers, src/worker/pluginManifest.ts), which decides
+// whether a submission passes, so this rule is never stricter than the review.
+// The id checks follow the developer docs' manifest reference, which the
+// scanner does not check itself.
 
-// The fields FORBIDDEN_WORDS applies to, and the only ones `allowedWords` can
+// The words the text checks single out: "obsidian" is the Obsidian trademark,
+// and "plugin" is redundant in the plugin directory. `allowedWords` can drop
+// either, per field.
+const FORBIDDEN_WORDS = ["obsidian", "plugin"] as const;
+type ForbiddenWord = (typeof FORBIDDEN_WORDS)[number];
+
+// The fields the word checks apply to, and the only ones `allowedWords` can
 // name.
 const CHECKED_WORD_FIELDS = ["id", "name", "description"] as const;
 type CheckedWordField = (typeof CHECKED_WORD_FIELDS)[number];
@@ -27,17 +41,22 @@ type CheckedWordField = (typeof CHECKED_WORD_FIELDS)[number];
 // Checks that can be switched off wholesale via the `ignore` option. Both are
 // judgement calls about listing text rather than structural errors, so a repo
 // may legitimately disagree with them; the structural checks are not ignorable.
+// `noForbiddenWords` covers every word check, `descriptionFormat` the length,
+// punctuation and name checks on the description.
 const IGNORABLE_CHECKS = ["noForbiddenWords", "descriptionFormat"] as const;
 type IgnorableCheck = (typeof IGNORABLE_CHECKS)[number];
 
-// A description may contain any ordinary punctuation -- backticks, em dashes,
-// parentheses, colons and slashes all appear in listings the directory has
-// passed. What it may not contain is emoji, or invisible characters that make
-// the text render differently than it reads. Flags and keycaps contain no
-// Extended_Pictographic code point, so their parts are listed separately:
-// regional indicators, U+FE0F (emoji presentation) and U+20E3 (keycap).
-const DISALLOWED_DESCRIPTION_CHARS =
-    /[\p{Extended_Pictographic}\p{Regional_Indicator}\u{FE0F}\u{20E3}\p{Cc}\p{Cf}\p{Cs}]/u;
+// Parts of "Obsidian" a plugin name may not use either, besides a leading "ob".
+const OBSIDIAN_FRAGMENTS = ["obsi", "sidian"];
+
+// A description that talks about itself ("this plugin", "a plugin that")
+// instead of saying what the plugin does. Mentioning plugins is fine otherwise:
+// "Automatically reload plugins in development." passes.
+const DESCRIPTION_SELF_REFERENCE =
+    /\b(this\s+(obsidian\s+)?(plugin|tool|extension|add-?on|mod)\b|an?\s+(obsidian\s+)?plugin\s+(that|for|to|which)\b|the\s+plugin\s+\w)/i;
+
+const DESCRIPTION_MIN_LENGTH = 10;
+const DESCRIPTION_MAX_LENGTH = 250;
 
 interface ValidateManifestOptions {
     /**
@@ -58,8 +77,18 @@ type MessageIds =
     | "invalidFundingUrl"
     | "emptyFundingUrlObject"
     | "mustBeRootObject"
-    | "noForbiddenWords"
-    | "descriptionFormat";
+    | "idObsidian"
+    | "idEndsWithPlugin"
+    | "nameObsidian"
+    | "nameObsidianFragment"
+    | "namePlugin"
+    | "descriptionObsidian"
+    | "descriptionSelfReference"
+    | "descriptionTooShort"
+    | "descriptionTooLong"
+    | "descriptionPunctuation"
+    | "descriptionSameAsName"
+    | "descriptionStartsWithName";
 
 // The manifest is strict JSON, so it is parsed by `@eslint/json` into a Momoa
 // AST (Document -> Object -> Member), not into the ESTree shape the rest of the
@@ -104,26 +133,77 @@ function isCheckedWordField(key: string): key is CheckedWordField {
     return (CHECKED_WORD_FIELDS as readonly string[]).includes(key);
 }
 
-// Returns the forbidden words found in `str`, spelled as the `noForbiddenWords`
-// message wants them, or `null` when there are none. One call answers both
-// "is this field reportable?" and "what does the report say?". The field is
-// matched case-insensitively, so the allowed words are too.
-function findForbiddenWords(str: string, allowed: string[] = []): string | null {
-    const forbiddenWordsFound = new Set<string>();
-    const strLower = str.toLowerCase();
-    const allowedLower = allowed.map((word) => word.toLowerCase());
-    for (const word of FORBIDDEN_WORDS) {
-        if (allowedLower.includes(word)) {
-            continue;
-        }
-        if (strLower.includes(word)) {
-            forbiddenWordsFound.add(word);
+// The word checks a field's value fails, as message ids. `allowed` holds the
+// words `allowedWords` drops for this field; matching is case-insensitive.
+function findWordProblems(
+    field: CheckedWordField,
+    value: string,
+    allowed: string[] = [],
+): MessageIds[] {
+    const allowedLower = new Set(allowed.map((word) => word.toLowerCase()));
+    const checks = (word: ForbiddenWord) => !allowedLower.has(word);
+    const lower = value.toLowerCase();
+    const problems: MessageIds[] = [];
+    switch (field) {
+        case "id":
+            if (checks("obsidian") && lower.includes("obsidian")) {
+                problems.push("idObsidian");
+            }
+            if (checks("plugin") && lower.endsWith("plugin")) {
+                problems.push("idEndsWithPlugin");
+            }
+            break;
+        case "name":
+            if (checks("obsidian")) {
+                if (lower.includes("obsidian")) {
+                    problems.push("nameObsidian");
+                } else if (
+                    OBSIDIAN_FRAGMENTS.some((fragment) => lower.includes(fragment)) ||
+                    lower.startsWith("ob")
+                ) {
+                    problems.push("nameObsidianFragment");
+                }
+            }
+            if (checks("plugin") && lower.includes("plugin")) {
+                problems.push("namePlugin");
+            }
+            break;
+        case "description":
+            if (checks("obsidian") && lower.includes("obsidian")) {
+                problems.push("descriptionObsidian");
+            }
+            if (checks("plugin") && DESCRIPTION_SELF_REFERENCE.test(value)) {
+                problems.push("descriptionSelfReference");
+            }
+            break;
+    }
+    return problems;
+}
+
+// The description checks it fails besides the word checks, as message ids:
+// length, ending punctuation, and repeating the name.
+function findDescriptionFormatProblems(description: string, name: string | undefined): MessageIds[] {
+    const trimmed = description.trim();
+    const problems: MessageIds[] = [];
+    if (trimmed.length < DESCRIPTION_MIN_LENGTH) {
+        problems.push("descriptionTooShort");
+    }
+    if (description.length > DESCRIPTION_MAX_LENGTH) {
+        problems.push("descriptionTooLong");
+    }
+    if (!/[.!?]$/.test(trimmed)) {
+        problems.push("descriptionPunctuation");
+    }
+    if (name !== undefined) {
+        const descriptionLower = trimmed.toLowerCase();
+        const nameLower = name.trim().toLowerCase();
+        if (descriptionLower === nameLower) {
+            problems.push("descriptionSameAsName");
+        } else if (nameLower.length > 0 && descriptionLower.startsWith(nameLower)) {
+            problems.push("descriptionStartsWithName");
         }
     }
-    if (forbiddenWordsFound.size === 0) {
-        return null;
-    }
-    return Array.from(forbiddenWordsFound).sort().join("' or '");
+    return problems;
 }
 
 const rule: ValidateManifestRuleDefinition = {
@@ -141,7 +221,7 @@ const rule: ValidateManifestRuleDefinition = {
                     allowedWords: {
                         type: "object",
                         description:
-                            "Words to drop from the forbidden list, per field, matched case-insensitively. Use this for findings that can never be acted on, such as a published plugin id that will always contain 'obsidian'.",
+                            "Words ('obsidian', 'plugin') to stop checking for, per field, matched case-insensitively. Use this for findings that can never be acted on, such as a published plugin id that will always contain 'obsidian'.",
                         properties: Object.fromEntries(
                             CHECKED_WORD_FIELDS.map((field) => [
                                 field,
@@ -177,10 +257,27 @@ const rule: ValidateManifestRuleDefinition = {
                 "The 'fundingUrl' object must only contain string values.",
             emptyFundingUrlObject: "The 'fundingUrl' cannot be empty.",
             mustBeRootObject: "The manifest must be a single JSON object.",
-            noForbiddenWords:
-                "The '{{key}}' property cannot contain '{{word}}'.",
-            descriptionFormat:
-                "The 'description' property should be concise and follow the submission requirements.",
+            idObsidian: "The plugin id must not contain \"obsidian\".",
+            idEndsWithPlugin: "The plugin id must not end with \"plugin\".",
+            nameObsidian: "Plugin name must not include the word \"Obsidian\".",
+            nameObsidianFragment:
+                "Plugin name must not include parts of the name \"Obsidian\" (\"obsi\", \"sidian\" or a leading \"ob\").",
+            namePlugin:
+                "Plugin name must not include the word \"Plugin\"; it is redundant in the plugin directory.",
+            descriptionObsidian:
+                "Plugin description must not include the word \"Obsidian\"; it is implied by the plugin directory.",
+            descriptionSelfReference:
+                "Plugin description should not refer to itself (e.g. \"this plugin\", \"a plugin that\"). It should describe what it does.",
+            descriptionTooShort:
+                "Plugin description is too short. A meaningful description of what the plugin does is required.",
+            descriptionTooLong:
+                "Plugin description exceeds the 250 character limit (currently {{length}} characters).",
+            descriptionPunctuation:
+                "Plugin description should end with punctuation (., !, or ?).",
+            descriptionSameAsName:
+                "Plugin description must not be the same as the plugin name.",
+            descriptionStartsWithName:
+                "Plugin description should not start with the plugin name.",
         },
     },
     create(context) {
@@ -267,18 +364,39 @@ const rule: ValidateManifestRuleDefinition = {
                     const actualType = getAstNodeType(valueNode);
 
                     if (expectedType.includes(actualType)) {
-                        // Hoisted out of the branch chain below so the check
-                        // runs once and its result is both the condition and
-                        // the reported word.
-                        const forbiddenWords =
+                        if (
                             valueNode.type === "String" &&
                             !ignored.has("noForbiddenWords") &&
                             isCheckedWordField(key)
-                                ? findForbiddenWords(
-                                      valueNode.value,
-                                      allowedWords[key],
-                                  )
-                                : null;
+                        ) {
+                            for (const messageId of findWordProblems(
+                                key,
+                                valueNode.value,
+                                allowedWords[key],
+                            )) {
+                                context.report({ node: valueNode, messageId });
+                            }
+                        }
+
+                        if (
+                            valueNode.type === "String" &&
+                            key === "description" &&
+                            !ignored.has("descriptionFormat")
+                        ) {
+                            const nameValue = presentKeys.get("name")?.value;
+                            const name =
+                                nameValue?.type === "String" ? nameValue.value : undefined;
+                            for (const messageId of findDescriptionFormatProblems(
+                                valueNode.value,
+                                name,
+                            )) {
+                                context.report({
+                                    node: valueNode,
+                                    messageId,
+                                    data: { length: String(valueNode.value.length) },
+                                });
+                            }
+                        }
 
                         if (key === "fundingUrl") {
                             if (
@@ -343,37 +461,6 @@ const rule: ValidateManifestRuleDefinition = {
                                 context.report({
                                     node: valueNode,
                                     messageId: "emptyFundingUrlObject",
-                                });
-                            }
-                        } else if (forbiddenWords !== null) {
-                            context.report({
-                                node: valueNode,
-                                messageId: "noForbiddenWords",
-                                data: { word: forbiddenWords, key },
-                            });
-                        } else if (
-                            actualType === "string" &&
-                            valueNode.type === "String" &&
-                            key === "description" &&
-                            !ignored.has("descriptionFormat")
-                        ) {
-                            // Check description format
-                            const description = valueNode.value;
-                            if (
-                                // 10 characters min
-                                description.length < 10 ||
-                                // 250 characters max
-                                description.length > 250 ||
-                                // Should start with a capital letter
-                                !description.match(/^[A-Z]/) ||
-                                // Should end with a period
-                                !description.endsWith(".") ||
-                                // Should not contain emoji or invisible characters
-                                DISALLOWED_DESCRIPTION_CHARS.test(description)
-                            ) {
-                                context.report({
-                                    node: valueNode,
-                                    messageId: "descriptionFormat",
                                 });
                             }
                         }
