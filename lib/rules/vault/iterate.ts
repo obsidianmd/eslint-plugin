@@ -1,6 +1,20 @@
 import { TSESTree } from "@typescript-eslint/utils";
 import { docsUrl, ruleCreator } from "../../ruleCreator.js";
 
+// `vault`, or any non-computed member access ending in `.vault`:
+// `this.app.vault`, `app.vault`, `plugin.app.vault`, `this.vault`.
+function isVault(node: TSESTree.Node): boolean {
+    if (node.type === TSESTree.AST_NODE_TYPES.Identifier) {
+        return node.name === "vault";
+    }
+    return (
+        node.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
+        !node.computed &&
+        node.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
+        node.property.name === "vault"
+    );
+}
+
 export default ruleCreator({
     meta: {
         docs: {
@@ -25,8 +39,7 @@ export default ruleCreator({
                     node.object.callee.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
                     node.object.callee.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
                     node.object.callee.property.name === "getFiles" &&
-                    node.object.callee.object.type === TSESTree.AST_NODE_TYPES.Identifier &&
-                    node.object.callee.object.name === "vault"
+                    isVault(node.object.callee.object)
                 ) {
                     if (
                         node.parent &&

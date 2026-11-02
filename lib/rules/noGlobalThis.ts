@@ -27,11 +27,11 @@ export default ruleCreator({
                 }
 
                 if (
-                    (node.parent.type === TSESTree.AST_NODE_TYPES.MemberExpression && node.parent.property === node) ||
-                    (node.parent.type === TSESTree.AST_NODE_TYPES.Property && node.parent.key === node) ||
+                    isPropertyName(node) ||
                     (node.parent.type === TSESTree.AST_NODE_TYPES.VariableDeclarator && node.parent.id === node) ||
                     (node.parent.type === TSESTree.AST_NODE_TYPES.UnaryExpression && node.parent.operator === "typeof") ||
-                    (node.parent.type === TSESTree.AST_NODE_TYPES.TSModuleDeclaration)
+                    (node.parent.type === TSESTree.AST_NODE_TYPES.TSModuleDeclaration) ||
+                    isInTypeContext(node)
                 ) {
                     return;
                 }
@@ -47,11 +47,77 @@ export default ruleCreator({
                     messageId: "avoidGlobal",
                     data: { name: node.name },
                     fix(fixer) {
-                        return fixer.replaceText(node, "window");
+                        // `{ global }` is the key and the value at once: keep the key.
+                        const shorthand =
+                            node.parent.type === TSESTree.AST_NODE_TYPES.Property &&
+                            node.parent.shorthand &&
+                            node.parent.value === node;
+                        return fixer.replaceText(node, shorthand ? `${node.name}: window` : "window");
                     },
                 });
             },
         };
+
+        // A name that is not a reference to the global: a non-computed property or
+        // member key (`obj.global`, `{ global: 1 }`, a class field), or an
+        // import/export name. Enum members are already bindings in their own scope.
+        function isPropertyName(node: TSESTree.Identifier): boolean {
+            const parent = node.parent;
+            switch (parent.type) {
+                case TSESTree.AST_NODE_TYPES.MemberExpression:
+                    return parent.property === node && !parent.computed;
+                case TSESTree.AST_NODE_TYPES.Property:
+                case TSESTree.AST_NODE_TYPES.PropertyDefinition:
+                case TSESTree.AST_NODE_TYPES.MethodDefinition:
+                case TSESTree.AST_NODE_TYPES.AccessorProperty:
+                case TSESTree.AST_NODE_TYPES.TSAbstractPropertyDefinition:
+                case TSESTree.AST_NODE_TYPES.TSAbstractMethodDefinition:
+                case TSESTree.AST_NODE_TYPES.TSAbstractAccessorProperty:
+                    return parent.key === node && !parent.computed;
+                case TSESTree.AST_NODE_TYPES.ImportSpecifier:
+                    return parent.imported === node && parent.local !== node;
+                case TSESTree.AST_NODE_TYPES.ExportSpecifier:
+                    return parent.exported === node;
+                default:
+                    return false;
+            }
+        }
+
+        // Types have no runtime effect, so popout windows do not apply: `typeof
+        // globalThis` in an annotation, `{ global: boolean }` in a type literal or
+        // interface, or anything inside an ambient `declare` block.
+        function isInTypeContext(node: TSESTree.Node): boolean {
+            let current: TSESTree.Node | undefined = node.parent;
+            while (current) {
+                switch (current.type) {
+                    case TSESTree.AST_NODE_TYPES.TSTypeAnnotation:
+                    case TSESTree.AST_NODE_TYPES.TSTypeQuery:
+                    case TSESTree.AST_NODE_TYPES.TSQualifiedName:
+                    case TSESTree.AST_NODE_TYPES.TSPropertySignature:
+                    case TSESTree.AST_NODE_TYPES.TSMethodSignature:
+                    case TSESTree.AST_NODE_TYPES.TSIndexSignature:
+                    case TSESTree.AST_NODE_TYPES.TSTypeLiteral:
+                    case TSESTree.AST_NODE_TYPES.TSInterfaceBody:
+                    case TSESTree.AST_NODE_TYPES.TSInterfaceDeclaration:
+                    case TSESTree.AST_NODE_TYPES.TSTypeAliasDeclaration:
+                    case TSESTree.AST_NODE_TYPES.TSTypeReference:
+                    case TSESTree.AST_NODE_TYPES.TSMappedType:
+                    case TSESTree.AST_NODE_TYPES.TSConditionalType:
+                    case TSESTree.AST_NODE_TYPES.TSTypeParameterDeclaration:
+                    case TSESTree.AST_NODE_TYPES.TSTypeParameterInstantiation:
+                        return true;
+                    case TSESTree.AST_NODE_TYPES.TSModuleDeclaration:
+                        if (current.declare) {
+                            return true;
+                        }
+                        break;
+                    default:
+                        break;
+                }
+                current = current.parent;
+            }
+            return false;
+        }
 
         function findVariable(scope: ReturnType<typeof context.sourceCode.getScope>, name: string): { defs: unknown[] } | null {
             let current: typeof scope | null = scope;

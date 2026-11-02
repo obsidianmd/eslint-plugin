@@ -16,6 +16,12 @@ declares them, and `activeWindow.createEl()` when `Window` declares them. Otherw
 is offered as a suggestion. Obsidian's own types declare `activeWindow` as a plain `Window`, so
 `activeDocument.createElement()` gets a suggestion rather than a fix that would not compile.
 
+`createEl()` and `createSvg()` take only tag names the DOM types know (`keyof HTMLElementTagNameMap`
+and `keyof SVGElementTagNameMap`). A tag literal, or a variable typed as a union of known tags, is
+fixed. A `string` variable, a custom element such as `'my-element'`, a deprecated tag such as
+`'xmp'`, or `createElementNS()` with an options argument is reported with neither a fix nor a
+suggestion, because the replacement would not compile.
+
 ## Iframe documents
 
 An iframe's document belongs to the iframe's own window, which Obsidian never gives its DOM helpers,
