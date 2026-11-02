@@ -657,8 +657,11 @@ The scanner only lints plugin source code. The following patterns are excluded:
 
 **Rule severity adjustments:**
 
-- Most rules are downgraded to `warn` (advisory). Only security-critical rules remain at `error`: `no-eval`, `no-implied-eval`, `no-unsanitized/method`, `no-unsanitized/property`, `obsidianmd/regex-lookbehind`, and `obsidianmd/no-forbidden-elements`.
-- Some rules are disabled because the scanner handles them separately or they produce too many false positives at scale: `no-undef`, `@typescript-eslint/no-unsafe-*`, `@typescript-eslint/restrict-template-expressions`, `@typescript-eslint/no-base-to-string`, `import/no-unresolved`, `obsidianmd/validate-manifest`, `obsidianmd/validate-license`, `obsidianmd/commands/no-command-in-command-id`, `obsidianmd/commands/no-plugin-id-in-command-id`.
+- Most rules are downgraded to `warn` (advisory). The security-critical rules stay at `error`: `no-eval`, `no-implied-eval`, `no-unsanitized/method`, `no-unsanitized/property`, `obsidianmd/regex-lookbehind`, and `obsidianmd/no-forbidden-elements`.
+- Some rules are disabled because the scanner handles them separately or they produce too many false positives at scale: `no-undef`, `@typescript-eslint/no-unsafe-*`, `@typescript-eslint/restrict-template-expressions`, `@typescript-eslint/no-base-to-string`, `import/no-unresolved`, `obsidianmd/validate-manifest`, `obsidianmd/validate-license` (both switched off under their own `manifest.json` and `LICENSE` globs), `obsidianmd/commands/no-command-in-command-id`, `obsidianmd/commands/no-plugin-id-in-command-id`, and the three sentence-case rules.
+- Plugins submitted more recently are checked with stricter layers on top: `eslint-comments/require-description` at `warn`, then at `error`; and for the newest, `@typescript-eslint/no-unsafe-*` and the two command-id rules back at `warn`, and these obsidianmd rules at `error`: `settings-tab/no-manual-html-headings`, `settings-tab/no-problematic-settings-headings`, `sample-names`, `no-sample-code`, `platform`, `no-plugin-as-component`, `detach-leaves`, `no-static-styles-assignment`, `no-view-references-in-plugin`, and `no-unsupported-api`.
+- Disable comments are honoured, and unused ones are not reported.
+- When a plugin's dependencies cannot be installed, typescript-eslint's type-aware rules and `obsidianmd/no-misused-promises` are switched off: without the dependencies' types they say nothing about the source.
 
 **Rule replacements:**
 
@@ -666,21 +669,18 @@ The scanner only lints plugin source code. The following patterns are excluded:
 
 **Parser options:**
 
-The scanner uses `projectService` with `allowDefaultProject` for `eslint.config.js` and `manifest.json`, and sets `tsconfigRootDir` to the plugin's root directory.
+The scanner uses `projectService` with `allowDefaultProject` for `eslint.config.js`, and sets `tsconfigRootDir` to the plugin's root directory. `manifest.json` needs no parser options: the recommended config reads it with the `json/json` language.
 
 ```js
 languageOptions: {
   parserOptions: {
     projectService: {
-      allowDefaultProject: ["eslint.config.js", "manifest.json"],
+      allowDefaultProject: ["eslint.config.js"],
     },
     tsconfigRootDir: process.cwd(),
-    extraFileExtensions: [".json"],
   },
 }
 ```
-
-The `manifest.json` entry and `extraFileExtensions` exist to let the TypeScript parser read `manifest.json`. The recommended config reads it with the `json/json` language instead, so neither setting reaches it, and the configuration below leaves both out.
 
 You do not need to replicate this configuration. The recommended config with the [quick start](#quick-start) setup is sufficient for local development. This section is provided for transparency so plugin authors understand what the scanner checks and what it skips.
 
@@ -756,6 +756,9 @@ export default defineConfig([
   },
 
   globalIgnores([
+    // Not in the scanner's list: it lints a checkout, where the built main.js is usually
+    // absent. Locally it is build output, and linting it fails.
+    "main.js",
     "node_modules",
     "dist",
     "build",
