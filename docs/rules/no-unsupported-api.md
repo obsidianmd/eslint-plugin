@@ -9,24 +9,44 @@
 ## Guarding with `requireApiVersion`
 
 An API newer than `minAppVersion` is allowed where a `requireApiVersion(...)` check proves the
-running app is new enough: inside the `if` or ternary branch it guards, or to the right of `&&`.
-The version can be a string literal, or any expression whose type is a single string literal: a
-`const` declared in the same file or imported from another module, a member of an `as const` object,
-an enum member, or a template literal built from such constants:
+running app is new enough. That holds:
+
+- inside the `if` branch or ternary branch it guards, or to the right of `&&`;
+- after an early exit on a failed check, for the rest of the block. The exit must be a `return`,
+  `throw`, `break` or `continue` that always runs, directly or at the top of a `{ ... }` block;
+- in the `else` branch or ternary alternate of a negated check, or to the right of `||` after one;
+- wherever a `const` holding the check's result is used the same way;
+- when several checks are combined: `a && b` proves the higher version, and `a || b` the lower.
 
 ```ts
 import { requireApiVersion } from "obsidian";
 
-const RENDER_CONTEXT_VERSION = "1.10.0";
+function renderPreview() {
+    if (!requireApiVersion("1.10.0")) {
+        return;
+    }
+    this.app.renderContext;
+}
 
-if (requireApiVersion(RENDER_CONTEXT_VERSION)) {
+const SUPPORTS_RENDER_CONTEXT = requireApiVersion("1.10.0");
+
+if (SUPPORTS_RENDER_CONTEXT) {
     this.app.renderContext;
 }
 ```
 
-A `let` variable, a `string`-typed value, a choice between versions such as `late ? "1.10.0" :
-"1.0.0"`, or a version that is not a full `x.y.z` does not count as a guard, so the API is still
-reported.
+The version can be a string literal, or any expression whose type is a string literal: a `const`
+declared in the same file or imported from another module, a member of an `as const` object, an
+enum member, or a template literal built from such constants. When its type is a choice between
+versions, such as `late ? "1.10.0" : "1.11.0"`, only the lowest one is proven.
+
+Anything else still reports the API: a `let` variable or `string`-typed value, a version that is
+not a full `x.y.z`, an exit that only runs inside a nested `if` or loop, `requireApiVersion(v) ||
+api` (which reaches `api` when the check fails), and a function declaration after an early exit,
+because a declaration is hoisted and can be called before the check.
+
+A `minAppVersion` without a patch version, such as `0.15`, is read as `0.15.0`. One with no version
+in it at all proves nothing about the app, so every versioned API is reported.
 
 ## Options
 

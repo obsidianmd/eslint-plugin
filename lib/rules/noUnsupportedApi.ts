@@ -1,8 +1,8 @@
-import { AST_NODE_TYPES, ESLintUtils } from "@typescript-eslint/utils";
+import { AST_NODE_TYPES, ASTUtils, ESLintUtils, TSESLint } from "@typescript-eslint/utils";
 import type { TSESTree } from "@typescript-eslint/utils";
 import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
-import { gt, valid } from "semver";
+import { gt, lt, valid } from "semver";
 import ts from "typescript";
 import { getManifest } from "../manifest.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
@@ -56,7 +56,13 @@ export default ruleCreator<Options, "apiNotAvailable">({
         if (!resolvedVersion) {
             return {};
         }
-        const minAppVersion: string = resolvedVersion;
+        const minAppVersion: string = String(resolvedVersion);
+        // A minAppVersion semver cannot parse would make `gt` throw and abort the
+        // whole lint run. "0.15" means 0.15.0, as a dotted version with missing
+        // parts read as 0; anything else proves nothing about the app, so it is
+        // checked as 0.0.0 and every versioned API is reported rather than the
+        // check being skipped.
+        const minVersion = toVersion(minAppVersion) ?? "0.0.0";
 
         const services = ESLintUtils.getParserServices(context);
         const checker = services.program.getTypeChecker();
@@ -143,12 +149,13 @@ export default ruleCreator<Options, "apiNotAvailable">({
                 const qualifiedName = parentName
                     ? `${parentName}.${symbolName}`
                     : symbolName;
-                const sinceVersion = sinceMap.get(qualifiedName);
+                const sinceTag = sinceMap.get(qualifiedName);
+                const sinceVersion = sinceTag && toVersion(sinceTag);
 
                 if (!sinceVersion) {
                     continue;
                 }
-                if (gt(sinceVersion, minAppVersion)) {
+                if (gt(sinceVersion, minVersion)) {
                     if (isGuardedByRequireApiVersion(node, sinceVersion)) {
                         return;
                     }
@@ -167,87 +174,280 @@ export default ruleCreator<Options, "apiNotAvailable">({
             }
         }
 
-        function getStringLiteralValue(
+        // The guard version a `requireApiVersion(...)` argument proves: a string
+        // literal, or any expression whose type is a string literal or a union of
+        // them (a const, an `as const` member, an enum, a template built from
+        // constants, a choice between versions). A union proves only its lowest
+        // member. let, string and anything that is not a full x.y.z prove nothing.
+        function getArgumentVersion(
             expr: TSESTree.CallExpressionArgument,
-        ): string | undefined {
+        ): Version | undefined {
             if (expr.type === AST_NODE_TYPES.Literal) {
-                const value = expr.value;
-                if (typeof value === "string") {
-                    return value;
-                }
-            } else if (expr.type !== AST_NODE_TYPES.SpreadElement) {
-                // Any other expression counts when its type is a single string
-                // literal: a const, an `as const` member, an enum member or a
-                // template built from constants. let, unions and string don't.
-                const typeInfo = checker.getTypeAtLocation(
-                    services.esTreeNodeToTSNodeMap.get(expr),
-                );
-                const literal = typeInfo.isStringLiteral()
-                    ? typeInfo.value
-                    : undefined;
-                return literal;
+                return typeof expr.value === "string" ? valid(expr.value) ?? undefined : undefined;
             }
-            return undefined;
+            if (expr.type === AST_NODE_TYPES.SpreadElement) {
+                return undefined;
+            }
+            const type = checker.getTypeAtLocation(services.esTreeNodeToTSNodeMap.get(expr));
+            let lowest: Version | undefined;
+            for (const member of type.isUnion() ? type.types : [type]) {
+                const version = member.isStringLiteral() ? valid(member.value) : null;
+                if (!version) {
+                    return undefined;
+                }
+                if (!lowest || lt(version, lowest)) {
+                    lowest = version;
+                }
+            }
+            return lowest;
         }
 
-        function extractRequireApiVersion(expr: TSESTree.Expression): string | undefined {
+        // The `x` of `const x = <init>`, with nothing else able to rebind it.
+        function getConstInitializer(id: TSESTree.Identifier): TSESTree.Expression | undefined {
+            const variable = ASTUtils.findVariable(context.sourceCode.getScope(id), id);
+            if (!variable || variable.defs.length !== 1) {
+                return undefined;
+            }
+            const def = variable.defs[0];
             if (
-                expr.type === AST_NODE_TYPES.CallExpression &&
-                expr.callee.type === AST_NODE_TYPES.Identifier &&
-                expr.callee.name === "requireApiVersion" &&
-                expr.arguments.length >= 1
+                def.type !== TSESLint.Scope.DefinitionType.Variable ||
+                def.parent.kind !== "const" ||
+                def.node.id.type !== AST_NODE_TYPES.Identifier
             ) {
-                const potentialString = getStringLiteralValue(
-                    expr.arguments[0],
-                );
-                // A version semver cannot parse would make `gt` throw and abort
-                // the whole lint run, so it does not count as a guard.
-                if (potentialString !== undefined && valid(potentialString)) {
-                    return potentialString;
-                }
+                return undefined;
             }
-            if (expr.type === AST_NODE_TYPES.LogicalExpression && expr.operator === "&&") {
-                return extractRequireApiVersion(expr.left);
-            }
-            return undefined;
+            return def.node.init ?? undefined;
         }
 
+        // The API version proven available when `expr` evaluates truthy (or
+        // falsy). `seen` holds the const initializers being resolved, so a
+        // cycle such as `const a = b, b = a` stops instead of recursing forever.
+        function versionWhen(
+            expr: TSESTree.Expression,
+            truthy: boolean,
+            seen: Set<TSESTree.Node> = new Set(),
+        ): Version | undefined {
+            switch (expr.type) {
+                case AST_NODE_TYPES.CallExpression:
+                    if (
+                        truthy &&
+                        expr.callee.type === AST_NODE_TYPES.Identifier &&
+                        expr.callee.name === "requireApiVersion" &&
+                        expr.arguments.length >= 1
+                    ) {
+                        return getArgumentVersion(expr.arguments[0]);
+                    }
+                    return undefined;
+                case AST_NODE_TYPES.UnaryExpression:
+                    return expr.operator === "!"
+                        ? versionWhen(expr.argument, !truthy, seen)
+                        : undefined;
+                case AST_NODE_TYPES.LogicalExpression: {
+                    if (expr.operator === "??") {
+                        return undefined;
+                    }
+                    const left = versionWhen(expr.left, truthy, seen);
+                    const right = versionWhen(expr.right, truthy, seen);
+                    // `a && b` truthy and `a || b` falsy mean both sides held, so
+                    // either side's version is proven; otherwise only one side
+                    // held, so both must prove a version and the lower one wins.
+                    return (expr.operator === "&&") === truthy
+                        ? higherOf(left, right)
+                        : lowerOfBoth(left, right);
+                }
+                case AST_NODE_TYPES.Identifier: {
+                    const init = getConstInitializer(expr);
+                    if (!init || seen.has(init)) {
+                        return undefined;
+                    }
+                    seen.add(init);
+                    const version = versionWhen(init, truthy, seen);
+                    seen.delete(init);
+                    return version;
+                }
+                default:
+                    return undefined;
+            }
+        }
+
+        // Whether `node` can only run once a `requireApiVersion` check has proven
+        // `sinceVersion` available.
         function isGuardedByRequireApiVersion(node: TSESTree.Node, sinceVersion: string): boolean {
+            const covers = (version: Version | undefined) =>
+                version !== undefined && !gt(sinceVersion, version);
+
             let current: TSESTree.Node | undefined = node.parent;
             let prevChild: TSESTree.Node = node;
 
             while (current) {
-                if (current.type === AST_NODE_TYPES.IfStatement) {
-                    if (prevChild !== current.test && prevChild !== current.alternate) {
-                        const guardVersion = extractRequireApiVersion(current.test);
-                        if (guardVersion && !gt(sinceVersion, guardVersion)) {
-                            return true;
-                        }
-                    }
-                } else if (current.type === AST_NODE_TYPES.ConditionalExpression) {
-                    if (prevChild !== current.test && prevChild !== current.alternate) {
-                        const guardVersion = extractRequireApiVersion(current.test);
-                        if (guardVersion && !gt(sinceVersion, guardVersion)) {
-                            return true;
-                        }
-                    }
-                } else if (
-                    current.type === AST_NODE_TYPES.LogicalExpression &&
-                    current.operator === "&&" &&
-                    prevChild === current.right
+                if (
+                    current.type === AST_NODE_TYPES.IfStatement ||
+                    current.type === AST_NODE_TYPES.ConditionalExpression
                 ) {
-                    const guardVersion = extractRequireApiVersion(current.left);
-                    if (guardVersion && !gt(sinceVersion, guardVersion)) {
+                    if (prevChild === current.consequent && covers(versionWhen(current.test, true))) {
                         return true;
                     }
+                    if (prevChild === current.alternate && covers(versionWhen(current.test, false))) {
+                        return true;
+                    }
+                } else if (current.type === AST_NODE_TYPES.LogicalExpression) {
+                    if (
+                        prevChild === current.right &&
+                        current.operator !== "??" &&
+                        covers(versionWhen(current.left, current.operator === "&&"))
+                    ) {
+                        return true;
+                    }
+                } else if (
+                    !isHoistedFunction(prevChild) &&
+                    getEarlierStatements(current, prevChild).some((statement) =>
+                        covers(versionAfterEarlyExit(statement)),
+                    )
+                ) {
+                    return true;
                 }
                 prevChild = current;
                 current = current.parent;
             }
             return false;
         }
+
+        // The version proven for the statements after `if (test) <exit>`, which
+        // only run when `test` was falsy (or truthy, for `if (test) {} else <exit>`).
+        function versionAfterEarlyExit(statement: TSESTree.Statement): Version | undefined {
+            if (statement.type !== AST_NODE_TYPES.IfStatement) {
+                return undefined;
+            }
+            const consequentExits = alwaysExits(statement.consequent);
+            const alternateExits = statement.alternate !== null && alwaysExits(statement.alternate);
+            if (consequentExits && !alternateExits) {
+                return versionWhen(statement.test, false);
+            }
+            if (alternateExits && !consequentExits) {
+                return versionWhen(statement.test, true);
+            }
+            return undefined;
+        }
     }
 });
+
+// A version semver can compare: as written when valid, a bare "x" or "x.y" with
+// the missing parts read as 0 ("0.15" is 0.15.0), else undefined. Nothing looser:
+// semver's coerce would read "x99.0.0" as 99.0.0, and a manifest could then
+// switch the rule off with a minAppVersion Obsidian does not read that way.
+function toVersion(raw: string): Version | undefined {
+    const version = valid(raw);
+    if (version) {
+        return version;
+    }
+    const partial = /^(\d+)(?:\.(\d+))?$/.exec(raw.trim());
+    return partial ? `${Number(partial[1])}.${Number(partial[2] ?? 0)}.0` : undefined;
+}
+
+function higherOf(a: Version | undefined, b: Version | undefined): Version | undefined {
+    if (!a || !b) {
+        return a ?? b;
+    }
+    return gt(a, b) ? a : b;
+}
+
+function lowerOfBoth(a: Version | undefined, b: Version | undefined): Version | undefined {
+    if (!a || !b) {
+        return undefined;
+    }
+    return lt(a, b) ? a : b;
+}
+
+// Function declarations are hoisted, so one written after an early exit can
+// still be called before it.
+function isHoistedFunction(node: TSESTree.Node): boolean {
+    if (
+        node.type === AST_NODE_TYPES.ExportNamedDeclaration ||
+        node.type === AST_NODE_TYPES.ExportDefaultDeclaration
+    ) {
+        return node.declaration?.type === AST_NODE_TYPES.FunctionDeclaration;
+    }
+    return node.type === AST_NODE_TYPES.FunctionDeclaration;
+}
+
+// The statements that run before `child` in a statement list it belongs to.
+function getEarlierStatements(container: TSESTree.Node, child: TSESTree.Node): TSESTree.Statement[] {
+    let statements: TSESTree.Node[];
+    switch (container.type) {
+        case AST_NODE_TYPES.BlockStatement:
+        case AST_NODE_TYPES.StaticBlock:
+        case AST_NODE_TYPES.Program:
+            statements = container.body;
+            break;
+        case AST_NODE_TYPES.SwitchCase:
+            statements = container.consequent;
+            break;
+        default:
+            return [];
+    }
+    const index = statements.indexOf(child);
+    return index > 0 ? (statements.slice(0, index) as TSESTree.Statement[]) : [];
+}
+
+// Whether running `statement` always leaves the statement list it sits in:
+// `return`, `throw`, a `break`/`continue` with a target, or a block holding one
+// of those at its top level. An exit only inside a nested `if` or loop does not
+// count.
+function alwaysExits(statement: TSESTree.Statement): boolean {
+    switch (statement.type) {
+        case AST_NODE_TYPES.ReturnStatement:
+        case AST_NODE_TYPES.ThrowStatement:
+            return true;
+        case AST_NODE_TYPES.BreakStatement:
+        case AST_NODE_TYPES.ContinueStatement:
+            return hasJumpTarget(statement);
+        case AST_NODE_TYPES.BlockStatement:
+            return statement.body.some(alwaysExits);
+        default:
+            return false;
+    }
+}
+
+// Whether a `break`/`continue` has a target in its own function. Without one the
+// code is not valid JavaScript, and the jump proves nothing.
+function hasJumpTarget(statement: TSESTree.BreakStatement | TSESTree.ContinueStatement): boolean {
+    const isContinue = statement.type === AST_NODE_TYPES.ContinueStatement;
+    for (let node = statement.parent; node; node = node.parent) {
+        switch (node.type) {
+            case AST_NODE_TYPES.FunctionDeclaration:
+            case AST_NODE_TYPES.FunctionExpression:
+            case AST_NODE_TYPES.ArrowFunctionExpression:
+            case AST_NODE_TYPES.StaticBlock:
+            case AST_NODE_TYPES.Program:
+                return false;
+            case AST_NODE_TYPES.LabeledStatement:
+                if (statement.label && node.label.name === statement.label.name) {
+                    return !isContinue || isLoop(node.body);
+                }
+                break;
+            case AST_NODE_TYPES.SwitchStatement:
+                if (!statement.label && !isContinue) {
+                    return true;
+                }
+                break;
+            default:
+                if (!statement.label && isLoop(node)) {
+                    return true;
+                }
+        }
+    }
+    return false;
+}
+
+function isLoop(node: TSESTree.Node): boolean {
+    return (
+        node.type === AST_NODE_TYPES.ForStatement ||
+        node.type === AST_NODE_TYPES.ForInStatement ||
+        node.type === AST_NODE_TYPES.ForOfStatement ||
+        node.type === AST_NODE_TYPES.WhileStatement ||
+        node.type === AST_NODE_TYPES.DoWhileStatement
+    );
+}
 
 function buildSinceMap(dtsPath: string): SinceMap {
     if (cachedSinceMap && cachedDtsPath === dtsPath) {
