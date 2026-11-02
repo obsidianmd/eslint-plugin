@@ -8,6 +8,20 @@
 
 <!-- end auto-generated rule header -->
 
+## What is reported
+
+Only a runtime reference to the global object: `globalThis.setTimeout()`, `global.process`,
+`(globalThis as Foo).bar`, `obj[globalThis]`. The fix replaces it with `window`; in a shorthand
+property, `{ globalThis }` becomes `{ globalThis: window }` so the key stays.
+
+Not reported, because they are not references to the global or have no runtime effect:
+
+- types: `typeof globalThis` in an annotation, `ReturnType<typeof globalThis.setTimeout>`, and
+  anything inside a `declare global` or other ambient `declare` block
+- names: a property, member or class-member key such as `{ global: boolean }` or `settings.global`,
+  and an import or export name
+- `typeof globalThis !== "undefined"` checks, and local variables named `global` or `globalThis`
+
 ## Web workers
 
 A web worker has no `window`, so `globalThis` and the bare timer functions are correct there. The
