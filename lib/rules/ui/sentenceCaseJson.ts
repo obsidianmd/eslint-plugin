@@ -1,4 +1,4 @@
-import type { JSONRuleDefinition } from "@eslint/json/types";
+import type { JSONRuleDefinition } from "@eslint/json";
 import { docsUrl } from "../../ruleCreator.js";
 import {
     createSentenceCaseEvaluator,
