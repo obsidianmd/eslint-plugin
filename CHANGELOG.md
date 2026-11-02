@@ -27,8 +27,8 @@ Upgrading from 0.4.x? The breaking changes below each have a fix in
 - `ruleConfigs` now hold exactly the obsidianmd rules the recommended config enables: `no-nodejs-modules`, `rule-custom-message` and `no-misused-promises` added, `@typescript-eslint/no-deprecated` moved out ([#207](https://github.com/obsidianmd/eslint-plugin/pull/207), [#210](https://github.com/obsidianmd/eslint-plugin/pull/210)).
 - The exported `configs` are typed with your own ESLint's `Linter.Config[]`, which its `defineConfig` accepts ([#203](https://github.com/obsidianmd/eslint-plugin/pull/203)).
 - Web worker files (`**/*.worker.*`, `**/workers/**`) no longer get the window-only rules and get worker globals instead; security rules still apply ([#207](https://github.com/obsidianmd/eslint-plugin/pull/207)).
-- Peer dependencies are ranges: `eslint >=9.19.0`, `typescript >=4.8.4` and `typescript-eslint ^8.35.1`. `@eslint/js`, `@eslint/json` and `obsidian` are no longer peers, and `@eslint/json` and `eslint-plugin-depend` use caret ranges so a project using them directly shares one copy ([#201](https://github.com/obsidianmd/eslint-plugin/pull/201), [#DEPS](https://github.com/obsidianmd/eslint-plugin/pull/DEPS)).
-- `typescript-eslint` 8.70.1 or later is recommended: it fixes a `no-unnecessary-type-assertion` false positive on a `Record` type alias (typescript-eslint/typescript-eslint#12856). The minimum stays 8.35.1, because a higher one makes npm install a second copy next to an older pinned one and fails with `Cannot redefine plugin "@typescript-eslint"` ([#DEPS](https://github.com/obsidianmd/eslint-plugin/pull/DEPS)).
+- Peer dependencies are ranges: `eslint >=9.19.0`, `typescript >=4.8.4` and `typescript-eslint ^8.35.1`. `@eslint/js`, `@eslint/json` and `obsidian` are no longer peers, and `@eslint/json` and `eslint-plugin-depend` use caret ranges so a project using them directly shares one copy ([#201](https://github.com/obsidianmd/eslint-plugin/pull/201), [#212](https://github.com/obsidianmd/eslint-plugin/pull/212)).
+- `typescript-eslint` 8.70.1 or later is recommended: it fixes a `no-unnecessary-type-assertion` false positive on a `Record` type alias (typescript-eslint/typescript-eslint#12856). The minimum stays 8.35.1, because a higher one makes npm install a second copy next to an older pinned one and fails with `Cannot redefine plugin "@typescript-eslint"` ([#212](https://github.com/obsidianmd/eslint-plugin/pull/212)).
 
 ### Added
 
@@ -41,14 +41,14 @@ Upgrading from 0.4.x? The breaking changes below each have a fix in
 
 ### Removed
 
-- The unused `eslint-plugin-security`, `eslint-plugin-json-schema-validator` and `@typescript-eslint/types` dependencies ([#201](https://github.com/obsidianmd/eslint-plugin/pull/201), [#DEPS](https://github.com/obsidianmd/eslint-plugin/pull/DEPS)).
+- The unused `eslint-plugin-security`, `eslint-plugin-json-schema-validator` and `@typescript-eslint/types` dependencies ([#201](https://github.com/obsidianmd/eslint-plugin/pull/201), [#212](https://github.com/obsidianmd/eslint-plugin/pull/212)).
 - The hand-written root `index.d.ts`, which was never published; the package's types are unchanged ([#206](https://github.com/obsidianmd/eslint-plugin/pull/206)).
 
 ### Fixed
 
 - `validate-manifest` never ran: it was configured only for JS/TS files. It now runs on `manifest.json`, no longer reports ordinary punctuation and accented letters in descriptions, now reports control characters such as newlines and an empty-string key, no longer crashes on keys such as `constructor`, and matches `allowedWords` case-insensitively ([#191](https://github.com/obsidianmd/eslint-plugin/pull/191)).
 - `validate-license` never ran either. It now runs on `LICENSE` files and recognises the standard MIT line (`Copyright (c) 2025 Name`, `©`, optional "by", CRLF) ([#192](https://github.com/obsidianmd/eslint-plugin/pull/192)).
-- `validate-license` reports the year only on the unchanged sample license (holder "Dynalist Inc."), so a GPL-family `LICENSE` (the FSF's own copyright line) and an older year in your own name are no longer reported ([#LICENSE](https://github.com/obsidianmd/eslint-plugin/pull/LICENSE)).
+- `validate-license` reports the year only on the unchanged sample license (holder "Dynalist Inc."), so a GPL-family `LICENSE` (the FSF's own copyright line) and an older year in your own name are no longer reported ([#211](https://github.com/obsidianmd/eslint-plugin/pull/211)).
 - English locale JSON (`en.json`, `en/**/*.json`) failed with "Unexpected token :" under `recommendedWithLocalesEn`; it is now read with the JSON language and `ui/sentence-case-json` runs ([#204](https://github.com/obsidianmd/eslint-plugin/pull/204)).
 - Core rules such as `no-irregular-whitespace` no longer abort the lint run on your own `json/json` blocks or on `LICENSE` ([#192](https://github.com/obsidianmd/eslint-plugin/pull/192), [#204](https://github.com/obsidianmd/eslint-plugin/pull/204)).
 - `regex-lookbehind` reports negative lookbehinds in regex literals, and no longer reports escaped parentheses or lookbehind-like text in character classes ([#202](https://github.com/obsidianmd/eslint-plugin/pull/202)).
