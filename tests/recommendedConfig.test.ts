@@ -1,4 +1,6 @@
 import assert from "node:assert";
+import comments from "@eslint-community/eslint-plugin-eslint-comments/configs";
+import js from "@eslint/js";
 import { ESLint, type Linter } from "eslint";
 import tseslint from "typescript-eslint";
 import plugin from "../lib/index.js";
@@ -273,6 +275,55 @@ describe("LICENSE survives a global parser override", () => {
 			"validate-license should still report"
 		);
 	});
+});
+
+// A config object without `files` applies its rules to LICENSE as well, and
+// rules written for JavaScript call `sourceCode.getAllComments()` whatever the
+// language. Without it on the plain text source code ESLint throws, which
+// aborts the whole lint run rather than just this file.
+describe("LICENSE survives rules applied to every file", () => {
+	const readmeParserOptions: Linter.Config = {
+		languageOptions: {
+			parserOptions: {
+				projectService: { allowDefaultProject: ["eslint.config.*"] },
+			},
+		},
+	};
+
+	async function lint(extra: Linter.Config) {
+		const eslint = new ESLint({
+			overrideConfigFile: true,
+			overrideConfig: [
+				...(plugin.configs.recommended as Linter.Config[]),
+				readmeParserOptions,
+				extra,
+			],
+		});
+		const [result] = await eslint.lintText(
+			"Copyright (c) 2020 Dynalist Inc.\n",
+			{ filePath: "LICENSE" }
+		);
+		return result;
+	}
+
+	for (const [name, extra] of [
+		// eslint-comments' own flat config, which carries no `files`.
+		["eslint-comments recommended", comments.recommended as Linter.Config],
+		// Re-enables no-irregular-whitespace, which the LICENSE block turns off.
+		["js recommended re-applied", js.configs.recommended],
+	] as const) {
+		it(`with ${name}`, async () => {
+			const result = await lint(extra);
+			assert.deepStrictEqual(
+				result.messages.filter(m => m.fatal).map(m => m.message),
+				[]
+			);
+			assert.ok(
+				result.messages.some(m => m.ruleId === "obsidianmd/validate-license"),
+				"validate-license should still report"
+			);
+		});
+	}
 });
 
 // The block docs/configuration.md tells users to add for a licence file under

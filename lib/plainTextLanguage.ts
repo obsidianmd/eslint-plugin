@@ -57,6 +57,14 @@ export class PlainTextSourceCode extends TextSourceCodeBase<{
         this.ast = ast;
     }
 
+    // Plain text has no comments. Rules written for JavaScript still call this
+    // unconditionally -- core `no-irregular-whitespace`, the eslint-comments
+    // rules -- and a config object without `files` hands them LICENSE too, so
+    // without it ESLint throws and the whole lint run aborts.
+    getAllComments(): never[] {
+        return [];
+    }
+
     // The AST is only two levels deep, so a node's parent is the document
     // unless the node is the document itself.
     override getParent(node: PlainTextNode): PlainTextNode | undefined {
