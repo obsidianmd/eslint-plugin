@@ -72,9 +72,9 @@ Upgrading from 0.4.x? The breaking changes below each have a fix in
 - `vault/iterate` no longer claims to be autofixable; it never fixed anything ([#213](https://github.com/obsidianmd/eslint-plugin/pull/213)).
 - `validate-license` rejects unknown options instead of silently ignoring a misspelled one ([#213](https://github.com/obsidianmd/eslint-plugin/pull/213)).
 - The published `dist/lib/manifest.d.ts` imported a `PluginManifest` type file the package never shipped; the type now lives in `lib/` and is published with it ([#213](https://github.com/obsidianmd/eslint-plugin/pull/213)).
-- `no-global-this` no longer reports `global` or `globalThis` in types (`typeof globalThis`, `{ global: boolean }` in a type literal or interface) or as a class-member, import or export name, where its fix renamed keys and broke type-checking; a shorthand `{ globalThis }` is fixed to `{ globalThis: window }` ([#FIX](https://github.com/obsidianmd/eslint-plugin/pull/FIX)).
-- `prefer-create-el` fixes `createElement()` and `createElementNS()` only for a tag name the DOM types know, so `createEl(tag)` with a `string`, a custom element or a deprecated tag (TS2345) is no longer written by `--fix`; those are reported without a fix ([#FIX](https://github.com/obsidianmd/eslint-plugin/pull/FIX)).
-- `vault/iterate` also reports `getFiles().find()` by path through `this.app.vault`, `app.vault`, `plugin.app.vault` and `this.vault`, not only a bare `vault` ([#FIX](https://github.com/obsidianmd/eslint-plugin/pull/FIX)).
+- `no-global-this` no longer reports `global` or `globalThis` in types (`typeof globalThis`, `{ global: boolean }` in a type literal or interface) or as a class-member, import or export name, where its fix renamed keys and broke type-checking; a shorthand `{ globalThis }` is fixed to `{ globalThis: window }` ([#216](https://github.com/obsidianmd/eslint-plugin/pull/216)).
+- `prefer-create-el` fixes `createElement()` and `createElementNS()` only for a tag name the DOM types know, so `createEl(tag)` with a `string`, a custom element or a deprecated tag (TS2345) is no longer written by `--fix`; those are reported without a fix ([#216](https://github.com/obsidianmd/eslint-plugin/pull/216)).
+- `vault/iterate` also reports `getFiles().find()` by path through `this.app.vault`, `app.vault`, `plugin.app.vault` and `this.vault`, not only a bare `vault` ([#216](https://github.com/obsidianmd/eslint-plugin/pull/216)).
 
 ### Documentation
 
