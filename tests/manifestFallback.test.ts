@@ -25,6 +25,10 @@ interface ChildResult {
     regexLookbehind: {
         unset: number;
     };
+    nodeGlobals: {
+        ts: boolean;
+        js: boolean;
+    };
 }
 
 interface ChildRun {
@@ -98,6 +102,20 @@ describe("manifest fallback in the linted repo's working directory", () => {
 
         it("reports with the option unset when there is no manifest", () => {
             assert.strictEqual(noManifest.result.regexLookbehind.unset, 1);
+        });
+    });
+
+    describe("Node globals in the recommended config", () => {
+        it("are added when the manifest is desktop-only", () => {
+            assert.deepStrictEqual(desktopOnly.result.nodeGlobals, { ts: true, js: true });
+        });
+
+        it("are not added when isDesktopOnly is the string \"false\"", () => {
+            assert.deepStrictEqual(stringFalse.result.nodeGlobals, { ts: false, js: false });
+        });
+
+        it("are not added when there is no manifest", () => {
+            assert.deepStrictEqual(noManifest.result.nodeGlobals, { ts: false, js: false });
         });
     });
 

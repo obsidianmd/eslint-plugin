@@ -26,6 +26,11 @@ async function recommendedFor(filename: string): Promise<Linter.Config> {
     return eslint.calculateConfigForFile(filename);
 }
 
+function declaresGlobal(config: Linter.Config, name: string): boolean {
+    const globals = config.languageOptions?.globals as Linter.Globals | undefined;
+    return globals !== undefined && Object.hasOwn(globals, name);
+}
+
 const nodeImport = "import fs from 'node:fs';";
 const ts = await recommendedFor("src/main.ts");
 const js = await recommendedFor("src/main.js");
@@ -39,5 +44,9 @@ console.log(JSON.stringify({
     },
     regexLookbehind: {
         unset: reports("regex-lookbehind", "error", "const re = /(?<=a)b/;"),
+    },
+    nodeGlobals: {
+        ts: declaresGlobal(ts, "process"),
+        js: declaresGlobal(js, "process"),
     },
 }));

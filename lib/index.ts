@@ -28,7 +28,7 @@ import validateLicense from "./rules/validateLicense.js";
 import ruleCustomMessage from "./rules/ruleCustomMessage.js";
 import noNodejsModules from "./rules/noNodejsModules.js";
 import noUnsupportedApi from "./rules/noUnsupportedApi.js";
-import { getManifest } from "./manifest.js";
+import { getManifest, isManifestDesktopOnly } from "./manifest.js";
 import { ui } from "./rules/ui/index.js";
 
 // --- Import plugins and configs for the recommended config ---
@@ -323,7 +323,7 @@ const flatRecommendedConfig: Config[] = defineConfig([
         languageOptions: {
             globals: {
                 ...globals.browser,
-                ...(manifest?.isDesktopOnly ? {
+                ...(isManifestDesktopOnly(manifest) ? {
                     ...globals.node,
                     NodeJS: "readonly"
                 } : {}),
