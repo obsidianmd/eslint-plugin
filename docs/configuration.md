@@ -49,7 +49,7 @@ See the [typescript-eslint docs on typed linting](https://typescript-eslint.io/g
 
 The recommended config is an array of flat config objects that sets up:
 
-- **ESLint core** (`@eslint/js` recommended rules)
+- **ESLint core** (`@eslint/js` recommended rules), for `.js`/`.ts` files and their variants only
 - **typescript-eslint** (`recommendedTypeChecked` for `.ts`/`.tsx`, `recommended` for `.js`/`.jsx`)
 - **All obsidianmd rules** at their default severities
 - **Third-party plugins**: `@microsoft/eslint-plugin-sdl`, `eslint-plugin-import`, `eslint-plugin-no-unsanitized`, `eslint-plugin-depend`, `@eslint-community/eslint-plugin-eslint-comments`
@@ -86,7 +86,6 @@ contributes:
   files: ["COPYING"],
   language: "obsidianmd/plain-text",
   rules: {
-    "no-irregular-whitespace": "off",
     "obsidianmd/validate-license": "warn",
   },
 }
@@ -98,6 +97,12 @@ restricting its `files`** replaces it for every file — including `LICENSE`, wh
 (say) the TypeScript parser and fail with *"was not found by the project service because the
 extension for the file (``) is non-standard"*. A `language` is only replaced by another `language`,
 so that cannot happen. The same reasoning is why `package.json` uses `language: "json/json"`.
+
+None of these files get the ESLint core rules: those are scoped to `.js`/`.ts` files and their
+variants. The same goes for any other JSON you lint with your own block, such as
+`{ files: ["**/*.json"], language: "json/json" }`; a core rule like `no-irregular-whitespace` cannot
+read a JSON file and would otherwise abort the run. If you lint other JavaScript-like files with your
+own parser — `.svelte` or `.vue`, say — add `js.configs.recommended` for them yourself.
 
 ## Using alongside stricter typescript-eslint configs
 

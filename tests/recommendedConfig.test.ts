@@ -1,6 +1,7 @@
 import assert from "node:assert";
 import comments from "@eslint-community/eslint-plugin-eslint-comments/configs";
 import js from "@eslint/js";
+import json from "@eslint/json";
 import { ESLint, type Linter } from "eslint";
 import tseslint from "typescript-eslint";
 import plugin from "../lib/index.js";
@@ -348,7 +349,8 @@ describe("LICENSE survives rules applied to every file", () => {
 	for (const [name, extra] of [
 		// eslint-comments' own flat config, which carries no `files`.
 		["eslint-comments recommended", comments.recommended as Linter.Config],
-		// Re-enables no-irregular-whitespace, which the LICENSE block turns off.
+		// Re-applies the core JS rules to every file; the recommended config
+		// scopes them to JS and TS.
 		["js recommended re-applied", js.configs.recommended],
 	] as const) {
 		it(`with ${name}`, async () => {
@@ -377,7 +379,6 @@ describe("validate-license on a user-configured filename", () => {
 					files: ["COPYING"],
 					language: "obsidianmd/plain-text",
 					rules: {
-						"no-irregular-whitespace": "off",
 						"obsidianmd/validate-license": "warn",
 					},
 				},
@@ -596,4 +597,57 @@ describe("manifest.json survives a global parser override", () => {
 			"validate-manifest should still report"
 		);
 	});
+});
+
+// The core JS rules used to sit in a block without `files`, so they reached
+// package.json, manifest.json, LICENSE and locale JSON too, where a rule such as
+// no-irregular-whitespace throws. They are scoped to JS and TS now.
+describe("core JS rules apply only to JS and TS files", () => {
+	const coreRules = Object.keys(js.configs.recommended.rules ?? {});
+
+	for (const configName of ["recommended", "recommendedWithLocalesEn"] as const) {
+		describe(configName, () => {
+			const nonCode = ["package.json", "manifest.json", "LICENSE"];
+			// Only recommendedWithLocalesEn lints locale JSON at all.
+			if (configName === "recommendedWithLocalesEn") nonCode.push("locales/en.json");
+			for (const filename of nonCode) {
+				it(`not to ${filename}`, async () => {
+					const rules = await rulesFor(configName, filename);
+					assert.deepStrictEqual(coreRules.filter(rule => rule in rules), []);
+				});
+			}
+
+			for (const filename of ["src/main.ts", "src/main.js"]) {
+				it(`still to ${filename}`, async () => {
+					const rules = await rulesFor(configName, filename);
+					assert.deepStrictEqual(coreRules.filter(rule => !(rule in rules)), []);
+				});
+			}
+		});
+	}
+});
+
+// A user who lints their other JSON with the JSON language used to get the
+// core JS rules on it from the recommended config, and no-irregular-whitespace
+// threw, aborting the whole lint run.
+describe("a user's own JSON block", () => {
+	for (const configName of ["recommended", "recommendedWithLocalesEn"] as const) {
+		it(`lints alongside ${configName}`, async () => {
+			const eslint = new ESLint({
+				overrideConfigFile: true,
+				overrideConfig: [
+					...(plugin.configs[configName] as Linter.Config[]),
+					{ files: ["**/*.json"], plugins: { json }, language: "json/json" },
+				],
+			});
+			for (const filePath of ["data/other.json", "locales/en.json"]) {
+				const [result] = await eslint.lintText('{ "a": "Fine as is" }\n', { filePath });
+				assert.deepStrictEqual(
+					result.messages.filter(m => m.fatal).map(m => m.message),
+					[],
+					filePath
+				);
+			}
+		});
+	}
 });
