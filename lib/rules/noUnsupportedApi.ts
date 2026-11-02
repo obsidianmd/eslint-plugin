@@ -2,7 +2,7 @@ import { AST_NODE_TYPES, ESLintUtils } from "@typescript-eslint/utils";
 import type { TSESTree } from "@typescript-eslint/utils";
 import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
-import { gt } from "semver";
+import { gt, valid } from "semver";
 import ts from "typescript";
 import { getManifest } from "../manifest.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
@@ -197,7 +197,9 @@ export default ruleCreator<Options, "apiNotAvailable">({
                 const potentialString = getStringLiteralValue(
                     expr.arguments[0],
                 );
-                if (potentialString !== undefined) {
+                // A version semver cannot parse would make `gt` throw and abort
+                // the whole lint run, so it does not count as a guard.
+                if (potentialString !== undefined && valid(potentialString)) {
                     return potentialString;
                 }
             }

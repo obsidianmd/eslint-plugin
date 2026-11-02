@@ -270,5 +270,30 @@ ruleTester.run("no-unsupported-api", rule, {
             options: [{ minAppVersion: "1.11.1" }],
             errors: [{ messageId: "apiNotAvailable" }],
         },
+        {
+            name: "requireApiVersion with a constant that is not a version is not a guard",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                const mode = "desktop";
+                if (requireApiVersion(mode)) {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "requireApiVersion with a literal that is not a full version is not a guard",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                if (requireApiVersion("1.10")) {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
     ],
 });
