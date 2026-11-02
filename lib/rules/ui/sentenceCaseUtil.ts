@@ -57,23 +57,35 @@ export function resolveSentenceCaseConfig(options: SentenceCaseRuleOptions): {
     };
 }
 
+// Creates a cached evaluator that returns the sentence-case suggestion for a
+// string that needs one, and undefined for a string that is already fine. It
+// is independent of the AST, so the JSON rule shares it with the ESTree rules.
+export function createSentenceCaseEvaluator(
+    evaluatorOptions: EvaluatorOptions,
+): (value: string) => string | undefined {
+    const cache = new Map<string, EvaluationResult>();
+
+    return (value) => {
+        const cached = cache.get(value);
+        const result = cached ?? evaluateSentenceCase(value, evaluatorOptions);
+        if (!cached) {
+            cache.set(value, result);
+        }
+        return result.ok || !result.suggestion ? undefined : result.suggestion;
+    };
+}
+
 // Creates a reporter function for sentence case violations with caching and auto-fix support
 export function createSentenceCaseReporter<MessageId extends string>(
     params: SentenceCaseReporterParams<MessageId>,
 ): SentenceCaseReport {
-    const cache = new Map<string, EvaluationResult>();
+    const suggestFor = createSentenceCaseEvaluator(params.evaluatorOptions);
 
     return (node, value) => {
-        const cached = cache.get(value);
-        const result = cached ?? evaluateSentenceCase(value, params.evaluatorOptions);
-        if (!cached) {
-            cache.set(value, result);
-        }
-        if (result.ok || !result.suggestion) {
+        const suggestion = suggestFor(value);
+        if (suggestion === undefined) {
             return;
         }
-
-        const suggestion = result.suggestion;
 
         if (!params.allowAutoFix) {
             params.context.report({

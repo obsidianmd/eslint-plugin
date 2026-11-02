@@ -599,6 +599,87 @@ describe("manifest.json survives a global parser override", () => {
 	});
 });
 
+// English JSON locale files are strict JSON. Under recommendedWithLocalesEn they
+// used to fall to the default JS parser, which fails on every one of them with
+// "Unexpected token :", so sentence-case-json never ran on a real file.
+describe("English JSON locale files", () => {
+	const localePaths = [
+		"en.json",
+		"en-US.json",
+		"locales/en.json",
+		"src/lang/en_GB.json",
+		"src/lang/en/common.json",
+	];
+
+	for (const filePath of localePaths) {
+		it(`${filePath} is read with the JSON language and checked`, async () => {
+			const eslint = new ESLint({
+				overrideConfigFile: true,
+				overrideConfig: plugin.configs.recommendedWithLocalesEn,
+			});
+			const config = await eslint.calculateConfigForFile(filePath);
+			assert.strictEqual(config.language, json.languages.json);
+			assert.strictEqual(
+				getSeverity(config.rules["obsidianmd/ui/sentence-case-json"]),
+				"warn"
+			);
+		});
+	}
+
+	async function lint(extra: Linter.Config[], fix = false) {
+		const eslint = new ESLint({
+			overrideConfigFile: true,
+			overrideConfig: [
+				...(plugin.configs.recommendedWithLocalesEn as Linter.Config[]),
+				...extra,
+			],
+			fix,
+		});
+		const [result] = await eslint.lintText('{ "open": "Open Settings" }\n', {
+			filePath: "locales/en.json",
+		});
+		return result;
+	}
+
+	it("reports a value that is not in sentence case", async () => {
+		const result = await lint([]);
+		assert.deepStrictEqual(
+			result.messages.map(m => m.ruleId),
+			["obsidianmd/ui/sentence-case-json"]
+		);
+	});
+
+	it("autofixes it when allowAutoFix is on", async () => {
+		const result = await lint(
+			[{ files: ["**/en.json"], rules: { "obsidianmd/ui/sentence-case-json": ["warn", { allowAutoFix: true }] } }],
+			true
+		);
+		assert.strictEqual(result.output, '{ "open": "Open settings" }\n');
+	});
+
+	it("survives a global parser override", async () => {
+		const result = await lint([
+			{
+				languageOptions: {
+					parser: tseslint.parser,
+					parserOptions: {
+						projectService: { allowDefaultProject: ["eslint.config.*"] },
+					},
+				},
+			},
+		]);
+		assert.deepStrictEqual(
+			result.messages.filter(m => m.fatal).map(m => m.message),
+			[],
+			"a global parser must not reach locale JSON"
+		);
+		assert.ok(
+			result.messages.some(m => m.ruleId === "obsidianmd/ui/sentence-case-json"),
+			"sentence-case-json should still report"
+		);
+	});
+});
+
 // The core JS rules used to sit in a block without `files`, so they reached
 // package.json, manifest.json, LICENSE and locale JSON too, where a rule such as
 // no-irregular-whitespace throws. They are scoped to JS and TS now.

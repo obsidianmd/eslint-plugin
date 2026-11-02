@@ -393,8 +393,11 @@ const flatRecommendedConfig: Config[] = defineConfig([
 
 const recommendedWithLocalesEn: Config[] = defineConfig([
     ...flatRecommendedConfig,
+    // English JSON locale files are strict JSON, so they need the JSON language
+    // to be parsed at all; under a JS parser every one was a fatal error.
     {
-        plugins: { obsidianmd: plugin },
+        plugins: { json, obsidianmd: plugin },
+        language: "json/json",
         files: [
             "**/en.json",
             "**/en*.json",

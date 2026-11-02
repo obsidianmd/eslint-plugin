@@ -58,6 +58,10 @@ The recommended config is an array of flat config objects that sets up:
 - **`manifest.json` linting** via `validate-manifest`, parsed with `@eslint/json`
 - **`LICENSE` linting** via `validate-license`, read with the plugin's `obsidianmd/plain-text` language
 
+`recommendedWithLocalesEn` adds English locale files on top: `en.json`-style JSON read with the
+`json/json` language and checked by `ui/sentence-case-json`, and `en.ts`-style modules checked by
+`ui/sentence-case-locale-module`.
+
 Because of this, you do **not** need to separately add `eslint.configs.recommended` or `tseslint.configs.recommended` — they are already included.
 
 ### Files linted beyond your source
