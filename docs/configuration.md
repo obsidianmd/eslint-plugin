@@ -365,7 +365,12 @@ A few things to keep in mind with this approach:
     files: ["manifest.json"],
     language: "json/json",
     plugins: { json, obsidianmd },
-    rules: { "obsidianmd/validate-manifest": "warn" },
+    rules: {
+      // eslint.configs.recommended above has no `files`, so it reaches
+      // manifest.json too, and this core rule cannot read JSON.
+      "no-irregular-whitespace": "off",
+      "obsidianmd/validate-manifest": "warn",
+    },
   }
   ```
 - **`LICENSE` linting** (`validate-license`) is not set up either, and is not covered by `ruleConfigs` — those presets only carry rules that apply to source files. `validate-license` needs its own config block, because `LICENSE` matches no source glob and needs its own language:
