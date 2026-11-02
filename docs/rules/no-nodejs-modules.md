@@ -37,5 +37,18 @@ being linted, so its `isDesktopOnly` is whatever JSON it holds: a non-boolean
 value -- `"false"`, `1`, `[]` -- is read as *not* desktop-only and the rule
 keeps reporting, rather than being turned off by a malformed field.
 
+Because the rule reads the manifest itself, a desktop-only plugin cannot turn
+the check back on by raising its severity: setting
+`"obsidianmd/no-nodejs-modules": "error"` still reports nothing there. Set the
+option, which takes precedence over the manifest:
+
+```js
+{
+    rules: {
+        "obsidianmd/no-nodejs-modules": ["error", { isDesktopOnly: false }],
+    },
+}
+```
+
 This rule is listed in `eslint-comments/no-restricted-disable`, so a disable
 comment is not an available escape.

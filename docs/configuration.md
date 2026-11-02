@@ -188,6 +188,11 @@ to read it from — a library, tooling, or a standalone CLI in the same repo —
 adding a `manifest.json` that served no other purpose. Note that this rule is listed in
 `eslint-comments/no-restricted-disable`, so a disable comment is not an available escape.
 
+The option also overrides the manifest in the other direction. Because the rule reads
+`isDesktopOnly` itself, a desktop-only plugin that wants the check anyway cannot get it by raising
+the severity alone; `"obsidianmd/no-nodejs-modules": "error"` still reports nothing there. Use
+`["error", { isDesktopOnly: false }]` instead.
+
 ESLint does not support disabling all rules from a plugin with a single glob like `"obsidianmd/*": "off"`. You can set each rule to `"off"` individually, or use `ruleConfigs` to generate the overrides programmatically:
 
 ```js
