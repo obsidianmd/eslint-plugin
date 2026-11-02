@@ -46,6 +46,16 @@ ruleTester.run("no-forbidden-elements", noForbiddenElements, {
             errors: [{ messageId: "doNotAttachForbiddenStyleElements" }]
         },
         {
+            name: "createEl('Link') on an element, in another case, is forbidden",
+            code: "const link = containerEl.createEl('Link');",
+            errors: [{ messageId: "doNotAttachForbiddenStyleElements" }]
+        },
+        {
+            name: "this.containerEl.createEl('style') is forbidden",
+            code: "const style = this.containerEl.createEl('style');",
+            errors: [{ messageId: "doNotAttachForbiddenStyleElements" }]
+        },
+        {
             name: "stylesheet link element with appendChild is forbidden",
             code: "const styleSheet = document.createElement('link');\n styleSheet.rel = 'stylesheet';\n styleSheet.href = this.app.vault.adapter.getResourcePath(`${this.manifest.dir}/styles.css`);\n document.head.appendChild(styleSheet);",
             errors: [{ messageId: "doNotAttachForbiddenStyleElements" }]
