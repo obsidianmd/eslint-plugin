@@ -7,6 +7,85 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Upgrading from 0.4.x? The breaking changes below each have a fix in
+[Upgrading to 0.5.0](docs/configuration.md#upgrading-to-050).
+
+### Changed
+
+- **Breaking:** Requires Node.js 20.19+, 22.13+ or 24+; Node.js 18 is no longer supported ([#203](https://github.com/obsidianmd/eslint-plugin/pull/203)).
+- **Breaking:** Moved to `@eslint/json` 2. A project that also registers `@eslint/json` itself for `package.json` or `manifest.json` must use 2.x, or ESLint reports `Cannot redefine plugin "json"` ([#203](https://github.com/obsidianmd/eslint-plugin/pull/203)).
+- **Breaking:** ESLint's core JS rules now apply only to JS and TS files, not to `package.json`, `manifest.json`, `LICENSE`, locale JSON or other files. Files linted with your own parser, such as `.vue` or `.svelte`, need `js.configs.recommended` added for them ([#204](https://github.com/obsidianmd/eslint-plugin/pull/204)).
+- **Breaking:** `ui/sentence-case` is off in `recommended` and `recommendedWithLocalesEn`, as 0.3.0 intended. Opt in with `["warn", { enforceCamelCaseLower: true }]` ([#208](https://github.com/obsidianmd/eslint-plugin/pull/208)).
+- **Breaking:** `@typescript-eslint/no-misused-promises` is replaced by `obsidianmd/no-misused-promises`. Rename `eslint-disable` comments for the old rule, or they are reported as unused ([#210](https://github.com/obsidianmd/eslint-plugin/pull/210)).
+- **Breaking:** `validate-manifest` and `validate-license` now actually run on `manifest.json` and `LICENSE`, and `prefer-active-doc` warns in `recommended`, so existing projects can see new warnings ([#191](https://github.com/obsidianmd/eslint-plugin/pull/191), [#192](https://github.com/obsidianmd/eslint-plugin/pull/192), [#187](https://github.com/obsidianmd/eslint-plugin/pull/187)).
+- **Breaking:** Because `manifest.json` and `LICENSE` are now linted, a type-checked config you add without `files` (for example a top-level `...tseslint.configs.strictTypeChecked`) aborts the run on them with "You have used a rule which requires type information". Scope it to your TypeScript files ([#191](https://github.com/obsidianmd/eslint-plugin/pull/191), [#192](https://github.com/obsidianmd/eslint-plugin/pull/192)).
+- **Breaking:** `obsidian` is no longer installed for you; it was supplied only by accident. Install it in your project (sample-plugin projects already have it), or `no-unsupported-api` reports nothing ([#201](https://github.com/obsidianmd/eslint-plugin/pull/201)).
+- In a desktop-only repository, raising `no-nodejs-modules`' severity no longer turns it back on; use `["error", { isDesktopOnly: false }]` ([#193](https://github.com/obsidianmd/eslint-plugin/pull/193)).
+- Only a literal `"isDesktopOnly": true` in `manifest.json` counts as desktop-only, for `no-nodejs-modules`, `regex-lookbehind` and the Node.js globals alike; a malformed value such as `"false"` no longer switches the checks off ([#193](https://github.com/obsidianmd/eslint-plugin/pull/193)).
+- `@typescript-eslint/no-require-imports` is off and `require` is a readonly global again, as in 0.2.9 ([#209](https://github.com/obsidianmd/eslint-plugin/pull/209)).
+- `no-unused-vars` ignores `_`-prefixed caught errors and destructured array elements again, as in 0.2.9; a dead `_x` variable is still reported ([#209](https://github.com/obsidianmd/eslint-plugin/pull/209)).
+- `ruleConfigs` now hold exactly the obsidianmd rules the recommended config enables: `no-nodejs-modules`, `rule-custom-message` and `no-misused-promises` added, `@typescript-eslint/no-deprecated` moved out ([#207](https://github.com/obsidianmd/eslint-plugin/pull/207), [#210](https://github.com/obsidianmd/eslint-plugin/pull/210)).
+- The exported `configs` are typed with your own ESLint's `Linter.Config[]`, which its `defineConfig` accepts ([#203](https://github.com/obsidianmd/eslint-plugin/pull/203)).
+- Web worker files (`**/*.worker.*`, `**/workers/**`) no longer get the window-only rules and get worker globals instead; security rules still apply ([#207](https://github.com/obsidianmd/eslint-plugin/pull/207)).
+- Peer dependencies are ranges: `eslint >=9.19.0`, `typescript >=4.8.4` and `typescript-eslint ^8.35.1`. `@eslint/js`, `@eslint/json` and `obsidian` are no longer peers, and `@eslint/json` and `eslint-plugin-depend` use caret ranges so a project using them directly shares one copy ([#201](https://github.com/obsidianmd/eslint-plugin/pull/201), [#DEPS](https://github.com/obsidianmd/eslint-plugin/pull/DEPS)).
+- `typescript-eslint` 8.70.1 or later is recommended: it fixes a `no-unnecessary-type-assertion` false positive on a `Record` type alias (typescript-eslint/typescript-eslint#12856). The minimum stays 8.35.1, because a higher one makes npm install a second copy next to an older pinned one and fails with `Cannot redefine plugin "@typescript-eslint"` ([#DEPS](https://github.com/obsidianmd/eslint-plugin/pull/DEPS)).
+
+### Added
+
+- `obsidianmd/no-misused-promises`: typescript-eslint's rule without Obsidian's chaining `then` (`Setting`, `BaseComponent`) counted as a Promise ([#210](https://github.com/obsidianmd/eslint-plugin/pull/210)).
+- `isDesktopOnly` option for `no-nodejs-modules`, for repositories without a `manifest.json` ([#193](https://github.com/obsidianmd/eslint-plugin/pull/193)).
+- `obsidianmd/plain-text` language, which reads `LICENSE`, `LICENSE.md` and `LICENSE.txt` ([#192](https://github.com/obsidianmd/eslint-plugin/pull/192)).
+- `requireApiVersion` guards accept a constant version, and any argument whose type is a single version string or a union of them, which proves its lowest member ([#169](https://github.com/obsidianmd/eslint-plugin/pull/169), [#205](https://github.com/obsidianmd/eslint-plugin/pull/205)).
+- `no-unsupported-api` recognises early exits (`if (!requireApiVersion(v)) return;`), the `else` of a negated check, `!check || api`, a `const` holding the check's result, and `&&`/`||` combinations of checks ([#205](https://github.com/obsidianmd/eslint-plugin/pull/205)).
+- This changelog ([#188](https://github.com/obsidianmd/eslint-plugin/pull/188)).
+
+### Removed
+
+- The unused `eslint-plugin-security`, `eslint-plugin-json-schema-validator` and `@typescript-eslint/types` dependencies ([#201](https://github.com/obsidianmd/eslint-plugin/pull/201), [#DEPS](https://github.com/obsidianmd/eslint-plugin/pull/DEPS)).
+- The hand-written root `index.d.ts`, which was never published; the package's types are unchanged ([#206](https://github.com/obsidianmd/eslint-plugin/pull/206)).
+
+### Fixed
+
+- `validate-manifest` never ran: it was configured only for JS/TS files. It now runs on `manifest.json`, no longer reports ordinary punctuation and accented letters in descriptions, now reports control characters such as newlines and an empty-string key, no longer crashes on keys such as `constructor`, and matches `allowedWords` case-insensitively ([#191](https://github.com/obsidianmd/eslint-plugin/pull/191)).
+- `validate-license` never ran either. It now runs on `LICENSE` files and recognises the standard MIT line (`Copyright (c) 2025 Name`, `©`, optional "by", CRLF) ([#192](https://github.com/obsidianmd/eslint-plugin/pull/192)).
+- `validate-license` reports the year only on the unchanged sample license (holder "Dynalist Inc."), so a GPL-family `LICENSE` (the FSF's own copyright line) and an older year in your own name are no longer reported ([#LICENSE](https://github.com/obsidianmd/eslint-plugin/pull/LICENSE)).
+- English locale JSON (`en.json`, `en/**/*.json`) failed with "Unexpected token :" under `recommendedWithLocalesEn`; it is now read with the JSON language and `ui/sentence-case-json` runs ([#204](https://github.com/obsidianmd/eslint-plugin/pull/204)).
+- Core rules such as `no-irregular-whitespace` no longer abort the lint run on your own `json/json` blocks or on `LICENSE` ([#192](https://github.com/obsidianmd/eslint-plugin/pull/192), [#204](https://github.com/obsidianmd/eslint-plugin/pull/204)).
+- `regex-lookbehind` reports negative lookbehinds in regex literals, and no longer reports escaped parentheses or lookbehind-like text in character classes ([#202](https://github.com/obsidianmd/eslint-plugin/pull/202)).
+- `no-unused-vars` no longer reports `using` and `await using` declarations ([#199](https://github.com/obsidianmd/eslint-plugin/pull/199)).
+- `no-nodejs-modules` no longer prints "Failed to load JSON file" when there is no `manifest.json` ([#193](https://github.com/obsidianmd/eslint-plugin/pull/193)).
+- `prefer-active-doc` false positives on `MathJax.document`, type positions, property names and local bindings named `document` ([#187](https://github.com/obsidianmd/eslint-plugin/pull/187)).
+- `no-unsupported-api` no longer aborts the run on a version semver cannot parse, in a guard or in `minAppVersion`; a `minAppVersion` such as `"0.15"` reads as 0.15.0, and anything else is checked as 0.0.0 ([#169](https://github.com/obsidianmd/eslint-plugin/pull/169), [#205](https://github.com/obsidianmd/eslint-plugin/pull/205)).
+- `no-global-this` and `prefer-window-timers` autofixes no longer break web workers ([#207](https://github.com/obsidianmd/eslint-plugin/pull/207)).
+- `prefer-create-el` no longer reports elements created in an iframe's document, where its suggestion would throw ([#207](https://github.com/obsidianmd/eslint-plugin/pull/207)).
+- `@typescript-eslint/no-deprecated` allows `caretRangeFromPoint`, the fallback before iOS 17.4 ([#207](https://github.com/obsidianmd/eslint-plugin/pull/207)).
+- Sentence-case rules keep URLs, date formats (`YYYY-MM-DD`), "REST" and example placeholder values as written, and the JSON and locale-module rules say what text they expect ([#208](https://github.com/obsidianmd/eslint-plugin/pull/208)).
+- `no-misused-promises` no longer reports `Setting` chains in callbacks or `if (component)` ([#210](https://github.com/obsidianmd/eslint-plugin/pull/210)).
+- The plugin loads on ESLint 9.19 to 9.21: since 0.3.0 it imported `eslint/config`, which arrived in 9.22 ([#201](https://github.com/obsidianmd/eslint-plugin/pull/201)).
+- Removed a misspelled `no-prototype-bultins` override that never applied; `no-prototype-builtins` stays at `error` ([#209](https://github.com/obsidianmd/eslint-plugin/pull/209)).
+- `check:eslint-docs` passes on Windows checkouts (contributors) ([#200](https://github.com/obsidianmd/eslint-plugin/pull/200)).
+
+### Documentation
+
+- An [Upgrading to 0.5.0](docs/configuration.md#upgrading-to-050) section, and a common-errors entry for type-checked configs reaching `LICENSE` and `manifest.json` ([#188](https://github.com/obsidianmd/eslint-plugin/pull/188)).
+- The README and quick-start examples ignore build output and Node build scripts as the sample plugin does, and say what to do when there is no build step and `main.js` is your source ([#207](https://github.com/obsidianmd/eslint-plugin/pull/207), [#188](https://github.com/obsidianmd/eslint-plugin/pull/188)).
+- "Files linted beyond your source" explains that `package.json`, `manifest.json` and `LICENSE` are matched by name, so ESLint must run from the project root ([#191](https://github.com/obsidianmd/eslint-plugin/pull/191), [#192](https://github.com/obsidianmd/eslint-plugin/pull/192)).
+- "Code that only runs on desktop" and "Web worker files" sections ([#193](https://github.com/obsidianmd/eslint-plugin/pull/193), [#207](https://github.com/obsidianmd/eslint-plugin/pull/207)).
+- The community scanner configuration switches `validate-manifest` and `validate-license` off under their own file globs, and uses `obsidianmd/no-misused-promises` ([#191](https://github.com/obsidianmd/eslint-plugin/pull/191), [#192](https://github.com/obsidianmd/eslint-plugin/pull/192), [#210](https://github.com/obsidianmd/eslint-plugin/pull/210)).
+- The `validate-manifest` options table lists `allowedWords`' fields under their own names, and the manual `manifest.json` example no longer crashes ESLint ([#206](https://github.com/obsidianmd/eslint-plugin/pull/206)).
+
+## [0.4.2] - 2026-08-24
+
+### Added
+
+- `ruleConfigs` export: `ruleConfigs.recommended` and `ruleConfigs.recommendedTypeChecked` are the obsidianmd rule severity presets as plain rule objects, to spread into a `rules` block when using your own ESLint and typescript-eslint setup instead of the full recommended config.
+
+### Documentation
+
+- A new [configuration guide](docs/configuration.md): why `parserOptions` is required, what the recommended config includes, layering stricter typescript-eslint configs, using only obsidianmd rules, disabling rules for specific files (including bulk-disable via `ruleConfigs`), common errors, and the community plugin scanner configuration.
+- README examples use `projectService` with `allowDefaultProject` instead of `parser` + `project`, which fixes the common "requires type information" error on `eslint.config.mts`.
+- Removed the legacy `.eslintrc` documentation; the plugin requires ESLint 9.19 or later.
+
 ## [0.4.1] - 2026-07-02
 
 ### Fixed
@@ -53,7 +132,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Disabled `sentence-case` rule by default (too broken).
+- Disabled `sentence-case` rule by default (too broken). Note: rebase commit f088476 re-enabled it in this release, so it shipped on; 0.5.0 turns it off ([#208](https://github.com/obsidianmd/eslint-plugin/pull/208)).
 - Switched to warnings for certain rules.
 
 ### Fixed
