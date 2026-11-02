@@ -1,4 +1,4 @@
-import type { ESLint } from "eslint";
+import type { ESLint, Linter } from "eslint";
 import { commands } from "./rules/commands/index.js";
 import { settingsTab } from "./rules/settingsTab/index.js";
 import { vault } from "./rules/vault/index.js";
@@ -64,7 +64,18 @@ const packageJsonPath = fs.existsSync(path.join(currentDir, "../../package.json"
     : path.join(currentDir, "../package.json");
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8")) as PackageJson;
 
-const plugin = {
+// The plugin's public type. The configs are typed with the user's own ESLint
+// (a peer dependency) rather than @eslint/config-helpers, so they fit the
+// defineConfig and Linter.Config of whichever ESLint version is installed.
+interface ObsidianmdPlugin {
+    meta: { name: string; version: string };
+    languages: { "plain-text": typeof PlainTextLanguage };
+    rules: Record<string, RuleDefinition<RuleDefinitionTypeOptions>>;
+    configs: { recommended: Linter.Config[]; recommendedWithLocalesEn: Linter.Config[] };
+    ruleConfigs: { recommended: RulesConfig; recommendedTypeChecked: RulesConfig };
+}
+
+const plugin: ObsidianmdPlugin = {
     meta: {
         name: packageJson.name,
         version: packageJson.version,
@@ -126,8 +137,8 @@ const plugin = {
         "ui/sentence-case-locale-module": ui.sentenceCaseLocaleModule,
     } as unknown as Record<string, RuleDefinition<RuleDefinitionTypeOptions>>,
     configs: {
-        recommended: [] as Config[],
-        recommendedWithLocalesEn: [] as Config[]
+        recommended: [],
+        recommendedWithLocalesEn: []
     },
     ruleConfigs: {
         recommended: {} as RulesConfig,
@@ -263,9 +274,9 @@ const flatRecommendedConfig: Config[] = defineConfig([
     {
         plugins: {
             import: importPlugin as ESLint.Plugin,
-            "@microsoft/sdl": sdl,
+            "@microsoft/sdl": sdl as ESLint.Plugin,
             depend,
-            noUnsanitizedPlugin,
+            noUnsanitizedPlugin: noUnsanitizedPlugin as ESLint.Plugin,
             "eslint-comments": eslintComments,
         },
         files: ['**/*.{js,cjs,mjs,jsx}'],
@@ -278,9 +289,9 @@ const flatRecommendedConfig: Config[] = defineConfig([
     {
         plugins: {
             import: importPlugin as ESLint.Plugin,
-            "@microsoft/sdl": sdl,
+            "@microsoft/sdl": sdl as ESLint.Plugin,
             depend,
-            noUnsanitizedPlugin,
+            noUnsanitizedPlugin: noUnsanitizedPlugin as ESLint.Plugin,
             "eslint-comments": eslintComments,
         },
         files: ['**/*.{ts,cts,mts,tsx}'],
@@ -440,8 +451,8 @@ const recommendedWithLocalesEn: Config[] = defineConfig([
 ]);
 
 plugin.configs = {
-    recommended: flatRecommendedConfig,
-    recommendedWithLocalesEn
+    recommended: flatRecommendedConfig as Linter.Config[],
+    recommendedWithLocalesEn: recommendedWithLocalesEn as Linter.Config[]
 };
 
 plugin.ruleConfigs = {
