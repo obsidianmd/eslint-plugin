@@ -1,0 +1,3 @@
+# eslint-doc-generator writes its lists with LF (see .editorconfig), so the docs it
+# checks must stay LF in every checkout, including core.autocrlf=true on Windows.
+*.md text eol=lf

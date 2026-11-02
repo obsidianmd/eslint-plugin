@@ -1,6 +1,6 @@
 import { RuleTester } from "@typescript-eslint/rule-tester";
 import tseslintPlugin from "@typescript-eslint/eslint-plugin";
-import { noUnusedExpressionsOptions } from "../lib/ruleOptions.js";
+import { noUnusedExpressionsOptions, noUnusedVarsOptions } from "../lib/ruleOptions.js";
 
 const ruleTester = new RuleTester();
 
@@ -9,24 +9,40 @@ ruleTester.run("ts-no-unused-vars", tseslintPlugin.rules["no-unused-vars"], {
         {
             name: "used variable is allowed",
             code: "const x = 1; console.log(x);",
-            options: [{ args: "none", ignoreRestSiblings: true }],
+            options: noUnusedVarsOptions,
         },
         {
             name: "unused function argument is allowed with args: none",
             code: "function foo(unusedParam: string) { return 1; }; foo('test');",
-            options: [{ args: "none", ignoreRestSiblings: true }],
+            options: noUnusedVarsOptions,
         },
         {
             name: "rest sibling destructuring is allowed with ignoreRestSiblings: true",
             code: "const settings = { toRemove: 'x', other: 'y' }; const { toRemove, ...rest } = settings; console.log(rest);",
-            options: [{ args: "none", ignoreRestSiblings: true }],
+            options: noUnusedVarsOptions,
+        },
+        {
+            name: "unused using declaration is allowed",
+            code: "declare function lock(): Disposable; function run() { using _sourceLock = lock(); } run();",
+            options: noUnusedVarsOptions,
+        },
+        {
+            name: "unused await using declaration is allowed",
+            code: "declare function lock(): AsyncDisposable; async function run() { await using asyncLock = lock(); } run();",
+            options: noUnusedVarsOptions,
         },
     ],
     invalid: [
         {
             name: "unused variable is forbidden",
             code: "const unused = 1;",
-            options: [{ args: "none", ignoreRestSiblings: true }],
+            options: noUnusedVarsOptions,
+            errors: [{ messageId: "unusedVar" }],
+        },
+        {
+            name: "unused underscore-prefixed variable is still forbidden",
+            code: "const _unused = 1;",
+            options: noUnusedVarsOptions,
             errors: [{ messageId: "unusedVar" }],
         },
     ],

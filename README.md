@@ -16,65 +16,41 @@ npm install eslint-plugin-obsidianmd --save-dev
 
 ## Usage
 
-With the release of ESLint v9, the default configuration file is now `eslint.config.js`.
+Add the recommended configuration to your `eslint.config.mjs`. This enables all recommended rules, including ESLint core, typescript-eslint type-checked rules, and Obsidian-specific rules.
 
-### Flat Config (`eslint.config.js`) - Recommended for ESLint v9+
-
-To use the recommended configuration, add it to your `eslint.config.js` file. This will enable all the recommended rules.
-
-```javascript
+```js
 // eslint.config.mjs
-import tsparser from "@typescript-eslint/parser";
 import { defineConfig } from "eslint/config";
 import obsidianmd from "eslint-plugin-obsidianmd";
 
 export default defineConfig([
   ...obsidianmd.configs.recommended,
   {
-    files: ["**/*.ts"],
     languageOptions: {
-      parser: tsparser,
-      parserOptions: { project: "./tsconfig.json" },
+      parserOptions: {
+        projectService: {
+          allowDefaultProject: ["eslint.config.*"],
+        },
+      },
     },
-
-    // You can add your own configuration to override or add rules
     rules: {
       // example: turn off a rule from the recommended set
       "obsidianmd/sample-names": "off",
-      // example: add a rule not in the recommended set and set its severity
-      "obsidianmd/prefer-file-manager-trash": "error",
     },
   },
 ]);
-
 ```
 
-### Legacy Config (`.eslintrc`)
+The `parserOptions` block is required because the recommended config includes type-checked rules that need access to your TypeScript project. `allowDefaultProject` ensures files not listed in your `tsconfig.json` (like the ESLint config file itself) are still linted without errors. See the [configuration guide](docs/configuration.md) for details on why this is needed and how to customize it.
 
-<details>
-<summary>Click here for ESLint v8 and older</summary>
+> **Note:** You do not need to separately add `eslint.configs.recommended` or `tseslint.configs.recommended` — both are already included in the recommended config.
 
-To use the recommended configuration, extend it in your `.eslintrc` file:
+The recommended config also lints files that are not source, matching `package.json`,
+`manifest.json` and `LICENSE` by name. **Run ESLint from the project root**: a lint script scoped to your sources —
+`eslint src` — never visits them, and their checks silently do nothing. See
+[Files linted beyond your source](docs/configuration.md#files-linted-beyond-your-source).
 
-```json
-{
-  "extends": ["plugin:obsidianmd/recommended"]
-}
-```
-
-You can also override or add rules:
-
-```json
-{
-  "extends": ["plugin:obsidianmd/recommended"],
-  "rules": {
-    "obsidianmd/sample-names": "off",
-    "obsidianmd/prefer-file-manager-trash": "error"
-  }
-}
-```
-
-</details>
+For advanced usage — layering stricter typescript-eslint configs, ignoring files, disabling rules for non-plugin code, and troubleshooting common errors — see the [configuration guide](docs/configuration.md).
 
 ## Configurations
 
@@ -160,7 +136,6 @@ Checks UI strings for sentence case. The rule reports warnings but doesn't chang
 
 ```js
 // eslint.config.mjs
-import tsparser from "@typescript-eslint/parser";
 import { defineConfig } from "eslint/config";
 import obsidianmd from "eslint-plugin-obsidianmd";
 
@@ -170,10 +145,12 @@ export default defineConfig([
   // ...obsidianmd.configs.recommendedWithLocalesEn,
 
   {
-    files: ["**/*.ts"],
     languageOptions: {
-      parser: tsparser,
-      parserOptions: { project: "./tsconfig.json" },
+      parserOptions: {
+        projectService: {
+          allowDefaultProject: ["eslint.config.*"],
+        },
+      },
     },
 
     // Optional project overrides
