@@ -37,7 +37,7 @@ type IgnorableCheck = (typeof IGNORABLE_CHECKS)[number];
 // Extended_Pictographic code point, so their parts are listed separately:
 // regional indicators, U+FE0F (emoji presentation) and U+20E3 (keycap).
 const DISALLOWED_DESCRIPTION_CHARS =
-    /[\p{Extended_Pictographic}\p{Regional_Indicator}️⃣\p{Cc}\p{Cf}\p{Cs}]/u;
+    /[\p{Extended_Pictographic}\p{Regional_Indicator}\u{FE0F}\u{20E3}\p{Cc}\p{Cf}\p{Cs}]/u;
 
 interface ValidateManifestOptions {
     /**
