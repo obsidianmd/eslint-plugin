@@ -208,20 +208,21 @@ describe("recommendedWithLocalesEn config", () => {
 describe("file-scoped rules", () => {
 	for (const configName of ["recommended", "recommendedWithLocalesEn"] as const) {
 		describe(configName, () => {
-			let licenseRules: Record<string, any>;
 			let tsRules: Record<string, any>;
 
 			before(async () => {
-				licenseRules = await rulesFor(configName, "LICENSE");
 				tsRules = await rulesFor(configName, "src/main.ts");
 			});
 
-			it("validate-license should be 'warn' for LICENSE", () => {
-				assert.strictEqual(
-					getSeverity(licenseRules["obsidianmd/validate-license"]),
-					"warn"
-				);
-			});
+			for (const filename of ["LICENSE", "LICENSE.md", "LICENSE.txt"]) {
+				it(`validate-license should be 'warn' for ${filename}`, async () => {
+					const licenseRules = await rulesFor(configName, filename);
+					assert.strictEqual(
+						getSeverity(licenseRules["obsidianmd/validate-license"]),
+						"warn"
+					);
+				});
+			}
 
 			it("validate-license should not apply to source files", () => {
 				const rule = "obsidianmd/validate-license";
