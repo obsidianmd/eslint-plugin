@@ -85,6 +85,9 @@ describe("recommended config", () => {
 			const fileSpecificRules = new Set([
 				"obsidianmd/ui/sentence-case-json",
 				"obsidianmd/ui/sentence-case-locale-module",
+				// Scoped to manifest.json, which can never match a JS/TS glob.
+				// Asserted separately in "file-scoped rules" below.
+				"obsidianmd/validate-manifest",
 				// Scoped to LICENSE, which can never match a JS/TS glob.
 				// Asserted separately in "file-scoped rules" below.
 				"obsidianmd/validate-license",
@@ -201,11 +204,45 @@ describe("recommendedWithLocalesEn config", () => {
 	});
 });
 
+// Regression guard for the defect these tests did not catch: validate-manifest
+// used to live in the block spread into the JS and TS globs, so no manifest.json
+// could ever match and the rule never ran. Resolving the config for the file the
+// rule actually targets is the only assertion that notices.
+describe("file-scoped rules", () => {
+	for (const configName of ["recommended", "recommendedWithLocalesEn"] as const) {
+		describe(configName, () => {
+			let manifestRules: Record<string, any>;
+			let tsRules: Record<string, any>;
+
+			before(async () => {
+				manifestRules = await rulesFor(configName, "manifest.json");
+				tsRules = await rulesFor(configName, "src/main.ts");
+			});
+
+			it("validate-manifest should be 'warn' for manifest.json", () => {
+				assert.strictEqual(
+					getSeverity(manifestRules["obsidianmd/validate-manifest"]),
+					"warn"
+				);
+			});
+
+			it("validate-manifest should not apply to source files", () => {
+				const rule = "obsidianmd/validate-manifest";
+				const severity = getSeverity(tsRules[rule]);
+				assert.ok(
+					severity === "off" || !(rule in tsRules),
+					`${rule} targets a non-source file but is enabled for .ts, got: ${severity}`
+				);
+			});
+		});
+	}
+});
+
 // Regression guard for the defect these tests did not catch: validate-license
 // used to live in the block spread into the JS and TS globs, so no LICENSE could
 // ever match and the rule never ran. Resolving the config for the file the rule
 // actually targets is the only assertion that notices.
-describe("file-scoped rules", () => {
+describe("file-scoped rules (LICENSE)", () => {
 	for (const configName of ["recommended", "recommendedWithLocalesEn"] as const) {
 		describe(configName, () => {
 			let tsRules: Record<string, any>;
@@ -434,7 +471,6 @@ describe("scanner-aligned severities", () => {
 			"obsidianmd/prefer-get-language",
 			"obsidianmd/prefer-abstract-input-suggest",
 			"obsidianmd/prefer-window-timers",
-			"obsidianmd/validate-manifest",
 			"obsidianmd/ui/sentence-case",
 		];
 		for (const rule of warnRules) {
@@ -444,6 +480,13 @@ describe("scanner-aligned severities", () => {
 				`non-escalated rule ${rule} should be 'warn'`
 			);
 		}
+	});
+
+	it("no-nodejs-modules should be at warn for both TS and JS", () => {
+		// The rule reads the manifest's isDesktopOnly itself, so the config no
+		// longer switches it off; manifestFallback.test.ts covers a desktop-only manifest.
+		assert.strictEqual(getSeverity(tsRules["obsidianmd/no-nodejs-modules"]), "warn");
+		assert.strictEqual(getSeverity(jsRules["obsidianmd/no-nodejs-modules"]), "warn");
 	});
 
 	it("non-escalated type-checked rules should be at warn", () => {
@@ -511,5 +554,44 @@ describe("type-checked rule guard", () => {
 				`${rule} requires type info but is missing from TS config — add it to recommendedPluginRulesConfigTypeChecked`
 			);
 		}
+	});
+});
+
+// The README's own setup ends with a global block that sets parser options
+// without restricting `files`. manifest.json is read with the `json/json`
+// language, which a global `languageOptions.parser` cannot replace; if the block
+// used a parser instead, the TypeScript parser would reach manifest.json and
+// fail fatally.
+describe("manifest.json survives a global parser override", () => {
+	async function lint(filePath: string, code: string) {
+		const eslint = new ESLint({
+			overrideConfigFile: true,
+			overrideConfig: [
+				...plugin.configs.recommended,
+				{
+					languageOptions: {
+						parser: tseslint.parser,
+						parserOptions: {
+							projectService: { allowDefaultProject: ["eslint.config.*"] },
+						},
+					},
+				},
+			],
+		});
+		const [result] = await eslint.lintText(code, { filePath });
+		return result;
+	}
+
+	it("manifest.json is still read by the JSON language", async () => {
+		const result = await lint("manifest.json", '{ "id": "sample-plugin" }\n');
+		assert.deepStrictEqual(
+			result.messages.filter(m => m.fatal).map(m => m.message),
+			[],
+			"a global parser must not reach manifest.json"
+		);
+		assert.ok(
+			result.messages.some(m => m.ruleId === "obsidianmd/validate-manifest"),
+			"validate-manifest should still report"
+		);
 	});
 });

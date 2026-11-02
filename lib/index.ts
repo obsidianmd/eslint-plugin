@@ -28,7 +28,7 @@ import validateLicense from "./rules/validateLicense.js";
 import ruleCustomMessage from "./rules/ruleCustomMessage.js";
 import noNodejsModules from "./rules/noNodejsModules.js";
 import noUnsupportedApi from "./rules/noUnsupportedApi.js";
-import { getManifest } from "./manifest.js";
+import { getManifest, isManifestDesktopOnly } from "./manifest.js";
 import { PlainTextLanguage } from "./plainTextLanguage.js";
 import { ui } from "./rules/ui/index.js";
 
@@ -178,10 +178,9 @@ const recommendedPluginRulesConfigBase: RulesConfig = {
     "obsidianmd/prefer-active-doc": "off",
     "obsidianmd/regex-lookbehind": "error",
     "obsidianmd/sample-names": "error",
-    "obsidianmd/validate-manifest": "warn",
-    // validate-license is NOT here: it lints LICENSE, which cannot match the
-    // JS/TS globs this block is spread into. It gets its own file-scoped block
-    // below.
+    // validate-manifest and validate-license are NOT here: they lint
+    // manifest.json and LICENSE, neither of which can match the JS/TS globs this
+    // block is spread into. They get their own file-scoped blocks below.
     "obsidianmd/ui/sentence-case": ["warn", { enforceCamelCaseLower: true }],
 }
 
@@ -191,7 +190,7 @@ const recommendedPluginRulesConfig: RulesConfig = {
     ...recommendedPluginRulesConfigTypeChecked,
 };
 
-import { restrictedGlobalsOptions, restrictedImportsOptions, noUnusedExpressionsOptions } from "./ruleOptions.js";
+import { restrictedGlobalsOptions, restrictedImportsOptions, noUnusedExpressionsOptions, noUnusedVarsOptions } from "./ruleOptions.js";
 
 const flatRecommendedGeneralRules: RulesConfig = {
     "no-unused-vars": "off",
@@ -213,7 +212,7 @@ const flatRecommendedGeneralRules: RulesConfig = {
     "no-alert": "warn",
     "no-undef": "warn",
     "@typescript-eslint/ban-ts-comment": "off",
-    "@typescript-eslint/no-unused-vars": ["warn", { args: "none", ignoreRestSiblings: true }],
+    "@typescript-eslint/no-unused-vars": ["warn", ...noUnusedVarsOptions],
     "@typescript-eslint/no-unused-expressions": ["warn", ...noUnusedExpressionsOptions],
     "@typescript-eslint/require-await": "off",
     "@typescript-eslint/no-explicit-any": [
@@ -222,8 +221,9 @@ const flatRecommendedGeneralRules: RulesConfig = {
     ],
     "@microsoft/sdl/no-document-write": "warn",
     "@microsoft/sdl/no-inner-html": "warn",
-    "obsidianmd/no-nodejs-modules":
-        manifest && manifest.isDesktopOnly ? "off" : "warn",
+    // The rule resolves the desktop-only signal itself, defaulting to the
+    // manifest, so the severity no longer has to be computed here.
+    "obsidianmd/no-nodejs-modules": "warn",
     "import/no-extraneous-dependencies": "warn",
     "obsidianmd/rule-custom-message": [
         "error",
@@ -300,6 +300,21 @@ const flatRecommendedConfig: Config[] = defineConfig([
             ]
         }
     },
+    // manifest.json is strict JSON, so it needs the JSON language to be parsed
+    // at all — under the JS/TS globs above it was never linted.
+    {
+        files: ['manifest.json'],
+        language: 'json/json',
+        extends: [tseslint.configs.disableTypeChecked as Config],
+        plugins: {
+            json,
+            obsidianmd: plugin
+        },
+        rules: {
+            "no-irregular-whitespace": "off",
+            "obsidianmd/validate-manifest": "warn"
+        }
+    },
     // LICENSE has no extension and is not code, so it needs both an explicit
     // glob and a language that can read it.
     {
@@ -346,7 +361,7 @@ const flatRecommendedConfig: Config[] = defineConfig([
         languageOptions: {
             globals: {
                 ...globals.browser,
-                ...(manifest?.isDesktopOnly ? {
+                ...(isManifestDesktopOnly(manifest) ? {
                     ...globals.node,
                     NodeJS: "readonly"
                 } : {}),

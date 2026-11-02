@@ -55,21 +55,22 @@ The recommended config is an array of flat config objects that sets up:
 - **Third-party plugins**: `@microsoft/eslint-plugin-sdl`, `eslint-plugin-import`, `eslint-plugin-no-unsanitized`, `eslint-plugin-depend`, `@eslint-community/eslint-plugin-eslint-comments`
 - **Obsidian globals** (`activeDocument`, `activeWindow`, `createEl`, etc.)
 - **`package.json` linting** via `eslint-plugin-depend` (ban common micro-utilities)
+- **`manifest.json` linting** via `validate-manifest`, parsed with `@eslint/json`
 - **`LICENSE` linting** via `validate-license`, read with the plugin's `obsidianmd/plain-text` language
 
 Because of this, you do **not** need to separately add `eslint.configs.recommended` or `tseslint.configs.recommended` — they are already included.
 
 ### Files linted beyond your source
 
-The recommended config lints more than `.ts` and `.js`. It matches `package.json` and `LICENSE` by
-name, each read with its own language, so **ESLint has to be pointed at the project root for those
-checks to run at all**. A lint script scoped to your sources — `eslint src` — will never visit
-them, and the rules covering them silently do nothing:
+The recommended config lints more than `.ts` and `.js`. It matches `package.json`, `manifest.json`
+and `LICENSE` by name, each read with its own language, so **ESLint has to be pointed at the project
+root for those checks to run at all**. A lint script scoped to your sources — `eslint src` — will
+never visit them, and the rules covering them silently do nothing:
 
 ```jsonc
 // package.json
 "scripts": {
-  "lint": "eslint .",       // package.json and LICENSE are checked
+  "lint": "eslint .",       // package.json, manifest.json and LICENSE are checked
   "lint:src": "eslint src"  // they are not
 }
 ```
@@ -207,6 +208,32 @@ export default defineConfig([
 ]);
 ```
 
+### Code that only runs on desktop
+
+`no-nodejs-modules` reports because Node APIs are unavailable on mobile. Where that does not apply —
+code that never runs inside Obsidian at all, such as a standalone CLI — say so with the rule's
+option, scoped with `files` to that code, so the plugin source beside it is still checked:
+
+```js
+{
+  files: ["cli/**"],
+  rules: {
+    "obsidianmd/no-nodejs-modules": ["warn", { isDesktopOnly: true }],
+  },
+}
+```
+
+The option defaults to the `isDesktopOnly` value of a `manifest.json` in the working directory, so a
+desktop-only plugin needs no configuration at all. It exists for the case where there is no manifest
+to read it from — a library, tooling, or a standalone CLI in the same repo — which previously meant
+adding a `manifest.json` that served no other purpose. Note that this rule is listed in
+`eslint-comments/no-restricted-disable`, so a disable comment is not an available escape.
+
+The option also overrides the manifest in the other direction. Because the rule reads
+`isDesktopOnly` itself, a desktop-only plugin that wants the check anyway cannot get it by raising
+the severity alone; `"obsidianmd/no-nodejs-modules": "error"` still reports nothing there. Use
+`["error", { isDesktopOnly: false }]` instead.
+
 ESLint does not support disabling all rules from a plugin with a single glob like `"obsidianmd/*": "off"`. You can set each rule to `"off"` individually, or use `ruleConfigs` to generate the overrides programmatically:
 
 ```js
@@ -328,7 +355,19 @@ A few things to keep in mind with this approach:
 
 - **Obsidian globals** must be declared manually. The recommended config does this for you; here you need to add them yourself. The list above covers the most common ones. `DomElementInfo`, `SvgElementInfo`, `isBoolean`, `nextFrame`, and `ready` are also available.
 - **Third-party plugins** bundled by the recommended config (`@microsoft/eslint-plugin-sdl`, `eslint-plugin-import`, `eslint-plugin-no-unsanitized`, `eslint-plugin-depend`, `eslint-plugin-eslint-comments`) are not included. Add them separately if you want them.
-- **`package.json` and `manifest.json` linting** (`validate-manifest`, `depend/ban-dependencies`) is not set up. The `validate-manifest` rule will work on `.json` files only if you have a JSON parser configured.
+- **`package.json` and `manifest.json` linting** (`validate-manifest`, `depend/ban-dependencies`) is not set up, and is not covered by `ruleConfigs` — those presets only carry rules that apply to source files. `validate-manifest` needs its own config block, because `manifest.json` matches no source glob and needs the JSON language to be parsed at all:
+
+  ```js
+  import json from "@eslint/json";
+
+  // in the defineConfig([...]) array:
+  {
+    files: ["manifest.json"],
+    language: "json/json",
+    plugins: { json, obsidianmd },
+    rules: { "obsidianmd/validate-manifest": "warn" },
+  }
+  ```
 - **`LICENSE` linting** (`validate-license`) is not set up either, and is not covered by `ruleConfigs` — those presets only carry rules that apply to source files. `validate-license` needs its own config block, because `LICENSE` matches no source glob and needs its own language:
 
   ```js
@@ -389,6 +428,8 @@ languageOptions: {
 }
 ```
 
+The `manifest.json` entry and `extraFileExtensions` exist to let the TypeScript parser read `manifest.json`. The recommended config reads it with the `json/json` language instead, so neither setting reaches it, and the configuration below leaves both out.
+
 You do not need to replicate this configuration. The recommended config with the [quick start](#quick-start) setup is sufficient for local development. This section is provided for transparency so plugin authors understand what the scanner checks and what it skips.
 
 <details>
@@ -406,9 +447,8 @@ export default defineConfig([
     languageOptions: {
       parserOptions: {
         projectService: {
-          allowDefaultProject: ["eslint.config.*", "manifest.json"],
+          allowDefaultProject: ["eslint.config.*"],
         },
-        extraFileExtensions: [".json"],
       },
     },
   },
@@ -437,12 +477,19 @@ export default defineConfig([
       "@typescript-eslint/no-base-to-string": "off",
       "import/no-unresolved": "off",
 
-      // Scanner handles this separately
-      "obsidianmd/validate-manifest": "off",
-
       // Old plugins should not change their command ids
       "obsidianmd/commands/no-command-in-command-id": "off",
       "obsidianmd/commands/no-plugin-id-in-command-id": "off",
+    },
+  },
+
+  {
+    // Scanner handles this separately. It must be switched off under the glob
+    // the rule actually runs on -- manifest.json matches no source glob, so an
+    // "off" in the block above would not reach it.
+    files: ["manifest.json"],
+    rules: {
+      "obsidianmd/validate-manifest": "off",
     },
   },
 

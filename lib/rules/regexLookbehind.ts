@@ -1,8 +1,34 @@
-import { getManifest } from "../manifest.js";
+import { isManifestDesktopOnly } from "../manifest.js";
 import { TSESTree } from "@typescript-eslint/utils";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 type Options = [{ isDesktopOnly?: boolean }?];
+
+/**
+ * Whether a regex source contains a lookbehind group. Escaped characters and character classes are
+ * skipped, because `\(?<=` and `[(?<!]` match those characters literally and parse everywhere.
+ */
+function hasLookbehind(pattern: string): boolean {
+    let inClass = false;
+    for (let i = 0; i < pattern.length; i++) {
+        const char = pattern[i];
+        if (char === "\\") {
+            i++;
+        } else if (inClass) {
+            if (char === "]") {
+                inClass = false;
+            }
+        } else if (char === "[") {
+            inClass = true;
+        } else if (
+            pattern.startsWith("(?<", i) &&
+            (pattern[i + 3] === "=" || pattern[i + 3] === "!")
+        ) {
+            return true;
+        }
+    }
+    return false;
+}
 
 export default ruleCreator<Options, "lookbehind">({
     meta: {
@@ -32,7 +58,7 @@ export default ruleCreator<Options, "lookbehind">({
     defaultOptions: [{}],
     create(context) {
         const options = context.options[0] || {};
-        const isDesktopOnly = options.isDesktopOnly ?? getManifest()?.isDesktopOnly;
+        const isDesktopOnly = options.isDesktopOnly ?? isManifestDesktopOnly();
         return {
             Literal(node: TSESTree.Literal) {
                 // Check RegExp literals
@@ -41,7 +67,7 @@ export default ruleCreator<Options, "lookbehind">({
                     node.regex &&
                     typeof node.regex.pattern === "string"
                 ) {
-                    if (/\(\?<=|\(\?<!\)/.test(node.regex.pattern)) {
+                    if (hasLookbehind(node.regex.pattern)) {
                         if (!isDesktopOnly) {
                             context.report({
                                 node,
@@ -53,7 +79,7 @@ export default ruleCreator<Options, "lookbehind">({
                 // Also check string literals (for RegExp constructor)
                 if (
                     typeof node.value === "string" &&
-                    /(\?<=|\?<!)/.test(node.value)
+                    hasLookbehind(node.value)
                 ) {
                     if (!isDesktopOnly) {
                         context.report({
