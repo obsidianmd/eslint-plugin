@@ -258,7 +258,14 @@ const flatRecommendedGeneralRules: RulesConfig = {
 };
 
 const flatRecommendedConfig: Config[] = defineConfig([
-    js.configs.recommended,
+    // Core JS rules are for JS and TS only. Without `files` they reached every
+    // other file too -- package.json, manifest.json, LICENSE, locale JSON, and
+    // any JSON a user lints -- where a rule like no-irregular-whitespace throws
+    // because that source code has no comments to walk.
+    {
+        ...js.configs.recommended,
+        files: ['**/*.{ts,cts,mts,tsx,js,cjs,mjs,jsx}'],
+    },
     {
         plugins: {
             obsidianmd: plugin
@@ -303,7 +310,6 @@ const flatRecommendedConfig: Config[] = defineConfig([
             json
         },
         rules: {
-            "no-irregular-whitespace": "off",
             "depend/ban-dependencies": [
                 "error", {
                     "presets": ["native", "microutilities", "preferred"]
@@ -322,7 +328,6 @@ const flatRecommendedConfig: Config[] = defineConfig([
             obsidianmd: plugin
         },
         rules: {
-            "no-irregular-whitespace": "off",
             "obsidianmd/validate-manifest": "warn"
         }
     },
@@ -336,7 +341,6 @@ const flatRecommendedConfig: Config[] = defineConfig([
             obsidianmd: plugin
         },
         rules: {
-            "no-irregular-whitespace": "off",
             "obsidianmd/validate-license": "warn"
         }
     },
@@ -400,8 +404,11 @@ const flatRecommendedConfig: Config[] = defineConfig([
 
 const recommendedWithLocalesEn: Config[] = defineConfig([
     ...flatRecommendedConfig,
+    // English JSON locale files are strict JSON, so they need the JSON language
+    // to be parsed at all; under a JS parser every one was a fatal error.
     {
-        plugins: { obsidianmd: plugin },
+        plugins: { json, obsidianmd: plugin },
+        language: "json/json",
         files: [
             "**/en.json",
             "**/en*.json",

@@ -1,31 +1,24 @@
-import { TSESLint, TSESTree } from "@typescript-eslint/utils";
-import { docsUrl, ruleCreator } from "../../ruleCreator.js";
+import type { JSONRuleDefinition } from "@eslint/json";
+import { docsUrl } from "../../ruleCreator.js";
 import {
-    createSentenceCaseReporter,
-    getContextFilename,
+    createSentenceCaseEvaluator,
     isEnglishLocalePath,
     resolveSentenceCaseConfig,
-    SentenceCaseRuleOptions,
+    SentenceCaseRuleConfig,
 } from "./sentenceCaseUtil.js";
 
-type MessageId = "useSentenceCase";
+// Locale JSON is strict JSON, so it is parsed by `@eslint/json` into a Momoa
+// AST (Document -> Object -> Member -> String), not into the ESTree shape the
+// other sentence-case rules see. `JSONRuleDefinition` types the visitor
+// accordingly.
+type SentenceCaseJsonRuleDefinition = JSONRuleDefinition<{
+    MessageIds: "useSentenceCase";
+    RuleOptions: [SentenceCaseRuleConfig?];
+}>;
 
-
-// Default configuration with no custom options specified
-const defaultOptions: SentenceCaseRuleOptions = [{}] as const;
-
-// Checks if the current file is an English locale JSON file
-function isInJsonFile(
-    context: TSESLint.RuleContext<MessageId, SentenceCaseRuleOptions>,
-): boolean {
-    const file = getContextFilename(context);
-    return file != null && isEnglishLocalePath(file, ["json"]);
-}
-
-
-export default ruleCreator({
+const rule: SentenceCaseJsonRuleDefinition = {
     meta: {
-        type: "suggestion" as const,
+        type: "suggestion",
         docs: {
             description: "Enforce sentence case for English JSON locale strings",
             url: docsUrl("sentence-case-json", "ui"),
@@ -77,31 +70,37 @@ export default ruleCreator({
             useSentenceCase: "Use sentence case for UI text.",
         },
     },
-    defaultOptions,
-    create(context: TSESLint.RuleContext<MessageId, SentenceCaseRuleOptions>) {
-        if (!isInJsonFile(context)) return {};
+    create(context) {
+        // Only English locale files hold English UI text.
+        if (!isEnglishLocalePath(context.physicalFilename, ["json"])) {
+            return {};
+        }
         const { evaluatorOptions, allowAutoFix } = resolveSentenceCaseConfig(context.options);
-
-        const reportIfNeeded = createSentenceCaseReporter({
-            context,
-            evaluatorOptions,
-            allowAutoFix,
-            messageId: "useSentenceCase"
-        });
+        const suggestFor = createSentenceCaseEvaluator(evaluatorOptions);
 
         return {
-            // Check string literals in JSON files
-            Literal(node: TSESTree.Literal) {
-                if (typeof node.value !== "string") return;
-                const parent = node.parent;
-                if (!parent) return;
-                if (parent.type === TSESTree.AST_NODE_TYPES.Property && parent.value === node) {
-                    reportIfNeeded(node, node.value);
-                } else if (parent.type === TSESTree.AST_NODE_TYPES.ArrayExpression) {
-                    // Skip array elements for now
+            // A member's string value is UI text; its key is an identifier.
+            // Array elements are Elements, not Members, so they stay skipped.
+            Member(member) {
+                const value = member.value;
+                if (value.type !== "String") {
                     return;
                 }
+                const suggestion = suggestFor(value.value);
+                if (suggestion === undefined) {
+                    return;
+                }
+                context.report({
+                    node: value,
+                    messageId: "useSentenceCase",
+                    data: { suggestion },
+                    ...(allowAutoFix
+                        ? { fix: (fixer) => fixer.replaceText(value, JSON.stringify(suggestion)) }
+                        : {}),
+                });
             },
         };
     },
-});
+};
+
+export default rule;

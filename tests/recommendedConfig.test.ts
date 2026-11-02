@@ -1,6 +1,7 @@
 import assert from "node:assert";
 import comments from "@eslint-community/eslint-plugin-eslint-comments/configs";
 import js from "@eslint/js";
+import json from "@eslint/json";
 import { ESLint, type Linter } from "eslint";
 import tseslint from "typescript-eslint";
 import plugin from "../lib/index.js";
@@ -348,7 +349,8 @@ describe("LICENSE survives rules applied to every file", () => {
 	for (const [name, extra] of [
 		// eslint-comments' own flat config, which carries no `files`.
 		["eslint-comments recommended", comments.recommended as Linter.Config],
-		// Re-enables no-irregular-whitespace, which the LICENSE block turns off.
+		// Re-applies the core JS rules to every file; the recommended config
+		// scopes them to JS and TS.
 		["js recommended re-applied", js.configs.recommended],
 	] as const) {
 		it(`with ${name}`, async () => {
@@ -377,7 +379,6 @@ describe("validate-license on a user-configured filename", () => {
 					files: ["COPYING"],
 					language: "obsidianmd/plain-text",
 					rules: {
-						"no-irregular-whitespace": "off",
 						"obsidianmd/validate-license": "warn",
 					},
 				},
@@ -596,4 +597,138 @@ describe("manifest.json survives a global parser override", () => {
 			"validate-manifest should still report"
 		);
 	});
+});
+
+// English JSON locale files are strict JSON. Under recommendedWithLocalesEn they
+// used to fall to the default JS parser, which fails on every one of them with
+// "Unexpected token :", so sentence-case-json never ran on a real file.
+describe("English JSON locale files", () => {
+	const localePaths = [
+		"en.json",
+		"en-US.json",
+		"locales/en.json",
+		"src/lang/en_GB.json",
+		"src/lang/en/common.json",
+	];
+
+	for (const filePath of localePaths) {
+		it(`${filePath} is read with the JSON language and checked`, async () => {
+			const eslint = new ESLint({
+				overrideConfigFile: true,
+				overrideConfig: plugin.configs.recommendedWithLocalesEn,
+			});
+			const config = await eslint.calculateConfigForFile(filePath);
+			assert.strictEqual(config.language, json.languages.json);
+			assert.strictEqual(
+				getSeverity(config.rules["obsidianmd/ui/sentence-case-json"]),
+				"warn"
+			);
+		});
+	}
+
+	async function lint(extra: Linter.Config[], fix = false) {
+		const eslint = new ESLint({
+			overrideConfigFile: true,
+			overrideConfig: [
+				...(plugin.configs.recommendedWithLocalesEn as Linter.Config[]),
+				...extra,
+			],
+			fix,
+		});
+		const [result] = await eslint.lintText('{ "open": "Open Settings" }\n', {
+			filePath: "locales/en.json",
+		});
+		return result;
+	}
+
+	it("reports a value that is not in sentence case", async () => {
+		const result = await lint([]);
+		assert.deepStrictEqual(
+			result.messages.map(m => m.ruleId),
+			["obsidianmd/ui/sentence-case-json"]
+		);
+	});
+
+	it("autofixes it when allowAutoFix is on", async () => {
+		const result = await lint(
+			[{ files: ["**/en.json"], rules: { "obsidianmd/ui/sentence-case-json": ["warn", { allowAutoFix: true }] } }],
+			true
+		);
+		assert.strictEqual(result.output, '{ "open": "Open settings" }\n');
+	});
+
+	it("survives a global parser override", async () => {
+		const result = await lint([
+			{
+				languageOptions: {
+					parser: tseslint.parser,
+					parserOptions: {
+						projectService: { allowDefaultProject: ["eslint.config.*"] },
+					},
+				},
+			},
+		]);
+		assert.deepStrictEqual(
+			result.messages.filter(m => m.fatal).map(m => m.message),
+			[],
+			"a global parser must not reach locale JSON"
+		);
+		assert.ok(
+			result.messages.some(m => m.ruleId === "obsidianmd/ui/sentence-case-json"),
+			"sentence-case-json should still report"
+		);
+	});
+});
+
+// The core JS rules used to sit in a block without `files`, so they reached
+// package.json, manifest.json, LICENSE and locale JSON too, where a rule such as
+// no-irregular-whitespace throws. They are scoped to JS and TS now.
+describe("core JS rules apply only to JS and TS files", () => {
+	const coreRules = Object.keys(js.configs.recommended.rules ?? {});
+
+	for (const configName of ["recommended", "recommendedWithLocalesEn"] as const) {
+		describe(configName, () => {
+			const nonCode = ["package.json", "manifest.json", "LICENSE"];
+			// Only recommendedWithLocalesEn lints locale JSON at all.
+			if (configName === "recommendedWithLocalesEn") nonCode.push("locales/en.json");
+			for (const filename of nonCode) {
+				it(`not to ${filename}`, async () => {
+					const rules = await rulesFor(configName, filename);
+					assert.deepStrictEqual(coreRules.filter(rule => rule in rules), []);
+				});
+			}
+
+			for (const filename of ["src/main.ts", "src/main.js"]) {
+				it(`still to ${filename}`, async () => {
+					const rules = await rulesFor(configName, filename);
+					assert.deepStrictEqual(coreRules.filter(rule => !(rule in rules)), []);
+				});
+			}
+		});
+	}
+});
+
+// A user who lints their other JSON with the JSON language used to get the
+// core JS rules on it from the recommended config, and no-irregular-whitespace
+// threw, aborting the whole lint run.
+describe("a user's own JSON block", () => {
+	for (const configName of ["recommended", "recommendedWithLocalesEn"] as const) {
+		it(`lints alongside ${configName}`, async () => {
+			const eslint = new ESLint({
+				overrideConfigFile: true,
+				overrideConfig: [
+					...(plugin.configs[configName] as Linter.Config[]),
+					{ files: ["**/*.json"], plugins: { json }, language: "json/json" },
+				],
+			});
+			for (const filePath of ["data/other.json", "locales/en.json"]) {
+				const [result] = await eslint.lintText('{ "a": "Fine as is" }\n', { filePath });
+				assert.deepStrictEqual(
+					result.messages.filter(m => m.fatal).map(m => m.message),
+					[],
+					filePath
+				);
+			}
+		});
+	}
 });
