@@ -6,6 +6,10 @@ on:
     # Allows manual run if needed
     workflow_dispatch:
 
+# Commits the regenerated docs and pushes them to master.
+permissions:
+    contents: write
+
 jobs:
     docs:
         runs-on: ubuntu-latest

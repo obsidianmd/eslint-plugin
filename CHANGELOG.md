@@ -30,6 +30,7 @@ Upgrading from 0.4.x? The breaking changes below each have a fix in
 - Peer dependencies are ranges: `eslint >=9.19.0`, `typescript >=4.8.4` and `typescript-eslint ^8.35.1`. `@eslint/js`, `@eslint/json` and `obsidian` are no longer peers, and `@eslint/json` and `eslint-plugin-depend` use caret ranges so a project using them directly shares one copy ([#201](https://github.com/obsidianmd/eslint-plugin/pull/201), [#212](https://github.com/obsidianmd/eslint-plugin/pull/212)).
 - `typescript-eslint` 8.70.1 or later is recommended: it fixes a `no-unnecessary-type-assertion` false positive on a `Record` type alias (typescript-eslint/typescript-eslint#12856). The minimum stays 8.35.1, because a higher one makes npm install a second copy next to an older pinned one and fails with `Cannot redefine plugin "@typescript-eslint"` ([#212](https://github.com/obsidianmd/eslint-plugin/pull/212)).
 - `no-undef` is off for TypeScript files, as typescript-eslint advises: the compiler reports undefined names itself, and `no-undef` misreported globals declared in a `.d.ts` or `declare global` block. JavaScript files keep it at `warn` ([#PRE](https://github.com/obsidianmd/eslint-plugin/pull/PRE)).
+- CI also runs `check:eslint-docs` on every pull request, and the build and docs workflows declare the token permissions they need ([#PRE](https://github.com/obsidianmd/eslint-plugin/pull/PRE)).
 
 ### Added
 
