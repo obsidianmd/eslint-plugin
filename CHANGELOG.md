@@ -73,6 +73,7 @@ Upgrading from 0.4.x? The breaking changes below each have a fix in
 - `validate-license` rejects unknown options instead of silently ignoring a misspelled one ([#213](https://github.com/obsidianmd/eslint-plugin/pull/213)).
 - The published `dist/lib/manifest.d.ts` imported a `PluginManifest` type file the package never shipped; the type now lives in `lib/` and is published with it ([#213](https://github.com/obsidianmd/eslint-plugin/pull/213)).
 - `no-global-this` no longer reports `global` or `globalThis` in types (`typeof globalThis`, `{ global: boolean }` in a type literal or interface) or as a class-member, import or export name, where its fix renamed keys and broke type-checking; a shorthand `{ globalThis }` is fixed to `{ globalThis: window }` ([#FIX](https://github.com/obsidianmd/eslint-plugin/pull/FIX)).
+- `prefer-create-el` fixes `createElement()` and `createElementNS()` only for a tag name the DOM types know, so `createEl(tag)` with a `string`, a custom element or a deprecated tag (TS2345) is no longer written by `--fix`; those are reported without a fix ([#FIX](https://github.com/obsidianmd/eslint-plugin/pull/FIX)).
 
 ### Documentation
 
