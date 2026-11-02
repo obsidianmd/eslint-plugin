@@ -450,8 +450,8 @@ switch a rule off for specific files (see [Disabling rules for specific files](#
 
 A few of these are worth knowing in advance:
 
-- `prefer-active-doc` findings often come from test files. Tests that run outside Obsidian can use
-  `document`; ignore them, or switch the rule off for them.
+- Test files are exempt from `prefer-active-doc` and the other rules about code that runs in
+  Obsidian (see [Test files](#test-files)), so its findings come from your plugin's own code.
 - A published plugin id that contains "obsidian" cannot change. Accept it with
   `"obsidianmd/validate-manifest": ["warn", { allowedWords: { id: ["obsidian"] } }]` in a block with
   `files: ["manifest.json"]` (see [`validate-manifest`](rules/validate-manifest.md)).

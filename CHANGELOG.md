@@ -11,11 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Upgrading from 0.4.x? The breaking changes below each have a fix in
 [Upgrading to 0.5.0](docs/configuration.md#upgrading-to-050). Rules that never ran
-before now do, so expect new findings, mostly from `prefer-active-doc` (often in test
-files you can ignore) and from `validate-manifest` on a published id containing
-"obsidian", which its `allowedWords` option accepts. Across ten popular plugins the
-total number of findings still fell by about half, mainly because `no-undef` no longer
-runs on TypeScript files.
+before now do, so expect new findings, mostly from `prefer-active-doc` and from
+`validate-manifest` on a published id containing "obsidian", which its `allowedWords`
+option accepts. Test files no longer get the rules about code that runs in Obsidian, and
+`no-undef` no longer runs on TypeScript files, so most projects see fewer findings overall.
 
 ### Changed
 
