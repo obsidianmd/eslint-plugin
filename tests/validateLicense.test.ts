@@ -16,6 +16,21 @@ const ruleTester = new RuleTester({
 
 const currentYear = new Date().getFullYear();
 
+// The opening lines of the FSF's licences, verbatim. Their copyright line is the
+// FSF's notice on the licence text itself, which a plugin author cannot edit.
+const FSF_NOTICE = [
+    " Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>",
+    " Everyone is permitted to copy and distribute verbatim copies",
+    " of this license document, but changing it is not allowed.",
+].join("\n");
+const GPL_3_0 = `                    GNU GENERAL PUBLIC LICENSE\n                       Version 3, 29 June 2007\n\n${FSF_NOTICE}\n`;
+const AGPL_3_0 = `                    GNU AFFERO GENERAL PUBLIC LICENSE\n                       Version 3, 19 November 2007\n\n${FSF_NOTICE}\n`;
+const LGPL_3_0 = `                   GNU LESSER GENERAL PUBLIC LICENSE\n                       Version 3, 29 June 2007\n\n${FSF_NOTICE}\n`;
+
+// The copyright line of the sample plugin's LICENSE, which the rule exists to
+// catch left unedited.
+const SAMPLE_LINE = "Copyright (C) 2020-2025 by Dynalist Inc.";
+
 ruleTester.run("validate-license", licenseRule as unknown as Rule.RuleModule, {
     valid: [
         {
@@ -33,17 +48,39 @@ ruleTester.run("validate-license", licenseRule as unknown as Rule.RuleModule, {
             filename: "LICENSE",
             code: `Copyright (C) ${currentYear + 1} by John Doe`,
         },
+        // An author's own notice need not carry the current year, so a past year
+        // is not reported: reporting it warned nearly every plugin, and again
+        // every 1 January.
         {
-            name: "copyright matching custom currentYear option is valid",
+            name: "own copyright with a past single year is valid",
             filename: "LICENSE",
-            code: `Copyright (C) 2000 by John Doe`,
+            code: `Copyright (c) 2023 Jane Doe`,
+        },
+        {
+            name: "own copyright with a range ending in the past is valid",
+            filename: "LICENSE",
+            code: `Copyright (C) 2020-2022 by Jane Doe`,
+        },
+        {
+            name: "own copyright before a custom currentYear is valid",
+            filename: "LICENSE",
+            code: `Copyright (C) 1999 by John Doe`,
             options: [{ currentYear: 2000, disableUnchangedYear: false }],
         },
         {
-            name: "copyright year after custom currentYear is valid",
+            name: "GPL-3.0 licence text is valid",
             filename: "LICENSE",
-            code: `Copyright (C) 2001 by John Doe`,
-            options: [{ currentYear: 2000, disableUnchangedYear: false }],
+            code: GPL_3_0,
+        },
+        {
+            name: "AGPL-3.0 licence text is valid",
+            filename: "LICENSE",
+            code: AGPL_3_0,
+        },
+        {
+            name: "LGPL-3.0 licence text is valid",
+            filename: "LICENSE",
+            code: LGPL_3_0,
         },
         {
             name: "copyright with disableUnchangedYear skips year check",
@@ -74,13 +111,29 @@ ruleTester.run("validate-license", licenseRule as unknown as Rule.RuleModule, {
     ],
     invalid: [
         {
+            name: "the sample plugin's copyright line reports the holder and the year",
+            filename: "LICENSE",
+            code: `MIT License\n\n${SAMPLE_LINE}\n`,
+            errors: [
+                { messageId: "unchangedYear", data: { expected: currentYear.toString(), actual: "2025" }, line: 3 },
+                { messageId: "unchangedCopyright", line: 3 },
+            ],
+        },
+        {
+            name: "disableUnchangedYear suppresses only the year of the sample line",
+            filename: "LICENSE",
+            code: SAMPLE_LINE,
+            options: [{ disableUnchangedYear: true }],
+            errors: [{ messageId: "unchangedCopyright" }],
+        },
+        {
             name: "a licence file under another name is checked too",
             filename: "COPYING",
             code: `Copyright (C) ${currentYear} by Dynalist Inc.`,
             errors: [{ messageId: "unchangedCopyright" }],
         },
         {
-            name: "unchanged Dynalist Inc copyright is forbidden",
+            name: "sample holder with a range ending in the current year reports only the holder",
             filename: "LICENSE",
             code: `Copyright (C) 2020-${currentYear} by Dynalist Inc.`,
             errors: [
@@ -116,22 +169,6 @@ ruleTester.run("validate-license", licenseRule as unknown as Rule.RuleModule, {
             ],
         },
         {
-            name: "outdated year in range is forbidden",
-            filename: "LICENSE",
-            code: `Copyright (C) 2020-2022 by John Doe`,
-            errors: [
-                { messageId: "unchangedYear", data: { expected: currentYear.toString(), actual: "2022" } }
-            ],
-        },
-        {
-            name: "outdated single year is forbidden",
-            filename: "LICENSE",
-            code: `Copyright (C) 2022 by John Doe`,
-            errors: [
-                { messageId: "unchangedYear", data: { expected: currentYear.toString(), actual: "2022" } }
-            ],
-        },
-        {
             name: "outdated year and Dynalist both trigger errors",
             filename: "LICENSE",
             code: `Copyright (C) 2020-2022 by Dynalist Inc.`,
@@ -141,12 +178,12 @@ ruleTester.run("validate-license", licenseRule as unknown as Rule.RuleModule, {
             ],
         },
         {
-            name: "multiple copyright lines each checked independently",
+            name: "only the sample holder's line is reported among several copyright lines",
             filename: "LICENSE",
-            code: `Copyright (C) 2020-2022 by John Doe\nCopyright (C) 2020-${currentYear} by Dynalist Inc.`,
+            code: `${FSF_NOTICE}\nCopyright (C) 2020-2022 by John Doe\nCopyright (C) 2020-2022 by Dynalist Inc.`,
             errors: [
-                { messageId: "unchangedYear", data: { expected: currentYear.toString(), actual: "2022" } },
-                { messageId: "unchangedCopyright" }
+                { messageId: "unchangedYear", data: { expected: currentYear.toString(), actual: "2022" }, line: 5 },
+                { messageId: "unchangedCopyright", line: 5 }
             ],
         },
         {
@@ -167,12 +204,22 @@ ruleTester.run("validate-license", licenseRule as unknown as Rule.RuleModule, {
             ],
         },
         {
-            name: "year before custom currentYear is forbidden",
+            name: "sample holder before a custom currentYear reports the year against it",
             filename: "LICENSE",
-            code: `Copyright (C) 1999 by John Doe`,
+            code: `Copyright (C) 1999 by Dynalist Inc.`,
             options: [{ currentYear: 2000, disableUnchangedYear: false }],
             errors: [
-                { messageId: "unchangedYear", data: { expected: "2000", actual: "1999" } }
+                { messageId: "unchangedYear", data: { expected: "2000", actual: "1999" } },
+                { messageId: "unchangedCopyright" }
+            ],
+        },
+        {
+            name: "sample holder matching a custom currentYear reports only the holder",
+            filename: "LICENSE",
+            code: `Copyright (C) 2000 by Dynalist Inc.`,
+            options: [{ currentYear: 2000 }],
+            errors: [
+                { messageId: "unchangedCopyright" }
             ],
         },
     ],
