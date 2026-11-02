@@ -81,6 +81,7 @@ Upgrading from 0.4.x? The breaking changes below each have a fix in
 - "Code that only runs on desktop" and "Web worker files" sections ([#193](https://github.com/obsidianmd/eslint-plugin/pull/193), [#207](https://github.com/obsidianmd/eslint-plugin/pull/207)).
 - The community scanner configuration switches `validate-manifest` and `validate-license` off under their own file globs, and uses `obsidianmd/no-misused-promises` ([#191](https://github.com/obsidianmd/eslint-plugin/pull/191), [#192](https://github.com/obsidianmd/eslint-plugin/pull/192), [#210](https://github.com/obsidianmd/eslint-plugin/pull/210)).
 - The `validate-manifest` options table lists `allowedWords`' fields under their own names, and the manual `manifest.json` example no longer crashes ESLint ([#206](https://github.com/obsidianmd/eslint-plugin/pull/206)).
+- The configuration examples work on the sample plugin's layout and no longer bring back the #181 false positive: they ignore build output, turn typescript-eslint's `no-misused-promises` off next to `strictTypeChecked` and `recommendedTypeChecked`, scope rule overrides, and give disable comments a description. The scanner section matches the scanner's 0.5.0 configuration, and CONTRIBUTING.md explains the changelog check ([#214](https://github.com/obsidianmd/eslint-plugin/pull/214)).
 
 ## [0.4.2] - 2026-08-24
 

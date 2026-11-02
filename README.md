@@ -147,7 +147,7 @@ For advanced usage — layering stricter typescript-eslint configs, ignoring fil
 
 Checks UI strings for sentence case. The rule reports warnings but doesn't change text unless you run ESLint with `--fix` and enable `allowAutoFix`.
 
-- Off in the `recommended` configs since 0.3.0; turn it on yourself, as in the example below
+- Off in the `recommended` configs from 0.5.0 (0.3.0 meant to turn it off, but it stayed on until 0.4.2); turn it on yourself, as in the example below
 - Locale checks for English JSON and TS/JS modules are on in `recommendedWithLocalesEn`
 - By default allows CamelCase words like `AutoReveal`
 - Set `enforceCamelCaseLower: true` to flag CamelCase as incorrect
@@ -193,7 +193,7 @@ export default defineConfig([
 ### Notes
 
 - Hyphenated words: `Auto-Reveal` becomes `auto-reveal`
-- Locale file patterns in `recommendedWithLocalesEn`: `en*.json`, `en*.ts`, `en*.js`, `en/**/*`
+- Locale file patterns in `recommendedWithLocalesEn`: JSON files named `en*.json` or under an `en/` directory, and modules (`.ts`, `.js`, `.cjs`, `.mjs`) named `en`, `en-*` or `en_*`, or under an `en/` directory
 
 ### Known limitations
 

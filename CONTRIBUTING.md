@@ -6,3 +6,12 @@ You have to agree to the [Contributor License Agreement](https://github.com/obsi
 
 - Keep it lightweight. The fewer the dependencies, the better. For example, please do not import `lodash` to use two functions from it.
 - Your code should be self-explanatory. Class and function names should explain most things, but you should add comments for anything non-obvious. Also add examples in your comments to describe any unusual conversion that has to be done.
+
+### Changelog
+
+Every pull request adds an entry to [CHANGELOG.md](CHANGELOG.md) under `## [Unreleased]`, in the
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) section that fits (`Added`, `Changed`,
+`Fixed`, and so on), with a link to the pull request. A CI check fails pull requests that do not
+touch `CHANGELOG.md`. For changes that need no entry, such as CI or test-only changes, a maintainer
+adds the `skip-changelog` label; Dependabot pull requests, labelled `dependencies`, are skipped
+automatically.

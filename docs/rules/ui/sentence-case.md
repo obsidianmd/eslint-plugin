@@ -11,8 +11,9 @@
 Checks UI text set from code, such as `setName`, `setDesc`, `setPlaceholder`, `new Notice(...)` and
 command names, and reports text that is not in sentence case.
 
-The rule is off in `recommended` and `recommendedWithLocalesEn`. It was disabled in 0.3.0 because it
-reported too much ordinary text to be on by default. To use it, turn it on yourself:
+The rule is off in `recommended` and `recommendedWithLocalesEn`, because it reports too much
+ordinary text to be on by default. 0.3.0 meant to turn it off, but it stayed on until 0.5.0. To use
+it, turn it on yourself:
 
 ```js
 {
