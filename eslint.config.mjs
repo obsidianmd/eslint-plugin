@@ -30,4 +30,11 @@ export default [
         ...eslintPluginPlugin.configs["tests-recommended"],
         files: ["tests/**/*.ts"],
     },
+    // This repo is the plugin, not an Obsidian plugin. Its manifest.json is a
+    // fixture for the sample plugin, so the rule is correct to fire here and the
+    // findings are unactionable.
+    {
+        files: ["manifest.json"],
+        rules: { "obsidianmd/validate-manifest": "off" },
+    },
 ];
