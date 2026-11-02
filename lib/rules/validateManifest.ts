@@ -1,4 +1,4 @@
-import type { JSONRuleDefinition } from "@eslint/json/types";
+import type { JSONRuleDefinition } from "@eslint/json";
 import path from "node:path";
 import { docsUrl } from "../ruleCreator.js";
 
