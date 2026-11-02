@@ -738,3 +738,114 @@ describe("a user's own JSON block", () => {
 		});
 	}
 });
+
+// Lints `code` through the recommended config as `filePath`. TypeScript files
+// get type information from this repo's tsconfig, which includes `file.ts`.
+async function lintRecommended(filePath: string, code: string) {
+	const eslint = new ESLint({
+		overrideConfigFile: true,
+		overrideConfig: [
+			...plugin.configs.recommended,
+			{
+				files: ["**/*.ts"],
+				languageOptions: {
+					parserOptions: { project: "./tsconfig.json", tsconfigRootDir: process.cwd() },
+				},
+			},
+		],
+	});
+	const [result] = await eslint.lintText(code, { filePath });
+	assert.deepStrictEqual(result.messages.filter(m => m.fatal).map(m => m.message), []);
+	return result.messages;
+}
+
+// 0.2.9 turned no-require-imports off and declared `require`; rebase commit
+// f088476 dropped both in 0.3.0. obsidianmd/no-nodejs-modules checks require()
+// itself and suggests a guarded require() as its fix.
+describe("require() in plugin code", () => {
+	for (const filePath of ["file.ts", "src/main.js"]) {
+		describe(filePath, () => {
+			it("no-require-imports is off and require is a readonly global", async () => {
+				const eslint = new ESLint({ overrideConfigFile: true, overrideConfig: plugin.configs.recommended });
+				const config = await eslint.calculateConfigForFile(filePath);
+				assert.strictEqual(getSeverity(config.rules?.["@typescript-eslint/no-require-imports"]), "off");
+				assert.strictEqual(config.languageOptions?.globals?.require, "readonly");
+			});
+
+			it("a require() call is reported by neither no-require-imports nor no-undef", async () => {
+				const messages = await lintRecommended(filePath, 'const x = require("x");\nexport default x;\n');
+				assert.deepStrictEqual(
+					messages
+						.filter(m => m.ruleId === "@typescript-eslint/no-require-imports" || m.ruleId === "no-undef")
+						.map(m => m.message),
+					[]
+				);
+			});
+		});
+	}
+});
+
+// 0.2.9 ignored `_`-prefixed caught errors and destructured elements; rebase
+// commit f088476 dropped the patterns in 0.3.0. A dead `_x` variable stays
+// reported (#199), and function arguments stay covered by args: "none".
+describe("underscore-prefixed unused bindings", () => {
+	const code = [
+		"export function run(pair: [number, number]): number {",
+		"\tconst [_first, second] = pair;",
+		"\ttry { JSON.parse(\"x\"); } catch (_error) { /* ignored */ }",
+		"\treturn second;",
+		"}",
+		"",
+	].join("\n");
+	const control = "export function run(): void {\n\tconst unused = 1;\n\ttry { JSON.parse(\"x\"); } catch (error) { /* ignored */ }\n}\n";
+
+	for (const filePath of ["file.ts", "src/main.js"]) {
+		// JavaScript has no tuple annotations.
+		const source = filePath.endsWith(".js") ? code.replace(": [number, number]): number", ")") : code;
+		const controlSource = filePath.endsWith(".js") ? control.replace("(): void", "()") : control;
+
+		it(`are not reported in ${filePath}`, async () => {
+			const messages = await lintRecommended(filePath, source);
+			assert.deepStrictEqual(
+				messages.filter(m => m.ruleId === "@typescript-eslint/no-unused-vars").map(m => m.message),
+				[]
+			);
+		});
+
+		it(`a dead _-prefixed variable is still reported in ${filePath}`, async () => {
+			const signature = filePath.endsWith(".js") ? "run()" : "run(): void";
+			const messages = await lintRecommended(filePath, `export function ${signature} {\n\tconst _unused = 1;\n}\n`);
+			assert.strictEqual(
+				messages.filter(m => m.ruleId === "@typescript-eslint/no-unused-vars").length,
+				1
+			);
+		});
+
+		it(`without the underscore are still reported in ${filePath}`, async () => {
+			const messages = await lintRecommended(filePath, controlSource);
+			assert.strictEqual(
+				messages.filter(m => m.ruleId === "@typescript-eslint/no-unused-vars").length,
+				2
+			);
+		});
+	}
+});
+
+// The config carried a misspelled "no-prototype-bultins": "off" from 2024 until
+// 0.5.0, so it never applied. The rule has run at error from
+// js.configs.recommended since, with no reports against it, and stays there.
+describe("no-prototype-builtins", () => {
+	const sources = {
+		"file.ts": "export function has(obj: object, k: string): boolean {\n\treturn obj.hasOwnProperty(k);\n}\n",
+		"src/main.js": "export function has(obj, k) {\n\treturn obj.hasOwnProperty(k);\n}\n",
+	};
+	for (const [filePath, code] of Object.entries(sources)) {
+		it(`reports obj.hasOwnProperty(k) in ${filePath}`, async () => {
+			const messages = await lintRecommended(filePath, code);
+			assert.deepStrictEqual(
+				messages.filter(m => m.ruleId === "no-prototype-builtins").map(m => m.severity),
+				[2]
+			);
+		});
+	}
+});

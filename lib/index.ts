@@ -273,7 +273,6 @@ import { restrictedGlobalsOptions, restrictedImportsOptions, noUnusedExpressions
 const flatRecommendedGeneralRules: RulesConfig = {
     "no-unused-vars": "off",
     "no-unused-expressions": "off",
-    "no-prototype-bultins": "off",
     "no-self-compare": "warn",
     "no-eval": "error",
     "no-implied-eval": "error",
@@ -290,6 +289,10 @@ const flatRecommendedGeneralRules: RulesConfig = {
     "no-alert": "warn",
     "no-undef": "warn",
     "@typescript-eslint/ban-ts-comment": "off",
+    // obsidianmd/no-nodejs-modules checks require() calls itself, and its fix
+    // for a Node module is a Platform.isDesktop-guarded require(), which this
+    // blanket ban would report in turn.
+    "@typescript-eslint/no-require-imports": "off",
     "@typescript-eslint/no-unused-vars": ["warn", ...noUnusedVarsOptions],
     "@typescript-eslint/no-unused-expressions": ["warn", ...noUnusedExpressionsOptions],
     "@typescript-eslint/require-await": "off",
@@ -441,6 +444,7 @@ const flatRecommendedConfig: Config[] = defineConfig([
         languageOptions: {
             globals: {
                 ...globals.browser,
+                require: "readonly",
                 ...(isManifestDesktopOnly(manifest) ? {
                     ...globals.node,
                     NodeJS: "readonly"
