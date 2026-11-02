@@ -222,6 +222,15 @@ ruleTester.run("no-unsupported-api", rule, {
             `,
             options: [{ minAppVersion: "1.0.0" }],
         },
+        {
+            name: "minAppVersion without a patch version covers APIs up to x.y.0",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                app.renderContext;
+            `,
+            options: [{ minAppVersion: "1.10" }],
+        },
     ],
     invalid: [
         {
@@ -480,6 +489,26 @@ ruleTester.run("no-unsupported-api", rule, {
             `,
             options: [{ minAppVersion: "1.0.0" }],
             errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "minAppVersion without a patch version is read as x.y.0",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                app.renderContext;
+            `,
+            options: [{ minAppVersion: "0.15" }],
+            errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "App.renderContext", sinceVersion: "1.10.0", minAppVersion: "0.15" } }],
+        },
+        {
+            name: "minAppVersion with no version in it is checked as 0.0.0",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                app.renderContext;
+            `,
+            options: [{ minAppVersion: "latest" }],
+            errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "App.renderContext", sinceVersion: "1.10.0", minAppVersion: "latest" } }],
         },
     ],
 });

@@ -2,7 +2,7 @@ import { AST_NODE_TYPES, ESLintUtils } from "@typescript-eslint/utils";
 import type { TSESTree } from "@typescript-eslint/utils";
 import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
-import { gt, valid } from "semver";
+import { coerce, gt, valid } from "semver";
 import ts from "typescript";
 import { getManifest } from "../manifest.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
@@ -56,7 +56,13 @@ export default ruleCreator<Options, "apiNotAvailable">({
         if (!resolvedVersion) {
             return {};
         }
-        const minAppVersion: string = resolvedVersion;
+        const minAppVersion: string = String(resolvedVersion);
+        // A minAppVersion semver cannot parse would make `gt` throw and abort the
+        // whole lint run. "0.15" means 0.15.0, as a dotted version with missing
+        // parts read as 0; anything with no version in it at all proves nothing
+        // about the app, so it is checked as 0.0.0 and every versioned API is
+        // reported rather than the check being skipped.
+        const minVersion = toVersion(minAppVersion) ?? "0.0.0";
 
         const services = ESLintUtils.getParserServices(context);
         const checker = services.program.getTypeChecker();
@@ -143,12 +149,13 @@ export default ruleCreator<Options, "apiNotAvailable">({
                 const qualifiedName = parentName
                     ? `${parentName}.${symbolName}`
                     : symbolName;
-                const sinceVersion = sinceMap.get(qualifiedName);
+                const sinceTag = sinceMap.get(qualifiedName);
+                const sinceVersion = sinceTag && toVersion(sinceTag);
 
                 if (!sinceVersion) {
                     continue;
                 }
-                if (gt(sinceVersion, minAppVersion)) {
+                if (gt(sinceVersion, minVersion)) {
                     if (isGuardedByRequireApiVersion(node, sinceVersion)) {
                         return;
                     }
@@ -248,6 +255,12 @@ export default ruleCreator<Options, "apiNotAvailable">({
         }
     }
 });
+
+// A version semver can compare: as written when valid, else coerced ("0.15" is
+// 0.15.0), else undefined.
+function toVersion(raw: string): Version | undefined {
+    return valid(raw) ?? coerce(raw)?.version ?? undefined;
+}
 
 function buildSinceMap(dtsPath: string): SinceMap {
     if (cachedSinceMap && cachedDtsPath === dtsPath) {

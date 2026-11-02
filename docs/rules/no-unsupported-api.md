@@ -28,6 +28,9 @@ A `let` variable, a `string`-typed value, a choice between versions such as `lat
 "1.0.0"`, or a version that is not a full `x.y.z` does not count as a guard, so the API is still
 reported.
 
+A `minAppVersion` without a patch version, such as `0.15`, is read as `0.15.0`. One with no version
+in it at all proves nothing about the app, so every versioned API is reported.
+
 ## Options
 
 <!-- begin auto-generated rule options list -->
