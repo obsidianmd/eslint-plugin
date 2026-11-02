@@ -67,7 +67,7 @@ const rule: SentenceCaseJsonRuleDefinition = {
             },
         ],
         messages: {
-            useSentenceCase: "Use sentence case for UI text.",
+            useSentenceCase: "Use sentence case for UI text. Expected: '{{suggestion}}'",
         },
     },
     create(context) {

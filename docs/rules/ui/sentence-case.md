@@ -8,6 +8,18 @@
 
 <!-- end auto-generated rule header -->
 
+Checks UI text set from code, such as `setName`, `setDesc`, `setPlaceholder`, `new Notice(...)` and
+command names, and reports text that is not in sentence case.
+
+Some text keeps its casing, because it is data rather than prose:
+
+- URLs, such as `https://obsidian.md/help`.
+- Date and time formats, such as `YYYY-MM-DD` or `HH:mm`.
+- "REST" written in capitals. It is also an ordinary word, so both "Use the REST API" and "Take a
+  rest" pass.
+- A placeholder that shows an example value: a single token with no spaces (`sk-123…`,
+  `YYYY-MM-DD`), or text starting with "e.g." or "ex." (`e.g. My Vault`).
+
 ## Options
 
 <!-- begin auto-generated rule options list -->
