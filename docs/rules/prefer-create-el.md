@@ -22,6 +22,11 @@ fixed. A `string` variable, a custom element such as `'my-element'`, a deprecate
 `'xmp'`, or `createElementNS()` with an options argument is reported with neither a fix nor a
 suggestion, because the replacement would not compile.
 
+A bare replacement such as `createDiv()` is not offered either when the file binds that name itself:
+inside `function createDiv() { … }`, or with a variable, parameter or import of that name in scope,
+the call would reach that binding instead of Obsidian's helper, and inside the function it would
+recurse. A method named `createDiv` is not a binding, so code inside it is still fixed.
+
 ## Iframe documents
 
 An iframe's document belongs to the iframe's own window, which Obsidian never gives its DOM helpers,

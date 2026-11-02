@@ -50,6 +50,7 @@ Upgrading from 0.4.x? The breaking changes below each have a fix in
 
 ### Fixed
 
+- `prefer-create-el` no longer fixes `document.createElement("div")` to `createDiv()` where the file binds that helper's name itself (a function, variable, parameter or import named `createDiv`), since the call would reach that binding, recursing inside `function createDiv()`; it is reported without a fix instead ([#MT](https://github.com/obsidianmd/eslint-plugin/pull/MT)).
 - `validate-manifest` follows the community scanner's manifest review, so it no longer reports what the review accepts: `helpUrl` is allowed, a description may end with `!` or `?`, start with a lowercase letter, contain emoji or mention plugins, and an `id` may contain "plugin" as long as it does not end with it. It now also reports what the review does: a `name` with parts of "Obsidian", and a description that refers to itself or repeats the name ([#MT](https://github.com/obsidianmd/eslint-plugin/pull/MT)).
 - `validate-manifest` never ran: it was configured only for JS/TS files. It now runs on `manifest.json`, no longer reports ordinary punctuation and accented letters in descriptions, now reports an empty-string key, no longer crashes on keys such as `constructor`, and matches `allowedWords` case-insensitively ([#191](https://github.com/obsidianmd/eslint-plugin/pull/191)).
 - `validate-license` never ran either. It now runs on `LICENSE` files and recognises the standard MIT line (`Copyright (c) 2025 Name`, `©`, optional "by", CRLF) ([#192](https://github.com/obsidianmd/eslint-plugin/pull/192)).

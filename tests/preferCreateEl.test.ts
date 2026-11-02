@@ -200,6 +200,66 @@ ruleTester.run("prefer-create-el", preferCreateEl, {
             errors: [{ messageId: "preferCreateEl" }],
         },
 
+        // --- The helper's name bound locally: reported, no fix or suggestion ---
+        // The bare replacement would call the local binding, e.g. recurse into the
+        // enclosing function (TS7023).
+        {
+            name: "inside a function named createDiv, createElement('div') is reported without a fix",
+            code: `${MOCK_OBSIDIAN_DOM}\nfunction createDiv(): HTMLDivElement { return document.createElement('div'); }`,
+            output: null,
+            errors: [{ messageId: "preferCreateEl", suggestions: [] }],
+        },
+        {
+            name: "a const named createEl in scope leaves createElement(tag) without a fix",
+            code: `${MOCK_OBSIDIAN_DOM}\nconst createEl = (tag: string) => tag;\ndocument.createElement('p');`,
+            output: null,
+            errors: [{ messageId: "preferCreateEl", suggestions: [] }],
+        },
+        {
+            name: "a parameter named createSpan leaves createElement('span') without a fix",
+            code: `${MOCK_OBSIDIAN_DOM}\nfunction make(createSpan: unknown) { return document.createElement('span'); }`,
+            output: null,
+            errors: [{ messageId: "preferCreateEl", suggestions: [] }],
+        },
+        {
+            name: "a named function expression createFragment leaves createDocumentFragment() without a fix",
+            code: `${MOCK_OBSIDIAN_DOM}\nconst make = function createFragment() { return document.createDocumentFragment(); };`,
+            output: null,
+            errors: [{ messageId: "preferCreateEl", suggestions: [] }],
+        },
+        {
+            name: "an imported createSvg leaves createElementNS() without a fix",
+            code: `import { createSvg } from './svg';\n${MOCK_OBSIDIAN_DOM}\ndocument.createElementNS('http://www.w3.org/2000/svg', 'path');`,
+            output: null,
+            errors: [{ messageId: "preferCreateEl", suggestions: [] }],
+        },
+        // A method is not a binding: the bare call inside it reaches the global.
+        {
+            name: "inside a class method named createDiv, createElement('div') is still fixed",
+            code: `${MOCK_OBSIDIAN_DOM}\nclass View { createDiv() { return document.createElement('div'); } }`,
+            output: `${MOCK_OBSIDIAN_DOM}\nclass View { createDiv() { return createDiv(); } }`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        {
+            name: "inside an object method named createDiv, createElement('div') is still fixed",
+            code: `${MOCK_OBSIDIAN_DOM}\nconst dom = { createDiv() { return document.createElement('div'); } };`,
+            output: `${MOCK_OBSIDIAN_DOM}\nconst dom = { createDiv() { return createDiv(); } };`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        // An ambient declaration has no body: the call still reaches the global.
+        {
+            name: "an ambient declare function createDiv does not stop the fix",
+            code: `${MOCK_OBSIDIAN_DOM}\ndeclare function createDiv(o?: any): HTMLDivElement;\ndocument.createElement('div');`,
+            output: `${MOCK_OBSIDIAN_DOM}\ndeclare function createDiv(o?: any): HTMLDivElement;\ncreateDiv();`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        {
+            name: "a prefixed replacement is fixed even when the bare name is bound locally",
+            code: `${MOCK_ACTIVE_WINDOW_WITH_HELPERS}\nfunction createDiv() { return activeDocument.createElement('div'); }`,
+            output: `${MOCK_ACTIVE_WINDOW_WITH_HELPERS}\nfunction createDiv() { return activeWindow.createDiv(); }`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+
         // --- Tags createEl()/createSvg() do not accept: reported, no fix or suggestion ---
         // createEl<K extends keyof HTMLElementTagNameMap>(tag: K) rejects these, so
         // createEl(tag) would fail tsc with TS2345.
