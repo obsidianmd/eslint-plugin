@@ -157,7 +157,19 @@ const recommendedPluginRulesConfigTypeChecked: RulesConfig = {
     "obsidianmd/prefer-create-el": "warn",
     "obsidianmd/prefer-file-manager-trash-file": "warn",
     "obsidianmd/prefer-instanceof": "warn",
-    "@typescript-eslint/no-deprecated": "warn",
+    "@typescript-eslint/no-deprecated": [
+        "warn",
+        {
+            allow: [
+                // The standard caretPositionFromPoint only reached WebKit in
+                // Safari/iOS 17.4, so caretRangeFromPoint is still the fallback
+                // that keeps caret lookup working on older iOS and Electron.
+                // typescript-eslint matches a value specifier by name, so any
+                // deprecated `caretRangeFromPoint` is allowed, not only the DOM's.
+                { from: "lib", name: "caretRangeFromPoint" },
+            ],
+        },
+    ],
 };
 
 const recommendedPluginRulesConfigBase: RulesConfig = {
