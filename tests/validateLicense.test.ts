@@ -1,4 +1,5 @@
-import { RuleTester, type Rule } from "eslint";
+import assert from "node:assert";
+import { Linter, RuleTester, type Rule } from "eslint";
 import licenseRule from "../lib/rules/validateLicense.js";
 import { PlainTextLanguage } from "../lib/plainTextLanguage.js";
 
@@ -223,4 +224,24 @@ ruleTester.run("validate-license", licenseRule as unknown as Rule.RuleModule, {
             ],
         },
     ],
+});
+
+describe("validate-license options", () => {
+    it("rejects a misspelled option instead of ignoring it", () => {
+        const linter = new Linter();
+        assert.throws(
+            () => linter.verify("Copyright (C) 2020 by Dynalist Inc.\n", [{
+                files: ["LICENSE"],
+                plugins: {
+                    obsidianmd: {
+                        languages: { "plain-text": PlainTextLanguage },
+                        rules: { "validate-license": licenseRule as unknown as Rule.RuleModule },
+                    },
+                },
+                language: "obsidianmd/plain-text",
+                rules: { "obsidianmd/validate-license": ["warn", { currentyear: 2026 }] },
+            }], "LICENSE"),
+            /additional properties/i
+        );
+    });
 });

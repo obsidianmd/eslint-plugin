@@ -68,6 +68,7 @@ Upgrading from 0.4.x? The breaking changes below each have a fix in
 - obsidianmd's JavaScript rules return nothing for files in other languages, so a type-aware one enabled without `files` (say, to raise its severity) no longer aborts the run on `LICENSE`, `manifest.json` or `package.json` ([#PRE](https://github.com/obsidianmd/eslint-plugin/pull/PRE)).
 - `prefer-create-el` no longer autofixes `activeDocument.createElement()` to `activeWindow.createEl()` when `Window` does not declare the helper, which Obsidian's types do not, so the fix no longer breaks `tsc`; it is offered as a suggestion ([#PRE](https://github.com/obsidianmd/eslint-plugin/pull/PRE)).
 - `vault/iterate` no longer claims to be autofixable; it never fixed anything ([#PRE](https://github.com/obsidianmd/eslint-plugin/pull/PRE)).
+- `validate-license` rejects unknown options instead of silently ignoring a misspelled one ([#PRE](https://github.com/obsidianmd/eslint-plugin/pull/PRE)).
 
 ### Documentation
 
