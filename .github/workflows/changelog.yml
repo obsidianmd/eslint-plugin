@@ -1,0 +1,32 @@
+name: Changelog
+
+on:
+    pull_request:
+        branches: ["master"]
+        types: [opened, synchronize, reopened, labeled, unlabeled]
+
+# The enforcer only reads the pull request's labels and changed files.
+permissions:
+    contents: read
+    pull-requests: read
+
+jobs:
+    changelog:
+        name: Changelog updated
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Check for CHANGELOG.md changes
+              # Third-party action, pinned to the v3.7.0 commit.
+              uses: dangoslen/changelog-enforcer@8b5e9dc3121363bb7c0115f8533404d92af382de # v3.7.0
+              with:
+                  changeLogPath: CHANGELOG.md
+                  # Dependabot labels its pull requests `dependencies`.
+                  skipLabels: "skip-changelog,dependencies"
+                  missingUpdateErrorMessage: >
+                      Please add a changelog entry to CHANGELOG.md under the
+                      `## [Unreleased]` section.
+                      Follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) conventions.
+                      If this change does not need a changelog entry, add the `skip-changelog` label.

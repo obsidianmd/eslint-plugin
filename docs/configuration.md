@@ -190,6 +190,32 @@ export default defineConfig([
 ]);
 ```
 
+If your plugin has no build step and you write `main.js` yourself, it is your source, so do not
+ignore it. It is in no `tsconfig.json`, so add it to `allowDefaultProject`, and declare the
+CommonJS `module` and `exports` Obsidian loads it with:
+
+```js
+export default defineConfig([
+  globalIgnores(["node_modules", "dist"]), // no build step: main.js is your source
+  ...obsidianmd.configs.recommended,
+  {
+    languageOptions: {
+      parserOptions: {
+        projectService: {
+          allowDefaultProject: ["eslint.config.*", "main.js"],
+        },
+      },
+    },
+  },
+  // Obsidian loads main.js as CommonJS
+  { files: ["main.js"], languageOptions: { globals: { module: "writable", exports: "writable" } } },
+]);
+```
+
+Declaring the two globals is enough. With `sourceType: "commonjs"` instead, `no-redeclare` checks
+the module's top level against the built-in globals, and `const { Plugin } = require("obsidian")`
+is reported, because `Plugin` is also a browser global.
+
 ## Disabling rules for specific files
 
 To turn off obsidianmd rules for files that are not part of your Obsidian plugin (e.g., build scripts), add a config block with the relevant `files` glob:
@@ -280,6 +306,120 @@ For worker code under another name, add the same overrides for its path:
 }
 ```
 
+## Upgrading to 0.5.0
+
+0.5.0 lints more files than 0.4 did and needs newer tooling. Work through the items below that
+apply to your project; [CHANGELOG.md](../CHANGELOG.md) lists every change.
+
+### Node.js 20.19, 22.13 or 24
+
+Node.js 18 is no longer supported. `@eslint/json` 2 and ESLint 10 need the same versions. Upgrade
+Node.js locally and in CI.
+
+### `@eslint/json` 2
+
+If your configuration registers `@eslint/json` itself for `package.json` or `manifest.json`,
+upgrade it to 2.x. With 0.14, ESLint reports `Cannot redefine plugin "json"`, because the two
+copies cannot share the `json` plugin name.
+
+### Type-checked configs reach `manifest.json` and `LICENSE`
+
+The recommended config now lints `manifest.json` and `LICENSE` as well as `package.json` (see
+[Files linted beyond your source](#files-linted-beyond-your-source)). A type-checked config you
+add without `files`, such as a top-level `...tseslint.configs.strictTypeChecked`, reaches those
+files too and aborts the whole run:
+
+```
+Error while loading rule '@typescript-eslint/await-thenable': You have used a rule which requires type information, but don't have parserOptions set to generate type information for this file. See https://tseslint.com/typed-linting for enabling linting with type information.
+Occurred while linting /path/to/your-plugin/LICENSE
+```
+
+Scope it to your TypeScript files, as
+[Using alongside stricter typescript-eslint configs](#using-alongside-stricter-typescript-eslint-configs)
+shows:
+
+```js
+...obsidianmd.configs.recommended,
+{
+  files: ["**/*.ts"],
+  extends: [tseslint.configs.strictTypeChecked],
+},
+```
+
+If the unscoped config comes from somewhere you cannot edit, switch the type-checked rules off for
+the files the plugin lints by name, in a block placed **last**:
+
+```js
+{
+  files: ["package.json", "manifest.json", "LICENSE", "LICENSE.md", "LICENSE.txt"],
+  extends: [tseslint.configs.disableTypeChecked],
+},
+```
+
+### Core JS rules apply only to JS and TS files
+
+ESLint's core rules (`js.configs.recommended`) no longer reach JSON, `LICENSE`, or files you lint
+with a parser of your own. If you lint `.svelte` or `.vue` files, add them back for those files:
+
+```js
+import js from "@eslint/js";
+
+// in the defineConfig([...]) array:
+{ files: ["**/*.svelte"], extends: [js.configs.recommended] },
+```
+
+### `ui/sentence-case` is off
+
+It was meant to be off since 0.3.0. To keep it, opt in:
+
+```js
+{ rules: { "obsidianmd/ui/sentence-case": ["warn", { enforceCamelCaseLower: true }] } },
+```
+
+The locale rules in `recommendedWithLocalesEn` stay on.
+
+### `no-misused-promises` has a new name
+
+`obsidianmd/no-misused-promises` replaces `@typescript-eslint/no-misused-promises` in the
+recommended config. It is the same rule, except that Obsidian's chaining `then` (on `Setting` and
+components) no longer counts as a Promise. Rename your disable comments, or ESLint reports them as
+unused:
+
+```ts
+// eslint-disable-next-line obsidianmd/no-misused-promises
+```
+
+If you build your configuration from `ruleConfigs.recommendedTypeChecked` on top of
+typescript-eslint's type-checked config, also turn `@typescript-eslint/no-misused-promises` off,
+or both rules report every real Promise.
+
+### New warnings from `validate-manifest`, `validate-license` and `prefer-active-doc`
+
+`validate-manifest` and `validate-license` were configured before but never ran. They now check
+`manifest.json` and `LICENSE`, as long as ESLint runs from the project root. `validate-license`
+reports only an unchanged copy of the sample plugin's license. `prefer-active-doc` now warns: use
+`activeDocument` instead of `document` so your code works in popout windows. Fix the findings, or
+switch a rule off for specific files (see [Disabling rules for specific files](#disabling-rules-for-specific-files)).
+
+### Install `obsidian` yourself
+
+The plugin no longer installs `obsidian` for you. Without it, `no-unsupported-api` reports nothing.
+Projects generated from the sample plugin already have it; otherwise run
+`npm install obsidian --save-dev`.
+
+### `no-nodejs-modules` in desktop-only repositories
+
+In a repository whose `manifest.json` sets `"isDesktopOnly": true`, raising the rule's severity no
+longer turns the check back on. Use `["error", { isDesktopOnly: false }]` (see
+[Code that only runs on desktop](#code-that-only-runs-on-desktop)).
+
+### Community scanner configuration
+
+If you copy the scanner's configuration, switch `validate-manifest` and `validate-license` off
+under their own file globs, since an `"off"` in a source-file block no longer reaches them, and
+use `obsidianmd/no-misused-promises` instead of typescript-eslint's rule. The
+[scanner-equivalent configuration](#community-plugin-scanner-configuration) shows both.
+
 ## Common errors
 
 ### "You have used a rule which requires type information"
@@ -303,6 +443,19 @@ The fix is to use `allowDefaultProject` so these files are linted with default c
 ```
 
 If you are using `project` instead of `projectService`, ensure the path to your `tsconfig.json` is correct relative to where you run ESLint.
+
+### "… requires type information" on `LICENSE`, `manifest.json` or `package.json`
+
+```
+Error while loading rule '@typescript-eslint/await-thenable': You have used a rule which requires type information, but don't have parserOptions set to generate type information for this file. See https://tseslint.com/typed-linting for enabling linting with type information.
+Occurred while linting /path/to/your-plugin/LICENSE
+```
+
+A type-checked config you added without `files`, such as a top-level
+`...tseslint.configs.strictTypeChecked`, reaches the files the recommended config lints by name,
+which TypeScript cannot read. Scope it to your TypeScript files with `files: ["**/*.ts"]`, as
+[Using alongside stricter typescript-eslint configs](#using-alongside-stricter-typescript-eslint-configs)
+shows, or see [Upgrading to 0.5.0](#upgrading-to-050) if you cannot edit that config.
 
 ### "… was not found by the project service"
 

@@ -1,5 +1,7 @@
 # eslint-plugin-obsidianmd
 
+> Upgrading from 0.4? See [Upgrading to 0.5.0](docs/configuration.md#upgrading-to-050) and the [changelog](CHANGELOG.md).
+
 ## Installation
 
 You'll first need to install [ESLint](https://eslint.org/):
@@ -54,6 +56,8 @@ export default defineConfig([
 ```
 
 The `globalIgnores` entry follows the official sample plugin's layout: `main.js` is the bundled build, and `esbuild.config.mjs` and `version-bump.mjs` are Node scripts. None of them is plugin source or in your `tsconfig.json`, so without it ESLint fails on them with "was not found by the project service". List your own build output and scripts there.
+
+If your plugin has no build step and you write `main.js` yourself, it is your source: leave it out of `globalIgnores`, add it to `allowDefaultProject`, and declare the CommonJS globals Obsidian loads it with. [Ignoring files](docs/configuration.md#ignoring-files) shows the full setup.
 
 The `parserOptions` block is required because the recommended config includes type-checked rules that need access to your TypeScript project. `allowDefaultProject` ensures files not listed in your `tsconfig.json` (like the ESLint config file itself) are still linted without errors. See the [configuration guide](docs/configuration.md) for details on why this is needed and how to customize it.
 
