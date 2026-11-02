@@ -8,7 +8,34 @@
 
 <!-- end auto-generated rule header -->
 
-## Fix or suggestion
+## What is reported
+
+Creating an element with the native DOM methods where Obsidian has a helper, and `createEl()` for a
+tag that has a shorter helper:
+
+| Call | Replacement |
+| ---- | ----------- |
+| `document.createElement("p")` | `createEl("p")` |
+| `document.createElement("div")`, `("span")` | `createDiv()`, `createSpan()` |
+| `document.createElementNS("http://www.w3.org/2000/svg", "path")` | `createSvg("path")` |
+| `document.createDocumentFragment()` | `createFragment()` |
+| `createEl("div", opts)`, `el.createEl("span")` | `createDiv(opts)`, `el.createSpan()` |
+
+The document decides where the replacement is called: the global `document` uses the global
+helpers, `activeDocument` uses `activeWindow.`, and any other value typed as a `Document`, such as
+`el.doc`, uses its window, `el.doc.win.`.
+
+Not reported:
+
+- `createElement()` with an options argument, and `createElementNS()` with a namespace other than SVG
+- calls on anything that is not a document, and `createEl()` with a tag other than `div` or `span`
+- an iframe's document; see [Iframe documents](#iframe-documents)
+
+The recommended config switches this rule off for worker and test files, which have no Obsidian DOM
+helpers; see [Web worker files](../configuration.md#web-worker-files) and
+[Test files](../configuration.md#test-files).
+
+### Fix or suggestion
 
 `--fix` applies a replacement only when the types say it exists: `createEl()` for the global
 `document` when the global helpers are declared, `doc.win.createEl()` when the document's `win`
@@ -27,7 +54,7 @@ inside `function createDiv() { … }`, or with a variable, parameter or import o
 the call would reach that binding instead of Obsidian's helper, and inside the function it would
 recurse. A method named `createDiv` is not a binding, so code inside it is still fixed.
 
-## Iframe documents
+### Iframe documents
 
 An iframe's document belongs to the iframe's own window, which Obsidian never gives its DOM helpers,
 so `doc.win.createEl()` would throw there. Creating an element in an iframe's document is not
