@@ -2,7 +2,7 @@ import { AST_NODE_TYPES, ESLintUtils } from "@typescript-eslint/utils";
 import type { TSESTree } from "@typescript-eslint/utils";
 import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
-import { gt } from "semver";
+import { gt, valid } from "semver";
 import ts from "typescript";
 import { getManifest } from "../manifest.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
@@ -167,16 +167,44 @@ export default ruleCreator<Options, "apiNotAvailable">({
             }
         }
 
+        function getStringLiteralValue(
+            expr: TSESTree.CallExpressionArgument,
+        ): string | undefined {
+            if (expr.type === AST_NODE_TYPES.Literal) {
+                const value = expr.value;
+                if (typeof value === "string") {
+                    return value;
+                }
+            } else if (expr.type !== AST_NODE_TYPES.SpreadElement) {
+                // Any other expression counts when its type is a single string
+                // literal: a const, an `as const` member, an enum member or a
+                // template built from constants. let, unions and string don't.
+                const typeInfo = checker.getTypeAtLocation(
+                    services.esTreeNodeToTSNodeMap.get(expr),
+                );
+                const literal = typeInfo.isStringLiteral()
+                    ? typeInfo.value
+                    : undefined;
+                return literal;
+            }
+            return undefined;
+        }
+
         function extractRequireApiVersion(expr: TSESTree.Expression): string | undefined {
             if (
                 expr.type === AST_NODE_TYPES.CallExpression &&
                 expr.callee.type === AST_NODE_TYPES.Identifier &&
                 expr.callee.name === "requireApiVersion" &&
-                expr.arguments.length >= 1 &&
-                expr.arguments[0].type === AST_NODE_TYPES.Literal &&
-                typeof (expr.arguments[0] as TSESTree.Literal).value === "string"
+                expr.arguments.length >= 1
             ) {
-                return (expr.arguments[0] as TSESTree.StringLiteral).value;
+                const potentialString = getStringLiteralValue(
+                    expr.arguments[0],
+                );
+                // A version semver cannot parse would make `gt` throw and abort
+                // the whole lint run, so it does not count as a guard.
+                if (potentialString !== undefined && valid(potentialString)) {
+                    return potentialString;
+                }
             }
             if (expr.type === AST_NODE_TYPES.LogicalExpression && expr.operator === "&&") {
                 return extractRequireApiVersion(expr.left);
