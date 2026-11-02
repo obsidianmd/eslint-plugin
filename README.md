@@ -14,6 +14,8 @@ Next, install `eslint-plugin-obsidianmd`:
 npm install eslint-plugin-obsidianmd --save-dev
 ```
 
+The plugin needs ESLint 9.19 or later, and `typescript-eslint` 8.70.1 or later. npm installs `typescript` and `typescript-eslint` alongside the plugin if your project does not already have them; if it pins an older `typescript-eslint`, upgrade it. The configuration examples below import `defineConfig` from `eslint/config`, which ESLint added in 9.22; on an older ESLint, export the array without it.
+
 The plugin reads Obsidian's own type definitions rather than bundling a copy, so your project needs `obsidian` installed as well. Plugin projects generated from the sample plugin already have it:
 
 ```sh
