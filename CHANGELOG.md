@@ -44,6 +44,7 @@ Upgrading from 0.4.x? The breaking changes below each have a fix in
 
 - The unused `eslint-plugin-security`, `eslint-plugin-json-schema-validator` and `@typescript-eslint/types` dependencies ([#201](https://github.com/obsidianmd/eslint-plugin/pull/201), [#212](https://github.com/obsidianmd/eslint-plugin/pull/212)).
 - The hand-written root `index.d.ts`, which was never published; the package's types are unchanged ([#206](https://github.com/obsidianmd/eslint-plugin/pull/206)).
+- The compiled tests and the non-working `eslint-plugin-obsidian` executable from the published package, which drops from 249 files and 685 kB to 115 files and 300 kB unpacked ([#PRE](https://github.com/obsidianmd/eslint-plugin/pull/PRE)).
 
 ### Fixed
 
@@ -69,6 +70,7 @@ Upgrading from 0.4.x? The breaking changes below each have a fix in
 - `prefer-create-el` no longer autofixes `activeDocument.createElement()` to `activeWindow.createEl()` when `Window` does not declare the helper, which Obsidian's types do not, so the fix no longer breaks `tsc`; it is offered as a suggestion ([#PRE](https://github.com/obsidianmd/eslint-plugin/pull/PRE)).
 - `vault/iterate` no longer claims to be autofixable; it never fixed anything ([#PRE](https://github.com/obsidianmd/eslint-plugin/pull/PRE)).
 - `validate-license` rejects unknown options instead of silently ignoring a misspelled one ([#PRE](https://github.com/obsidianmd/eslint-plugin/pull/PRE)).
+- The published `dist/lib/manifest.d.ts` imported a `PluginManifest` type file the package never shipped; the type now lives in `lib/` and is published with it ([#PRE](https://github.com/obsidianmd/eslint-plugin/pull/PRE)).
 
 ### Documentation
 

@@ -24,11 +24,8 @@
 		"update:eslint-docs": "eslint-doc-generator",
 		"check:eslint-docs": "eslint-doc-generator --check"
 	},
-	"bin": {
-		"eslint-plugin-obsidian": "dist/lib/index.js"
-	},
 	"files": [
-		"dist/**"
+		"dist/lib/**"
 	],
 	"types": "dist/lib/index.d.ts",
 	"dependencies": {
