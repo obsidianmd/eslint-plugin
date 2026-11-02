@@ -6,6 +6,29 @@
 
 <!-- end auto-generated rule header -->
 
+## What is reported
+
+Unless the code is desktop-only (see `isDesktopOnly` below), a Node.js built-in module, with or
+without the `node:` prefix and including subpaths such as `fs/promises`, loaded through:
+
+- a static `import`, type-only imports included, since a static import cannot be guarded;
+- a dynamic `import()` or a `require()` that `Platform.isDesktop` does not guard.
+
+A dynamic `import()` or `require()` counts as guarded inside `if (Platform.isDesktop)` (or
+`if (Platform.isDesktop && …)`), in the first branch of `Platform.isDesktop ? … : …`, to the right of
+`Platform.isDesktop && …`, and anywhere in a function whose first statement is
+`if (!Platform.isDesktop) return;` or `throw`, without an `else`:
+
+```ts
+if (Platform.isDesktop) {
+  const { readFile } = await import("node:fs/promises");
+}
+```
+
+Not reported: modules that are not built into Node.js, and a dynamic `import()` or `require()` whose
+module name is not a string literal. The recommended config does not apply this rule to
+[test files](../configuration.md#test-files), which run in Node.js.
+
 ## Options
 
 <!-- begin auto-generated rule options list -->
