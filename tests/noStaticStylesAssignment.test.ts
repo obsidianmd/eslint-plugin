@@ -37,6 +37,14 @@ ruleTester.run("no-static-styles-assignment", noInlineStylesRule, {
             name: "setCssProps with computed key is allowed",
             code: "el.setCssProps({ [someKey]: someValue });",
         },
+        {
+            name: "setCssStyles with standard property is allowed",
+            code: "el.setCssStyles({ 'color': 'blue' });",
+        },
+        {
+            name: "setCssStyles with computed key is allowed",
+            code: "el.setCssStyles({ [someKey]: someValue });",
+        },
     ],
     invalid: [
         {
@@ -90,24 +98,14 @@ ruleTester.run("no-static-styles-assignment", noInlineStylesRule, {
             ],
         },
         {
-            name: "setCssProps with non-variable property is forbidden",
+            name: "setCssProps with non-custom-property key is forbidden",
             code: "el.setCssProps({ 'color': 'blue' });",
             errors: [
                 {
-                    messageId: "avoidStyleAssignment",
-                    data: { property: "el.setCssProps" },
+                    messageId: "avoidNonCustomPropertyInSetCssProps",
                 }
             ]
         },
-        {
-            name: "setCssStyles with non-variable property is forbidden",
-            code: "el.setCssStyles({ 'color': 'blue' });",
-            errors: [
-                {
-                    messageId: "avoidStyleAssignment",
-                    data: { property: "el.setCssStyles" },
-                }
-            ]
-        }
+
     ],
 });
