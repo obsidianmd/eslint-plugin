@@ -2,7 +2,7 @@
 
 📝 Enforce sentence case for UI strings.
 
-⚠️ This rule _warns_ in the following configs: ✅ `recommended`, 🇬🇧 `recommendedWithLocalesEn`.
+🚫 This rule is _disabled_ in the following configs: ✅ `recommended`, 🇬🇧 `recommendedWithLocalesEn`.
 
 🔧 This rule is automatically fixable by the [`--fix` CLI option](https://eslint.org/docs/latest/user-guide/command-line-interface#--fix).
 
@@ -10,6 +10,17 @@
 
 Checks UI text set from code, such as `setName`, `setDesc`, `setPlaceholder`, `new Notice(...)` and
 command names, and reports text that is not in sentence case.
+
+The rule is off in `recommended` and `recommendedWithLocalesEn`. It was disabled in 0.3.0 because it
+reported too much ordinary text to be on by default. To use it, turn it on yourself:
+
+```js
+{
+  rules: {
+    "obsidianmd/ui/sentence-case": ["warn", { enforceCamelCaseLower: true }],
+  },
+}
+```
 
 Some text keeps its casing, because it is data rather than prose:
 
