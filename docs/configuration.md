@@ -53,7 +53,7 @@ The recommended config is an array of flat config objects that sets up:
 
 - **ESLint core** (`@eslint/js` recommended rules), for `.js`/`.ts` files and their variants only
 - **typescript-eslint** (`recommendedTypeChecked` for `.ts`/`.tsx`, `recommended` for `.js`/`.jsx`)
-- **All obsidianmd rules** at their default severities
+- **obsidianmd rules** at their default severities, except `ui/sentence-case`, which is off, and the two locale rules, which `recommendedWithLocalesEn` adds
 - **Third-party plugins**: `@microsoft/eslint-plugin-sdl`, `eslint-plugin-import`, `eslint-plugin-no-unsanitized`, `eslint-plugin-depend`, `@eslint-community/eslint-plugin-eslint-comments`
 - **Obsidian globals** (`activeDocument`, `activeWindow`, `createEl`, etc.)
 - **`package.json` linting** via `eslint-plugin-depend` (ban common micro-utilities)
@@ -116,11 +116,12 @@ If you want stricter rules than what the recommended config provides (e.g., `str
 
 ```js
 // eslint.config.mjs
-import { defineConfig } from "eslint/config";
+import { defineConfig, globalIgnores } from "eslint/config";
 import obsidianmd from "eslint-plugin-obsidianmd";
 import tseslint from "typescript-eslint";
 
 export default defineConfig([
+  globalIgnores(["node_modules", "dist", "main.js", "esbuild.config.mjs", "version-bump.mjs"]),
   ...obsidianmd.configs.recommended,
   {
     files: ["**/*.ts"],
@@ -129,6 +130,9 @@ export default defineConfig([
       tseslint.configs.stylisticTypeChecked,
     ],
     rules: {
+      // strictTypeChecked turns this back on; the recommended config runs
+      // obsidianmd/no-misused-promises in its place.
+      "@typescript-eslint/no-misused-promises": "off",
       // your overrides
       "@typescript-eslint/no-non-null-assertion": "off",
     },
@@ -145,7 +149,14 @@ export default defineConfig([
 ]);
 ```
 
-The stricter configs will merge on top of the plugin's defaults. Rules present in both will use the last (strictest) value.
+The stricter configs merge on top of the plugin's defaults; where both set a rule, the later block wins.
+That is why the example turns `@typescript-eslint/no-misused-promises` off again: `strictTypeChecked`
+and `recommendedTypeChecked` switch it on, and next to
+[`obsidianmd/no-misused-promises`](rules/no-misused-promises.md) it reports every real Promise a second
+time and treats Obsidian's chaining `then` (on `Setting` and every component) as a Promise again.
+Keep the block scoped to your TypeScript files: typescript-eslint's type-aware rules cannot run on
+`package.json`, `manifest.json` or `LICENSE` (see
+[Common errors](#-requires-type-information-on-license-manifestjson-or-packagejson)).
 
 ## Overriding rules
 
@@ -153,6 +164,7 @@ Override any rule in a config block after the recommended spread:
 
 ```js
 export default defineConfig([
+  globalIgnores(["node_modules", "dist", "main.js", "esbuild.config.mjs", "version-bump.mjs"]),
   ...obsidianmd.configs.recommended,
   {
     languageOptions: {
@@ -162,6 +174,9 @@ export default defineConfig([
         },
       },
     },
+  },
+  {
+    files: ["**/*.ts"],
     rules: {
       "obsidianmd/sample-names": "off",
       "obsidianmd/prefer-file-manager-trash-file": "error",
@@ -169,6 +184,11 @@ export default defineConfig([
   },
 ]);
 ```
+
+Give rule overrides a `files` glob for your source. A block without `files` applies to every file
+ESLint lints, including `package.json`, `manifest.json` and `LICENSE`. The recommended config
+registers typescript-eslint for JS and TS files only, so a `@typescript-eslint/*` rule set without
+`files` fails with `Could not find plugin "@typescript-eslint"`.
 
 ## Ignoring files
 
@@ -222,6 +242,7 @@ To turn off obsidianmd rules for files that are not part of your Obsidian plugin
 
 ```js
 export default defineConfig([
+  globalIgnores(["node_modules", "dist", "main.js", "esbuild.config.mjs", "version-bump.mjs"]),
   ...obsidianmd.configs.recommended,
   {
     languageOptions: {
@@ -343,23 +364,33 @@ shows:
 {
   files: ["**/*.ts"],
   extends: [tseslint.configs.strictTypeChecked],
+  rules: {
+    // strictTypeChecked turns this back on; obsidianmd/no-misused-promises replaces it.
+    "@typescript-eslint/no-misused-promises": "off",
+  },
 },
 ```
 
 If the unscoped config comes from somewhere you cannot edit, switch the type-checked rules off for
-the files the plugin lints by name, in a block placed **last**:
+the files the plugin lints by name, and typescript-eslint's `no-misused-promises` off for your
+source, in blocks placed **last**:
 
 ```js
 {
   files: ["package.json", "manifest.json", "LICENSE", "LICENSE.md", "LICENSE.txt"],
   extends: [tseslint.configs.disableTypeChecked],
 },
+{
+  files: ["**/*.ts"],
+  rules: { "@typescript-eslint/no-misused-promises": "off" },
+},
 ```
 
 ### Core JS rules apply only to JS and TS files
 
 ESLint's core rules (`js.configs.recommended`) no longer reach JSON, `LICENSE`, or files you lint
-with a parser of your own. If you lint `.svelte` or `.vue` files, add them back for those files:
+with a parser of your own. If you lint `.svelte` or `.vue` files, add them back for those files,
+with `@eslint/js` installed in your project (`npm install --save-dev @eslint/js`):
 
 ```js
 import js from "@eslint/js";
@@ -370,7 +401,7 @@ import js from "@eslint/js";
 
 ### `ui/sentence-case` is off
 
-It was meant to be off since 0.3.0. To keep it, opt in:
+0.3.0 meant to turn it off, but it stayed on until 0.4.2. To keep it, opt in:
 
 ```js
 { rules: { "obsidianmd/ui/sentence-case": ["warn", { enforceCamelCaseLower: true }] } },
@@ -383,15 +414,17 @@ The locale rules in `recommendedWithLocalesEn` stay on.
 `obsidianmd/no-misused-promises` replaces `@typescript-eslint/no-misused-promises` in the
 recommended config. It is the same rule, except that Obsidian's chaining `then` (on `Setting` and
 components) no longer counts as a Promise. Rename your disable comments, or ESLint reports them as
-unused:
+unused. Keep a description after `--`: the recommended config's
+`eslint-comments/require-description` reports a disable comment without one.
 
 ```ts
-// eslint-disable-next-line obsidianmd/no-misused-promises
+// eslint-disable-next-line obsidianmd/no-misused-promises -- the handler catches its own errors
 ```
 
-If you build your configuration from `ruleConfigs.recommendedTypeChecked` on top of
-typescript-eslint's type-checked config, also turn `@typescript-eslint/no-misused-promises` off,
-or both rules report every real Promise.
+If you add typescript-eslint's type-checked configs yourself, on top of the recommended config or
+around `ruleConfigs.recommendedTypeChecked`, turn `@typescript-eslint/no-misused-promises` off in
+that block. Otherwise both rules report every real Promise, and typescript-eslint's also reports
+Obsidian's chaining `then` again.
 
 ### New warnings from `validate-manifest`, `validate-license` and `prefer-active-doc`
 
@@ -496,21 +529,21 @@ The plugin exports `ruleConfigs` with two presets you can spread into your `rule
 Between them they hold every obsidianmd rule the recommended config sets for source files, at the same
 severity and options, and nothing else.
 
-Both carry only obsidianmd's own rules. The recommended config also replaces
-`@typescript-eslint/no-misused-promises` with [`obsidianmd/no-misused-promises`](rules/no-misused-promises.md),
-which does not report Obsidian's chaining `then` (on `Setting` and every component) as a Promise. If
-your own setup extends typescript-eslint's type-checked configs, make the same swap in your
-TypeScript block: `"@typescript-eslint/no-misused-promises": "off"` and
-`"obsidianmd/no-misused-promises": "error"`.
+Both carry only obsidianmd's own rules. `recommendedTypeChecked` includes
+[`obsidianmd/no-misused-promises`](rules/no-misused-promises.md), which replaces typescript-eslint's
+`no-misused-promises` and does not report Obsidian's chaining `then` (on `Setting` and every
+component) as a Promise. Turn `@typescript-eslint/no-misused-promises` off in the same block, as the
+example below does, or both report every real Promise.
 
 ```js
 // eslint.config.mjs
-import { defineConfig } from "eslint/config";
+import { defineConfig, globalIgnores } from "eslint/config";
 import eslint from "@eslint/js";
 import tseslint from "typescript-eslint";
 import obsidianmd from "eslint-plugin-obsidianmd";
 
 export default defineConfig([
+  globalIgnores(["node_modules", "dist", "main.js", "esbuild.config.mjs", "version-bump.mjs"]),
   eslint.configs.recommended,
   {
     files: ["**/*.ts"],
@@ -546,6 +579,8 @@ export default defineConfig([
     rules: {
       ...obsidianmd.ruleConfigs.recommended,
       ...obsidianmd.ruleConfigs.recommendedTypeChecked,
+      // Replaced by obsidianmd/no-misused-promises, from recommendedTypeChecked above
+      "@typescript-eslint/no-misused-promises": "off",
 
       // Override individual rules as needed
       "obsidianmd/sample-names": "off",
@@ -554,14 +589,16 @@ export default defineConfig([
 ]);
 ```
 
-If your tseslint setup does not include type checking (e.g., you use `tseslint.configs.recommended` instead of `recommendedTypeChecked`), omit the `recommendedTypeChecked` spread.
+`@eslint/js` is not installed with the plugin; add it to your project (`npm install --save-dev @eslint/js`).
+
+If your tseslint setup does not include type checking (e.g., you use `tseslint.configs.recommended` instead of `recommendedTypeChecked`), omit the `recommendedTypeChecked` spread and the `no-misused-promises` line.
 
 A few things to keep in mind with this approach:
 
 - **Obsidian globals** must be declared manually. The recommended config does this for you; here you need to add them yourself. The list above covers the most common ones. `DomElementInfo`, `SvgElementInfo`, `isBoolean`, `nextFrame`, and `ready` are also available.
-- **Rules from other plugins** that the recommended config sets are not in `ruleConfigs` — notably typescript-eslint's `no-deprecated`, which it runs at `warn` with `caretRangeFromPoint` allowed. Add them yourself if you want them. The recommended config also turns typescript-eslint's `no-misused-promises` off in favour of `obsidianmd/no-misused-promises` (in `recommendedTypeChecked`), so turn it off too if you extend typescript-eslint's type-checked config.
-- **Third-party plugins** bundled by the recommended config (`@microsoft/eslint-plugin-sdl`, `eslint-plugin-import`, `eslint-plugin-no-unsanitized`, `eslint-plugin-depend`, `eslint-plugin-eslint-comments`) are not included. Add them separately if you want them.
-- **`package.json` and `manifest.json` linting** (`validate-manifest`, `depend/ban-dependencies`) is not set up, and is not covered by `ruleConfigs` — those presets only carry rules that apply to source files. `validate-manifest` needs its own config block, because `manifest.json` matches no source glob and needs the JSON language to be parsed at all:
+- **Rules from other plugins** that the recommended config sets are not in `ruleConfigs` — notably typescript-eslint's `no-deprecated`, which it runs at `warn` with `caretRangeFromPoint` allowed. Add them yourself if you want them.
+- **Third-party plugins** bundled by the recommended config (`@microsoft/eslint-plugin-sdl`, `eslint-plugin-import`, `eslint-plugin-no-unsanitized`, `eslint-plugin-depend`, `@eslint-community/eslint-plugin-eslint-comments`) are not included. Add them separately if you want them.
+- **`package.json` and `manifest.json` linting** (`validate-manifest`, `depend/ban-dependencies`) is not set up, and is not covered by `ruleConfigs` — those presets only carry rules that apply to source files. `validate-manifest` needs its own config block, because `manifest.json` matches no source glob and needs the JSON language to be parsed at all. Install `@eslint/json` 2.x for it (`npm install --save-dev @eslint/json`):
 
   ```js
   import json from "@eslint/json";

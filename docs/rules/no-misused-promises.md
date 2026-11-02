@@ -41,17 +41,24 @@ reported with `checksConditionals: { flagUnions: "all" }` or `"strict"`.
 
 Disable comments for the upstream rule no longer match anything, so
 `// eslint-disable-next-line @typescript-eslint/no-misused-promises` becomes
-`// eslint-disable-next-line obsidianmd/no-misused-promises`. Unlike the other `obsidianmd/*`
-rules, this one may be disabled inline, as the upstream rule could.
+`// eslint-disable-next-line obsidianmd/no-misused-promises -- <reason>`. Unlike the other
+`obsidianmd/*` rules, this one may be disabled inline, as the upstream rule could. Keep the
+description after `--`: the recommended config's `eslint-comments/require-description` reports a
+disable comment without one.
 
-If you build your own configuration from `ruleConfigs` instead of using the recommended config,
-`ruleConfigs.recommendedTypeChecked` already turns this rule on, so turn the upstream rule off in your
-TypeScript block, or both report every real promise:
+typescript-eslint's `strictTypeChecked` and `recommendedTypeChecked` turn the upstream rule back on.
+If you add either yourself, on top of the recommended config or around
+`ruleConfigs.recommendedTypeChecked` (which already turns this rule on), turn the upstream rule off in
+that block. Otherwise both rules report every real Promise, and the upstream one reports Obsidian's
+chaining `then` again:
 
 ```js
-rules: {
-  ...obsidianmd.ruleConfigs.recommendedTypeChecked,
-  "@typescript-eslint/no-misused-promises": "off",
+{
+  files: ["**/*.ts"],
+  extends: [tseslint.configs.strictTypeChecked],
+  rules: {
+    "@typescript-eslint/no-misused-promises": "off",
+  },
 },
 ```
 
