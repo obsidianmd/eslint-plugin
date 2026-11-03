@@ -109,6 +109,10 @@ ruleTester.run("prefer-create-el", preferCreateEl, {
             code: "createEl(tag);",
         },
         {
+            name: "createEl with a tag named like an Object.prototype member is allowed",
+            code: "createEl('toString'); el.createEl('constructor'); document.createEl('__proto__');",
+        },
+        {
             name: "createSvg is allowed",
             code: "createSvg('path');",
         },
@@ -274,6 +278,12 @@ ruleTester.run("prefer-create-el", preferCreateEl, {
             code: `${MOCK_OBSIDIAN_DOM}\ndocument.createElement('my-element');`,
             output: null,
             errors: [{ messageId: "preferCreateEl", suggestions: [] }],
+        },
+        {
+            name: "document.createElement() with a tag named like an Object.prototype member is reported without a fix",
+            code: `${MOCK_OBSIDIAN_DOM}\ndocument.createElement('constructor');`,
+            output: null,
+            errors: [{ messageId: "preferCreateEl", data: { replacement: "createEl('constructor')", original: "document.createElement('constructor')" }, suggestions: [] }],
         },
         {
             name: "document.createElement() with a deprecated tag is reported without a fix",

@@ -18,8 +18,36 @@ ruleTester.run("object-assign", objectAssignRule, {
             code: "Object.assign(settings, data);",
         },
         {
-            name: "a property as the target is not reported",
-            code: "Object.assign(this.DEFAULT_SETTINGS, data);",
+            name: "a property whose name does not contain default is not reported",
+            code: "Object.assign(this.settings, data);",
+        },
+        {
+            name: "a property of the defaults is not reported, only the last name is matched",
+            code: "Object.assign(DEFAULT_SETTINGS.editor, data.editor);",
+        },
+        {
+            name: "a module's default export is not a set of defaults",
+            code: "Object.assign(mod.default, overrides);",
+        },
+        {
+            name: "a document's defaultView is the window, not a set of defaults",
+            code: "Object.assign(doc.defaultView, globals);",
+        },
+        {
+            name: "a computed property with a variable key is not reported",
+            code: "Object.assign(this[DEFAULT_KEY], data);",
+        },
+        {
+            name: "a copy of property defaults into a new object is not reported",
+            code: "this.settings = Object.assign({}, this.defaults, await this.loadData());",
+        },
+        {
+            name: "a property target with an object literal as the second argument is not reported",
+            code: "Object.assign(this.defaults, { theme: 'dark' });",
+        },
+        {
+            name: "merging property defaults into the settings is not reported",
+            code: "Object.assign(this.settings, this.defaultSettings);",
         },
         {
             name: "an object literal as the second argument is not reported",
@@ -52,6 +80,36 @@ ruleTester.run("object-assign", objectAssignRule, {
         {
             name: "the defaults name is matched in any case",
             code: "Object.assign(myDefaults, data);",
+            errors: [{ messageId: "twoArgumentsDefault" }],
+        },
+        {
+            name: "a property of this named defaults is reported",
+            code: "this.settings = Object.assign(this.defaults, await this.loadData());",
+            errors: [{ messageId: "twoArgumentsDefault" }],
+        },
+        {
+            name: "a property of another object named DEFAULT_SETTINGS is reported",
+            code: "this.settings = Object.assign(Constants.DEFAULT_SETTINGS, data);",
+            errors: [{ messageId: "twoArgumentsDefault" }],
+        },
+        {
+            name: "a camel-case defaults property is reported",
+            code: "Object.assign(this.defaultSettings, data);",
+            errors: [{ messageId: "twoArgumentsDefault" }],
+        },
+        {
+            name: "a nested property is matched by its last name",
+            code: "Object.assign(this.plugin.DEFAULT_SETTINGS, data);",
+            errors: [{ messageId: "twoArgumentsDefault" }],
+        },
+        {
+            name: "a computed property with a string key is reported",
+            code: "Object.assign(this[\"defaults\"], data);",
+            errors: [{ messageId: "twoArgumentsDefault" }],
+        },
+        {
+            name: "a private field is reported",
+            code: "class Store { #defaults = {}; load(data: object) { return Object.assign(this.#defaults, data); } }",
             errors: [{ messageId: "twoArgumentsDefault" }],
         },
     ],

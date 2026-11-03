@@ -39,10 +39,41 @@ const TEST_FILES = [
 	"test/helpers/vault.js",
 	"src/__tests__/view.tsx",
 	"__mocks__/obsidian.ts",
+	// End-to-end tests and their runners' configs, all run from Node.
+	"e2e/helpers.ts",
+	"e2e-tests/helpers.ts",
+	"packages/plugin/e2e/specs/smoke.js",
+	"src/settings.e2e.ts",
+	"vitest.e2e.config.ts",
+	"wdio.conf.mts",
+	"wdio.mobile.conf.mts",
+	"playwright.config.ts",
+	// The rest of what the community scanner leaves out as tests.
+	"tests/all.tests.ts",
+	"eslint.tests.config.mjs",
+	"src/view.specs.ts",
+	"src/mocks/crypto.ts",
+	"src/testUtils.ts",
+	"testUtils/fakeElectron.ts",
+	"automation/run.ts",
+	"test-vault/.obsidian/plugins/hot-reload/main.js",
 ];
 
-// Names that only look like tests keep every rule.
-const NOT_TEST_FILES = ["src/main.ts", "src/testing-utils.ts", "src/contest/entry.ts", "src/latest.js"];
+// Names that only look like tests keep every rule. `e2ee` is end-to-end
+// encryption, which is plugin code.
+const NOT_TEST_FILES = [
+	"src/main.ts",
+	"src/testing-utils.ts",
+	"src/contest/entry.ts",
+	"src/latest.js",
+	"src/crypto/e2ee.ts",
+	"src/e2ee/session.ts",
+	"src/e2e-encryption.ts",
+	"src/wdio.ts",
+	"src/automation/rules.ts",
+	"src/test-vault-picker.ts",
+	"src/mockup.ts",
+];
 
 function getSeverity(ruleValue: unknown): string {
 	const value = Array.isArray(ruleValue) ? ruleValue[0] : ruleValue;
@@ -111,6 +142,15 @@ describe("linting a test file", () => {
 
 	it("reports none of the Obsidian-runtime rules", async () => {
 		const [result] = await eslint.lintText(code, { filePath: "tests/fixture.js" });
+		assert.deepStrictEqual(
+			result.messages.filter((message) => message.ruleId?.startsWith("obsidianmd/")).map((message) => message.ruleId),
+			[],
+		);
+	});
+
+	it("reports none of the Obsidian-runtime rules in an end-to-end helper", async () => {
+		// A Playwright helper like incremental-reading's e2e-tests/helpers.ts.
+		const [result] = await eslint.lintText(code, { filePath: "e2e-tests/helpers.js" });
 		assert.deepStrictEqual(
 			result.messages.filter((message) => message.ruleId?.startsWith("obsidianmd/")).map((message) => message.ruleId),
 			[],

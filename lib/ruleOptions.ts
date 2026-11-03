@@ -1,5 +1,8 @@
 import type { ESLint } from "eslint";
+import { gte as semverGte, valid as semverValid } from "semver";
 import tseslint from "typescript-eslint";
+import { DECLARATIVE_MIN_VERSION } from "./rules/settingsTab/shared.js";
+import type { PluginManifest } from "./types/manifest.js";
 
 export const restrictedGlobalsOptions = [
     {
@@ -75,3 +78,40 @@ export const noUnusedVarsOptions = [{
     ignoreRestSiblings: true,
     ...(supportsIgnoreUsingDeclarations ? { ignoreUsingDeclarations: true } : {}),
 }] as const;
+
+/**
+ * The options for `@typescript-eslint/no-deprecated`, for a plugin with this
+ * manifest.
+ */
+export function noDeprecatedOptions(manifest: PluginManifest | null) {
+    // The obsidian typings mark SettingTab#display() `@deprecated Since 1.13.0`,
+    // but before 1.13 there is no update() and display() is how a settings tab
+    // renders and refreshes, so a plugin whose minAppVersion is below 1.13 has
+    // to keep calling it. The settings-tab rules cover the move to 1.13
+    // (prefer-update-over-display, no-deprecated-display, require-display), so
+    // display() is only reported here from minAppVersion 1.13.0. Like those
+    // rules, an unknown or invalid minAppVersion reports nothing.
+    const minAppVersion = (manifest as { minAppVersion?: unknown } | null)?.minAppVersion;
+    const displayIsDeprecated = typeof minAppVersion === "string"
+        && semverValid(minAppVersion) !== null
+        && semverGte(minAppVersion, DECLARATIVE_MIN_VERSION);
+    return [{
+        allow: [
+            // The standard caretPositionFromPoint only reached WebKit in
+            // Safari/iOS 17.4, so caretRangeFromPoint is still the fallback
+            // that keeps caret lookup working on older iOS and Electron.
+            // typescript-eslint matches a value specifier by name, so any
+            // deprecated `caretRangeFromPoint` is allowed, not only the DOM's.
+            { from: "lib", name: "caretRangeFromPoint" },
+            ...(displayIsDeprecated ? [] : [
+                // `tab.display()`, which resolves to obsidian's declaration.
+                { from: "package", package: "obsidian", name: "display" },
+                // `this.display()` in a tab that overrides display(): the
+                // override is declared in the plugin's own file, and inherits
+                // the @deprecated tag from SettingTab#display(). As with
+                // caretRangeFromPoint, this allows any deprecated `display`.
+                { from: "file", name: "display" },
+            ]),
+        ],
+    }];
+}

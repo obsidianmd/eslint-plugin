@@ -16,6 +16,21 @@ ruleTester.run("no-plugin-id-in-command-id", noPluginIdRule, {
             options: [{ pluginId: "my-plugin" }],
         },
         {
+            name: "plugin id inside a longer word is allowed",
+            code: "this.addCommand({ id: 'open-digital-garden' }); this.addCommand({ id: 'legit' });",
+            options: [{ pluginId: "git" }],
+        },
+        {
+            name: "the words of the plugin id must be together and whole",
+            code: "this.addCommand({ id: 'my-plugins-list' }); this.addCommand({ id: 'my-open-plugin' });",
+            options: [{ pluginId: "my-plugin" }],
+        },
+        {
+            name: "an empty plugin id matches nothing",
+            code: "this.addCommand({ id: 'open-note' });",
+            options: [{ pluginId: "-" }],
+        },
+        {
             name: "id from a template literal is not checked",
             code: "this.addCommand({ id: `my-plugin-open-note` });",
             options: [{ pluginId: "my-plugin" }],
@@ -44,6 +59,24 @@ ruleTester.run("no-plugin-id-in-command-id", noPluginIdRule, {
             code: "this.addCommand({ id: 'My-Plugin-open-note' });",
             options: [{ pluginId: "my-plugin" }],
             errors: [{ messageId: "pluginId" }],
+        },
+        {
+            name: "plugin id in camelCase is forbidden",
+            code: "this.addCommand({ id: 'myPluginOpenNote' });",
+            options: [{ pluginId: "my-plugin" }],
+            errors: [{ messageId: "pluginId" }],
+        },
+        {
+            name: "plugin id between other separators is forbidden",
+            code: "this.addCommand({ id: 'my_plugin_open' }); this.addCommand({ id: 'my-plugin:open' });",
+            options: [{ pluginId: "my-plugin" }],
+            errors: [{ messageId: "pluginId" }, { messageId: "pluginId" }],
+        },
+        {
+            name: "a one-word plugin id is found as a word",
+            code: "this.addCommand({ id: 'git-commit' }); this.addCommand({ id: 'pullFromGit' });",
+            options: [{ pluginId: "git" }],
+            errors: [{ messageId: "pluginId" }, { messageId: "pluginId" }],
         },
         {
             // This repository's own manifest.json has "id": "sample-plugin".

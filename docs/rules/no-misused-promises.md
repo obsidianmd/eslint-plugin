@@ -45,12 +45,27 @@ recommended config runs the rule on TypeScript files only, since it needs type i
 
 ## Migrating
 
-Disable comments for the upstream rule no longer match anything, so
-`// eslint-disable-next-line @typescript-eslint/no-misused-promises` becomes
-`// eslint-disable-next-line obsidianmd/no-misused-promises -- <reason>`. Unlike the other
-`obsidianmd/*` rules, this one may be disabled inline, as the upstream rule could. Keep the
-description after `--`: the recommended config's `eslint-comments/require-description` reports a
-disable comment without one.
+This rule also honours disable comments that name the upstream rule. An `eslint-disable-next-line`,
+`eslint-disable-line` or `eslint-disable` … `eslint-enable` comment naming
+`@typescript-eslint/no-misused-promises` covers the same code it did, following ESLint's rules for
+each directive, so code you had already accepted is not reported again.
+
+Rename those comments all the same. The upstream rule is off, so to ESLint they suppress nothing:
+with `reportUnusedDisableDirectives` on, as in the recommended config, ESLint reports each one as an
+unused disable directive, and `eslint --fix` deletes it, after which this rule reports the code it
+covered.
+
+```ts
+// Before
+// eslint-disable-next-line @typescript-eslint/no-misused-promises -- the handler catches its own errors
+
+// After
+// eslint-disable-next-line obsidianmd/no-misused-promises -- the handler catches its own errors
+```
+
+Unlike the other `obsidianmd/*` rules, this one may be disabled inline, as the upstream rule could.
+Keep the description after `--`: the recommended config's `eslint-comments/require-description`
+reports a disable comment without one.
 
 typescript-eslint's `strictTypeChecked` and `recommendedTypeChecked` turn the upstream rule back on.
 If you add either yourself, on top of the recommended config or around

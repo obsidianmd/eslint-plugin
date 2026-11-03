@@ -1,9 +1,14 @@
 import { TSESTree } from "@typescript-eslint/utils";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
+import { isReportedOnGlobalDocument } from "./preferCreateEl.js";
 
 const REPLACEMENTS: Record<string, string> = {
     document: "activeDocument",
 };
+
+// The files the recommended config runs prefer-create-el on, given type
+// information: its `**/*.{ts,cts,mts,tsx}` block.
+const TYPESCRIPT_FILE = /\.(?:ts|cts|mts|tsx)$/;
 
 const WINDOW_TIMER_METHODS = new Set([
     "clearInterval",
@@ -30,6 +35,12 @@ export default ruleCreator({
     },
     defaultOptions: [],
     create(context) {
+        // prefer-create-el needs type information, and the recommended config
+        // runs it on TypeScript files only.
+        const createElRuns =
+            Boolean(context.sourceCode.parserServices?.program) &&
+            TYPESCRIPT_FILE.test(context.filename);
+
         return {
             Identifier(node: TSESTree.Identifier) {
                 if (!Object.hasOwn(REPLACEMENTS, node.name)) {
@@ -128,6 +139,21 @@ export default ruleCreator({
                 const scope = context.sourceCode.getScope(node);
                 const variable = findVariable(scope, node.name);
                 if (variable && variable.defs.length > 0) {
+                    return;
+                }
+
+                // Leave `document.createElement("p")` and the other calls
+                // prefer-create-el reports to it: its createEl("p") drops
+                // `document`, while activeDocument.createElement("p") would
+                // still be reported by it.
+                if (
+                    createElRuns &&
+                    node.parent.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
+                    node.parent.object === node &&
+                    node.parent.parent.type === TSESTree.AST_NODE_TYPES.CallExpression &&
+                    node.parent.parent.callee === node.parent &&
+                    isReportedOnGlobalDocument(node.parent.parent)
+                ) {
                     return;
                 }
 

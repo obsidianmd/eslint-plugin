@@ -54,7 +54,8 @@ Without type information, only rewrites that can never change a type are fixed: 
 `unknown` or `never`, an argument to a call whose result is not used, an `in` check, and the timer
 calls that [`prefer-window-timers`](prefer-window-timers.md) fixes. Those are `setTimeout()` or
 `setInterval()` whose result is not used, `clearTimeout()` or `clearInterval()` with a number
-literal, and `requestAnimationFrame()`. Everything else gets a suggestion.
+literal, and `requestAnimationFrame()` and `cancelAnimationFrame()`. Everything else gets a
+suggestion.
 
 Neither a fix nor a suggestion is offered where `window` would be wrong:
 
