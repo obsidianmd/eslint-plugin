@@ -176,6 +176,12 @@ ruleTester.run("no-global-this", noGlobalThisRule, {
             errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" } }],
         },
         {
+            name: "cancelAnimationFrame with a number handle is fixed",
+            code: "declare const id: number; globalThis.cancelAnimationFrame(id);",
+            output: "declare const id: number; window.cancelAnimationFrame(id);",
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" } }],
+        },
+        {
             name: "a cast to any or to a type window is assignable to is fixed",
             code: "(globalThis as any).createEl = 1; const scope = globalThis as typeof globalThis;",
             output: "(window as any).createEl = 1; const scope = window as typeof globalThis;",
@@ -374,6 +380,15 @@ untypedRuleTester.run("no-global-this without type information", noGlobalThisRul
             errors: [
                 { messageId: "avoidGlobal", data: { name: "globalThis" } },
                 { messageId: "avoidGlobal", data: { name: "global" } },
+            ],
+        },
+        {
+            name: "cancelAnimationFrame is fixed without type information, like requestAnimationFrame",
+            code: "const id = globalThis.requestAnimationFrame(() => {}); globalThis.cancelAnimationFrame(id);",
+            output: "const id = window.requestAnimationFrame(() => {}); window.cancelAnimationFrame(id);",
+            errors: [
+                { messageId: "avoidGlobal", data: { name: "globalThis" } },
+                { messageId: "avoidGlobal", data: { name: "globalThis" } },
             ],
         },
         {

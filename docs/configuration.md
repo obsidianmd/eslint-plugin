@@ -51,7 +51,7 @@ See the [typescript-eslint docs on typed linting](https://typescript-eslint.io/g
 
 The recommended config is an array of flat config objects that sets up:
 
-- **ESLint core** (`@eslint/js` recommended rules), for `.js`/`.ts` files and their variants only
+- **ESLint core**: the recommended rules of the ESLint you have installed (`js.configs.recommended` for that version), for `.js`/`.ts` files and their variants only
 - **typescript-eslint** (`recommendedTypeChecked` for `.ts`/`.tsx`, `recommended` for `.js`/`.jsx`)
 - **obsidianmd rules** at their default severities, except `ui/sentence-case`, which is off, and the two locale rules, which `recommendedWithLocalesEn` adds
 - **Third-party plugins**: `@microsoft/eslint-plugin-sdl`, `eslint-plugin-import`, `eslint-plugin-no-unsanitized`, `eslint-plugin-depend`, `@eslint-community/eslint-plugin-eslint-comments`
@@ -307,16 +307,25 @@ ESLint does not support disabling all rules from a plugin with a single glob lik
 A web worker has no `window`: `window`, `activeWindow`, `activeDocument` and Obsidian's DOM helpers
 do not exist there, and `globalThis` is the right way to reach the worker's own scope. The
 recommended config therefore treats files matching `**/*.worker.*` and anything under a `workers/`
-directory as worker code: it adds the worker globals (`importScripts`, `postMessage`, …) and switches
-off the rules whose fix needs a window — `no-global-this`, `prefer-active-doc`, `prefer-create-el`,
-`prefer-instanceof` and `prefer-window-timers`. Every other rule, including the security rules, still
-applies.
+directory as worker code. It switches off the rules whose fix needs a window — `no-global-this`,
+`prefer-active-doc`, `prefer-create-el`, `prefer-instanceof` and `prefer-window-timers` — and gives
+these files the worker globals (`self`, `importScripts`, `postMessage`, …) in place of the browser
+and Obsidian ones. In JavaScript, `no-undef` then reports `window`, `document`, `localStorage`,
+`createEl` and the rest, which would throw in a worker; browser APIs a worker also has, such as
+`fetch`, `structuredClone`, `OffscreenCanvas` and `requestAnimationFrame`, stay declared. (`no-undef`
+is off for TypeScript, where the compiler reports undefined names.) Every other rule, including the
+security rules, still applies.
 
-For worker code under another name, add the same overrides for its path:
+For worker code under another name, add the same overrides for its path. In JavaScript, also declare
+the worker globals from the `globals` package and switch off the window globals you want reported:
 
 ```js
+// import globals from "globals";
 {
   files: ["src/background/**"],
+  languageOptions: {
+    globals: { ...globals.worker, window: "off", document: "off" },
+  },
   rules: {
     "obsidianmd/no-global-this": "off",
     "obsidianmd/prefer-active-doc": "off",
@@ -332,15 +341,19 @@ For worker code under another name, add the same overrides for its path:
 Tests run in Node or a DOM emulation such as jsdom, not inside Obsidian, so the rules about code that
 runs in Obsidian do not fit them: there is no popout window, Node.js modules are available, mocks cast
 to `TFile`, fixtures name `.obsidian`, and the code never runs in an older Obsidian or on iOS. The
-recommended config treats files matching `**/*.{test,spec}.*` and anything under a `test/`, `tests/`,
-`__tests__/` or `__mocks__/` directory as tests, and switches off `no-global-this`, `prefer-active-doc`,
+recommended config treats the files the community scanner leaves out as tests: files matching
+`**/*.{test,tests,spec,specs}.*` or `**/testUtils*`, anything under a `test/`, `tests/`, `__tests__/`,
+`mocks/`, `__mocks__/` or `testUtils*/` directory, and anything under a top-level `automation/` or
+`test-vault/` directory. So are end-to-end tests, which drive Obsidian from Node: files matching
+`**/*.e2e.*`, anything under an `e2e/` or `e2e-tests/` directory, and the WebdriverIO and Playwright
+configs (`wdio.conf.*`, `wdio.*.conf.*` and `playwright.config.*`). For all of them it switches off `no-global-this`, `prefer-active-doc`,
 `prefer-create-el`, `prefer-instanceof`, `prefer-window-timers`, `no-nodejs-modules`,
-`no-tfile-tfolder-cast`, `hardcoded-config-path`, `no-unsupported-api` and `regex-lookbehind` for
-them. Every other rule, including the security rules, still applies. The community scanner does not
-lint tests at all.
+`no-tfile-tfolder-cast`, `hardcoded-config-path`, `no-unsupported-api` and `regex-lookbehind`. Every
+other rule, including the security rules, still applies. The community scanner does not lint most of
+these files at all; see its [ignored files](#community-plugin-scanner-configuration).
 
-For tests under another name, such as an `e2e/` directory, add the same overrides for its path, or
-leave the directory out with `globalIgnores`.
+For tests under another name, such as an `integration-tests/` directory, add the same overrides for
+its path, or leave the directory out with `globalIgnores`.
 
 ## Upgrading to 0.5.0
 
@@ -414,6 +427,17 @@ import js from "@eslint/js";
 { files: ["**/*.svelte"], extends: [js.configs.recommended] },
 ```
 
+### ESLint 10 gets ESLint 10's core rules
+
+The core rules now come from the ESLint you run, not from a bundled `@eslint/js` 9. ESLint 9
+projects keep the same core rules. On ESLint 10 the recommended config adds the three rules
+ESLint 10 recommends, at `error`:
+[`no-unassigned-vars`](https://eslint.org/docs/latest/rules/no-unassigned-vars),
+[`no-useless-assignment`](https://eslint.org/docs/latest/rules/no-useless-assignment) and
+[`preserve-caught-error`](https://eslint.org/docs/latest/rules/preserve-caught-error).
+`preserve-caught-error` suggests `new Error(message, { cause: error })`, which TypeScript accepts
+only with `ES2022` or later in your `tsconfig.json` `lib`; the sample plugin's is `ES2021`.
+
 ### `ui/sentence-case` is off
 
 0.3.0 meant to turn it off, but it stayed on until 0.4.2. To keep it, opt in:
@@ -428,8 +452,11 @@ The locale rules in `recommendedWithLocalesEn` stay on.
 
 `obsidianmd/no-misused-promises` replaces `@typescript-eslint/no-misused-promises` in the
 recommended config. It is the same rule, except that Obsidian's chaining `then` (on `Setting` and
-components) no longer counts as a Promise. Rename your disable comments, or ESLint reports them as
-unused. Keep a description after `--`: the recommended config's
+components) no longer counts as a Promise. Disable comments that name
+`@typescript-eslint/no-misused-promises` still suppress what they did, but rename them: ESLint
+reports each one as an unused disable directive, since the recommended config sets
+`reportUnusedDisableDirectives`, and `eslint --fix` deletes it, after which the code it covered is
+reported. Keep a description after `--`: the recommended config's
 `eslint-comments/require-description` reports a disable comment without one.
 
 ```ts
@@ -512,6 +539,17 @@ sample plugin's layout this is the bundled `main.js` and the Node scripts `esbui
 `version-bump.mjs`. If the file is build output or a script rather than plugin source, ignore it (see
 [Ignoring files](#ignoring-files)); otherwise add it to your `tsconfig.json`'s `include`, or for a
 few loose files, to `allowDefaultProject`.
+
+### "Cannot read properties of undefined (reading 'includes')" with `--fix-dry-run`
+
+With `parserOptions.project` and TypeScript 6, `eslint --fix-dry-run` could stop with this error in a
+type-aware rule such as `@typescript-eslint/no-unsafe-assignment`. For a command-line run, and for
+any run with `CI=true` set, typescript-eslint builds the TypeScript program once and does not update
+it between fix passes, except under `--fix`. The second pass then reads types for the code as it was
+before the first fixes. The recommended config turns this off under `--fix-dry-run`. If you fix
+through ESLint's API instead, for example in a script that runs with `CI=true`, set
+`parserOptions.disallowAutomaticSingleRunInference: true` or the environment variable
+`TSESTREE_SINGLE_RUN=false`, or use `projectService` as the examples here do.
 
 ### "Configuration for rule '0' is invalid"
 
@@ -611,7 +649,7 @@ If your tseslint setup does not include type checking (e.g., you use `tseslint.c
 A few things to keep in mind with this approach:
 
 - **Obsidian globals** must be declared manually. The recommended config does this for you; here you need to add them yourself. The list above covers the most common ones. `DomElementInfo`, `SvgElementInfo`, `isBoolean`, `nextFrame`, and `ready` are also available.
-- **Rules from other plugins** that the recommended config sets are not in `ruleConfigs` — notably typescript-eslint's `no-deprecated`, which it runs at `warn` with `caretRangeFromPoint` allowed. Add them yourself if you want them.
+- **Rules from other plugins** that the recommended config sets are not in `ruleConfigs` — notably typescript-eslint's `no-deprecated`, which it runs at `warn` with `caretRangeFromPoint` allowed. While `minAppVersion` in `manifest.json` is below 1.13.0, or there is no valid one, it allows `display()` as well: the `obsidian` typings mark `SettingTab#display()` deprecated since 1.13.0, but before 1.13 there is no `update()`, so a settings tab has to keep calling `display()`. From 1.13.0 the call is reported, alongside [`settings-tab/prefer-update-over-display`](rules/settings-tab/prefer-update-over-display.md). Add these rules yourself if you want them; for the `display()` allowance, the entries are `{ from: "package", package: "obsidian", name: "display" }` and `{ from: "file", name: "display" }`.
 - **Third-party plugins** bundled by the recommended config (`@microsoft/eslint-plugin-sdl`, `eslint-plugin-import`, `eslint-plugin-no-unsanitized`, `eslint-plugin-depend`, `@eslint-community/eslint-plugin-eslint-comments`) are not included. Add them separately if you want them.
 - **`package.json` and `manifest.json` linting** (`validate-manifest`, `depend/ban-dependencies`) is not set up, and is not covered by `ruleConfigs` — those presets only carry rules that apply to source files. `validate-manifest` needs its own config block, because `manifest.json` matches no source glob and needs the JSON language to be parsed at all. Install `@eslint/json` 2.x for it (`npm install --save-dev @eslint/json`):
 
@@ -668,7 +706,9 @@ The scanner only lints plugin source code. The following patterns are excluded:
 | `**/docs/**` | Documentation |
 | `**/i18n/**`, `**/i18next/**`, `**/locale/**`, `**/locales/**`, `**/translations/**`, `**/l10n/**` | Localization files |
 | `.pnpm-store` | pnpm cache |
-| `automation/**`, `e2e-tests/**` | CI/automation and end-to-end tests |
+| `automation/**` | CI/automation |
+| `**/e2e/**`, `**/e2e-tests/**`, `**/*.e2e.*` | End-to-end tests |
+| `**/wdio.conf.*`, `**/wdio.*.conf.*`, `**/playwright.config.*` | End-to-end test runner configs |
 
 **Rule severity adjustments:**
 
@@ -680,7 +720,7 @@ The scanner only lints plugin source code. The following patterns are excluded:
 
 **Rule replacements:**
 
-- `@typescript-eslint/no-misused-promises` is replaced by `obsidianmd/no-misused-promises`, the same rule without Obsidian's chaining `then` counted as a Promise. A scanner configuration built on the recommended config inherits the swap; one that enables `@typescript-eslint/no-misused-promises` itself should enable the obsidianmd rule instead, or every `Setting` chain in a callback is reported.
+- `@typescript-eslint/no-misused-promises` is replaced by `obsidianmd/no-misused-promises`, the same rule without Obsidian's chaining `then` counted as a Promise. A scanner configuration built on the recommended config inherits the swap; one that enables `@typescript-eslint/no-misused-promises` itself should enable the obsidianmd rule instead, or every `Setting` chain in a callback is reported. Disable comments naming `@typescript-eslint/no-misused-promises` still suppress the obsidianmd rule, so findings a plugin had already disabled stay disabled.
 
 **Parser options:**
 

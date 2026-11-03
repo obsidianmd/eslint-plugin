@@ -1,5 +1,8 @@
 import { TSESTree } from "@typescript-eslint/utils";
 import { docsUrl, ruleCreator } from "../../ruleCreator.js";
+import { phrasePattern } from "./words.js";
+
+const COMMAND = phrasePattern("command")!;
 
 export default ruleCreator({
     meta: {
@@ -35,7 +38,7 @@ export default ruleCreator({
                         property.key.name === "name" &&
                         property.value.type === TSESTree.AST_NODE_TYPES.Literal &&
                         typeof property.value.value === "string" &&
-                        property.value.value.toLowerCase().includes("command")
+                        COMMAND.test(property.value.value)
                     ) {
                         context.report({
                             node: property,

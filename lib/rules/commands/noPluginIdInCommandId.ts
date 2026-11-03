@@ -1,6 +1,7 @@
 import { TSESTree } from "@typescript-eslint/utils";
 import { getManifest } from "../../manifest.js";
 import { docsUrl, ruleCreator } from "../../ruleCreator.js";
+import { containsWords, idWords } from "./words.js";
 
 type Options = [{ pluginId?: string }?];
 
@@ -31,6 +32,7 @@ export default ruleCreator<Options, "pluginId">({
     create(context) {
         const options = context.options[0] || {};
         const pluginId = options.pluginId ?? getManifest()?.id;
+        const pluginIdWords = typeof pluginId === "string" ? idWords(pluginId) : [];
         return {
             CallExpression(node: TSESTree.CallExpression) {
                 if (
@@ -45,15 +47,13 @@ export default ruleCreator<Options, "pluginId">({
                 const commandObject = node.arguments[0];
                 for (const property of commandObject.properties) {
                     if (
-                        typeof pluginId === "string" &&
+                        pluginIdWords.length > 0 &&
                         property.type === TSESTree.AST_NODE_TYPES.Property &&
                         property.key.type === TSESTree.AST_NODE_TYPES.Identifier &&
                         property.key.name === "id" &&
                         property.value.type === TSESTree.AST_NODE_TYPES.Literal &&
                         typeof property.value.value === "string" &&
-                        property.value.value
-                            .toLowerCase()
-                            .includes(pluginId.toLowerCase())
+                        containsWords(idWords(property.value.value), pluginIdWords)
                     ) {
                         context.report({
                             node: property,

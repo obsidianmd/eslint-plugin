@@ -310,8 +310,8 @@ export function isTimerCallTypeSafe(node: TSESTree.CallExpression, name: string,
         const arg = node.arguments[0];
         return arg === undefined || isNumberCompatible(arg, types);
     }
-    // requestAnimationFrame is a DOM function either way.
-    return name === "requestAnimationFrame";
+    // requestAnimationFrame and cancelAnimationFrame are DOM functions either way.
+    return name === "requestAnimationFrame" || name === "cancelAnimationFrame";
 }
 
 // Whether `arg` fits window.clearTimeout's `number | undefined`. Without

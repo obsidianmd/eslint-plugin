@@ -1,4 +1,6 @@
+import assert from "node:assert";
 import { RuleTester } from "@typescript-eslint/rule-tester";
+import { Linter } from "eslint";
 import editorDropPasteRule from "../lib/rules/editorDropPaste.js";
 
 const ruleTester = new RuleTester();
@@ -135,4 +137,18 @@ ruleTester.run("editor-drop-paste", editorDropPasteRule, {
             ],
         },
     ],
+});
+
+// The rule looks for the check anywhere in the handler, so the message must
+// not ask for it at the start.
+describe("editor-drop-paste messages", () => {
+    it("asks for the defaultPrevented check in the handler, not at its start", () => {
+        const messages = new Linter().verify("workspace.on(\"editor-paste\", (evt) => { evt.preventDefault(); });", [{
+            plugins: { o: { rules: { r: editorDropPasteRule as never } } },
+            rules: { "o/r": "error" },
+        }]);
+        assert.deepStrictEqual(messages.map((m) => m.message), [
+            "Check 'evt.defaultPrevented' in the 'editor-paste' handler and return early if another handler already handled the event.",
+        ]);
+    });
 });

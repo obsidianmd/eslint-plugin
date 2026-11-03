@@ -1,6 +1,7 @@
 import { TSESTree } from "@typescript-eslint/utils";
 import { getManifest } from "../../manifest.js";
 import { docsUrl, ruleCreator } from "../../ruleCreator.js";
+import { phrasePattern } from "./words.js";
 
 type Options = [{ pluginName?: string }?];
 
@@ -32,6 +33,7 @@ export default ruleCreator<Options, "pluginName">({
     create(context) {
         const options = context.options[0] || {};
         const pluginName = options.pluginName ?? getManifest()?.name;
+        const pluginNamePattern = typeof pluginName === "string" ? phrasePattern(pluginName) : null;
         return {
             CallExpression(node: TSESTree.CallExpression) {
                 if (
@@ -46,15 +48,13 @@ export default ruleCreator<Options, "pluginName">({
                 const commandObject = node.arguments[0];
                 for (const property of commandObject.properties) {
                     if (
-                        typeof pluginName === "string" &&
+                        pluginNamePattern &&
                         property.type === TSESTree.AST_NODE_TYPES.Property &&
                         property.key.type === TSESTree.AST_NODE_TYPES.Identifier &&
                         property.key.name === "name" &&
                         property.value.type === TSESTree.AST_NODE_TYPES.Literal &&
                         typeof property.value.value === "string" &&
-                        property.value.value
-                            .toLowerCase()
-                            .includes(pluginName.toLowerCase())
+                        pluginNamePattern.test(property.value.value)
                     ) {
                         context.report({
                             node: property,

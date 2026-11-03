@@ -8,3 +8,4 @@ node_modules
 
 # Ignore all log files
 *.log
+!tests/fixtures/**/*.js

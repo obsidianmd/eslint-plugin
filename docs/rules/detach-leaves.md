@@ -19,11 +19,40 @@ onunload() {
 }
 ```
 
-The fix removes the call. Detaching the leaves here makes them reopen in their default location the
-next time the plugin loads, even if the user had moved them elsewhere.
+Detaching the leaves here makes them reopen in their default location the next time the plugin
+loads, even if the user had moved them elsewhere.
 
 Not reported: a call nested inside a block such as an `if`, a call made through a helper method, and
 an `onunload` written as an arrow-function property.
+
+### Fix
+
+The fix removes the call together with its line. When nothing else is left in `onunload()`, the
+method goes too, provided the class extends Obsidian's `Plugin` directly (`Plugin` or
+`obsidian.Plugin` imported from `"obsidian"`): `Plugin` inherits `onunload()` from `Component`, where
+it does nothing, so removing the method changes nothing.
+
+```ts
+// Before
+export default class MyPlugin extends Plugin {
+  async onload() { /* … */ }
+
+  onunload() {
+    this.app.workspace.detachLeavesOfType(VIEW_TYPE_EXAMPLE);
+  }
+}
+
+// After --fix
+export default class MyPlugin extends Plugin {
+  async onload() { /* … */ }
+}
+```
+
+Otherwise the method stays, with an empty body `{}`: when the class extends a class of your own,
+whose `onunload()` the method overrides; when a comment is in, above or after the method, as the fix
+removes no comment outside the call; and for an `async`, `static` or decorated `onunload()`, one
+with parameters, or one with overloads. `@typescript-eslint/no-empty-function`, if you enable it,
+reports the empty method: remove it yourself, or say in a comment why it is empty.
 
 ## Further reading
 

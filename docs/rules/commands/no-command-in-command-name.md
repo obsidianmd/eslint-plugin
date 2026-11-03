@@ -9,14 +9,18 @@
 ## What is reported
 
 The `name` of a command passed to `addCommand()` as an object literal, when it is a string literal
-that contains "command" in any case, also inside a longer word such as "Commander":
+that contains the word "command", in any case:
 
 ```ts
 this.addCommand({ id: "open-note", name: "Open note command", callback }); // reported
+this.addCommand({ id: "open-note", name: "Command: open note", callback }); // reported
 this.addCommand({ id: "open-note", name: "Open note", callback });
 ```
 
-Not reported: a name built from a template literal or a variable, and a command object defined
+Only the whole word counts: no letter or digit, in any script, may come right before or after it.
+Not reported, therefore: "command" inside a longer word, as in "Open Commander" or "Recommended
+settings", and the plural, as in "Show all commands", where the commands are what the command acts
+on. Nor are a name built from a template literal or a variable, and a command object defined
 elsewhere and passed to `addCommand()` by name.
 
 ## Further reading

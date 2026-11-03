@@ -29,12 +29,14 @@ import ruleCustomMessage from "./rules/ruleCustomMessage.js";
 import noNodejsModules from "./rules/noNodejsModules.js";
 import noUnsupportedApi from "./rules/noUnsupportedApi.js";
 import noMisusedPromises from "./rules/noMisusedPromises.js";
+import { withCustomMessages } from "./customMessages.js";
 import { getManifest, isManifestDesktopOnly } from "./manifest.js";
 import { PlainTextLanguage } from "./plainTextLanguage.js";
 import { ui } from "./rules/ui/index.js";
+import { browserOnlyGlobalsOff } from "./workerGlobals.js";
 
 // --- Import plugins and configs for the recommended config ---
-import js from "@eslint/js";
+import { builtinRules } from "eslint/use-at-your-own-risk";
 import json from "@eslint/json";
 import tseslint from "typescript-eslint";
 import sdl from "@microsoft/eslint-plugin-sdl";
@@ -45,7 +47,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { type Config, defineConfig } from "@eslint/config-helpers";
-import type { RuleDefinition, RuleDefinitionTypeOptions, RulesConfig } from "@eslint/core";
+import type { RulesConfig } from "@eslint/core";
 import noUnsanitizedPlugin from "eslint-plugin-no-unsanitized";
 import eslintComments from "@eslint-community/eslint-plugin-eslint-comments";
 
@@ -65,15 +67,21 @@ const packageJsonPath = fs.existsSync(path.join(currentDir, "../../package.json"
     : path.join(currentDir, "../package.json");
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8")) as PackageJson;
 
-// The plugin's public type. The configs are typed with the user's own ESLint
-// (a peer dependency) rather than @eslint/config-helpers, so they fit the
-// defineConfig and Linter.Config of whichever ESLint version is installed.
+// The plugin's public type. The rules and configs are typed with the user's own
+// ESLint (a peer dependency) rather than @eslint/core and
+// @eslint/config-helpers, so the plugin fits the ESLint.Plugin, defineConfig
+// and Linter.Config of whichever ESLint version is installed. ESLint 9.19 types
+// a plugin's rules as Rule.RuleModule, which @eslint/core's RuleDefinition does
+// not fit.
 interface ObsidianmdPlugin {
     meta: { name: string; version: string };
     languages: { "plain-text": typeof PlainTextLanguage };
-    rules: Record<string, RuleDefinition<RuleDefinitionTypeOptions>>;
+    rules: NonNullable<ESLint.Plugin["rules"]>;
     configs: { recommended: Linter.Config[]; recommendedWithLocalesEn: Linter.Config[] };
     ruleConfigs: { recommended: RulesConfig; recommendedTypeChecked: RulesConfig };
+    // ESLint ignores the keys of a plugin object it does not use, and names the
+    // plugin by `meta` in --print-config and --cache.
+    withCustomMessages: typeof withCustomMessages;
 }
 
 const plugin: ObsidianmdPlugin = {
@@ -137,7 +145,7 @@ const plugin: ObsidianmdPlugin = {
         "ui/sentence-case": ui.sentenceCase,
         "ui/sentence-case-json": ui.sentenceCaseJson,
         "ui/sentence-case-locale-module": ui.sentenceCaseLocaleModule,
-    } as unknown as Record<string, RuleDefinition<RuleDefinitionTypeOptions>>,
+    } as unknown as ObsidianmdPlugin["rules"],
     configs: {
         recommended: [],
         recommendedWithLocalesEn: []
@@ -145,7 +153,8 @@ const plugin: ObsidianmdPlugin = {
     ruleConfigs: {
         recommended: {} as RulesConfig,
         recommendedTypeChecked: {} as RulesConfig,
-    }
+    },
+    withCustomMessages,
 };
 
 // Rules that require type information (call getParserServices).
@@ -222,19 +231,8 @@ const recommendedPluginRulesConfigBase: RulesConfig = {
 // obsidianmd rules they only run on TS files, but they are not obsidianmd rules,
 // so they stay out of `ruleConfigs`.
 const recommendedTypeCheckedGeneralRules: RulesConfig = {
-    "@typescript-eslint/no-deprecated": [
-        "warn",
-        {
-            allow: [
-                // The standard caretPositionFromPoint only reached WebKit in
-                // Safari/iOS 17.4, so caretRangeFromPoint is still the fallback
-                // that keeps caret lookup working on older iOS and Electron.
-                // typescript-eslint matches a value specifier by name, so any
-                // deprecated `caretRangeFromPoint` is allowed, not only the DOM's.
-                { from: "lib", name: "caretRangeFromPoint" },
-            ],
-        },
-    ],
+    // Allows caretRangeFromPoint, and SettingTab#display() below minAppVersion 1.13.
+    "@typescript-eslint/no-deprecated": ["warn", ...noDeprecatedOptions(manifest)],
     // Obsidian's Setting and BaseComponent declare a chaining `then`, so the
     // upstream rule reports them as promises (#181). obsidianmd/no-misused-promises
     // is the same rule with that declaration ignored, and replaces it.
@@ -269,6 +267,28 @@ const WORKER_FILES = [
     '**/workers/**/*.{ts,cts,mts,tsx,js,cjs,mjs,jsx}',
 ];
 
+// The globals Obsidian defines on each window. Worker files get them switched
+// off again, like the browser globals.
+const obsidianGlobals = {
+    DomElementInfo: "readonly",
+    SvgElementInfo: "readonly",
+    activeDocument: "readonly",
+    activeWindow: "readonly",
+    ajax: "readonly",
+    ajaxPromise: "readonly",
+    createDiv: "readonly",
+    createEl: "readonly",
+    createFragment: "readonly",
+    createSpan: "readonly",
+    createSvg: "readonly",
+    fish: "readonly",
+    fishAll: "readonly",
+    isBoolean: "readonly",
+    nextFrame: "readonly",
+    ready: "readonly",
+    sleep: "readonly",
+} as const;
+
 // Tests run in Node or a DOM emulation, not inside Obsidian, so the rules about
 // code that runs in Obsidian do not apply to them: there is no popout window,
 // Node.js modules are available, mocks cast to TFile, fixtures name `.obsidian`,
@@ -284,9 +304,20 @@ const OBSIDIAN_RUNTIME_RULES = new Set([
     "obsidianmd/no-unsupported-api",
     "obsidianmd/regex-lookbehind",
 ]);
+// The test files the community scanner leaves out (its ignores.json), plus the
+// end-to-end tests, which drive Obsidian from Node: `e2e/` and `e2e-tests/` hold
+// them, `*.e2e.*` names them (wdio-obsidian-service's convention), and
+// `wdio.conf.*`, `wdio.<name>.conf.*` and `playwright.config.*` configure their
+// runners. Each name is only used for tests; end-to-end encryption code (`e2ee`)
+// does not match. These are only ever `ignores`, in blocks that already apply to
+// JS and TS files alone.
 const TEST_FILES = [
-    '**/*.{test,spec}.{ts,cts,mts,tsx,js,cjs,mjs,jsx}',
-    '**/{test,tests,__tests__,__mocks__}/**/*.{ts,cts,mts,tsx,js,cjs,mjs,jsx}',
+    '**/*.{test,tests,spec,specs,e2e}.*',
+    '**/{test,tests,__tests__,mocks,__mocks__,e2e,e2e-tests}/**',
+    '**/testUtils*',
+    '**/testUtils*/**',
+    '{automation,test-vault}/**',
+    '**/{wdio.conf,wdio.*.conf,playwright.config}.*',
 ];
 
 // The rules of `config` that `keep` accepts. The window-only and Obsidian-runtime
@@ -300,7 +331,8 @@ const isRuntimeOnly = (rule: string) => OBSIDIAN_RUNTIME_RULES.has(rule);
 const isWindowOnly = (rule: string) => WINDOW_ONLY_RULES.has(rule);
 const isRuntimeNotWindowOnly = (rule: string) => isRuntimeOnly(rule) && !isWindowOnly(rule);
 
-import { restrictedGlobalsOptions, restrictedImportsOptions, noUnusedExpressionsOptions, noUnusedVarsOptions } from "./ruleOptions.js";
+import { fixDryRunConfigs } from "./singleRun.js";
+import { restrictedGlobalsOptions, restrictedImportsOptions, noUnusedExpressionsOptions, noUnusedVarsOptions, noDeprecatedOptions } from "./ruleOptions.js";
 
 const flatRecommendedGeneralRules: RulesConfig = {
     "no-unused-vars": "off",
@@ -340,14 +372,27 @@ const flatRecommendedGeneralRules: RulesConfig = {
     "no-unsanitized/property": "error",
 };
 
+// ESLint's recommended core rules, read from the ESLint that is running rather
+// than from a copy of @eslint/js. A copy fits one major only: @eslint/js 9
+// lacks the rules ESLint 10 added to `recommended`, and @eslint/js 10 names
+// rules that ESLint 9.19 does not have ("Could not find rule"). ESLint
+// generates `js.configs.recommended` from these same two fields
+// (tools/update-eslint-recommended.js), so this is that config for the
+// installed version.
+const coreRecommendedRules: RulesConfig = Object.fromEntries(
+    [...builtinRules]
+        .filter(([, rule]) => !rule.meta?.deprecated && rule.meta?.docs?.recommended === true)
+        .map(([ruleId]) => [ruleId, "error" as const]),
+);
+
 const flatRecommendedConfig: Config[] = defineConfig([
     // Core JS rules are for JS and TS only. Without `files` they reached every
     // other file too -- package.json, manifest.json, LICENSE, locale JSON, and
     // any JSON a user lints -- where a rule like no-irregular-whitespace throws
     // because that source code has no comments to walk.
     {
-        ...js.configs.recommended,
         files: ['**/*.{ts,cts,mts,tsx,js,cjs,mjs,jsx}'],
+        rules: coreRecommendedRules,
     },
     {
         plugins: {
@@ -385,6 +430,7 @@ const flatRecommendedConfig: Config[] = defineConfig([
             ...pickRules(recommendedPluginRulesConfig, (rule) => !isRuntimeOnly(rule))
         },
     },
+    ...fixDryRunConfigs(process.argv),
     {
         files: ['**/*.{js,cjs,mjs,jsx}'],
         ignores: [...WORKER_FILES, ...TEST_FILES],
@@ -404,12 +450,6 @@ const flatRecommendedConfig: Config[] = defineConfig([
         files: ['**/*.{ts,cts,mts,tsx}'],
         ignores: TEST_FILES,
         rules: pickRules(recommendedPluginRulesConfig, isRuntimeNotWindowOnly),
-    },
-    {
-        files: WORKER_FILES,
-        languageOptions: {
-            globals: globals.worker,
-        },
     },
     {
         files: ['package.json'],
@@ -493,26 +533,25 @@ const flatRecommendedConfig: Config[] = defineConfig([
                     ...globals.node,
                     NodeJS: "readonly"
                 } : {}),
-                DomElementInfo: "readonly",
-                SvgElementInfo: "readonly",
-                activeDocument: "readonly",
-                activeWindow: "readonly",
-                ajax: "readonly",
-                ajaxPromise: "readonly",
-                createDiv: "readonly",
-                createEl: "readonly",
-                createFragment: "readonly",
-                createSpan: "readonly",
-                createSvg: "readonly",
-                fish: "readonly",
-                fishAll: "readonly",
-                isBoolean: "readonly",
-                nextFrame: "readonly",
-                ready: "readonly",
-                sleep: "readonly"
+                ...obsidianGlobals,
             }
         },
-    }
+    },
+    // After the block above, which gives every file the browser and Obsidian
+    // globals: flat config merges `languageOptions.globals`, so worker files
+    // would keep them all. A worker has neither, so they are switched off there
+    // and its own globals (`self`, `postMessage`, `importScripts`, ...) take
+    // their place. no-undef is off for TypeScript, so this is for JavaScript.
+    {
+        files: WORKER_FILES,
+        languageOptions: {
+            globals: {
+                ...browserOnlyGlobalsOff,
+                ...Object.fromEntries(Object.keys(obsidianGlobals).map((name) => [name, "off"])),
+                ...globals.worker,
+            },
+        },
+    },
 ]);
 
 const recommendedWithLocalesEn: Config[] = defineConfig([
@@ -576,3 +615,7 @@ plugin.ruleConfigs = {
 };
 
 export default plugin;
+// Types only: at runtime the module has just its default export, as eslint-doc-generator
+// and require() of the package expect, so withCustomMessages is reached as
+// obsidianmd.withCustomMessages.
+export type { CustomMessages, WrappableRule } from "./customMessages.js";

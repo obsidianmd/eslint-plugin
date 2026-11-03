@@ -10,6 +10,14 @@ ruleTester.run("no-command-in-command-id", noCommandInIdRule, {
             code: "this.addCommand({ id: 'open-thing' });",
         },
         {
+            name: "'command' inside a longer word is allowed",
+            code: "plugin.addCommand({ id: 'open-commander' }); plugin.addCommand({ id: 'recommend-notes' }); plugin.addCommand({ id: 'commandeerTab' });",
+        },
+        {
+            name: "the plural 'commands' is allowed",
+            code: "plugin.addCommand({ id: 'list-commands' });",
+        },
+        {
             name: "id from a template literal is not checked",
             code: "this.addCommand({ id: `open-command` });",
         },
@@ -30,9 +38,19 @@ ruleTester.run("no-command-in-command-id", noCommandInIdRule, {
             errors: [{ messageId: "commandInId" }],
         },
         {
-            name: "'command' inside a longer word is forbidden",
-            code: "plugin.addCommand({ id: 'open-commander' });",
+            name: "id starting with 'command' in camelCase is forbidden",
+            code: "this.addCommand({ id: 'commandPalette' });",
             errors: [{ messageId: "commandInId" }],
+        },
+        {
+            name: "'command' after an acronym is forbidden",
+            code: "this.addCommand({ id: 'PDFCommand' });",
+            errors: [{ messageId: "commandInId" }],
+        },
+        {
+            name: "'command' between other separators is forbidden",
+            code: "this.addCommand({ id: 'run_command' }); this.addCommand({ id: 'editor:COMMAND' }); this.addCommand({ id: 'open.command.now' });",
+            errors: [{ messageId: "commandInId" }, { messageId: "commandInId" }, { messageId: "commandInId" }],
         },
     ],
 });

@@ -1,5 +1,6 @@
 import { TSESTree } from "@typescript-eslint/utils";
 import { docsUrl, ruleCreator } from "../../ruleCreator.js";
+import { idWords } from "./words.js";
 
 export default ruleCreator({
     meta: {
@@ -34,7 +35,7 @@ export default ruleCreator({
                         property.key.name === "id" &&
                         property.value.type === TSESTree.AST_NODE_TYPES.Literal &&
                         typeof property.value.value === "string" &&
-                        property.value.value.toLowerCase().includes("command")
+                        idWords(property.value.value).includes("command")
                     ) {
                         context.report({
                             node: property,

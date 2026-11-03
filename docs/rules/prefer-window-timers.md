@@ -10,7 +10,8 @@
 
 ## What is reported
 
-A call to `setTimeout`, `setInterval`, `clearTimeout`, `clearInterval` or `requestAnimationFrame`:
+A call to `setTimeout`, `setInterval`, `clearTimeout`, `clearInterval`, `requestAnimationFrame` or
+`cancelAnimationFrame`:
 
 - called bare, as the global function. The fix prefixes `window.`
 - called on `activeWindow`, which may be a popout window that the user closes, taking its timers with
@@ -32,7 +33,8 @@ change with it:
 - `clearTimeout()` and `clearInterval()` are fixed when their argument is a `number` or `undefined`
   (without type information: a number literal or `undefined`). A `NodeJS.Timeout` argument gets a
   suggestion.
-- `requestAnimationFrame()` is a DOM function either way and is always fixed.
+- `requestAnimationFrame()` and `cancelAnimationFrame()` are DOM functions either way and are always
+  fixed.
 - Calls on `activeWindow` are fixed: both are a `Window`.
 
 ```ts
@@ -50,8 +52,8 @@ on `activeWindow` are not fixed there either:
   Where the check proves that the window exists, such as inside
   `if (typeof window !== "undefined") { … }`, the rules above apply
 
-Not reported: calls on `window` already, a function of your own or an import with one of these names,
-and other functions such as `cancelAnimationFrame`.
+Not reported: calls on `window` already or on another window such as `el.win`, a function of your own
+or an import with one of these names, and other functions such as `requestIdleCallback`.
 
 ## Web workers and tests
 
