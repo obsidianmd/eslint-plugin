@@ -428,8 +428,11 @@ The locale rules in `recommendedWithLocalesEn` stay on.
 
 `obsidianmd/no-misused-promises` replaces `@typescript-eslint/no-misused-promises` in the
 recommended config. It is the same rule, except that Obsidian's chaining `then` (on `Setting` and
-components) no longer counts as a Promise. Rename your disable comments, or ESLint reports them as
-unused. Keep a description after `--`: the recommended config's
+components) no longer counts as a Promise. Disable comments that name
+`@typescript-eslint/no-misused-promises` still suppress what they did, but rename them: ESLint
+reports each one as an unused disable directive, since the recommended config sets
+`reportUnusedDisableDirectives`, and `eslint --fix` deletes it, after which the code it covered is
+reported. Keep a description after `--`: the recommended config's
 `eslint-comments/require-description` reports a disable comment without one.
 
 ```ts
@@ -680,7 +683,7 @@ The scanner only lints plugin source code. The following patterns are excluded:
 
 **Rule replacements:**
 
-- `@typescript-eslint/no-misused-promises` is replaced by `obsidianmd/no-misused-promises`, the same rule without Obsidian's chaining `then` counted as a Promise. A scanner configuration built on the recommended config inherits the swap; one that enables `@typescript-eslint/no-misused-promises` itself should enable the obsidianmd rule instead, or every `Setting` chain in a callback is reported.
+- `@typescript-eslint/no-misused-promises` is replaced by `obsidianmd/no-misused-promises`, the same rule without Obsidian's chaining `then` counted as a Promise. A scanner configuration built on the recommended config inherits the swap; one that enables `@typescript-eslint/no-misused-promises` itself should enable the obsidianmd rule instead, or every `Setting` chain in a callback is reported. Disable comments naming `@typescript-eslint/no-misused-promises` still suppress the obsidianmd rule, so findings a plugin had already disabled stay disabled.
 
 **Parser options:**
 
