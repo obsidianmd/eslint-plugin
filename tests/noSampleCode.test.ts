@@ -44,5 +44,48 @@ ruleTester.run("no-sample-code", noSampleCode, {
             errors: [{ messageId: "removeSampleDomEvent" }],
             output: "", // The auto-fix should remove the entire block
         },
+        {
+            name: "the sample statement is removed from onload()",
+            code: "class MyPlugin extends Plugin { onload() { this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000)); this.addCommand(command); } }",
+            errors: [{ messageId: "removeSampleInterval" }],
+            output: "class MyPlugin extends Plugin { onload() {  this.addCommand(command); } }",
+        },
+
+        // --- The call's value is used, or the call is not a statement of its own: no fix ---
+        // Removing the declarator left `const ;`, which does not parse.
+        {
+            name: "a sample interval whose id is kept is reported without a fix",
+            code: "const id = this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));",
+            errors: [{ messageId: "removeSampleInterval" }],
+            output: null,
+        },
+        {
+            name: "a sample interval assigned to a field is reported without a fix",
+            code: "this.intervalId = this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));",
+            errors: [{ messageId: "removeSampleInterval" }],
+            output: null,
+        },
+        {
+            name: "a returned sample interval is reported without a fix",
+            code: "function start() { return this.registerInterval(window.setInterval(() => console.log('setInterval'), 1000)); }",
+            errors: [{ messageId: "removeSampleInterval" }],
+            output: null,
+        },
+        {
+            name: "a sample call as an arrow function body is reported without a fix",
+            code: "const start = () => this.registerInterval(window.setInterval(() => console.log('setInterval'), 1000));",
+            errors: [{ messageId: "removeSampleInterval" }],
+            output: null,
+        },
+        // Removing the statement would make the next one the body of the `if`.
+        {
+            name: "a sample call as the body of an if is reported without a fix",
+            code: `if (debug) this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
+                console.log('click', evt);
+            });
+            this.addCommand(command);`,
+            errors: [{ messageId: "removeSampleDomEvent" }],
+            output: null,
+        },
     ],
 });

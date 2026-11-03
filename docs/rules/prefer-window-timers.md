@@ -33,11 +33,22 @@ change with it:
   (without type information: a number literal or `undefined`). A `NodeJS.Timeout` argument gets a
   suggestion.
 - `requestAnimationFrame()` is a DOM function either way and is always fixed.
-- Calls on `activeWindow` are always fixed: both are a `Window`.
+- Calls on `activeWindow` are fixed: both are a `Window`.
 
 ```ts
 this.timer = setTimeout(save, 1000); // reported, suggestion only: timer may be a NodeJS.Timeout
 ```
+
+Neither a fix nor a suggestion is offered where `window` would not be the global window, and calls
+on `activeWindow` are not fixed there either:
+
+- a local binding named `window` is in scope, such as a Playwright page in
+  `const window = await app.firstWindow()`, so `window.setTimeout` would call that binding
+- with type information, the project declares no `window` because it has no DOM lib
+- an earlier `typeof window` or `typeof document` check shows that the code also runs without a
+  window, as in `typeof window === "undefined" ? setTimeout(fn, ms) : window.setTimeout(fn, ms)`.
+  Where the check proves that the window exists, such as inside
+  `if (typeof window !== "undefined") { … }`, the rules above apply
 
 Not reported: calls on `window` already, a function of your own or an import with one of these names,
 and other functions such as `cancelAnimationFrame`.
