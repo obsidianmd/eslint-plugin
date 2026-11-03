@@ -4,7 +4,7 @@
 
 ⚠️ This rule _warns_ in the following configs: ✅ `recommended`, 🇬🇧 `recommendedWithLocalesEn`.
 
-🔧 This rule is automatically fixable by the [`--fix` CLI option](https://eslint.org/docs/latest/user-guide/command-line-interface#--fix).
+💡 This rule is manually fixable by [editor suggestions](https://eslint.org/docs/latest/use/core-concepts#rule-suggestions).
 
 <!-- end auto-generated rule header -->
 
@@ -14,8 +14,19 @@ A `display()` method (or `display` class field) on a settings tab that also impl
 `getSettingDefinitions()`, once `minAppVersion` is 1.13.0 or later. Obsidian then renders the
 declarative settings and never calls `display()`.
 
-The fix removes the `display` member, including a trailing semicolon and its line. Below 1.13, or
-without `getSettingDefinitions()`, `display()` still does the work and is not reported.
+Below 1.13, or without `getSettingDefinitions()`, `display()` still does the work and is not
+reported. Neither is it when `getSettingDefinitions()` only returns an empty array
+(`return [];`): Obsidian renders a tab from its definitions only when there are some, so
+`display()` still renders that tab.
+
+An editor suggestion removes the `display` member, including a trailing semicolon, a trailing `//`
+comment and its line. `--fix` never removes it, because that is not always safe:
+
+- With `obsidian` typings older than 1.13, `display()` is abstract, so the class no longer compiles
+  without it. Upgrade the `obsidian` package first.
+- When `getSettingDefinitions()` returns an empty array only sometimes, `display()` still renders the
+  tab then.
+- Imports, helpers and fields that only `display()` used are left unused; remove them with it.
 
 Only a class that extends `PluginSettingTab` by that name is checked, declared or as a class
 expression; an `abstract` class is skipped, and so is a superclass written as a property access
