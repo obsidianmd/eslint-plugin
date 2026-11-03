@@ -1,0 +1,9 @@
+// The repository's tsconfig without strict mode, for tests of rules whose fix
+// depends on strictNullChecks. It covers the file.ts that RuleTester lints.
+{
+	"extends": "../../tsconfig.json",
+	"compilerOptions": {
+		"strict": false
+	},
+	"include": ["../../file.ts"]
+}
