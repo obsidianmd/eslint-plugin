@@ -34,8 +34,24 @@ ruleTester.run("prefer-window-timers", preferWindowTimersRule, {
             code: "import { setTimeout } from 'node:timers/promises'; await setTimeout(10);",
         },
         {
-            name: "cancelAnimationFrame is not reported",
-            code: "cancelAnimationFrame(handle);",
+            name: "window.cancelAnimationFrame is allowed",
+            code: "window.cancelAnimationFrame(handle);",
+        },
+        {
+            name: "a local function named cancelAnimationFrame is not reported",
+            code: "function cancelAnimationFrame(id: number) {} cancelAnimationFrame(1);",
+        },
+        {
+            name: "an imported cancelAnimationFrame is not reported",
+            code: "import { cancelAnimationFrame } from './raf'; cancelAnimationFrame(1);",
+        },
+        {
+            name: "cancelAnimationFrame on another window is not reported",
+            code: "declare const el: HTMLElement; el.win.cancelAnimationFrame(1); popout.cancelAnimationFrame(2);",
+        },
+        {
+            name: "other functions such as requestIdleCallback are not reported",
+            code: "const id = requestIdleCallback(() => {}); cancelIdleCallback(id);",
         },
     ],
     invalid: [
@@ -98,6 +114,48 @@ ruleTester.run("prefer-window-timers", preferWindowTimersRule, {
             code: "activeWindow.requestAnimationFrame(() => {});",
             output: "window.requestAnimationFrame(() => {});",
             errors: [{ messageId: "noActiveWindowTimer", data: { name: "requestAnimationFrame" } }],
+        },
+        {
+            name: "bare cancelAnimationFrame is forbidden",
+            code: "cancelAnimationFrame(handle);",
+            output: "window.cancelAnimationFrame(handle);",
+            errors: [{ messageId: "preferWindowTimer", data: { name: "cancelAnimationFrame" } }],
+        },
+        {
+            name: "activeWindow.cancelAnimationFrame is forbidden",
+            code: "activeWindow.cancelAnimationFrame(handle);",
+            output: "window.cancelAnimationFrame(handle);",
+            errors: [{ messageId: "noActiveWindowTimer", data: { name: "cancelAnimationFrame" } }],
+        },
+        {
+            name: "cancelAnimationFrame with a number handle is fixed, it takes a number either way",
+            code: "declare const frame: number; cancelAnimationFrame(frame);",
+            output: "declare const frame: number; window.cancelAnimationFrame(frame);",
+            errors: [{ messageId: "preferWindowTimer", data: { name: "cancelAnimationFrame" } }],
+        },
+        {
+            name: "a frame requested and cancelled on activeWindow is moved to window together",
+            code: "const id = activeWindow.requestAnimationFrame(() => {}); activeWindow.cancelAnimationFrame(id);",
+            output: "const id = window.requestAnimationFrame(() => {}); window.cancelAnimationFrame(id);",
+            errors: [
+                { messageId: "noActiveWindowTimer", data: { name: "requestAnimationFrame" } },
+                { messageId: "noActiveWindowTimer", data: { name: "cancelAnimationFrame" } },
+            ],
+        },
+        {
+            name: "cancelAnimationFrame is not rewritten to a local named window",
+            code: "export function stop(window: { id: number }) { cancelAnimationFrame(window.id); activeWindow.cancelAnimationFrame(window.id); }",
+            output: null,
+            errors: [
+                { messageId: "preferWindowTimer", data: { name: "cancelAnimationFrame" }, suggestions: [] },
+                { messageId: "noActiveWindowTimer", data: { name: "cancelAnimationFrame" } },
+            ],
+        },
+        {
+            name: "cancelAnimationFrame where window may be undefined is reported only",
+            code: `export function stop(id: number) { if (typeof window === "undefined") { cancelAnimationFrame(id); } }`,
+            output: null,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "cancelAnimationFrame" }, suggestions: [] }],
         },
         {
             name: "a timer stored in a NodeJS.Timeout field gets a suggestion, not a fix",
@@ -260,6 +318,12 @@ untypedRuleTester.run("prefer-window-timers without type information", preferWin
             errors: [{ messageId: "preferWindowTimer", data: { name: "setTimeout" } }],
         },
         {
+            name: "cancelAnimationFrame with a variable is fixed without type information",
+            code: "cancelAnimationFrame(handle);",
+            output: "window.cancelAnimationFrame(handle);",
+            errors: [{ messageId: "preferWindowTimer", data: { name: "cancelAnimationFrame" } }],
+        },
+        {
             name: "a local named window is not the global without type information either",
             code: "function reload(window) { setTimeout(() => {}, 10); }",
             output: null,
@@ -280,11 +344,12 @@ noDomRuleTester.run("prefer-window-timers without the DOM lib", preferWindowTime
     invalid: [
         {
             name: "a timer is reported only when the project declares no window",
-            code: "setTimeout(() => {}, 10); declare const n: number; clearInterval(n);",
+            code: "setTimeout(() => {}, 10); declare const n: number; clearInterval(n); cancelAnimationFrame(n);",
             output: null,
             errors: [
                 { messageId: "preferWindowTimer", data: { name: "setTimeout" }, suggestions: [] },
                 { messageId: "preferWindowTimer", data: { name: "clearInterval" }, suggestions: [] },
+                { messageId: "preferWindowTimer", data: { name: "cancelAnimationFrame" }, suggestions: [] },
             ],
         },
     ],

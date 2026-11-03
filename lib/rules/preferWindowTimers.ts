@@ -3,6 +3,7 @@ import { getTypeInfo, isGlobalWindowAt, isTimerCallTypeSafe } from "../globalWin
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 const TIMER_FUNCTIONS = new Set([
+    "cancelAnimationFrame",
     "clearInterval",
     "clearTimeout",
     "requestAnimationFrame",
