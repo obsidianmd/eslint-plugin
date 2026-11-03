@@ -2,6 +2,7 @@
 // rule-custom-message rule and obsidianmd.withCustomMessages().
 
 import type { TSESLint, TSESTree } from "@typescript-eslint/utils";
+import type { Rule as ESLintRule } from "eslint";
 
 /** Maps a message, or part of one, to the message to show instead. */
 export type CustomMessages = Readonly<Record<string, string>>;
@@ -108,13 +109,18 @@ interface ReportingContext {
 }
 
 /**
- * The `create()` that withCustomMessages() adds to the type of the rule it
- * returns. ESLint's types do not accept a typescript-eslint rule, so this one
- * takes any context, as typescript-eslint's `LooseRuleDefinition` does.
+ * What withCustomMessages() adds to the type of the rule it returns, so that a
+ * typescript-eslint rule fits the plugin rule type of the installed ESLint (a
+ * peer dependency): a `create()` that takes any context, as typescript-eslint's
+ * `LooseRuleDefinition` does, for ESLint 9.20 and later, whose context type
+ * typescript-eslint's `create()` does not accept; and ESLint's own `meta`, for
+ * ESLint 9.19, whose `meta.docs.recommended` is a boolean where
+ * typescript-eslint's is a string.
  */
 interface LooseCreate {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the visitors of any rule type
     create(context: unknown): any;
+    meta?: ESLintRule.RuleModule["meta"];
 }
 
 /**
@@ -136,9 +142,9 @@ interface LooseCreate {
  * The result has `rule`'s `meta`, so ESLint checks its options against `rule`'s
  * schema, fills in `rule`'s defaults and accepts its fixes and suggestions.
  *
- * Its type is `rule`'s, with a `create()` that also takes the context in
- * ESLint's own types, so a typescript-eslint rule fits ESLint's
- * `defineConfig()`.
+ * Its type is `rule`'s, with a `create()` and `meta` that also fit the
+ * installed ESLint's own types, so a typescript-eslint rule fits ESLint's
+ * `defineConfig()` and `Linter.Config`.
  */
 export function withCustomMessages<Rule extends WrappableRule>(rule: Rule, messages: CustomMessages): Rule & LooseCreate {
     if (!isRecord(rule) || typeof rule.create !== "function") {

@@ -47,7 +47,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { type Config, defineConfig } from "@eslint/config-helpers";
-import type { RuleDefinition, RuleDefinitionTypeOptions, RulesConfig } from "@eslint/core";
+import type { RulesConfig } from "@eslint/core";
 import noUnsanitizedPlugin from "eslint-plugin-no-unsanitized";
 import eslintComments from "@eslint-community/eslint-plugin-eslint-comments";
 
@@ -67,13 +67,16 @@ const packageJsonPath = fs.existsSync(path.join(currentDir, "../../package.json"
     : path.join(currentDir, "../package.json");
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8")) as PackageJson;
 
-// The plugin's public type. The configs are typed with the user's own ESLint
-// (a peer dependency) rather than @eslint/config-helpers, so they fit the
-// defineConfig and Linter.Config of whichever ESLint version is installed.
+// The plugin's public type. The rules and configs are typed with the user's own
+// ESLint (a peer dependency) rather than @eslint/core and
+// @eslint/config-helpers, so the plugin fits the ESLint.Plugin, defineConfig
+// and Linter.Config of whichever ESLint version is installed. ESLint 9.19 types
+// a plugin's rules as Rule.RuleModule, which @eslint/core's RuleDefinition does
+// not fit.
 interface ObsidianmdPlugin {
     meta: { name: string; version: string };
     languages: { "plain-text": typeof PlainTextLanguage };
-    rules: Record<string, RuleDefinition<RuleDefinitionTypeOptions>>;
+    rules: NonNullable<ESLint.Plugin["rules"]>;
     configs: { recommended: Linter.Config[]; recommendedWithLocalesEn: Linter.Config[] };
     ruleConfigs: { recommended: RulesConfig; recommendedTypeChecked: RulesConfig };
     // ESLint ignores the keys of a plugin object it does not use, and names the
@@ -142,7 +145,7 @@ const plugin: ObsidianmdPlugin = {
         "ui/sentence-case": ui.sentenceCase,
         "ui/sentence-case-json": ui.sentenceCaseJson,
         "ui/sentence-case-locale-module": ui.sentenceCaseLocaleModule,
-    } as unknown as Record<string, RuleDefinition<RuleDefinitionTypeOptions>>,
+    } as unknown as ObsidianmdPlugin["rules"],
     configs: {
         recommended: [],
         recommendedWithLocalesEn: []
