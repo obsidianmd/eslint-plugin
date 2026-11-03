@@ -1,13 +1,14 @@
 import { TSESTree } from "@typescript-eslint/utils";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
-const sampleNames = [
+const sampleTypeNames = [
     "MyPlugin",
     "MyPluginSettings",
     "SampleSettingTab",
     "SampleModal",
-    "mySetting",
 ];
+
+const sampleSettingNames = ["mySetting"];
 
 export default ruleCreator({
     meta: {
@@ -18,6 +19,7 @@ export default ruleCreator({
         type: "problem" as const,
         messages: {
             rename: "Rename the sample classes.",
+            renameSetting: "Rename the sample setting '{{name}}'.",
         },
         schema: [],
     },
@@ -25,7 +27,7 @@ export default ruleCreator({
     create(context) {
         return {
             TSInterfaceDeclaration(node: TSESTree.TSInterfaceDeclaration) {
-                if (sampleNames.includes(node.id.name)) {
+                if (sampleTypeNames.includes(node.id.name)) {
                     context.report({
                         node: node.id,
                         messageId: "rename",
@@ -33,21 +35,30 @@ export default ruleCreator({
                 }
             },
             ClassDeclaration(node: TSESTree.ClassDeclaration) {
-                if (node.id && sampleNames.includes(node.id.name)) {
+                if (node.id && sampleTypeNames.includes(node.id.name)) {
                     context.report({
                         node: node.id,
                         messageId: "rename",
                     });
                 }
             },
-            PropertySignature(node: TSESTree.TSPropertySignature) {
-                if (
-                    node.key.type === TSESTree.AST_NODE_TYPES.Identifier &&
-                    sampleNames.includes(node.key.name)
-                ) {
+            // A property of an interface or object type, such as the sample's
+            // `interface MyPluginSettings { mySetting: string }`.
+            TSPropertySignature(node: TSESTree.TSPropertySignature) {
+                if (node.computed) {
+                    return;
+                }
+                const name =
+                    node.key.type === TSESTree.AST_NODE_TYPES.Identifier
+                        ? node.key.name
+                        : node.key.type === TSESTree.AST_NODE_TYPES.Literal
+                          ? node.key.value
+                          : undefined;
+                if (typeof name === "string" && sampleSettingNames.includes(name)) {
                     context.report({
                         node: node.key,
-                        messageId: "rename",
+                        messageId: "renameSetting",
+                        data: { name },
                     });
                 }
             },
