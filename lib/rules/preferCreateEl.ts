@@ -12,6 +12,12 @@ const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
 // A replacement that calls one of Obsidian's global helpers by its bare name.
 const BARE_HELPER_CALL = /^(createEl|createDiv|createSpan|createSvg|createFragment)(?:\?\.)?\(/;
 
+// The helper for a tag that has one of its own: `createDiv` for `"div"`. An
+// own key only, so that a tag such as `"constructor"` is not taken for one.
+function getTagShorthand(tagName: string | undefined): string | undefined {
+    return tagName !== undefined && Object.hasOwn(TAG_SHORTHANDS, tagName) ? TAG_SHORTHANDS[tagName] : undefined;
+}
+
 export default ruleCreator({
     meta: {
         type: "suggestion" as const,
@@ -144,7 +150,7 @@ export default ruleCreator({
 
             const tagArg = node.arguments[0];
             const tagName = getStringLiteralValue(tagArg);
-            const shorthand = tagName ? TAG_SHORTHANDS[tagName] : undefined;
+            const shorthand = getTagShorthand(tagName);
 
             const replacement = shorthand
                 ? `${target.prefix}${shorthand}()`
@@ -213,7 +219,7 @@ export default ruleCreator({
                 return;
             }
 
-            const shorthand = TAG_SHORTHANDS[tagName];
+            const shorthand = getTagShorthand(tagName);
             if (!shorthand) {
                 return;
             }
