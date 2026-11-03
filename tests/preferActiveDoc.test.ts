@@ -161,11 +161,75 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
             name: "window.document and globalThis.document are not reported",
             code: "window.document.body; globalThis.document.body;",
         },
+        // prefer-create-el reports these calls in a TypeScript file with type
+        // information, and its replacement drops `document`.
+        {
+            name: "document.createElement() is left to prefer-create-el",
+            code: "const el = document.createElement('p'); document.createElement('div'); document.createElement(tag);",
+        },
+        {
+            name: "document.createElementNS() for SVG is left to prefer-create-el",
+            code: "document.createElementNS('http://www.w3.org/2000/svg', 'path');",
+        },
+        {
+            name: "document.createDocumentFragment() is left to prefer-create-el",
+            code: "const fragment = document.createDocumentFragment();",
+        },
+        {
+            name: "document.createEl('div') and ('span') are left to prefer-create-el",
+            code: "document.createEl('div', { cls: 'x' }); document.createEl('span');",
+        },
+        {
+            name: "optional calls are left to prefer-create-el",
+            code: "document?.createElement('p'); document.createElement?.('p');",
+        },
     ],
     invalid: [
         {
             name: "bare document reference is forbidden",
-            code: "document.createElement('div');",
+            code: "document.getElementById('my-plugin');",
+            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+        },
+        // Calls prefer-create-el does not report, or whose replacement keeps `document`.
+        {
+            name: "document.createElement() with options is still flagged",
+            code: "document.createElement('div', { is: 'my-div' });",
+            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+        },
+        {
+            name: "document.createElementNS() for another namespace is still flagged",
+            code: "document.createElementNS('http://www.w3.org/1999/xhtml', 'div');",
+            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+        },
+        {
+            name: "document.createEl() with a tag other than div or span is still flagged",
+            code: "document.createEl('p');",
+            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+        },
+        {
+            name: "document.createTextNode() is still flagged",
+            code: "document.createTextNode('text');",
+            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+        },
+        {
+            name: "an asserted document's createElement() is still flagged, as prefer-create-el keeps it in doc.win.createEl()",
+            code: "document!.createElement('p'); (document as Document).createElement('p');",
+            errors: [
+                { messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } },
+                { messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } },
+            ],
+        },
+        {
+            name: "document.createElement that is not called is still flagged",
+            code: "const create = document.createElement.bind(document);",
+            errors: [
+                { messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } },
+                { messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } },
+            ],
+        },
+        {
+            name: "document as an argument to createElement is still flagged",
+            code: "el.createElement(document);",
             errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
         },
         {
@@ -226,6 +290,48 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
         {
             name: "shorthand object property document is still flagged",
             code: "const x = { document };",
+            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+        },
+    ],
+});
+
+// prefer-create-el needs type information, and the recommended config runs it
+// on TypeScript files only. Elsewhere prefer-active-doc is the only rule that
+// reports document.createElement().
+const untypedRuleTester = new RuleTester({
+    languageOptions: { parserOptions: { project: null, projectService: false } },
+});
+
+untypedRuleTester.run("prefer-active-doc without type information", preferActiveDocRule, {
+    valid: [],
+    invalid: [
+        {
+            name: "document.createElement() is flagged",
+            code: "document.createElement('div'); document.createDocumentFragment();",
+            errors: [
+                { messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } },
+                { messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } },
+            ],
+        },
+    ],
+});
+
+// A JavaScript file in a TypeScript project, such as a hand-written main.js
+// listed in allowDefaultProject: it has type information, but the recommended
+// config does not run prefer-create-el on it.
+const typedJsRuleTester = new RuleTester({
+    languageOptions: {
+        parserOptions: { project: "./tsconfig.json", tsconfigRootDir: `${process.cwd()}/tests/fixtures/js-project` },
+    },
+});
+
+typedJsRuleTester.run("prefer-active-doc in a JavaScript file with type information", preferActiveDocRule, {
+    valid: [],
+    invalid: [
+        {
+            name: "document.createElement() is flagged",
+            filename: "main.js",
+            code: "document.createElement('div');",
             errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
         },
     ],

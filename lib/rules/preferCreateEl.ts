@@ -12,10 +12,62 @@ const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
 // A replacement that calls one of Obsidian's global helpers by its bare name.
 const BARE_HELPER_CALL = /^(createEl|createDiv|createSpan|createSvg|createFragment)(?:\?\.)?\(/;
 
-// The helper for a tag that has one of its own: `createDiv` for `"div"`. An
-// own key only, so that a tag such as `"constructor"` is not taken for one.
-function getTagShorthand(tagName: string | undefined): string | undefined {
+// The helper for a tag argument that has one of its own: `createDiv` for
+// `"div"`. An own key only, so that a tag such as `"constructor"` is not taken
+// for one.
+function getTagShorthand(tagArg: TSESTree.Node | undefined): string | undefined {
+    const tagName = tagArg && getStringLiteralValue(tagArg);
     return tagName !== undefined && Object.hasOwn(TAG_SHORTHANDS, tagName) ? TAG_SHORTHANDS[tagName] : undefined;
+}
+
+// The methods this rule replaces, with the arguments it replaces them for.
+// The first three are replaced on a document, which classifyDocumentTarget()
+// decides; createEl() on any object, and called bare.
+const REPLACED_METHODS: Record<string, (args: TSESTree.CallExpressionArgument[]) => boolean> = {
+    // createElement(tag), not createElement(tag, options)
+    createElement: (args) => args.length === 1,
+    createElementNS: (args) => args.length >= 2 && getStringLiteralValue(args[0]) === SVG_NAMESPACE,
+    createDocumentFragment: (args) => args.length === 0,
+    // createEl("div", …) and createEl("span", …)
+    createEl: (args) => getTagShorthand(args[0]) !== undefined,
+};
+
+// Whether `node` is `<object>.<method>(…)` with arguments this rule replaces
+// the method for.
+function isReplacedMethodCall(
+    node: TSESTree.CallExpression,
+    method: string,
+): node is TSESTree.CallExpression & { callee: TSESTree.MemberExpression } {
+    return (
+        node.callee.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
+        node.callee.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
+        node.callee.property.name === method &&
+        REPLACED_METHODS[method](node.arguments)
+    );
+}
+
+/**
+ * Whether this rule reports `call` when it is made on the global `document`,
+ * as it then always does: `document.createElement(tag)`,
+ * `document.createElementNS(svgNamespace, tag, …)`,
+ * `document.createDocumentFragment()` and `document.createEl("div" | "span", …)`.
+ * The replacement calls a global helper (`createEl(tag)`, `createDiv()`, …),
+ * which leaves no `document` for prefer-active-doc to report.
+ */
+export function isReportedOnGlobalDocument(call: TSESTree.CallExpression): boolean {
+    return Object.keys(REPLACED_METHODS).some((method) => isReplacedMethodCall(call, method));
+}
+
+function getStringLiteralValue(
+    node: TSESTree.Node,
+): string | undefined {
+    if (
+        node.type === TSESTree.AST_NODE_TYPES.Literal &&
+        typeof node.value === "string"
+    ) {
+        return node.value;
+    }
+    return undefined;
 }
 
 export default ruleCreator({
@@ -134,12 +186,7 @@ export default ruleCreator({
         };
 
         function checkCreateElement(node: TSESTree.CallExpression): void {
-            if (
-                node.callee.type !== TSESTree.AST_NODE_TYPES.MemberExpression ||
-                node.callee.property.type !== TSESTree.AST_NODE_TYPES.Identifier ||
-                node.callee.property.name !== "createElement" ||
-                node.arguments.length !== 1
-            ) {
+            if (!isReplacedMethodCall(node, "createElement")) {
                 return;
             }
 
@@ -149,8 +196,7 @@ export default ruleCreator({
             }
 
             const tagArg = node.arguments[0];
-            const tagName = getStringLiteralValue(tagArg);
-            const shorthand = getTagShorthand(tagName);
+            const shorthand = getTagShorthand(tagArg);
 
             const replacement = shorthand
                 ? `${target.prefix}${shorthand}()`
@@ -160,18 +206,7 @@ export default ruleCreator({
         }
 
         function checkCreateElementNS(node: TSESTree.CallExpression): void {
-            if (
-                node.callee.type !== TSESTree.AST_NODE_TYPES.MemberExpression ||
-                node.callee.property.type !== TSESTree.AST_NODE_TYPES.Identifier ||
-                node.callee.property.name !== "createElementNS" ||
-                node.arguments.length < 2
-            ) {
-                return;
-            }
-
-            const namespaceArg = node.arguments[0];
-            const namespaceValue = getStringLiteralValue(namespaceArg);
-            if (namespaceValue !== SVG_NAMESPACE) {
+            if (!isReplacedMethodCall(node, "createElementNS")) {
                 return;
             }
 
@@ -192,34 +227,14 @@ export default ruleCreator({
             let obj: TSESTree.Expression | undefined;
             let isDocGlobal = false;
 
-            if (node.callee.type === TSESTree.AST_NODE_TYPES.Identifier) {
-                if (node.callee.name !== "createEl") {
-                    return;
-                }
-            } else if (node.callee.type === TSESTree.AST_NODE_TYPES.MemberExpression) {
-                if (
-                    node.callee.property.type !== TSESTree.AST_NODE_TYPES.Identifier ||
-                    node.callee.property.name !== "createEl"
-                ) {
-                    return;
-                }
+            if (isReplacedMethodCall(node, "createEl")) {
                 obj = node.callee.object;
                 isDocGlobal = isGlobalDocument(obj);
-            } else {
+            } else if (node.callee.type !== TSESTree.AST_NODE_TYPES.Identifier || node.callee.name !== "createEl") {
                 return;
             }
 
-            if (node.arguments.length === 0) {
-                return;
-            }
-
-            const tagArg = node.arguments[0];
-            const tagName = getStringLiteralValue(tagArg);
-            if (!tagName) {
-                return;
-            }
-
-            const shorthand = getTagShorthand(tagName);
+            const shorthand = getTagShorthand(node.arguments[0]);
             if (!shorthand) {
                 return;
             }
@@ -357,12 +372,7 @@ export default ruleCreator({
         }
 
         function checkCreateDocumentFragment(node: TSESTree.CallExpression): void {
-            if (
-                node.callee.type !== TSESTree.AST_NODE_TYPES.MemberExpression ||
-                node.callee.property.type !== TSESTree.AST_NODE_TYPES.Identifier ||
-                node.callee.property.name !== "createDocumentFragment" ||
-                node.arguments.length !== 0
-            ) {
+            if (!isReplacedMethodCall(node, "createDocumentFragment")) {
                 return;
             }
 
@@ -571,18 +581,6 @@ export default ruleCreator({
                 after = sourceCode.getTokenAfter(after);
             }
             return sourceCode.getText().slice(start, end);
-        }
-
-        function getStringLiteralValue(
-            node: TSESTree.Node,
-        ): string | undefined {
-            if (
-                node.type === TSESTree.AST_NODE_TYPES.Literal &&
-                typeof node.value === "string"
-            ) {
-                return node.value;
-            }
-            return undefined;
         }
     },
 });

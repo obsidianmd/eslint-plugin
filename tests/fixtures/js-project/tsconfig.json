@@ -1,0 +1,12 @@
+{
+	"compilerOptions": {
+		"target": "es2022",
+		"module": "nodenext",
+		"lib": ["es2022", "dom"],
+		"allowJs": true,
+		"skipLibCheck": true,
+		"noEmit": true,
+		"types": []
+	},
+	"include": ["main.js"]
+}

@@ -25,6 +25,11 @@ The document decides where the replacement is called: the global `document` uses
 helpers, `activeDocument` uses `activeWindow.`, and any other value typed as a `Document`, such as
 `el.doc`, uses its window, `el.doc.win.`.
 
+[`prefer-active-doc`](prefer-active-doc.md) does not report the global `document` in a call this rule
+reports, as the replacement drops `document`; see
+[Calls left to `prefer-create-el`](prefer-active-doc.md#calls-left-to-prefer-create-el). If you
+switch this rule off, neither rule reports these calls.
+
 Not reported:
 
 - `createElement()` with an options argument, and `createElementNS()` with a namespace other than SVG

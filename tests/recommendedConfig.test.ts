@@ -1001,6 +1001,48 @@ describe("no-misused-promises swap", () => {
 	});
 });
 
+// prefer-create-el's fix for document.createElement() drops `document`, while
+// prefer-active-doc's activeDocument.createElement() would still be reported by
+// prefer-create-el, so only prefer-create-el reports the call. It needs type
+// information and runs on TypeScript files only, so prefer-active-doc keeps
+// reporting the call in JavaScript.
+describe("document.createElement() is reported once", () => {
+	async function lint(filePath: string) {
+		const eslint = new ESLint({
+			overrideConfigFile: true,
+			overrideConfig: [
+				...plugin.configs.recommended,
+				{
+					files: ["**/*.ts"],
+					languageOptions: {
+						parserOptions: { projectService: true, tsconfigRootDir: process.cwd() },
+					},
+				},
+			],
+		});
+		const code = 'export const el = document.createElement("p");\nexport const body = document.body;\n';
+		const [result] = await eslint.lintText(code, { filePath });
+		assert.deepStrictEqual(result.messages.filter(m => m.fatal), []);
+		return result.messages
+			.filter(m => m.ruleId === "obsidianmd/prefer-create-el" || m.ruleId === "obsidianmd/prefer-active-doc")
+			.map(m => [m.ruleId, m.line]);
+	}
+
+	it("by prefer-create-el in a TypeScript file", async () => {
+		assert.deepStrictEqual(await lint("file.ts"), [
+			["obsidianmd/prefer-create-el", 1],
+			["obsidianmd/prefer-active-doc", 2],
+		]);
+	});
+
+	it("by prefer-active-doc in a JavaScript file", async () => {
+		assert.deepStrictEqual(await lint("src/main.js"), [
+			["obsidianmd/prefer-active-doc", 1],
+			["obsidianmd/prefer-active-doc", 2],
+		]);
+	});
+});
+
 // typescript-eslint advises turning no-undef off for TypeScript: the compiler
 // reports undefined names itself, and no-undef cannot see globals declared in a
 // .d.ts or a `declare global` block. JavaScript files keep it.
