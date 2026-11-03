@@ -45,17 +45,67 @@ export default ruleCreator<[NoNodejsModulesOptions?], "noNodejs">({
             return {};
         }
 
+        // TypeScript erases `import type` and `export type`. An import or
+        // export whose specifiers are all inline `type` ones is erased too,
+        // except with verbatimModuleSyntax, which keeps it as
+        // `import {} from "fs"`, and that still loads the module.
+        const keepsInlineTypeOnly =
+            context.sourceCode.parserServices?.program?.getCompilerOptions()
+                .verbatimModuleSyntax === true;
+        const allInlineTypeOnly = (specifiers: readonly (TSESTree.ImportClause | TSESTree.ExportSpecifier)[]) =>
+            !keepsInlineTypeOnly &&
+            specifiers.length > 0 &&
+            specifiers.every((specifier) =>
+                specifier.type === AST_NODE_TYPES.ImportSpecifier
+                    ? specifier.importKind === "type"
+                    : specifier.type === AST_NODE_TYPES.ExportSpecifier && specifier.exportKind === "type",
+            );
+
+        // A static import or re-export loads the module wherever the file
+        // runs, so it can never be guarded.
+        const reportStatic = (node: TSESTree.Node, source: string) => {
+            if (isBuiltin(source)) {
+                context.report({
+                    node,
+                    messageId: "noNodejs",
+                    data: { module: source },
+                });
+            }
+        };
+
         return {
-            // Static import declarations can never be guarded at runtime
             ImportDeclaration(node: TSESTree.ImportDeclaration) {
-                const source = node.source.value;
-                if (isBuiltin(source)) {
-                    context.report({
-                        node,
-                        messageId: "noNodejs",
-                        data: { module: source },
-                    });
+                if (node.importKind === "type" || allInlineTypeOnly(node.specifiers)) {
+                    return;
                 }
+                reportStatic(node, node.source.value);
+            },
+
+            ExportNamedDeclaration(node: TSESTree.ExportNamedDeclaration) {
+                if (!node.source || node.exportKind === "type" || allInlineTypeOnly(node.specifiers)) {
+                    return;
+                }
+                reportStatic(node, node.source.value);
+            },
+
+            ExportAllDeclaration(node: TSESTree.ExportAllDeclaration) {
+                if (node.exportKind === "type") {
+                    return;
+                }
+                reportStatic(node, node.source.value);
+            },
+
+            // import fs = require("fs");
+            TSImportEqualsDeclaration(node: TSESTree.TSImportEqualsDeclaration) {
+                const reference = node.moduleReference;
+                if (
+                    node.importKind === "type" ||
+                    reference.type !== AST_NODE_TYPES.TSExternalModuleReference ||
+                    typeof reference.expression.value !== "string"
+                ) {
+                    return;
+                }
+                reportStatic(node, reference.expression.value);
             },
 
             // Dynamic import() expressions — allowed when guarded by Platform.isDesktop

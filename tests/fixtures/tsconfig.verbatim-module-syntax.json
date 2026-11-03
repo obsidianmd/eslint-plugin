@@ -1,0 +1,9 @@
+// The repository tsconfig with verbatimModuleSyntax, for rules that depend on
+// which imports TypeScript keeps. It covers the file.ts that RuleTester lints.
+{
+	"extends": "../../tsconfig.json",
+	"compilerOptions": {
+		"verbatimModuleSyntax": true
+	},
+	"include": ["../../file.ts"]
+}

@@ -165,6 +165,32 @@ ruleTester.run("no-nodejs-modules", noNodejsModules, {
             name: "require() with a non-literal module name is not checked",
             code: "const module = require(moduleName);",
         },
+        // Type-only imports and exports are erased when compiling, so they
+        // never load the module.
+        {
+            name: "a type-only import is allowed",
+            code: "import type { Stats } from 'node:fs';",
+        },
+        {
+            name: "a type-only default or namespace import is allowed",
+            code: "import type fs from 'fs'; import type * as path from 'node:path';",
+        },
+        {
+            name: "an import whose specifiers are all type-only is allowed",
+            code: "import { type Stats, type Dirent } from 'node:fs';",
+        },
+        {
+            name: "a type-only re-export is allowed",
+            code: "export type { Stats } from 'fs'; export { type Dirent } from 'node:fs'; export type * from 'node:path';",
+        },
+        {
+            name: "a type-only import-equals is allowed",
+            code: "import type fs = require('fs');",
+        },
+        {
+            name: "a type query of a built-in module is allowed",
+            code: "type Fs = typeof import('fs');",
+        },
     ],
     invalid: [
         {
@@ -183,9 +209,29 @@ ruleTester.run("no-nodejs-modules", noNodejsModules, {
             errors: [{ messageId: "noNodejs" }],
         },
         {
-            name: "a type-only static import is forbidden too",
-            code: "import type { Stats } from 'node:fs';",
+            name: "an import with a value specifier besides type-only ones is forbidden",
+            code: "import { type Stats, readFile } from 'node:fs';",
             errors: [{ messageId: "noNodejs" }],
+        },
+        {
+            name: "a side-effect import is forbidden",
+            code: "import 'fs';",
+            errors: [{ messageId: "noNodejs" }],
+        },
+        {
+            name: "a re-export of a value is forbidden",
+            code: "export { readFile } from 'fs';",
+            errors: [{ messageId: "noNodejs", data: { module: "fs" } }],
+        },
+        {
+            name: "a re-export of everything is forbidden",
+            code: "export * from 'node:fs'; export * as path from 'node:path';",
+            errors: [{ messageId: "noNodejs" }, { messageId: "noNodejs" }],
+        },
+        {
+            name: "an import-equals of a built-in module is forbidden",
+            code: "import fs = require('fs');",
+            errors: [{ messageId: "noNodejs", data: { module: "fs" } }],
         },
         {
             name: "static import of child_process is forbidden",
@@ -309,6 +355,34 @@ ruleTester.run("no-nodejs-modules", noNodejsModules, {
                     const fs = await import('fs');
                 }
             `,
+            errors: [{ messageId: "noNodejs" }],
+        },
+    ],
+});
+
+// With verbatimModuleSyntax, TypeScript keeps an import or export whose
+// specifiers are all inline type-only as `import {} from "fs"`, which still
+// loads the module; `import type` is erased either way.
+const verbatimRuleTester = new RuleTester({
+    languageOptions: { parserOptions: { project: "./tests/fixtures/tsconfig.verbatim-module-syntax.json" } },
+});
+
+verbatimRuleTester.run("no-nodejs-modules with verbatimModuleSyntax", noNodejsModules, {
+    valid: [
+        {
+            name: "a type-only import is allowed",
+            code: "import type { Stats } from 'node:fs'; export type { Dirent } from 'fs';",
+        },
+    ],
+    invalid: [
+        {
+            name: "an import whose specifiers are all inline type-only is forbidden",
+            code: "import { type Stats } from 'node:fs';",
+            errors: [{ messageId: "noNodejs" }],
+        },
+        {
+            name: "a re-export whose specifiers are all inline type-only is forbidden",
+            code: "export { type Stats } from 'node:fs';",
             errors: [{ messageId: "noNodejs" }],
         },
     ],

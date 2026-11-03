@@ -11,7 +11,9 @@
 Unless the code is desktop-only (see `isDesktopOnly` below), a Node.js built-in module, with or
 without the `node:` prefix and including subpaths such as `fs/promises`, loaded through:
 
-- a static `import`, type-only imports included, since a static import cannot be guarded;
+- a static `import`, including a side-effect `import "fs"` and TypeScript's
+  `import fs = require("fs")`, or a re-export (`export … from "fs"`), since these load the module
+  wherever the file runs and cannot be guarded;
 - a dynamic `import()` or a `require()` that `Platform.isDesktop` does not guard.
 
 A dynamic `import()` or `require()` counts as guarded inside `if (Platform.isDesktop)` (or
@@ -25,9 +27,23 @@ if (Platform.isDesktop) {
 }
 ```
 
-Not reported: modules that are not built into Node.js, and a dynamic `import()` or `require()` whose
-module name is not a string literal. The recommended config does not apply this rule to
-[test files](../configuration.md#test-files), which run in Node.js.
+Not reported: modules that are not built into Node.js; a dynamic `import()` or `require()` whose
+module name is not a string literal; and imports and re-exports that TypeScript erases when
+compiling, so they never load the module:
+
+```ts
+import type { Stats } from "node:fs";
+import { type Dirent, type ReadStream } from "node:fs"; // every specifier is `type`
+export type { WriteStream } from "node:fs";
+import type fs = require("node:fs");
+```
+
+With `verbatimModuleSyntax`, TypeScript keeps an import or re-export whose specifiers are all
+inline `type` ones as `import {} from "node:fs"`, which still loads the module, so when the file is
+linted with type information from such a project those are reported; write `import type` instead.
+
+The recommended config does not apply this rule to [test files](../configuration.md#test-files),
+which run in Node.js.
 
 ## Options
 
