@@ -13,7 +13,7 @@ Upgrading from 0.4.x? The breaking changes below each have a fix in
 ### Changed
 
 - **Breaking:** Requires Node.js 20.19+, 22.13+ or 24+; Node.js 18 is no longer supported ([#203](https://github.com/obsidianmd/eslint-plugin/pull/203)).
-- **Breaking:** Moved to `@eslint/json` 2. A project that also registers `@eslint/json` itself for `package.json` or `manifest.json` must use 2.x, or ESLint reports `Cannot redefine plugin "json"` ([#203](https://github.com/obsidianmd/eslint-plugin/pull/203)).
+- **Breaking:** Moved to `@eslint/json` 2. A project that also registers `@eslint/json` itself for `package.json` or `manifest.json` must use 2.x, or ESLint reports `Cannot redefine plugin "json"` ([#203](https://github.com/obsidianmd/eslint-plugin/pull/203), [#222](https://github.com/obsidianmd/eslint-plugin/pull/222)).
 - **Breaking:** ESLint's core JS rules now apply only to JS and TS files, not to `package.json`, `manifest.json`, `LICENSE`, locale JSON or other files. Files linted with your own parser, such as `.vue` or `.svelte`, need `js.configs.recommended` added for them ([#204](https://github.com/obsidianmd/eslint-plugin/pull/204)).
 - **Breaking:** `ui/sentence-case` is off in `recommended` and `recommendedWithLocalesEn`, as 0.3.0 intended. Opt in with `["warn", { enforceCamelCaseLower: true }]` ([#208](https://github.com/obsidianmd/eslint-plugin/pull/208)).
 - **Breaking:** `@typescript-eslint/no-misused-promises` is replaced by `obsidianmd/no-misused-promises`. `eslint-disable` comments for the old rule still suppress the new one, but ESLint reports them as unused, so rename them ([#210](https://github.com/obsidianmd/eslint-plugin/pull/210), [#223](https://github.com/obsidianmd/eslint-plugin/pull/223)).
