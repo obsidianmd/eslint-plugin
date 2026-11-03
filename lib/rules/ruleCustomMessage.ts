@@ -13,7 +13,6 @@ import { docsUrl, ruleCreator } from "../ruleCreator.js";
 interface RuleConfig {
     messages: CustomMessages;
     options?: unknown[];
-    rule?: ESLintRule;
 }
 
 type RuleMessageConfig = Record<string, RuleConfig>;
@@ -154,10 +153,6 @@ export default ruleCreator<Options, MessageIds>({
                             type: "array",
                             description: "Options to pass to the wrapped rule",
                         },
-                        rule: {
-                            type: "object",
-                            description: "For plugin rules: the rule object from the plugin (e.g., typescriptPlugin.rules['rule-name'])",
-                        },
                     },
                     required: ["messages"],
                     additionalProperties: false,
@@ -171,17 +166,15 @@ export default ruleCreator<Options, MessageIds>({
         const visitors: Record<string, Handler> = {};
 
         for (const [ruleName, config] of Object.entries(messageOverrides)) {
-            let rule: ESLintRule | undefined = config.rule;
+            // Only a core rule can be named here: a plugin's rule would have to
+            // come as an object in the options, and ESLint copies the options
+            // with structuredClone, which cannot copy a rule's functions.
+            const rule = builtinRules.get(ruleName) as unknown as ESLintRule | undefined;
 
             if (!rule) {
-                const builtinRule = builtinRules.get(ruleName);
-                if (builtinRule) {
-                    rule = builtinRule as unknown as ESLintRule;
-                }
-            }
-
-            if (!rule) {
-                console.warn(`Rule "${ruleName}" not found: it is not a core ESLint rule.`);
+                console.warn(
+                    `Rule "${ruleName}" not found: it is not a core ESLint rule. For a plugin's rule, use obsidianmd.withCustomMessages() instead: ${docsUrl("rule-custom-message")}#wrapping-a-plugins-rule`,
+                );
                 continue;
             }
 

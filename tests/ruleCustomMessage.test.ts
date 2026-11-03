@@ -190,18 +190,36 @@ describe("rule-custom-message in a lint run", () => {
     });
 });
 
-// ESLint 9 deep-clones rule options with structuredClone, which cannot copy a
-// rule's functions, so the `rule` key cannot carry a plugin rule. Described in
-// docs/rules/rule-custom-message.md.
+// ESLint deep-clones rule options with structuredClone, which cannot copy a
+// rule's functions, so the options cannot carry a plugin's rule, and the
+// `rule` key meant for one is gone; obsidianmd.withCustomMessages() wraps one instead.
+// Described in docs/rules/rule-custom-message.md.
 describe("rule-custom-message limitations", () => {
-    it("a plugin rule given with `rule` stops ESLint before linting", () => {
+    const lintWith = (entry: Record<string, unknown>) => new Linter().verify("a;", [{
+        plugins: { o: { rules: { r: ruleCustomMessage as never } } },
+        rules: { "o/r": ["error", entry] },
+    }]);
+
+    it("a plugin rule object in the options stops ESLint before linting", () => {
         const pluginRule = { meta: { messages: {} }, create: () => ({}) };
-        assert.throws(
-            () => new Linter().verify("a;", [{
-                plugins: { o: { rules: { r: ruleCustomMessage as never } } },
-                rules: { "o/r": ["error", { "p/r": { messages: { x: "y" }, rule: pluginRule } }] },
-            }]),
-            /could not be cloned/,
-        );
+        assert.throws(() => lintWith({ "p/r": { messages: { x: "y" }, rule: pluginRule } }), /could not be cloned/);
+    });
+
+    it("the options have no `rule` key", () => {
+        assert.throws(() => lintWith({ "p/r": { messages: { x: "y" }, rule: {} } }), /Unexpected property "rule"/);
+    });
+
+    it("a rule name that is not a core rule logs a warning that points to obsidianmd.withCustomMessages()", () => {
+        const warnings: unknown[][] = [];
+        const warn = console.warn;
+        console.warn = (...args: unknown[]) => { warnings.push(args); };
+        try {
+            lintWith({ "p/r": { messages: { x: "y" } } });
+        } finally {
+            console.warn = warn;
+        }
+        assert.deepStrictEqual(warnings, [[
+            'Rule "p/r" not found: it is not a core ESLint rule. For a plugin\'s rule, use obsidianmd.withCustomMessages() instead: https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/rule-custom-message.md#wrapping-a-plugins-rule',
+        ]]);
     });
 });

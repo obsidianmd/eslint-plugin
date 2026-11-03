@@ -36,9 +36,10 @@ schema, so a wrong one is not reported as a configuration error.
 
 Limitations:
 
-- Only core ESLint rules can be wrapped. ESLint 9 copies rule options with `structuredClone`, which
-  cannot copy a rule's functions, so a configuration that gives a plugin rule object as `rule` stops
-  ESLint with "could not be cloned" before anything is linted.
+- Only core ESLint rules can be wrapped. A plugin's rule could only be given as an object in the
+  options, and ESLint copies rule options with `structuredClone`, which cannot copy a rule's
+  functions: ESLint stops with "could not be cloned" before anything is linted. Wrap a plugin's rule
+  with [`obsidianmd.withCustomMessages()`](#wrapping-a-plugins-rule) instead.
 - A rule name that is not a core rule logs a warning and is skipped.
 - A wrapped rule that throws while starting, for example on an option it does not accept, logs the
   error and is skipped.
@@ -46,12 +47,11 @@ Limitations:
 ## Options
 
 The rule takes a single configuration object where:
-- Keys are the names of rules you want to wrap
+- Keys are the names of the core rules you want to wrap
 - Values are objects containing:
   - `messages`: Map of original error messages to custom messages
   - `options`: (optional) Array of options for the wrapped rule; its defaults fill in the rest
     (see above)
-  - `rule`: (optional) Meant for a plugin rule object, which ESLint 9 cannot pass (see above)
 
 ```json
 {
@@ -69,7 +69,7 @@ The rule takes a single configuration object where:
 }
 ```
 
-For built-in ESLint rules, only `messages` is required.
+Only `messages` is required.
 
 ## Examples
 
