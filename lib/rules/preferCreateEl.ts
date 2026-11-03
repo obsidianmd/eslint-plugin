@@ -1,4 +1,5 @@
 import { ASTUtils, ESLintUtils, TSESTree } from "@typescript-eslint/utils";
+import ts from "typescript";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 const TAG_SHORTHANDS: Record<string, string> = {
@@ -9,7 +10,7 @@ const TAG_SHORTHANDS: Record<string, string> = {
 const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
 
 // A replacement that calls one of Obsidian's global helpers by its bare name.
-const BARE_HELPER_CALL = /^(createEl|createDiv|createSpan|createSvg|createFragment)\(/;
+const BARE_HELPER_CALL = /^(createEl|createDiv|createSpan|createSvg|createFragment)(?:\?\.)?\(/;
 
 export default ruleCreator({
     meta: {
@@ -32,22 +33,27 @@ export default ruleCreator({
     defaultOptions: [],
     create(context) {
         const services = ESLintUtils.getParserServices(context);
+        const checker = services.program.getTypeChecker();
 
         function hasObsidianDomHelpers(node: TSESTree.Node): boolean {
             const type = services.getTypeAtLocation(node);
             return type.getProperty("createEl") !== undefined;
         }
 
-        function winHasObsidianDomHelpers(node: TSESTree.Node): boolean {
+        // Whether the document's `win` declares `helper`, so that
+        // `doc.win.<helper>()` compiles.
+        function winHasHelper(node: TSESTree.Node, helper: string): boolean {
             const type = services.getTypeAtLocation(node);
             const winSymbol = type.getProperty("win");
             if (winSymbol === undefined) {
                 return false;
             }
-            const winType = services.program
-                .getTypeChecker()
-                .getTypeOfSymbol(winSymbol);
-            return winType.getProperty("createEl") !== undefined;
+            return checker.getTypeOfSymbol(winSymbol).getProperty(helper) !== undefined;
+        }
+
+        // The global `helper` a bare call at `node` would reach, if one is declared.
+        function resolveGlobalHelper(node: TSESTree.Node, helper: string): ts.Symbol | undefined {
+            return checker.resolveName(helper, services.esTreeNodeToTSNodeMap.get(node), ts.SymbolFlags.Value, false);
         }
 
         // Whether the call resolved to lib.dom's overload for a known tag name, the
@@ -56,9 +62,7 @@ export default ruleCreator({
         // compile: a `string`, a custom element or a deprecated tag picks another
         // overload, and createEl(tag) fails with TS2345.
         function resolvesToTagMapOverload(node: TSESTree.CallExpression, tagMap: string): boolean {
-            const signature = services.program
-                .getTypeChecker()
-                .getResolvedSignature(services.esTreeNodeToTSNodeMap.get(node));
+            const signature = checker.getResolvedSignature(services.esTreeNodeToTSNodeMap.get(node));
             const typeParameter = signature?.getDeclaration()?.typeParameters?.[0];
             return typeParameter?.constraint?.getText() === `keyof ${tagMap}`;
         }
@@ -72,15 +76,22 @@ export default ruleCreator({
             );
         }
 
+        // Where the replacement is called, and whether `helper` is declared
+        // there, which decides between a fix and a suggestion.
         function classifyDocumentTarget(
-            obj: TSESTree.Expression,
-        ): { prefix: string; canAutofix: boolean } | null {
+            callee: TSESTree.MemberExpression,
+        ): { prefix: string; canAutofix: (helper: string) => boolean } | null {
+            const obj = callee.object;
             if (isIframeDocument(obj)) {
                 return null;
             }
 
             if (isGlobalDocument(obj)) {
-                return { prefix: "", canAutofix: hasObsidianDomHelpers(obj) };
+                return {
+                    prefix: "",
+                    canAutofix: (helper) =>
+                        hasObsidianDomHelpers(obj) && resolveGlobalHelper(callee, helper) !== undefined,
+                };
             }
 
             const isActiveDoc =
@@ -92,14 +103,15 @@ export default ruleCreator({
                 // helpers, so a fix to activeWindow.createSpan() would not compile.
                 return {
                     prefix: "activeWindow.",
-                    canAutofix: winHasObsidianDomHelpers(obj),
+                    canAutofix: (helper) => winHasHelper(obj, helper),
                 };
             }
 
             if (isDocumentType(obj)) {
+                // `doc?.createElement()` keeps its `?.`: `doc?.win.createEl()`.
                 return {
-                    prefix: `${getObjectText(obj)}.win.`,
-                    canAutofix: winHasObsidianDomHelpers(obj),
+                    prefix: `${getObjectText(obj)}${callee.optional ? "?." : "."}win.`,
+                    canAutofix: (helper) => winHasHelper(obj, helper),
                 };
             }
 
@@ -125,7 +137,7 @@ export default ruleCreator({
                 return;
             }
 
-            const target = classifyDocumentTarget(node.callee.object);
+            const target = classifyDocumentTarget(node.callee);
             if (!target) {
                 return;
             }
@@ -138,7 +150,7 @@ export default ruleCreator({
                 ? `${target.prefix}${shorthand}()`
                 : `${target.prefix}createEl(${getText(tagArg)})`;
             const compiles = shorthand !== undefined || resolvesToTagMapOverload(node, "HTMLElementTagNameMap");
-            report(node, replacement, compiles ? target.canAutofix : null);
+            report(node, replacement, compiles ? target.canAutofix(shorthand ?? "createEl") : null);
         }
 
         function checkCreateElementNS(node: TSESTree.CallExpression): void {
@@ -157,7 +169,7 @@ export default ruleCreator({
                 return;
             }
 
-            const target = classifyDocumentTarget(node.callee.object);
+            const target = classifyDocumentTarget(node.callee);
             if (!target) {
                 return;
             }
@@ -167,7 +179,7 @@ export default ruleCreator({
             const argsText = [getText(tagArg), ...remainingArgs.map((arg) => getText(arg))].join(", ");
             const replacement = `${target.prefix}createSvg(${argsText})`;
             const compiles = resolvesToTagMapOverload(node, "SVGElementTagNameMap");
-            report(node, replacement, compiles ? target.canAutofix : null);
+            report(node, replacement, compiles ? target.canAutofix("createSvg") : null);
         }
 
         function checkCreateElShorthand(node: TSESTree.CallExpression): void {
@@ -206,14 +218,136 @@ export default ruleCreator({
                 return;
             }
 
-            const prefix = obj && !isDocGlobal ? getObjectText(obj) + "." : "";
+            // `el?.createEl("div")` keeps its `?.`: `el?.createDiv()`.
+            const dot = node.callee.type === TSESTree.AST_NODE_TYPES.MemberExpression && node.callee.optional ? "?." : ".";
+            const prefix = obj && !isDocGlobal ? getObjectText(obj) + dot : "";
             const remainingArgs = node.arguments.slice(1);
             const argsText = remainingArgs
                 .map((arg) => getText(arg))
                 .join(", ");
-            const replacement = `${prefix}${shorthand}(${argsText})`;
+            const replacement = `${prefix}${shorthand}${node.optional ? "?.(" : "("}${argsText})`;
 
-            report(node, replacement, true);
+            report(node, replacement, checkShorthand(node, shorthand, isDocGlobal ? undefined : obj));
+        }
+
+        // Whether `createDiv(...)` or `el.createDiv(...)`, with the arguments
+        // after the tag, compiles to what `createEl("div", ...)` returned: true
+        // when the types say so, false when they cannot tell (a suggestion),
+        // null when the replacement would not compile. Without types for the
+        // call (an `any` receiver, or no declaration of the helpers at all) it
+        // is fixed, as the replacement cannot fail where the original did not.
+        function checkShorthand(
+            node: TSESTree.CallExpression,
+            helper: string,
+            receiver: TSESTree.Expression | undefined,
+        ): boolean | null {
+            const callee = node.callee as TSESTree.Identifier | TSESTree.MemberExpression;
+            let helperSymbol: ts.Symbol | undefined;
+            if (receiver) {
+                let type = services.getTypeAtLocation(receiver);
+                if (callee.type === TSESTree.AST_NODE_TYPES.MemberExpression && callee.optional) {
+                    type = checker.getNonNullableType(type);
+                }
+                if ((type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) !== 0) {
+                    return true;
+                }
+                // A type that declares only createEl(), such as a cast to
+                // `{ createEl(...) }` or a polyfill's own `this`.
+                helperSymbol = type.getProperty(helper);
+                if (helperSymbol === undefined) {
+                    return null;
+                }
+            } else {
+                helperSymbol = resolveGlobalHelper(callee, helper);
+                if (helperSymbol === undefined) {
+                    // createEl() resolves, but no global helper is declared: a
+                    // project's own typings, or a createEl imported from them.
+                    return createElResolves(callee) ? null : true;
+                }
+                if (callee.type === TSESTree.AST_NODE_TYPES.Identifier && shadowsGlobalHelper(node, "createEl")) {
+                    // The file's own createEl, such as an import: the global
+                    // helper may not do what it does.
+                    return false;
+                }
+            }
+            const helperType = checker.getTypeOfSymbolAtLocation(helperSymbol, services.esTreeNodeToTSNodeMap.get(callee));
+            return fitsSignature(node, helperType);
+        }
+
+        function createElResolves(callee: TSESTree.Identifier | TSESTree.MemberExpression): boolean {
+            if (callee.type === TSESTree.AST_NODE_TYPES.MemberExpression) {
+                return hasObsidianDomHelpers(callee.object);
+            }
+            return checker.getSymbolAtLocation(services.esTreeNodeToTSNodeMap.get(callee)) !== undefined;
+        }
+
+        // Whether one of the helper's signatures takes the arguments after the
+        // tag and returns the type the createEl() call had.
+        function fitsSignature(node: TSESTree.CallExpression, helperType: ts.Type): boolean | null {
+            const args = node.arguments.slice(1);
+            if (
+                typeof checker.isTypeAssignableTo !== "function" ||
+                args.some((arg) => arg.type === TSESTree.AST_NODE_TYPES.SpreadElement)
+            ) {
+                return false;
+            }
+            const argTypes = args.map((arg) => services.getTypeAtLocation(arg));
+            const call = services.esTreeNodeToTSNodeMap.get(node);
+            // In an optional chain the signature's return type includes the
+            // chain's `undefined`; the replacement keeps the chain, so compare
+            // without it.
+            const returnType = (type: ts.Type) => ts.isOptionalChain(call) ? checker.getNonNullableType(type) : type;
+            const originalType = checker.getResolvedSignature(call)?.getReturnType();
+            let unknown = false;
+            for (const signature of helperType.getCallSignatures()) {
+                const fits = signatureTakes(signature, argTypes);
+                if (
+                    fits === true &&
+                    (isResultUnused(node) ||
+                        (originalType && isSameType(returnType(signature.getReturnType()), returnType(originalType))))
+                ) {
+                    return true;
+                }
+                unknown ||= fits !== null;
+            }
+            return unknown ? false : null;
+        }
+
+        // true when every argument fits its parameter and the rest are
+        // optional, null when they do not, false when the signature is generic
+        // or has a rest parameter, which this does not work out.
+        function signatureTakes(signature: ts.Signature, argTypes: ts.Type[]): boolean | null {
+            const params = signature.getParameters();
+            const declarations = params.map((param) => param.valueDeclaration);
+            if (
+                (signature.getTypeParameters()?.length ?? 0) > 0 ||
+                declarations.some((declaration) => declaration === undefined || !ts.isParameter(declaration) || declaration.dotDotDotToken)
+            ) {
+                return false;
+            }
+            if (argTypes.length > params.length) {
+                return null;
+            }
+            for (let i = 0; i < params.length; i++) {
+                const declaration = declarations[i] as ts.ParameterDeclaration;
+                if (i >= argTypes.length) {
+                    if (!declaration.questionToken && !declaration.initializer) {
+                        return null;
+                    }
+                } else if (!checker.isTypeAssignableTo(argTypes[i], checker.getTypeOfSymbol(params[i]))) {
+                    return null;
+                }
+            }
+            return true;
+        }
+
+        function isSameType(a: ts.Type, b: ts.Type): boolean {
+            return a === b || (checker.isTypeAssignableTo(a, b) && checker.isTypeAssignableTo(b, a));
+        }
+
+        function isResultUnused(node: TSESTree.CallExpression): boolean {
+            const parent = node.parent.type === TSESTree.AST_NODE_TYPES.ChainExpression ? node.parent.parent : node.parent;
+            return parent.type === TSESTree.AST_NODE_TYPES.ExpressionStatement;
         }
 
         function checkCreateDocumentFragment(node: TSESTree.CallExpression): void {
@@ -226,13 +360,13 @@ export default ruleCreator({
                 return;
             }
 
-            const target = classifyDocumentTarget(node.callee.object);
+            const target = classifyDocumentTarget(node.callee);
             if (!target) {
                 return;
             }
 
             const replacement = `${target.prefix}createFragment()`;
-            report(node, replacement, target.canAutofix);
+            report(node, replacement, target.canAutofix("createFragment"));
         }
 
         // Whether `name`, called bare at `node`, resolves to a binding of the

@@ -31,6 +31,18 @@ ruleTester.run("no-problematic-settings-headings", rule, {
             `,
         },
         {
+            name: "a chain that does not start from a method call is not checked, and does not crash",
+            code: `
+                ${MOCK_CLASS}
+                declare function getSetting(): Setting;
+                class MyTab extends PluginSettingTab {
+                    display() {
+                        getSetting().setName("General").setHeading();
+                    }
+                }
+            `,
+        },
+        {
             name: "a heading whose name is not a string literal is not checked",
             code: `
                 ${MOCK_CLASS}
@@ -155,5 +167,80 @@ ruleTester.run("no-problematic-settings-headings", rule, {
                 }
             `,
         },
+        // Patterns from the community-plugin run. Removing only setHeading() from
+        // a longer chain left `.setClass(…)` as a statement of its own.
+        {
+            name: "a heading chain that continues after setHeading() is removed as a whole (notes-explorer)",
+            code: tab(`
+                new Setting(this.containerEl)
+                    .setName("Notes explorer settings")
+                    .setHeading()
+                    .setClass("notes-explorer-setting-tab-header");
+                new Setting(this.containerEl).setName("Launch on start");`),
+            options: [{ pluginName: "Notes Explorer" }],
+            output: tab(`
+                ;
+                new Setting(this.containerEl).setName("Launch on start");`),
+            errors: [{ messageId: "settings" }, { messageId: "pluginName" }],
+        },
+        {
+            name: "a heading with a control is not removed (spacekeys)",
+            code: tab(`
+                new Setting(this.containerEl)
+                    .setName("Spacekeys keymap file")
+                    .setDesc("YAML or Markdown file defining a custom keymap.")
+                    .setHeading()
+                    .addButton((btn) => btn.setIcon("refresh-cw"));`),
+            options: [{ pluginName: "Spacekeys" }],
+            output: null,
+            errors: [{ messageId: "pluginName", suggestions: [] }],
+        },
+        {
+            name: "removing a heading with a description is a suggestion",
+            code: tab(`new Setting(this.containerEl).setName("General").setDesc("Applies everywhere.").setHeading();`),
+            output: null,
+            errors: [{
+                messageId: "general",
+                suggestions: [{ messageId: "removeHeading", output: tab(`;`) }],
+            }],
+        },
+        {
+            name: "removing a heading whose arguments have side effects is a suggestion",
+            code: tab(`new Setting(this.containerEl.createDiv()).setName("General").setHeading();`),
+            output: null,
+            errors: [{
+                messageId: "general",
+                suggestions: [{ messageId: "removeHeading", output: tab(`;`) }],
+            }],
+        },
+        {
+            name: "a heading whose value is used is not removed (links, obsidian-plugin-groups)",
+            code: tab(`
+                const generalHeading = new Setting(this.containerEl).setName("General").setHeading();
+                generalHeading.setClass("x");`),
+            output: null,
+            errors: [{ messageId: "general", suggestions: [] }],
+        },
+        {
+            name: "a heading without a semicolon becomes an empty statement",
+            code: tab(`
+                if (this.containerEl) new Setting(this.containerEl).setName("General").setHeading()
+                this.containerEl.empty()`),
+            output: tab(`
+                if (this.containerEl) ;
+                this.containerEl.empty()`),
+            errors: [{ messageId: "general" }],
+        },
     ],
 });
+
+function tab(body: string): string {
+    return `
+        ${MOCK_CLASS}
+        class MyTab extends PluginSettingTab {
+            display() {
+                ${body}
+            }
+        }
+    `;
+}

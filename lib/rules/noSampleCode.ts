@@ -102,6 +102,29 @@ function isSampleDomEventCall(node: TSESTree.CallExpression): boolean {
     return true;
 }
 
+/**
+ * The statement that can be deleted with the call: the call must be the whole
+ * statement, as in the template, and the statement one of a list. Otherwise its
+ * value is used (`const id = this.registerInterval(...)`, `return ...`, an arrow
+ * body) or deleting it would make the next statement the body of an `if`/loop.
+ */
+function getRemovableStatement(node: TSESTree.CallExpression): TSESTree.ExpressionStatement | null {
+    const statement = node.parent;
+    if (statement.type !== TSESTree.AST_NODE_TYPES.ExpressionStatement || statement.expression !== node) {
+        return null;
+    }
+    switch (statement.parent.type) {
+        case TSESTree.AST_NODE_TYPES.Program:
+        case TSESTree.AST_NODE_TYPES.BlockStatement:
+        case TSESTree.AST_NODE_TYPES.StaticBlock:
+        case TSESTree.AST_NODE_TYPES.SwitchCase:
+        case TSESTree.AST_NODE_TYPES.TSModuleBlock:
+            return statement;
+        default:
+            return null;
+    }
+}
+
 export default ruleCreator({
     meta: {
         type: "problem" as const,
@@ -121,20 +144,21 @@ export default ruleCreator({
     },
     defaultOptions: [],
     create(context) {
+        function report(node: TSESTree.CallExpression, messageId: "removeSampleInterval" | "removeSampleDomEvent"): void {
+            const statement = getRemovableStatement(node);
+            context.report({
+                node,
+                messageId,
+                fix: statement ? (fixer) => fixer.remove(statement) : null,
+            });
+        }
+
         return {
             CallExpression(node: TSESTree.CallExpression) {
                 if (isSampleIntervalCall(node)) {
-                    context.report({
-                        node,
-                        messageId: "removeSampleInterval",
-                        fix: (fixer) => fixer.remove(node.parent), // Remove the entire ExpressionStatement
-                    });
+                    report(node, "removeSampleInterval");
                 } else if (isSampleDomEventCall(node)) {
-                    context.report({
-                        node,
-                        messageId: "removeSampleDomEvent",
-                        fix: (fixer) => fixer.remove(node.parent), // Remove the entire ExpressionStatement
-                    });
+                    report(node, "removeSampleDomEvent");
                 }
             },
         };

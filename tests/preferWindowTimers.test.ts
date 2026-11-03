@@ -195,6 +195,36 @@ ruleTester.run("prefer-window-timers", preferWindowTimersRule, {
             output: `const handle = window.requestAnimationFrame(() => {}); handle;`,
             errors: [{ messageId: "preferWindowTimer", data: { name: "requestAnimationFrame" } }],
         },
+        {
+            name: "a local named window, such as a Playwright page, is not the global, so nothing is offered",
+            code: `export async function reload(window: { evaluate(fn: () => void): Promise<void> }) { await window.evaluate(() => { setTimeout(() => location.reload(), 0); }); }`,
+            output: null,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "setTimeout" }, suggestions: [] }],
+        },
+        {
+            name: "activeWindow is not fixed to a local named window",
+            code: `export function start(window: { id: string }) { activeWindow.setTimeout(() => {}, 10); return window.id; }`,
+            output: null,
+            errors: [{ messageId: "noActiveWindowTimer", data: { name: "setTimeout" } }],
+        },
+        {
+            name: "the branch where window is undefined is reported only",
+            code: `export function later(fn: () => void) { if (typeof window === "undefined") { setTimeout(fn, 0); return; } window.setTimeout(fn, 0); }`,
+            output: null,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "setTimeout" }, suggestions: [] }],
+        },
+        {
+            name: "the branch where window exists is still fixed",
+            code: `export function later(fn: () => void) { if (typeof window !== "undefined") { setTimeout(fn, 0); } }`,
+            output: `export function later(fn: () => void) { if (typeof window !== "undefined") { window.setTimeout(fn, 0); } }`,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "setTimeout" } }],
+        },
+        {
+            name: "a typeof window check in another function does not stop the fix",
+            code: `export const isBrowser = typeof window !== "undefined"; export function later(fn: () => void) { setTimeout(fn, 0); }`,
+            output: `export const isBrowser = typeof window !== "undefined"; export function later(fn: () => void) { window.setTimeout(fn, 0); }`,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "setTimeout" } }],
+        },
     ],
 });
 
@@ -228,6 +258,34 @@ untypedRuleTester.run("prefer-window-timers without type information", preferWin
             code: "setTimeout(() => {}, 10);",
             output: "window.setTimeout(() => {}, 10);",
             errors: [{ messageId: "preferWindowTimer", data: { name: "setTimeout" } }],
+        },
+        {
+            name: "a local named window is not the global without type information either",
+            code: "function reload(window) { setTimeout(() => {}, 10); }",
+            output: null,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "setTimeout" }, suggestions: [] }],
+        },
+    ],
+});
+
+// A project without the DOM lib has no `window` to write.
+const noDomRuleTester = new RuleTester({
+    languageOptions: {
+        parserOptions: { project: "./tsconfig.json", tsconfigRootDir: `${process.cwd()}/tests/fixtures/no-dom` },
+    },
+});
+
+noDomRuleTester.run("prefer-window-timers without the DOM lib", preferWindowTimersRule, {
+    valid: [],
+    invalid: [
+        {
+            name: "a timer is reported only when the project declares no window",
+            code: "setTimeout(() => {}, 10); declare const n: number; clearInterval(n);",
+            output: null,
+            errors: [
+                { messageId: "preferWindowTimer", data: { name: "setTimeout" }, suggestions: [] },
+                { messageId: "preferWindowTimer", data: { name: "clearInterval" }, suggestions: [] },
+            ],
         },
     ],
 });

@@ -25,9 +25,30 @@ The fix rewrites the check to `value.instanceOf(SomeClass)` when the value's typ
 A value that is not a name, a property access, a call or `this` is put in parentheses, so
 `(await getEl()) instanceof HTMLElement` becomes `(await getEl()).instanceOf(HTMLElement)`.
 
-Not reported: `instanceof` on any other type, such as a `TFile` or your own classes, and on an `any`
-value.
+Not reported: `instanceof` on any other type, such as a `TFile` or your own classes, on an `any`
+value, and with `strictNullChecks` on a value whose type includes `null` or `undefined`, such as
+`el.parentElement`.
 
 The recommended config switches this rule off for worker and test files, which have no popout windows
 and no `instanceOf()`; see [Web worker files](../configuration.md#web-worker-files) and
 [Test files](../configuration.md#test-files).
+
+### Values that may be null or undefined
+
+`null instanceof HTMLElement` is `false`, but `null.instanceOf(HTMLElement)` throws. When the value
+may be null or undefined, the rewrite is offered as a suggestion that keeps the check safe,
+`value?.instanceOf(SomeClass)`, which is falsy for null and undefined and still narrows `value`:
+
+```ts
+if (list[0] instanceof HTMLElement) {} // suggestion: list[0]?.instanceOf(HTMLElement)
+```
+
+With `strictNullChecks` the type tells, and a value read through an index signature, such as
+`list[0]` or `record.key`, also counts as possibly undefined: unless `noUncheckedIndexedAccess` is
+on, it is typed as present even past the end of the list.
+
+Without `strictNullChecks` no type includes `null`, so the value's declaration tells instead: a
+property or call declared as `null` or `undefined` (`el.parentElement`, `el.querySelector()`,
+`list.find()`), an optional property or parameter, an optional chain, an index signature, or a
+`const` set from one of them. Everything else, and a value with a non-null assertion
+(`el.parentElement!`), is still fixed.

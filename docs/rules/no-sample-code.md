@@ -19,5 +19,7 @@ this.registerDomEvent(document, "click", (evt: MouseEvent) => {
 });
 ```
 
-The fix deletes the statement. Other `registerInterval()` and `registerDomEvent()` calls are not
-reported.
+The fix deletes the statement. When the call is not a statement of its own, such as
+`const id = this.registerInterval(…)`, a `return` or the body of an `if` without braces, it is
+reported without a fix: deleting it would break the code that uses its value or change what the `if`
+controls. Other `registerInterval()` and `registerDomEvent()` calls are not reported.
