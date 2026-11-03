@@ -16,6 +16,7 @@ const es2022RuleTester = new RuleTester({
 });
 
 testJsConfigsRecommendedRules();
+testEslint10RecommendedRules();
 testExplicitlyConfiguredRules();
 testTseslintEslintRecommendedRules();
 
@@ -968,6 +969,66 @@ function testJsConfigsRecommendedRules(): void {
     });
 }
 
+// ESLint 10 added these to `recommended`. The recommended config takes its core
+// rules from the installed ESLint, so it runs them on ESLint 10 only. They exist
+// since ESLint 9.0 (no-useless-assignment), 9.27 (no-unassigned-vars) and 9.35
+// (preserve-caught-error), so this repository's ESLint 9 can test them.
+function testEslint10RecommendedRules(): void {
+    ruleTester.run("no-unassigned-vars", getBuiltinRule("no-unassigned-vars"), {
+        valid: [
+            {
+                name: "a variable that is assigned is allowed",
+                code: "let x; x = 1; console.log(x);",
+            },
+        ],
+        invalid: [
+            {
+                name: "a variable read but never assigned is forbidden",
+                code: "let x; console.log(x);",
+                errors: [{ messageId: "unassigned" }],
+            },
+        ],
+    });
+
+    ruleTester.run("no-useless-assignment", getBuiltinRule("no-useless-assignment"), {
+        valid: [
+            {
+                name: "an assignment that may be read is allowed",
+                code: "export function f(a) { let x = 1; if (a) { x = 2; } return x; }",
+            },
+        ],
+        invalid: [
+            {
+                name: "an assignment overwritten before it is read is forbidden",
+                code: "export function f() { let x = 1; x = 2; return x; }",
+                errors: [{ messageId: "unnecessaryAssignment" }],
+            },
+        ],
+    });
+
+    ruleTester.run("preserve-caught-error", getBuiltinRule("preserve-caught-error"), {
+        valid: [
+            {
+                name: "re-throwing with the caught error as cause is allowed",
+                code: "try { f(); } catch (error) { throw new Error(\"Failed\", { cause: error }); }",
+            },
+        ],
+        invalid: [
+            {
+                name: "re-throwing without the caught error as cause is forbidden",
+                code: "try { f(); } catch (error) { throw new Error(\"Failed\"); }",
+                errors: [{
+                    messageId: "missingCause",
+                    suggestions: [{
+                        messageId: "includeCause",
+                        output: "try { f(); } catch (error) { throw new Error(\"Failed\", { cause: error }); }",
+                    }],
+                }],
+            },
+        ],
+    });
+}
+
 function testExplicitlyConfiguredRules(): void {
     ruleTester.run("no-self-compare", getBuiltinRule("no-self-compare"), {
         valid: [
@@ -1220,6 +1281,7 @@ type TestedBuiltinRule =
     | "no-shadow-restricted-names"
     | "no-sparse-arrays"
     | "no-this-before-super"
+    | "no-unassigned-vars"
     | "no-unexpected-multiline"
     | "no-unreachable"
     | "no-unsafe-finally"
@@ -1229,11 +1291,13 @@ type TestedBuiltinRule =
     | "no-unused-private-class-members"
     | "no-useless-backreference"
     | "no-useless-catch"
+    | "no-useless-assignment"
     | "no-useless-escape"
     | "no-var"
     | "no-with"
     | "prefer-rest-params"
     | "prefer-spread"
+    | "preserve-caught-error"
     | "require-yield"
     | "use-isnan"
     | "valid-typeof";

@@ -3,6 +3,7 @@ import comments from "@eslint-community/eslint-plugin-eslint-comments/configs";
 import js from "@eslint/js";
 import json from "@eslint/json";
 import { ESLint, type Linter } from "eslint";
+import { builtinRules } from "eslint/use-at-your-own-risk";
 import tseslint from "typescript-eslint";
 import plugin from "../lib/index.js";
 
@@ -713,6 +714,74 @@ describe("core JS rules apply only to JS and TS files", () => {
 			}
 		});
 	}
+});
+
+// The core JS rules are the recommended set of the ESLint that is running, not
+// of a bundled @eslint/js: @eslint/js 9 lacks the three rules ESLint 10 added to
+// `recommended`, and @eslint/js 10 names two rules ESLint 9.19 does not have.
+describe("core JS rules are the installed ESLint's recommended set", () => {
+	const majorOf = (version: string) => Number(version.split(".")[0]);
+
+	for (const configName of ["recommended", "recommendedWithLocalesEn"] as const) {
+		describe(configName, () => {
+			const coreBlock = plugin.configs[configName].find(
+				config => config.rules?.["for-direction"] === "error"
+			);
+			const coreRules = coreBlock?.rules ?? {};
+
+			it("is scoped to JS and TS files", () => {
+				assert.deepStrictEqual(coreBlock?.files, ["**/*.{ts,cts,mts,tsx,js,cjs,mjs,jsx}"]);
+			});
+
+			it("equals @eslint/js's recommended rules for this ESLint major", () => {
+				// The comparison only holds for matching majors; bump the
+				// @eslint/js devDependency along with eslint.
+				assert.strictEqual(majorOf(js.meta.version), majorOf(ESLint.version));
+				assert.deepStrictEqual(
+					Object.entries(coreRules).sort(),
+					Object.entries(js.configs.recommended.rules ?? {}).sort()
+				);
+			});
+
+			it("holds every rule this ESLint recommends, at error", () => {
+				const recommended = [...builtinRules]
+					.filter(([, rule]) => !rule.meta?.deprecated && rule.meta?.docs?.recommended === true)
+					.map(([ruleId]) => ruleId);
+				assert.ok(recommended.length > 0);
+				assert.deepStrictEqual(recommended.filter(ruleId => coreRules[ruleId] !== "error"), []);
+			});
+
+			it("names only rules this ESLint has, none of them deprecated", () => {
+				assert.deepStrictEqual(
+					Object.keys(coreRules).filter(ruleId => {
+						const rule = builtinRules.get(ruleId);
+						return !rule || rule.meta?.deprecated || rule.meta?.docs?.recommended !== true;
+					}),
+					[]
+				);
+			});
+		});
+	}
+
+	// The core block comes first, so the blocks after it still decide these.
+	describe("the plugin's own settings still win", () => {
+		for (const filename of ["src/main.ts", "src/main.js"]) {
+			it(`no-unused-vars is off for ${filename}, replaced by the typescript-eslint rule`, async () => {
+				const rules = await rulesFor("recommended", filename);
+				assert.strictEqual(getSeverity(rules["no-unused-vars"]), "off");
+				assert.strictEqual(getSeverity(rules["@typescript-eslint/no-unused-vars"]), "warn");
+			});
+		}
+
+		it("typescript-eslint switches off the core rules TypeScript covers, for TS only", async () => {
+			const tsRules = await rulesFor("recommended", "src/main.ts");
+			const jsRules = await rulesFor("recommended", "src/main.js");
+			for (const ruleId of ["constructor-super", "no-redeclare", "no-dupe-keys"]) {
+				assert.strictEqual(getSeverity(tsRules[ruleId]), "off", `${ruleId} in TS`);
+				assert.strictEqual(getSeverity(jsRules[ruleId]), "error", `${ruleId} in JS`);
+			}
+		});
+	});
 });
 
 // A user who lints their other JSON with the JSON language used to get the

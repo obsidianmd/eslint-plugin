@@ -51,7 +51,7 @@ See the [typescript-eslint docs on typed linting](https://typescript-eslint.io/g
 
 The recommended config is an array of flat config objects that sets up:
 
-- **ESLint core** (`@eslint/js` recommended rules), for `.js`/`.ts` files and their variants only
+- **ESLint core**: the recommended rules of the ESLint you have installed (`js.configs.recommended` for that version), for `.js`/`.ts` files and their variants only
 - **typescript-eslint** (`recommendedTypeChecked` for `.ts`/`.tsx`, `recommended` for `.js`/`.jsx`)
 - **obsidianmd rules** at their default severities, except `ui/sentence-case`, which is off, and the two locale rules, which `recommendedWithLocalesEn` adds
 - **Third-party plugins**: `@microsoft/eslint-plugin-sdl`, `eslint-plugin-import`, `eslint-plugin-no-unsanitized`, `eslint-plugin-depend`, `@eslint-community/eslint-plugin-eslint-comments`
@@ -413,6 +413,17 @@ import js from "@eslint/js";
 // in the defineConfig([...]) array:
 { files: ["**/*.svelte"], extends: [js.configs.recommended] },
 ```
+
+### ESLint 10 gets ESLint 10's core rules
+
+The core rules now come from the ESLint you run, not from a bundled `@eslint/js` 9. ESLint 9
+projects keep the same core rules. On ESLint 10 the recommended config adds the three rules
+ESLint 10 recommends, at `error`:
+[`no-unassigned-vars`](https://eslint.org/docs/latest/rules/no-unassigned-vars),
+[`no-useless-assignment`](https://eslint.org/docs/latest/rules/no-useless-assignment) and
+[`preserve-caught-error`](https://eslint.org/docs/latest/rules/preserve-caught-error).
+`preserve-caught-error` suggests `new Error(message, { cause: error })`, which TypeScript accepts
+only with `ES2022` or later in your `tsconfig.json` `lib`; the sample plugin's is `ES2021`.
 
 ### `ui/sentence-case` is off
 

@@ -34,7 +34,7 @@ import { PlainTextLanguage } from "./plainTextLanguage.js";
 import { ui } from "./rules/ui/index.js";
 
 // --- Import plugins and configs for the recommended config ---
-import js from "@eslint/js";
+import { builtinRules } from "eslint/use-at-your-own-risk";
 import json from "@eslint/json";
 import tseslint from "typescript-eslint";
 import sdl from "@microsoft/eslint-plugin-sdl";
@@ -340,14 +340,27 @@ const flatRecommendedGeneralRules: RulesConfig = {
     "no-unsanitized/property": "error",
 };
 
+// ESLint's recommended core rules, read from the ESLint that is running rather
+// than from a copy of @eslint/js. A copy fits one major only: @eslint/js 9
+// lacks the rules ESLint 10 added to `recommended`, and @eslint/js 10 names
+// rules that ESLint 9.19 does not have ("Could not find rule"). ESLint
+// generates `js.configs.recommended` from these same two fields
+// (tools/update-eslint-recommended.js), so this is that config for the
+// installed version.
+const coreRecommendedRules: RulesConfig = Object.fromEntries(
+    [...builtinRules]
+        .filter(([, rule]) => !rule.meta?.deprecated && rule.meta?.docs?.recommended === true)
+        .map(([ruleId]) => [ruleId, "error" as const]),
+);
+
 const flatRecommendedConfig: Config[] = defineConfig([
     // Core JS rules are for JS and TS only. Without `files` they reached every
     // other file too -- package.json, manifest.json, LICENSE, locale JSON, and
     // any JSON a user lints -- where a rule like no-irregular-whitespace throws
     // because that source code has no comments to walk.
     {
-        ...js.configs.recommended,
         files: ['**/*.{ts,cts,mts,tsx,js,cjs,mjs,jsx}'],
+        rules: coreRecommendedRules,
     },
     {
         plugins: {
