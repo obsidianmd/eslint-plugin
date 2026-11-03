@@ -8,8 +8,36 @@
 
 <!-- end auto-generated rule header -->
 
-Checks UI text set from code, such as `setName`, `setDesc`, `setPlaceholder`, `new Notice(...)` and
-command names, and reports text that is not in sentence case.
+## What is reported
+
+UI text set from code that is not in sentence case. The rule checks string literals, and template
+literals without `${…}`, used as:
+
+- the first argument of `setName`, `setDesc`, `setButtonText`, `setTooltip`, `setPlaceholder`,
+  `setText` and `setTitle`, the tooltip of `addRibbonIcon` and the label of `addOption`
+- the message of `new Notice(…)` and a command's `name` in `addCommand({ … })`
+- `createEl()`'s `text` and `title` options and its `attr` values for `aria-label`,
+  `aria-description`, `title` and `placeholder`, including nested option objects, and the same
+  attributes set with `setAttribute()`
+- assignments to `textContent`, `innerText`, `title`, `placeholder` and `ariaLabel`
+- strings returned from a `getDisplayText()` method
+
+The message gives the expected text. There is no fix unless you set `allowAutoFix: true`; `--fix`
+then rewrites the string and keeps its quotes.
+
+Some text keeps its casing, because it is data rather than prose:
+
+- brand names and acronyms, such as "GitHub" or "PDF"; in the default `loose` mode a camelCase or
+  PascalCase word too, unless `enforceCamelCaseLower` is set
+- URLs, such as `https://obsidian.md/help`, and date and time formats, such as `YYYY-MM-DD` or `HH:mm`
+- "REST" written in capitals. It is also an ordinary word, so both "Use the REST API" and "Take a
+  rest" pass.
+- a placeholder that shows an example value: a single token with no spaces (`sk-123…`,
+  `YYYY-MM-DD`), or text starting with "e.g." or "ex." (`e.g. My Vault`)
+
+Not checked at all: text with inline code (`` `npm install` ``) or HTML tags, text with placeholders
+(`{count}`, `%s`), file paths, keyboard shortcuts (`Ctrl+S`), version numbers and all-caps
+identifiers (`API_KEY`).
 
 The rule is off in `recommended` and `recommendedWithLocalesEn`, because it reports too much
 ordinary text to be on by default. 0.3.0 meant to turn it off, but it stayed on until 0.5.0. To use
@@ -22,15 +50,6 @@ it, turn it on yourself:
   },
 }
 ```
-
-Some text keeps its casing, because it is data rather than prose:
-
-- URLs, such as `https://obsidian.md/help`.
-- Date and time formats, such as `YYYY-MM-DD` or `HH:mm`.
-- "REST" written in capitals. It is also an ordinary word, so both "Use the REST API" and "Take a
-  rest" pass.
-- A placeholder that shows an example value: a single token with no spaces (`sk-123…`,
-  `YYYY-MM-DD`), or text starting with "e.g." or "ex." (`e.g. My Vault`).
 
 ## Options
 

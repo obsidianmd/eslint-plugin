@@ -55,6 +55,52 @@ ruleTester.run("no-view-references-in-plugin", noViewReferencesRule, {
                 }
             `,
         },
+        {
+            name: "storing the view through a variable first is not detected",
+            code: `
+                ${MOCK_API}
+                class MyPlugin extends Plugin {
+                    view: MyCustomView;
+                    onload() {
+                        this.registerView('my-view', (leaf) => {
+                            const view = new MyCustomView();
+                            this.view = view;
+                            return view;
+                        });
+                    }
+                }
+            `,
+        },
+        {
+            name: "an assignment inside a nested block is not detected",
+            code: `
+                ${MOCK_API}
+                class MyPlugin extends Plugin {
+                    view: MyCustomView;
+                    onload() {
+                        this.registerView('my-view', (leaf) => {
+                            if (leaf) {
+                                this.view = new MyCustomView();
+                            }
+                            return new MyCustomView();
+                        });
+                    }
+                }
+            `,
+        },
+        {
+            name: "a factory passed by reference is not checked",
+            code: `
+                ${MOCK_API}
+                class MyPlugin extends Plugin {
+                    view: MyCustomView;
+                    createView = (leaf: WorkspaceLeaf) => (this.view = new MyCustomView());
+                    onload() {
+                        this.registerView('my-view', this.createView);
+                    }
+                }
+            `,
+        },
     ],
     invalid: [
         {

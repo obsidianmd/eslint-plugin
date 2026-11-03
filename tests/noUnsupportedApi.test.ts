@@ -492,6 +492,17 @@ ruleTester.run("no-unsupported-api", rule, {
             errors: [{ messageId: "apiNotAvailable" }],
         },
         {
+            name: "new SecretComponent requires 1.11.1",
+            code: `
+                import { SecretComponent } from 'obsidian';
+                declare const app: any;
+                declare const el: HTMLElement;
+                const secret = new SecretComponent(app, el);
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
             name: "Class extension: AbstractInputSuggest requires 1.4.10",
             code: `
                 import { AbstractInputSuggest } from 'obsidian';

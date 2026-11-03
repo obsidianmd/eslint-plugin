@@ -36,6 +36,34 @@ ruleTester.run("prefer-update-over-display", preferUpdateOverDisplayRule, {
                 }
             `,
         },
+        {
+            name: "a class extending obsidian.PluginSettingTab is not matched",
+            options: [{ minAppVersion: "1.13.0" }],
+            code: `
+                declare const obsidian: { PluginSettingTab: new () => object };
+                class MyTab extends obsidian.PluginSettingTab { refresh() { this.display(); } }
+            `,
+        },
+        {
+            name: "minAppVersion defaults to manifest.json (0.15.0 here, so display() stays)",
+            code: `
+                ${MOCK_CLASS}
+                class MyTab extends PluginSettingTab {
+                    refresh() { this.display(); }
+                }
+            `,
+        },
+        {
+            name: "display() on another object is not reported",
+            options: [{ minAppVersion: "1.13.0" }],
+            code: `
+                ${MOCK_CLASS}
+                declare const other: { display(): void };
+                class MyTab extends PluginSettingTab {
+                    refresh() { other.display(); }
+                }
+            `,
+        },
     ],
     invalid: [
         {
@@ -57,6 +85,51 @@ ruleTester.run("prefer-update-over-display", preferUpdateOverDisplayRule, {
                         this.update();
                     }
                 }
+            `,
+        },
+        {
+            name: "this.display() in an arrow callback is flagged and fixed",
+            options: [{ minAppVersion: "1.13.0" }],
+            code: `
+                ${MOCK_CLASS}
+                declare function onChange(cb: () => void): void;
+                class MyTab extends PluginSettingTab {
+                    build() { onChange(() => this.display()); }
+                }
+            `,
+            errors: [{ messageId: "preferUpdate" }],
+            output: `
+                ${MOCK_CLASS}
+                declare function onChange(cb: () => void): void;
+                class MyTab extends PluginSettingTab {
+                    build() { onChange(() => this.update()); }
+                }
+            `,
+        },
+        {
+            name: "this.display() in a class expression is flagged and fixed",
+            options: [{ minAppVersion: "1.13.0" }],
+            code: `
+                ${MOCK_CLASS}
+                const MyTab = class extends PluginSettingTab { refresh() { this.display(); } };
+            `,
+            errors: [{ messageId: "preferUpdate" }],
+            output: `
+                ${MOCK_CLASS}
+                const MyTab = class extends PluginSettingTab { refresh() { this.update(); } };
+            `,
+        },
+        {
+            name: "this.display() in an abstract settings tab is flagged too",
+            options: [{ minAppVersion: "1.13.0" }],
+            code: `
+                ${MOCK_CLASS}
+                abstract class BaseTab extends PluginSettingTab { refresh() { this.display(); } }
+            `,
+            errors: [{ messageId: "preferUpdate" }],
+            output: `
+                ${MOCK_CLASS}
+                abstract class BaseTab extends PluginSettingTab { refresh() { this.update(); } }
             `,
         },
     ],

@@ -22,6 +22,26 @@ ruleTester.run("no-problematic-settings-headings", rule, {
             `,
             options: [{ pluginName: "My Awesome Plugin" }],
         },
+        {
+            name: "a heading outside a settings tab is not checked",
+            code: `
+                ${MOCK_CLASS}
+                declare const el: unknown;
+                new Setting(el).setName("General settings").setHeading();
+            `,
+        },
+        {
+            name: "a heading whose name is not a string literal is not checked",
+            code: `
+                ${MOCK_CLASS}
+                declare const label: string;
+                class MyTab extends PluginSettingTab {
+                    display() {
+                        new Setting(this.containerEl).setName(label).setHeading();
+                    }
+                }
+            `,
+        },
     ],
     invalid: [
         {
@@ -93,6 +113,38 @@ ruleTester.run("no-problematic-settings-headings", rule, {
                 }
             `,
             options: [{ pluginName: "My Awesome Plugin" }],
+            errors: [{ messageId: "pluginName" }],
+            output: `
+                ${MOCK_CLASS}
+                class MyTab extends PluginSettingTab {
+                    display() {
+                        ;
+                    }
+                }
+            `,
+        },
+        {
+            name: "'options' alone is reported without a fix",
+            code: `
+                ${MOCK_CLASS}
+                class MyTab extends PluginSettingTab {
+                    display() {
+                        new Setting(this.containerEl).setName("Display options").setHeading();
+                    }
+                }
+            `,
+            errors: [{ messageId: "settings" }],
+        },
+        {
+            name: "the plugin name defaults to manifest.json (Sample Plugin in this repository)",
+            code: `
+                ${MOCK_CLASS}
+                class MyTab extends PluginSettingTab {
+                    display() {
+                        new Setting(this.containerEl).setName("Sample Plugin").setHeading();
+                    }
+                }
+            `,
             errors: [{ messageId: "pluginName" }],
             output: `
                 ${MOCK_CLASS}

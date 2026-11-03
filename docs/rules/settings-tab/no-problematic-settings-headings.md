@@ -8,6 +8,19 @@
 
 <!-- end auto-generated rule header -->
 
+## What is reported
+
+A settings heading, `new Setting(…).setName("…").setHeading()` with a string-literal name, inside a
+class declaration that extends `PluginSettingTab`, whose name contains (ignoring case):
+
+- "settings" or "options": every heading in a settings tab is about settings, so the word adds
+  nothing. Reported without a fix; rename the heading.
+- "general": keep general settings at the top without a heading. The fix removes the heading.
+- the plugin's name, from the `pluginName` option or else the `name` in `manifest.json`: the tab
+  already carries it. The fix removes the heading.
+
+Not reported: headings outside a settings tab, and a name that is not a string literal.
+
 ## Further reading
 
 - [UI text - Plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#UI+text)

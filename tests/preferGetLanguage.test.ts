@@ -21,6 +21,14 @@ ruleTester.run("prefer-get-language", preferGetLanguageRule, {
             name: "importing other i18n packages is allowed",
             code: "import i18next from 'i18next';",
         },
+        {
+            name: "a variable holding the storage is not followed",
+            code: "const store = localStorage; store.getItem('language');",
+        },
+        {
+            name: "a dynamic import of the detector is not reported",
+            code: "const detector = await import('i18next-browser-languagedetector');",
+        },
     ],
     invalid: [
         {
@@ -42,6 +50,11 @@ ruleTester.run("prefer-get-language", preferGetLanguageRule, {
             name: "require i18next-browser-languagedetector is forbidden",
             code: "const LanguageDetector = require('i18next-browser-languagedetector');",
             errors: [{ messageId: "i18nextDetector" }],
+        },
+        {
+            name: "another window's localStorage is reported",
+            code: "const lang = activeWindow.localStorage.getItem('language');",
+            errors: [{ messageId: "localStorageLanguage" }],
         },
     ],
 });

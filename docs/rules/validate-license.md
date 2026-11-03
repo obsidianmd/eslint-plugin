@@ -6,13 +6,15 @@
 
 <!-- end auto-generated rule header -->
 
+## What is reported
+
 This rule catches the sample plugin's `LICENSE` left unedited. Its copyright line reads
 `Copyright (C) 2020-2025 by Dynalist Inc.`.
 
 - A copyright line whose holder is `Dynalist Inc.` is reported: change the holder to your name.
 - While the holder is still `Dynalist Inc.`, a year before the current year is reported too.
 
-A copyright line with any other holder is not checked, whatever its year:
+Not reported: a copyright line with any other holder, whatever its year.
 
 - Your own notice does not have to carry the current year. Reporting every past year warned nearly
   every plugin, and again every 1 January, which breaks a `--max-warnings 0` build on a date.
@@ -21,7 +23,11 @@ A copyright line with any other holder is not checked, whatever its year:
   line belongs to the licence text, which you must not edit.
 
 Copyright lines are recognised in the forms `Copyright (C) 2020 by Name`,
-`Copyright (c) 2020-2025 Name` and `Copyright © 2020 Name`.
+`Copyright (c) 2020-2025 Name` and `Copyright © 2020 Name`. There is no fix.
+
+The recommended config runs this rule on `LICENSE`, `LICENSE.md` and `LICENSE.txt` next to your
+ESLint config; for a licence file under another name, see
+[Files linted beyond your source](../configuration.md#files-linted-beyond-your-source).
 
 ## Options
 

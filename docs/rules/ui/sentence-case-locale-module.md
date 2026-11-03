@@ -8,9 +8,27 @@
 
 <!-- end auto-generated rule header -->
 
-Checks the strings of an English locale module, such as `en.ts` or a module under an `en/` directory,
-and reports those not in sentence case. URLs, date formats such as `YYYY-MM-DD`, and "REST" written
-in capitals keep their casing.
+## What is reported
+
+Checks the strings of an English locale module, such as `en.ts`, `en-GB.ts` or a module under an `en/`
+directory, and reports those not in sentence case. The strings checked are those of an exported
+object, including nested objects and arrays:
+
+```ts
+export default { autoReveal: "Enable Auto Reveal" }; // reported
+const strings = { openNote: "Open note" };
+export { strings }; // checked as well, as are `export default strings` and `export const x = { … }`
+```
+
+The message gives the expected text, and with `allowAutoFix: true`, `--fix` rewrites the string.
+Values are judged as in [`ui/sentence-case`](sentence-case.md): URLs, date formats such as
+`YYYY-MM-DD`, brand names and "REST" written in capitals keep their casing.
+
+Not reported: keys, an object that is not exported, strings in functions, template literals with
+`${…}`, and modules that are not English locale files, such as `fr.ts`.
+
+`recommendedWithLocalesEn` runs this rule on `.ts`, `.js`, `.cjs` and `.mjs` files named `en`,
+`en-*` or `en_*`, and on those under an `en/` directory.
 
 ## Options
 

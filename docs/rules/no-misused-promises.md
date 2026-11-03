@@ -25,6 +25,8 @@ names.forEach((name) => new Setting(containerEl).setName(name));
 if (toggle) toggle.setValue(true);
 ```
 
+## What is reported
+
 This rule runs the upstream rule unchanged, except that a `then` declared only in the
 `obsidian` package's own `obsidian.d.ts` is treated as not callable. Everything else is
 reported exactly as upstream reports it:
@@ -36,6 +38,10 @@ reported exactly as upstream reports it:
 
 As upstream, a union in a condition (`if (value)` with `value: Setting | Promise<void>`) is only
 reported with `checksConditionals: { flagUnions: "all" }` or `"strict"`.
+
+Not reported: Obsidian's chaining `then` itself, as in the examples above: a `Setting` or component
+returned from a callback, used in a condition, negated, spread or returned from a predicate. The
+recommended config runs the rule on TypeScript files only, since it needs type information.
 
 ## Migrating
 

@@ -8,6 +8,8 @@
 
 <!-- end auto-generated rule header -->
 
+## What is reported
+
 Checks the string values of an English locale JSON file — `en.json`, `en-US.json`, `en_GB.json`, or
 any `.json` under an `en/` directory — and reports those not in sentence case. Keys are not checked,
 and neither are array elements. Values in nested objects are.
@@ -20,9 +22,14 @@ and neither are array elements. Values in nested objects are.
 }
 ```
 
-Here `"Open Settings"` is reported; `"Open settings"` would pass. With `allowAutoFix: true`,
-`--fix` rewrites it. URLs, date formats such as `YYYY-MM-DD`, and "REST" written in capitals keep
-their casing.
+Here `"Open Settings"` is reported; `"Open settings"` would pass. The message gives the expected
+text, and with `allowAutoFix: true`, `--fix` rewrites the value as a valid JSON string. Values are
+judged as in [`ui/sentence-case`](sentence-case.md): URLs, date formats such as `YYYY-MM-DD`, brand
+names and "REST" written in capitals keep their casing, and text with inline code or HTML is not
+checked.
+
+Not reported: keys, array elements, non-string values, and files that are not English locale files,
+such as `fr.json` or `entries.json`, which only starts with "en".
 
 The rule reads the file with the `json/json` language from `@eslint/json`, which
 `recommendedWithLocalesEn` sets up for these files. To enable it without that config, do the same:
