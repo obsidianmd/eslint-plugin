@@ -4,6 +4,8 @@
 
 💼 This rule is enabled in the following configs: ✅ `recommended`, 🇬🇧 `recommendedWithLocalesEn`.
 
+🔧💡 This rule is automatically fixable by the [`--fix` CLI option](https://eslint.org/docs/latest/user-guide/command-line-interface#--fix) and manually fixable by [editor suggestions](https://eslint.org/docs/latest/use/core-concepts#rule-suggestions).
+
 <!-- end auto-generated rule header -->
 
 Allows redefining error messages from other ESLint rules that don't provide this functionality natively.
@@ -11,28 +13,35 @@ Allows redefining error messages from other ESLint rules that don't provide this
 ## What is reported
 
 Each configured rule runs inside this one. A report from it whose message equals, or contains, a
-key of `messages` is reported again as `[rule-name] custom message`, at this rule's severity; the
-first matching key wins. A report that matches no key is dropped, so list every message you want
-to keep.
+key of `messages` is reported again as `[rule-name] custom message`, at this rule's severity and
+where the wrapped rule reported it; the first matching key wins. A report that matches no key is
+dropped, so list every message you want to keep.
 
 This is particularly useful when you want to:
 - Provide team-specific guidance or documentation links
 - Make error messages more context-appropriate for your project
 - Maintain consistent messaging across your codebase
 
-To match, a `messageId` report's template is filled in from its string data only; a number or other
-value stays as `{{placeholder}}`, so match on the fixed wording ("has too many parameters" rather
-than the whole sentence).
+The message a key is matched against is the one ESLint shows for the wrapped rule, its placeholders
+filled in, so a message copied from ESLint's output matches, and so does any part of it ("has too
+many parameters").
 
-Limitations of the wrapper as it stands:
+A matched report keeps the wrapped rule's fix, which `--fix` applies, and its suggestions, under the
+wrapped rule's descriptions.
 
-- `options` go to the wrapped rule as given; its own defaults are not applied. A core rule that
-  expects options, such as `no-console`, does not run without them, so pass `options: [{}]` at
-  least.
-- Suggestions are dropped. A matched report that carries a fix, or that gives a location without a
-  node (as `max-lines` does), stops ESLint with an error, so wrap rules that report a node without a
-  fix, as the recommended config does for `no-console` and `no-new-func`.
-- A rule name that is neither a core rule nor given with `rule` logs a warning and is skipped.
+The wrapped rule gets the options ESLint would give it: `options` with the defaults of its schema
+filled in, merged over its `meta.defaultOptions`. So a core rule that reads its options, such as
+`no-console`, also runs without `options`. The options are not checked against the wrapped rule's
+schema, so a wrong one is not reported as a configuration error.
+
+Limitations:
+
+- Only core ESLint rules can be wrapped. ESLint 9 copies rule options with `structuredClone`, which
+  cannot copy a rule's functions, so a configuration that gives a plugin rule object as `rule` stops
+  ESLint with "could not be cloned" before anything is linted.
+- A rule name that is not a core rule logs a warning and is skipped.
+- A wrapped rule that throws while starting, for example on an option it does not accept, logs the
+  error and is skipped.
 
 ## Options
 
@@ -40,8 +49,9 @@ The rule takes a single configuration object where:
 - Keys are the names of rules you want to wrap
 - Values are objects containing:
   - `messages`: Map of original error messages to custom messages
-  - `options`: (optional) Array of options to pass to the wrapped rule, as given (see above)
-  - `rule`: (optional) For plugin rules, the rule object from the plugin
+  - `options`: (optional) Array of options for the wrapped rule; its defaults fill in the rest
+    (see above)
+  - `rule`: (optional) Meant for a plugin rule object, which ESLint 9 cannot pass (see above)
 
 ```json
 {
@@ -59,7 +69,7 @@ The rule takes a single configuration object where:
 }
 ```
 
-For built-in ESLint rules, only `messages` and `options` are needed. For plugin rules, you also need to provide the `rule` object.
+For built-in ESLint rules, only `messages` is required.
 
 ## Examples
 
@@ -105,32 +115,8 @@ You'll see:
 
 ### Wrapping Plugin Rules
 
-To wrap rules from ESLint plugins, import the plugin and provide the rule object in the configuration:
-
-```javascript
-import typescriptPlugin from "@typescript-eslint/eslint-plugin";
-
-export default [
-  {
-    rules: {
-      "@typescript-eslint/no-explicit-any": "off",
-      "obsidianmd/rule-custom-message": [
-        "error",
-        {
-          "@typescript-eslint/no-explicit-any": {
-            messages: {
-              "Unexpected any. Specify a different type.":
-                "Avoid using 'any'. Use 'unknown' or define a proper type."
-            },
-            options: [],
-            rule: typescriptPlugin.rules["no-explicit-any"]
-          }
-        }
-      ]
-    }
-  }
-];
-```
+Not possible with ESLint 9: a plugin rule object given as `rule` stops ESLint, as described under
+[What is reported](#what-is-reported).
 
 ### Partial Message Matching
 
