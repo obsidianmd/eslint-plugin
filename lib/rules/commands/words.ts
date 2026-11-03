@@ -39,3 +39,13 @@ const ID_WORD = /\p{Lu}+(?=\p{Lu}\p{Ll})|\p{Lu}*[\p{Ll}\p{Lt}\p{Lm}\p{Lo}\p{N}\p
 export function idWords(id: string): string[] {
     return (id.match(ID_WORD) ?? []).map((word) => word.toLowerCase());
 }
+
+/** Whether `words` contain all of `wanted`, together and in order. */
+export function containsWords(words: readonly string[], wanted: readonly string[]): boolean {
+    for (let start = 0; start + wanted.length <= words.length; start++) {
+        if (wanted.every((word, i) => words[start + i] === word)) {
+            return true;
+        }
+    }
+    return false;
+}
