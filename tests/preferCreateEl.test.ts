@@ -471,7 +471,7 @@ ruleTester.run("prefer-create-el", preferCreateEl, {
             errors: [{ messageId: "preferCreateEl" }],
         },
 
-        // --- createEl shorthand: always autofix (already Obsidian API) ---
+        // --- createEl shorthand on an untyped receiver, or with no helper declared anywhere: fixed ---
         {
             name: "createEl('div') → createDiv()",
             code: "createEl('div');",
@@ -622,6 +622,196 @@ ruleTester.run("prefer-create-el", preferCreateEl, {
             code: `${MOCK_OBSIDIAN_DOM}\ndeclare global { interface Document { win: typeof globalThis } }\ndeclare const iframe: HTMLIFrameElement;\ndeclare const other: { document: Document };\nother.document.createElement('p');`,
             output: `${MOCK_OBSIDIAN_DOM}\ndeclare global { interface Document { win: typeof globalThis } }\ndeclare const iframe: HTMLIFrameElement;\ndeclare const other: { document: Document };\nother.document.win.createEl('p');`,
             errors: [{ messageId: "preferCreateEl" }],
+        },
+
+        // --- An optional chain keeps its `?.` ---
+        {
+            name: "doc?.createElement(tag) keeps the optional chain",
+            code: `${MOCK_OBSIDIAN_DOM}\ndeclare const doc: Document & { win: typeof globalThis };\nconst el = doc?.createElement('p');`,
+            output: `${MOCK_OBSIDIAN_DOM}\ndeclare const doc: Document & { win: typeof globalThis };\nconst el = doc?.win.createEl('p');`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+
+        // --- The global document declares createEl but no global helper does ---
+        {
+            name: "document.createElement('div') without a global createDiv offers a suggestion",
+            code: "declare global { interface Document { createEl(tag: string): HTMLElement; } }\nexport {};\ndocument.createElement('div');",
+            output: null,
+            errors: [
+                {
+                    messageId: "preferCreateEl",
+                    suggestions: [
+                        {
+                            messageId: "preferCreateElSuggestion",
+                            output: "declare global { interface Document { createEl(tag: string): HTMLElement; } }\nexport {};\ncreateDiv();",
+                        },
+                    ],
+                },
+            ],
+        },
+    ],
+});
+
+// Obsidian's own declarations: the shorthands with Obsidian's types.
+const OBSIDIAN = `import "obsidian";\n`;
+
+// A test mock's helpers (pfrankov/obsidian-ai-providers): createSpan() takes
+// only a class name, so createSpan({ text }) fails with TS2345.
+const MOCK_CLASS_NAME_HELPERS = `
+    declare global {
+        interface HTMLElement {
+            createEl(tag: string, attrs?: { text?: string }, cls?: string): HTMLElement;
+            createSpan(className?: string): HTMLElement;
+        }
+    }
+    export {};
+`;
+
+ruleTester.run("prefer-create-el: createEl() shorthands", preferCreateEl, {
+    valid: [],
+    invalid: [
+        // --- With Obsidian's types: fixed ---
+        {
+            name: "el.createEl('div', opts) → el.createDiv(opts) with Obsidian's types",
+            code: `${OBSIDIAN}declare const containerEl: HTMLElement;\nconst helpEl = containerEl.createEl('div', { cls: 'setting-item-description' });`,
+            output: `${OBSIDIAN}declare const containerEl: HTMLElement;\nconst helpEl = containerEl.createDiv({ cls: 'setting-item-description' });`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        {
+            name: "createEl('span', opts, callback) → createSpan(opts, callback) with Obsidian's types",
+            code: `${OBSIDIAN}const span = createEl('span', { text: 'hi' }, (el) => el.addClass('x'));`,
+            output: `${OBSIDIAN}const span = createSpan({ text: 'hi' }, (el) => el.addClass('x'));`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        {
+            name: "a fragment's createEl('div') → createDiv() with Obsidian's types",
+            code: `${OBSIDIAN}const frag = createFragment();\nfrag.createEl('div', 'note');`,
+            output: `${OBSIDIAN}const frag = createFragment();\nfrag.createDiv('note');`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        // The fix dropped the `?.` and failed with TS18047.
+        {
+            name: "el?.createEl('div', opts) keeps the optional chain",
+            code: `${OBSIDIAN}declare const text: { inputEl: HTMLInputElement };\nconst eyeIcon = text.inputEl.parentElement?.createEl('div', { cls: 'bunny-eye-toggle clickable-icon' });`,
+            output: `${OBSIDIAN}declare const text: { inputEl: HTMLInputElement };\nconst eyeIcon = text.inputEl.parentElement?.createDiv({ cls: 'bunny-eye-toggle clickable-icon' });`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        {
+            name: "this.el?.createEl('div', opts) as a statement keeps the optional chain",
+            code: `${OBSIDIAN}class View { el: HTMLElement | null = null; render() { this.el?.createEl('div', { cls: 'empty', text: 'None' }); } }`,
+            output: `${OBSIDIAN}class View { el: HTMLElement | null = null; render() { this.el?.createDiv({ cls: 'empty', text: 'None' }); } }`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        {
+            name: "an optional call keeps its ?.",
+            code: `${OBSIDIAN}declare const el: HTMLElement;\nel.createEl?.('span');`,
+            output: `${OBSIDIAN}declare const el: HTMLElement;\nel.createSpan?.();`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        // The arguments cannot be checked one by one.
+        {
+            name: "a spread argument gets a suggestion",
+            code: `${OBSIDIAN}declare const el: HTMLElement;\ndeclare const args: [DomElementInfo];\nel.createEl('div', ...args);`,
+            output: null,
+            errors: [
+                {
+                    messageId: "preferCreateEl",
+                    suggestions: [
+                        {
+                            messageId: "preferCreateElSuggestion",
+                            output: `${OBSIDIAN}declare const el: HTMLElement;\ndeclare const args: [DomElementInfo];\nel.createDiv(...args);`,
+                        },
+                    ],
+                },
+            ],
+        },
+
+        // --- A receiver whose type has no createDiv()/createSpan(): no fix or suggestion ---
+        // The fix failed with TS2339 (grub-basket/SP, ankinglin/EasyQuiz).
+        {
+            name: "a value cast to a type with only createEl() is reported without a fix",
+            code: `${OBSIDIAN}const frag = createFragment() as unknown as { createEl: (t: string, o?: { text?: string }) => HTMLElement };\nfrag.createEl('div', { text: 'Stashpad tabs cleaned up:' });`,
+            output: null,
+            errors: [{ messageId: "preferCreateEl", suggestions: [] }],
+        },
+        {
+            name: "a polyfill's createDiv() calling createEl('div') is reported without a fix",
+            code: "declare const proto: { createDiv?: (o?: object) => Element };\nproto.createDiv = function (this: Element, o?: object) {\n    return (this as unknown as { createEl: (t: string, o?: unknown) => Element }).createEl('div', o);\n};",
+            output: null,
+            errors: [{ messageId: "preferCreateEl", suggestions: [] }],
+        },
+
+        // --- The helper does not take createEl()'s arguments: no fix or suggestion ---
+        {
+            name: "createSpan() that takes only a class name is not given createEl()'s options",
+            code: `${MOCK_CLASS_NAME_HELPERS}\ndeclare const labelEl: HTMLElement;\nlabelEl.createEl('span', { text: 'Label' });`,
+            output: null,
+            errors: [{ messageId: "preferCreateEl", suggestions: [] }],
+        },
+        {
+            name: "createSpan() that takes only a class name is still fixed without arguments",
+            code: `${MOCK_CLASS_NAME_HELPERS}\ndeclare const labelEl: HTMLElement;\nconst span = labelEl.createEl('span');`,
+            output: `${MOCK_CLASS_NAME_HELPERS}\ndeclare const labelEl: HTMLElement;\nconst span = labelEl.createSpan();`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+
+        // --- createDiv() returns another type than createEl('div') did ---
+        // MOCK_OBSIDIAN_DOM's createEl() returns an HTMLElement, its createDiv()
+        // an HTMLDivElement, so a variable holding the result would change type.
+        {
+            name: "a used result of another type gets a suggestion",
+            code: `${MOCK_OBSIDIAN_DOM}\ndeclare const el: HTMLElement;\nlet child = el.createEl('div');`,
+            output: null,
+            errors: [
+                {
+                    messageId: "preferCreateEl",
+                    suggestions: [
+                        {
+                            messageId: "preferCreateElSuggestion",
+                            output: `${MOCK_OBSIDIAN_DOM}\ndeclare const el: HTMLElement;\nlet child = el.createDiv();`,
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "an unused result of another type is fixed",
+            code: `${MOCK_OBSIDIAN_DOM}\ndeclare const el: HTMLElement;\nel.createEl('div');`,
+            output: `${MOCK_OBSIDIAN_DOM}\ndeclare const el: HTMLElement;\nel.createDiv();`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+
+        // --- A createEl of the file's own ---
+        // A project's typings exported createEl() but declared no global
+        // createSpan(), so the fix failed with TS2304 (mohamedsaleh0-0/Advanced-Formatting).
+        {
+            name: "an imported createEl() without a global createSpan() is reported without a fix",
+            code: "import { createEl } from './dom';\nconst span = createEl('span', { cls: 'af-footnote-def-marker' });",
+            output: null,
+            errors: [{ messageId: "preferCreateEl", suggestions: [] }],
+        },
+        // The global helper exists, but need not do what the file's createEl() does.
+        {
+            name: "an imported createEl() with a global createSpan() gets a suggestion",
+            code: `import { createEl } from './dom';\n${MOCK_OBSIDIAN_DOM}\nconst span = createEl('span', { cls: 'af-footnote-def-marker' });`,
+            output: null,
+            errors: [
+                {
+                    messageId: "preferCreateEl",
+                    suggestions: [
+                        {
+                            messageId: "preferCreateElSuggestion",
+                            output: `import { createEl } from './dom';\n${MOCK_OBSIDIAN_DOM}\nconst span = createSpan({ cls: 'af-footnote-def-marker' });`,
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "a declared global createEl() without a global createDiv() is reported without a fix",
+            code: "declare global { function createEl(tag: string, o?: object): HTMLElement; }\nexport {};\ncreateEl('div', { cls: 'x' });",
+            output: null,
+            errors: [{ messageId: "preferCreateEl", suggestions: [] }],
         },
     ],
 });

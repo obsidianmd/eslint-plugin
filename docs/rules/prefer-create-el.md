@@ -54,6 +54,24 @@ inside `function createDiv() { … }`, or with a variable, parameter or import o
 the call would reach that binding instead of Obsidian's helper, and inside the function it would
 recurse. A method named `createDiv` is not a binding, so code inside it is still fixed.
 
+`createEl("div", …)` and `el.createEl("span", …)` are fixed when the types show that the shorter
+helper exists where it is called, accepts the arguments after the tag and returns what `createEl()`
+did, as it does with Obsidian's types. Otherwise:
+
+- `el`'s type has no `createDiv()` or `createSpan()`, for example a value cast to
+  `{ createEl(…) }`, or the helper does not take those arguments (a project's own typings with
+  `createSpan(className?: string)`): reported with neither a fix nor a suggestion, because the
+  replacement would not compile. The same holds for a bare `createEl()` from a project's own typings
+  or an import when no global `createSpan()` is declared.
+- A `createEl` of the file's own, such as an import, when the global helper is declared: a
+  suggestion, since the global helper need not do what the file's `createEl()` does.
+- A result whose type would change (a `createEl()` typed to return an `HTMLElement` against a
+  `createDiv()` that returns an `HTMLDivElement`) or a spread argument: a suggestion.
+
+On an `any` value, or with no helper declared anywhere, the replacement is fixed as before. An
+optional chain is kept: `el?.createEl("div")` becomes `el?.createDiv()`, and `doc?.createElement("p")`
+becomes `doc?.win.createEl("p")`.
+
 ### Iframe documents
 
 An iframe's document belongs to the iframe's own window, which Obsidian never gives its DOM helpers,
