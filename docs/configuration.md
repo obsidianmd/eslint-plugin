@@ -540,6 +540,17 @@ sample plugin's layout this is the bundled `main.js` and the Node scripts `esbui
 [Ignoring files](#ignoring-files)); otherwise add it to your `tsconfig.json`'s `include`, or for a
 few loose files, to `allowDefaultProject`.
 
+### "Cannot read properties of undefined (reading 'includes')" with `--fix-dry-run`
+
+With `parserOptions.project` and TypeScript 6, `eslint --fix-dry-run` could stop with this error in a
+type-aware rule such as `@typescript-eslint/no-unsafe-assignment`. For a command-line run, and for
+any run with `CI=true` set, typescript-eslint builds the TypeScript program once and does not update
+it between fix passes, except under `--fix`. The second pass then reads types for the code as it was
+before the first fixes. The recommended config turns this off under `--fix-dry-run`. If you fix
+through ESLint's API instead, for example in a script that runs with `CI=true`, set
+`parserOptions.disallowAutomaticSingleRunInference: true` or the environment variable
+`TSESTREE_SINGLE_RUN=false`, or use `projectService` as the examples here do.
+
 ### "Configuration for rule '0' is invalid"
 
 This happens when `obsidianmd.configs.recommended` is spread into a `rules` object instead of into the top-level config array. The recommended config is an **array of config objects**, not a rules object:

@@ -323,6 +323,7 @@ const isRuntimeOnly = (rule: string) => OBSIDIAN_RUNTIME_RULES.has(rule);
 const isWindowOnly = (rule: string) => WINDOW_ONLY_RULES.has(rule);
 const isRuntimeNotWindowOnly = (rule: string) => isRuntimeOnly(rule) && !isWindowOnly(rule);
 
+import { fixDryRunConfigs } from "./singleRun.js";
 import { restrictedGlobalsOptions, restrictedImportsOptions, noUnusedExpressionsOptions, noUnusedVarsOptions, noDeprecatedOptions } from "./ruleOptions.js";
 
 const flatRecommendedGeneralRules: RulesConfig = {
@@ -421,6 +422,7 @@ const flatRecommendedConfig: Config[] = defineConfig([
             ...pickRules(recommendedPluginRulesConfig, (rule) => !isRuntimeOnly(rule))
         },
     },
+    ...fixDryRunConfigs(process.argv),
     {
         files: ['**/*.{js,cjs,mjs,jsx}'],
         ignores: [...WORKER_FILES, ...TEST_FILES],

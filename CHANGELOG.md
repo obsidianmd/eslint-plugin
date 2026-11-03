@@ -51,6 +51,7 @@ Upgrading from 0.4.x? The breaking changes below each have a fix in
 
 ### Fixed
 
+- `eslint --fix-dry-run` with `parserOptions.project` no longer checks later fix passes against the types of the unfixed code, which made TypeScript 6 crash with "Cannot read properties of undefined (reading 'includes')". The recommended config turns off typescript-eslint's single-run mode there, as typescript-eslint itself does for `--fix` ([#223](https://github.com/obsidianmd/eslint-plugin/pull/223)).
 - `rule-custom-message` no longer aborts the lint run when the wrapped rule's report has a fix or only a location. It passes fixes and suggestions on, fills message placeholders the way ESLint does, and runs a wrapped core rule with its default options, so `no-console` or `prefer-const` works without `options: [{}]`. Its `rule:` option, for wrapping a rule passed as an object, cannot work on ESLint 9, which copies rule options and cannot copy functions; the docs no longer show it ([#223](https://github.com/obsidianmd/eslint-plugin/pull/223)).
 - `sample-names` reports `mySetting` in interfaces and type literals, which it never matched ([#223](https://github.com/obsidianmd/eslint-plugin/pull/223)).
 - `no-nodejs-modules` no longer reports type-only imports and exports (`import type`, imports whose specifiers are all `type`, `export type … from`), which never load the module. It now reports `export … from "fs"`, `export * from "fs"` and `import fs = require("fs")`, which do ([#223](https://github.com/obsidianmd/eslint-plugin/pull/223)).
