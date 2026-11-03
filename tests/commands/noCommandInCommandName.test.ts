@@ -14,6 +14,19 @@ ruleTester.run("no-command-in-command-name", noCommandInNameRule, {
             code: "this.addCommand({ name: 'Accommodate the user' });",
         },
         {
+            name: "'command' inside a longer word is allowed",
+            code: "this.addCommand({ name: 'Open Commander' }); this.addCommand({ name: 'Recommended settings' });",
+        },
+        {
+            name: "the plural 'commands' is allowed",
+            code: "this.addCommand({ name: 'Show all commands' });",
+        },
+        {
+            // A JavaScript \b would start the word after the "É".
+            name: "a letter outside ASCII is part of the word",
+            code: "this.addCommand({ name: 'Open Écommand' });",
+        },
+        {
             name: "name from a template literal is not checked",
             code: "this.addCommand({ name: `Run command` });",
         },
@@ -30,9 +43,9 @@ ruleTester.run("no-command-in-command-name", noCommandInNameRule, {
             errors: [{ messageId: "commandInName" }],
         },
         {
-            name: "'command' inside a longer word is forbidden",
-            code: "this.addCommand({ name: 'Open Commander' });",
-            errors: [{ messageId: "commandInName" }],
+            name: "'command' next to punctuation is forbidden",
+            code: "this.addCommand({ name: 'Run (command)' }); this.addCommand({ name: 'Open-command' });",
+            errors: [{ messageId: "commandInName" }, { messageId: "commandInName" }],
         },
     ],
 });
