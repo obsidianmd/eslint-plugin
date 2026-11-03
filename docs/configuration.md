@@ -341,11 +341,12 @@ the worker globals from the `globals` package and switch off the window globals 
 Tests run in Node or a DOM emulation such as jsdom, not inside Obsidian, so the rules about code that
 runs in Obsidian do not fit them: there is no popout window, Node.js modules are available, mocks cast
 to `TFile`, fixtures name `.obsidian`, and the code never runs in an older Obsidian or on iOS. The
-recommended config treats files matching `**/*.{test,spec}.*` and anything under a `test/`, `tests/`,
-`__tests__/` or `__mocks__/` directory as tests. So are end-to-end tests, which drive Obsidian from
-Node: files matching `**/*.e2e.*`, anything under an `e2e/`, `e2e-tests/` or `__e2e__/` directory,
-and the WebdriverIO and Playwright configs (`wdio.conf.*`, `wdio.*.conf.*` and
-`playwright.config.*`). For all of them it switches off `no-global-this`, `prefer-active-doc`,
+recommended config treats the files the community scanner leaves out as tests: files matching
+`**/*.{test,tests,spec,specs}.*` or `**/testUtils*`, anything under a `test/`, `tests/`, `__tests__/`,
+`mocks/`, `__mocks__/` or `testUtils*/` directory, and anything under a top-level `automation/` or
+`test-vault/` directory. So are end-to-end tests, which drive Obsidian from Node: files matching
+`**/*.e2e.*`, anything under an `e2e/` or `e2e-tests/` directory, and the WebdriverIO and Playwright
+configs (`wdio.conf.*`, `wdio.*.conf.*` and `playwright.config.*`). For all of them it switches off `no-global-this`, `prefer-active-doc`,
 `prefer-create-el`, `prefer-instanceof`, `prefer-window-timers`, `no-nodejs-modules`,
 `no-tfile-tfolder-cast`, `hardcoded-config-path`, `no-unsupported-api` and `regex-lookbehind`. Every
 other rule, including the security rules, still applies. The community scanner does not lint most of
@@ -694,7 +695,9 @@ The scanner only lints plugin source code. The following patterns are excluded:
 | `**/docs/**` | Documentation |
 | `**/i18n/**`, `**/i18next/**`, `**/locale/**`, `**/locales/**`, `**/translations/**`, `**/l10n/**` | Localization files |
 | `.pnpm-store` | pnpm cache |
-| `automation/**`, `e2e-tests/**` | CI/automation and end-to-end tests |
+| `automation/**` | CI/automation |
+| `**/e2e/**`, `**/e2e-tests/**`, `**/*.e2e.*` | End-to-end tests |
+| `**/wdio.conf.*`, `**/wdio.*.conf.*`, `**/playwright.config.*` | End-to-end test runner configs |
 
 **Rule severity adjustments:**
 

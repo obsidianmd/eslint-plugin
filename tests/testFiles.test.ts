@@ -43,11 +43,20 @@ const TEST_FILES = [
 	"e2e/helpers.ts",
 	"e2e-tests/helpers.ts",
 	"packages/plugin/e2e/specs/smoke.js",
-	"src/__e2e__/view.ts",
 	"src/settings.e2e.ts",
+	"vitest.e2e.config.ts",
 	"wdio.conf.mts",
 	"wdio.mobile.conf.mts",
 	"playwright.config.ts",
+	// The rest of what the community scanner leaves out as tests.
+	"tests/all.tests.ts",
+	"eslint.tests.config.mjs",
+	"src/view.specs.ts",
+	"src/mocks/crypto.ts",
+	"src/testUtils.ts",
+	"testUtils/fakeElectron.ts",
+	"automation/run.ts",
+	"test-vault/.obsidian/plugins/hot-reload/main.js",
 ];
 
 // Names that only look like tests keep every rule. `e2ee` is end-to-end
@@ -61,6 +70,9 @@ const NOT_TEST_FILES = [
 	"src/e2ee/session.ts",
 	"src/e2e-encryption.ts",
 	"src/wdio.ts",
+	"src/automation/rules.ts",
+	"src/test-vault-picker.ts",
+	"src/mockup.ts",
 ];
 
 function getSeverity(ruleValue: unknown): string {
