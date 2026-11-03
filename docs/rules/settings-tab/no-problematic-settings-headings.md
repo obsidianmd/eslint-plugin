@@ -4,7 +4,7 @@
 
 💼 This rule is enabled in the following configs: ✅ `recommended`, 🇬🇧 `recommendedWithLocalesEn`.
 
-🔧 This rule is automatically fixable by the [`--fix` CLI option](https://eslint.org/docs/latest/user-guide/command-line-interface#--fix).
+🔧💡 This rule is automatically fixable by the [`--fix` CLI option](https://eslint.org/docs/latest/user-guide/command-line-interface#--fix) and manually fixable by [editor suggestions](https://eslint.org/docs/latest/use/core-concepts#rule-suggestions).
 
 <!-- end auto-generated rule header -->
 
@@ -20,6 +20,22 @@ class declaration that extends `PluginSettingTab`, whose name contains (ignoring
   already carries it. The fix removes the heading.
 
 Not reported: headings outside a settings tab, and a name that is not a string literal.
+
+## Fixes and suggestions
+
+The fix replaces the heading's whole statement with an empty one (`;`), which stays valid as the body
+of an `if` and keeps the statements around it apart. It is applied only where the statement is just
+the heading: `new Setting(…)`, `setName()`, `setHeading()` and `setClass()`, in any order, with
+literals, variables and property reads as arguments.
+
+```ts
+new Setting(containerEl).setName("General").setHeading().setClass("my-heading"); // fixed to ;
+```
+
+Removing a heading that also has a description, tooltip or `setDisabled()`, or an argument with a
+side effect such as `new Setting(containerEl.createDiv())`, is a suggestion. There is no fix or
+suggestion when the heading has a control (`addButton()`, `addToggle()`, …) or another call, or when
+its value is used, as in `const heading = new Setting(…)…setHeading()`. Rename the heading instead.
 
 ## Further reading
 
