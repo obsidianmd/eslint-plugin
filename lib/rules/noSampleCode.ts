@@ -2,6 +2,20 @@ import { TSESTree } from "@typescript-eslint/utils";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 /**
+ * Checks if a node is a `.log(label, ...)` call, as in `console.log('click', evt)`.
+ * The callee can be anything (`tick()`, `this.update()`), so check it before reading it.
+ */
+function isLogCall(node: TSESTree.Node, label: string): boolean {
+    return (
+        node.type === TSESTree.AST_NODE_TYPES.CallExpression &&
+        node.callee.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
+        node.callee.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
+        node.callee.property.name === "log" &&
+        (node.arguments[0] as TSESTree.Literal | undefined)?.value === label
+    );
+}
+
+/**
  * Checks if a node is the sample `registerInterval` call.
  * `this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));`
  */
@@ -35,15 +49,7 @@ function isSampleIntervalCall(node: TSESTree.CallExpression): boolean {
     if (
         !callback ||
         callback.type !== TSESTree.AST_NODE_TYPES.ArrowFunctionExpression ||
-        callback.body.type !== TSESTree.AST_NODE_TYPES.CallExpression ||
-        (callback.body.callee as TSESTree.MemberExpression)?.property.type !==
-        TSESTree.AST_NODE_TYPES.Identifier ||
-        (
-            (callback.body.callee as TSESTree.MemberExpression)
-                ?.property as TSESTree.Identifier
-        )?.name !== "log" ||
-        (callback.body.arguments[0] as TSESTree.Literal)?.value !==
-        "setInterval"
+        !isLogCall(callback.body, "setInterval")
     ) {
         return false;
     }
@@ -88,15 +94,7 @@ function isSampleDomEventCall(node: TSESTree.CallExpression): boolean {
     if (
         !firstStatement ||
         firstStatement.type !== TSESTree.AST_NODE_TYPES.ExpressionStatement ||
-        firstStatement.expression.type !== TSESTree.AST_NODE_TYPES.CallExpression ||
-        (firstStatement.expression.callee as TSESTree.MemberExpression)
-            ?.property.type !== TSESTree.AST_NODE_TYPES.Identifier ||
-        (
-            (firstStatement.expression.callee as TSESTree.MemberExpression)
-                ?.property as TSESTree.Identifier
-        )?.name !== "log" ||
-        (firstStatement.expression.arguments[0] as TSESTree.Literal)?.value !==
-        "click"
+        !isLogCall(firstStatement.expression, "click")
     ) {
         return false;
     }

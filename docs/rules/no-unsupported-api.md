@@ -23,6 +23,16 @@ The uses checked are:
 A use is allowed where a `requireApiVersion()` check proves the app is new enough, as described below.
 There is no fix: either guard the call, or raise `minAppVersion` if the plugin needs the API anyway.
 
+Not reported: members of the settings-definition types (`SettingDefinitionItem`, `SettingDefinitionGroup`,
+`SettingDefinitionControl`, the `Setting*Control` types and the rest reachable from what
+`getSettingDefinitions()` returns). Those objects are the plugin's own data, so reading `item.items` or
+`definition.control.key`, for instance to render the definitions on an older Obsidian, works on every
+version. The settings classes, such as `SettingPage` and `SettingGroup`, are still reported: they are
+runtime exports, and extending one on an older Obsidian fails when the plugin loads.
+
+The recommended config does not apply this rule to [test files](../configuration.md#test-files),
+which never run in an older Obsidian.
+
 ## Guarding with `requireApiVersion`
 
 An API newer than `minAppVersion` is allowed where a `requireApiVersion(...)` check proves the

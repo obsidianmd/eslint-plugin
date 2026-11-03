@@ -16,7 +16,8 @@ Rewrite the expression without the lookbehind, for example by matching the prece
 group.
 
 Nothing is reported when the plugin is desktop-only, which is read from `manifest.json` or the
-`isDesktopOnly` option below. There is no fix.
+`isDesktopOnly` option below. There is no fix. The recommended config does not apply this rule to
+[test files](../configuration.md#test-files), which run in Node.js, not on iOS.
 
 Not reported, because they are not lookbehinds:
 

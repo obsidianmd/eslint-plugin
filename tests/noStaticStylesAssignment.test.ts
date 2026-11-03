@@ -41,6 +41,18 @@ ruleTester.run("no-static-styles-assignment", noInlineStylesRule, {
             name: "setCssStyles with CSS variable is allowed",
             code: "el.setCssStyles({ '--some-var': 'blue' });",
         },
+        {
+            name: "setCssProps() without arguments does not crash",
+            code: "el.setCssProps();",
+        },
+        {
+            name: "setCssStyles() without arguments does not crash",
+            code: "el.setCssStyles();",
+        },
+        {
+            name: "setCssStyles with a variable is allowed",
+            code: "el.setCssStyles(styles);",
+        },
     ],
     invalid: [
         {

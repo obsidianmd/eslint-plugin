@@ -22,6 +22,8 @@ if (target.instanceOf(HTMLElement)) {} // works in popout windows
 
 The fix rewrites the check to `value.instanceOf(SomeClass)` when the value's type declares
 `instanceOf()`, as it does with Obsidian's types. Without them it is offered as a suggestion only.
+A value that is not a name, a property access, a call or `this` is put in parentheses, so
+`(await getEl()) instanceof HTMLElement` becomes `(await getEl()).instanceOf(HTMLElement)`.
 
 Not reported: `instanceof` on any other type, such as a `TFile` or your own classes, and on an `any`
 value.

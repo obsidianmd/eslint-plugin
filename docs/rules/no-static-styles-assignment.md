@@ -18,5 +18,5 @@ Setting a style to a fixed value in code, where a CSS class would do:
 
 Not reported: values from a variable or a template literal with expressions
 (`el.style.width = width`, `` el.style.transform = `translateX(${x}px)` ``), CSS custom properties
-(`--name`) in `setCssProps()` and `setCssStyles()`, computed keys, other attributes, and reading a
-style.
+(`--name`) in `setCssProps()` and `setCssStyles()`, computed keys, `setCssProps()` and
+`setCssStyles()` called with a variable or with no argument, other attributes, and reading a style.
