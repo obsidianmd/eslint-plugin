@@ -291,7 +291,13 @@ describe("disable comments naming @typescript-eslint/no-misused-promises", () =>
                     files: ["**/*.ts"],
                     languageOptions: {
                         parser: tseslint.parser,
-                        parserOptions: { project: "./tsconfig.json", tsconfigRootDir: process.cwd() },
+                        parserOptions: {
+                            project: "./tsconfig.json",
+                            tsconfigRootDir: process.cwd(),
+                            // With CI=true, typescript-eslint otherwise builds the program once
+                            // from the files on disk and ignores the code linted here.
+                            disallowAutomaticSingleRunInference: true,
+                        },
                     },
                     linterOptions: { reportUnusedDisableDirectives },
                     plugins: {
@@ -586,7 +592,13 @@ describe("disable comments naming @typescript-eslint/no-misused-promises", () =>
                     {
                         files: ["**/*.ts"],
                         languageOptions: {
-                            parserOptions: { project: "./tsconfig.json", tsconfigRootDir: process.cwd() },
+                            parserOptions: {
+                                project: "./tsconfig.json",
+                                tsconfigRootDir: process.cwd(),
+                                // With CI=true, typescript-eslint otherwise builds the program once
+                                // from the files on disk and ignores the code linted here.
+                                disallowAutomaticSingleRunInference: true,
+                            },
                         },
                     },
                 ],
