@@ -307,16 +307,25 @@ ESLint does not support disabling all rules from a plugin with a single glob lik
 A web worker has no `window`: `window`, `activeWindow`, `activeDocument` and Obsidian's DOM helpers
 do not exist there, and `globalThis` is the right way to reach the worker's own scope. The
 recommended config therefore treats files matching `**/*.worker.*` and anything under a `workers/`
-directory as worker code: it adds the worker globals (`importScripts`, `postMessage`, …) and switches
-off the rules whose fix needs a window — `no-global-this`, `prefer-active-doc`, `prefer-create-el`,
-`prefer-instanceof` and `prefer-window-timers`. Every other rule, including the security rules, still
-applies.
+directory as worker code. It switches off the rules whose fix needs a window — `no-global-this`,
+`prefer-active-doc`, `prefer-create-el`, `prefer-instanceof` and `prefer-window-timers` — and gives
+these files the worker globals (`self`, `importScripts`, `postMessage`, …) in place of the browser
+and Obsidian ones. In JavaScript, `no-undef` then reports `window`, `document`, `localStorage`,
+`createEl` and the rest, which would throw in a worker; browser APIs a worker also has, such as
+`fetch`, `structuredClone`, `OffscreenCanvas` and `requestAnimationFrame`, stay declared. (`no-undef`
+is off for TypeScript, where the compiler reports undefined names.) Every other rule, including the
+security rules, still applies.
 
-For worker code under another name, add the same overrides for its path:
+For worker code under another name, add the same overrides for its path. In JavaScript, also declare
+the worker globals from the `globals` package and switch off the window globals you want reported:
 
 ```js
+// import globals from "globals";
 {
   files: ["src/background/**"],
+  languageOptions: {
+    globals: { ...globals.worker, window: "off", document: "off" },
+  },
   rules: {
     "obsidianmd/no-global-this": "off",
     "obsidianmd/prefer-active-doc": "off",

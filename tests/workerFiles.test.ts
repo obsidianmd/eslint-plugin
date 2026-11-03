@@ -1,5 +1,6 @@
 import assert from "node:assert";
 import { ESLint } from "eslint";
+import globals from "globals";
 import plugin from "../lib/index.js";
 
 // Web worker code runs without a window, so the recommended config switches off
@@ -32,6 +33,37 @@ const WORKER_FILES = [
 	"src/workers/nested/helper.js",
 	"src/embedding.worker.ts",
 	"src/indexer.worker.mjs",
+];
+
+// A worker has no window, so these must not be declared for worker files: in a
+// JavaScript worker, no-undef reports them rather than letting them fail at
+// runtime.
+const NOT_IN_WORKERS = [
+	"window",
+	"document",
+	"localStorage",
+	"alert",
+	"HTMLElement",
+	"MutationObserver",
+	"activeDocument",
+	"activeWindow",
+	"createEl",
+	"sleep",
+];
+
+// Browser globals a worker has as well. globals 14's worker list leaves out
+// the first six; Intl is an ECMAScript built-in.
+const ALSO_IN_WORKERS = [
+	"AbortController",
+	"structuredClone",
+	"OffscreenCanvas",
+	"requestAnimationFrame",
+	"EventTarget",
+	"DOMException",
+	"Intl",
+	"fetch",
+	"setTimeout",
+	"navigator",
 ];
 
 function getSeverity(ruleValue: unknown): string {
@@ -67,6 +99,58 @@ for (const configName of ["recommended", "recommendedWithLocalesEn"] as const) {
 			assert.ok(languageOptions?.globals && "importScripts" in languageOptions.globals);
 		});
 
+		for (const filename of WORKER_FILES) {
+			it(`switches off the browser and Obsidian globals a worker lacks for ${filename}`, async () => {
+				const { languageOptions } = await eslint.calculateConfigForFile(filename);
+				const declared = languageOptions?.globals ?? {};
+				for (const name of NOT_IN_WORKERS) {
+					assert.strictEqual(declared[name], "off", name);
+				}
+			});
+
+			it(`keeps the browser globals a worker also has for ${filename}`, async () => {
+				const { languageOptions } = await eslint.calculateConfigForFile(filename);
+				const declared = languageOptions?.globals ?? {};
+				for (const name of ALSO_IN_WORKERS) {
+					assert.ok(name in declared, `${name} is not declared`);
+					assert.notStrictEqual(declared[name], "off", name);
+				}
+			});
+		}
+
+		it("uses the worker's own values for globals both scopes have", async () => {
+			const { languageOptions } = await eslint.calculateConfigForFile("src/workers/shims.js");
+			const declared = languageOptions?.globals ?? {};
+			// A worker's `self` and `postMessage` are writable; a window's are readonly.
+			assert.strictEqual(declared.self, true);
+			assert.strictEqual(declared.postMessage, true);
+		});
+
+		it("switches off none of the worker's own globals", async () => {
+			const { languageOptions } = await eslint.calculateConfigForFile("src/workers/shims.js");
+			const declared = languageOptions?.globals ?? {};
+			for (const name of Object.keys(globals.worker)) {
+				assert.notStrictEqual(declared[name], "off", name);
+			}
+		});
+
+		it("keeps no-undef off for TypeScript worker files", async () => {
+			const { rules = {} } = await eslint.calculateConfigForFile("src/workers/shims.ts");
+			assert.strictEqual(getSeverity(rules["no-undef"]), "off");
+		});
+
+		it("leaves the browser and Obsidian globals declared for other files", async () => {
+			for (const filename of ["src/main.ts", "src/workerManager.ts", "src/view.js"]) {
+				const { languageOptions } = await eslint.calculateConfigForFile(filename);
+				const declared = languageOptions?.globals ?? {};
+				for (const name of NOT_IN_WORKERS) {
+					assert.ok(name in declared, `${name} is not declared in ${filename}`);
+					assert.notStrictEqual(declared[name], "off", `${name} in ${filename}`);
+				}
+				assert.ok(!("importScripts" in declared), filename);
+			}
+		});
+
 		it("leaves the window-only rules on for other files", async () => {
 			for (const filename of ["src/main.ts", "src/workerManager.ts", "src/view.js"]) {
 				const { rules = {} } = await eslint.calculateConfigForFile(filename);
@@ -90,6 +174,45 @@ describe("linting a worker file", () => {
 			"scope.addEventListener(\"message\", () => {",
 			"    setTimeout(() => postMessage(\"done\"), 0);",
 			"});",
+			"",
+		].join("\n");
+		const [result] = await eslint.lintText(code, { filePath: "src/workers/embed.worker.js" });
+		assert.deepStrictEqual(
+			result.messages.map((message) => `${message.ruleId}: ${message.message}`),
+			[],
+		);
+	});
+
+	it("reports window, document and Obsidian's helpers in a JavaScript worker", async () => {
+		const code = [
+			"window.addEventListener(\"message\", () => {});",
+			"document.title = \"x\";",
+			"createEl(\"div\");",
+			"void activeDocument;",
+			"",
+		].join("\n");
+		const [result] = await eslint.lintText(code, { filePath: "src/workers/embed.worker.js" });
+		assert.deepStrictEqual(
+			result.messages.map((message) => `${message.line}: ${message.ruleId}: ${message.message}`),
+			[
+				"1: no-undef: 'window' is not defined.",
+				"2: no-undef: 'document' is not defined.",
+				"3: no-undef: 'createEl' is not defined.",
+				"4: no-undef: 'activeDocument' is not defined.",
+			],
+		);
+	});
+
+	it("reports nothing for the browser APIs a worker also has", async () => {
+		const code = [
+			"const controller = new AbortController();",
+			"const canvas = new OffscreenCanvas(1, 1);",
+			"const format = new Intl.NumberFormat();",
+			"requestAnimationFrame(() => {});",
+			"onmessage = (event) => {",
+			"    postMessage(structuredClone({ data: event.data, controller, canvas, format }));",
+			"    close();",
+			"};",
 			"",
 		].join("\n");
 		const [result] = await eslint.lintText(code, { filePath: "src/workers/embed.worker.js" });

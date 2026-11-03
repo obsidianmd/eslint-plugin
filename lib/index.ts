@@ -32,6 +32,7 @@ import noMisusedPromises from "./rules/noMisusedPromises.js";
 import { getManifest, isManifestDesktopOnly } from "./manifest.js";
 import { PlainTextLanguage } from "./plainTextLanguage.js";
 import { ui } from "./rules/ui/index.js";
+import { browserOnlyGlobalsOff } from "./workerGlobals.js";
 
 // --- Import plugins and configs for the recommended config ---
 import { builtinRules } from "eslint/use-at-your-own-risk";
@@ -269,6 +270,28 @@ const WORKER_FILES = [
     '**/workers/**/*.{ts,cts,mts,tsx,js,cjs,mjs,jsx}',
 ];
 
+// The globals Obsidian defines on each window. Worker files get them switched
+// off again, like the browser globals.
+const obsidianGlobals = {
+    DomElementInfo: "readonly",
+    SvgElementInfo: "readonly",
+    activeDocument: "readonly",
+    activeWindow: "readonly",
+    ajax: "readonly",
+    ajaxPromise: "readonly",
+    createDiv: "readonly",
+    createEl: "readonly",
+    createFragment: "readonly",
+    createSpan: "readonly",
+    createSvg: "readonly",
+    fish: "readonly",
+    fishAll: "readonly",
+    isBoolean: "readonly",
+    nextFrame: "readonly",
+    ready: "readonly",
+    sleep: "readonly",
+} as const;
+
 // Tests run in Node or a DOM emulation, not inside Obsidian, so the rules about
 // code that runs in Obsidian do not apply to them: there is no popout window,
 // Node.js modules are available, mocks cast to TFile, fixtures name `.obsidian`,
@@ -419,12 +442,6 @@ const flatRecommendedConfig: Config[] = defineConfig([
         rules: pickRules(recommendedPluginRulesConfig, isRuntimeNotWindowOnly),
     },
     {
-        files: WORKER_FILES,
-        languageOptions: {
-            globals: globals.worker,
-        },
-    },
-    {
         files: ['package.json'],
         language: 'json/json',
         extends: [tseslint.configs.disableTypeChecked as Config],
@@ -506,26 +523,25 @@ const flatRecommendedConfig: Config[] = defineConfig([
                     ...globals.node,
                     NodeJS: "readonly"
                 } : {}),
-                DomElementInfo: "readonly",
-                SvgElementInfo: "readonly",
-                activeDocument: "readonly",
-                activeWindow: "readonly",
-                ajax: "readonly",
-                ajaxPromise: "readonly",
-                createDiv: "readonly",
-                createEl: "readonly",
-                createFragment: "readonly",
-                createSpan: "readonly",
-                createSvg: "readonly",
-                fish: "readonly",
-                fishAll: "readonly",
-                isBoolean: "readonly",
-                nextFrame: "readonly",
-                ready: "readonly",
-                sleep: "readonly"
+                ...obsidianGlobals,
             }
         },
-    }
+    },
+    // After the block above, which gives every file the browser and Obsidian
+    // globals: flat config merges `languageOptions.globals`, so worker files
+    // would keep them all. A worker has neither, so they are switched off there
+    // and its own globals (`self`, `postMessage`, `importScripts`, ...) take
+    // their place. no-undef is off for TypeScript, so this is for JavaScript.
+    {
+        files: WORKER_FILES,
+        languageOptions: {
+            globals: {
+                ...browserOnlyGlobalsOff,
+                ...Object.fromEntries(Object.keys(obsidianGlobals).map((name) => [name, "off"])),
+                ...globals.worker,
+            },
+        },
+    },
 ]);
 
 const recommendedWithLocalesEn: Config[] = defineConfig([
