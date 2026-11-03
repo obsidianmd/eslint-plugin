@@ -307,9 +307,15 @@ const OBSIDIAN_RUNTIME_RULES = new Set([
     "obsidianmd/no-unsupported-api",
     "obsidianmd/regex-lookbehind",
 ]);
+// End-to-end tests drive Obsidian from Node. `e2e/`, `e2e-tests/` and `__e2e__/`
+// hold them, `*.e2e.*` names them (wdio-obsidian-service's convention), and
+// `wdio.conf.*`, `wdio.<name>.conf.*` and `playwright.config.*` configure their
+// runners. Each name is only used for tests; end-to-end encryption code
+// (`e2ee`) does not match.
 const TEST_FILES = [
-    '**/*.{test,spec}.{ts,cts,mts,tsx,js,cjs,mjs,jsx}',
-    '**/{test,tests,__tests__,__mocks__}/**/*.{ts,cts,mts,tsx,js,cjs,mjs,jsx}',
+    '**/*.{test,spec,e2e}.{ts,cts,mts,tsx,js,cjs,mjs,jsx}',
+    '**/{test,tests,__tests__,__mocks__,e2e,e2e-tests,__e2e__}/**/*.{ts,cts,mts,tsx,js,cjs,mjs,jsx}',
+    '**/{wdio.conf,wdio.*.conf,playwright.config}.{ts,cts,mts,tsx,js,cjs,mjs,jsx}',
 ];
 
 // The rules of `config` that `keep` accepts. The window-only and Obsidian-runtime

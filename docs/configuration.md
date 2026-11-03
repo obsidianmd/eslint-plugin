@@ -342,14 +342,17 @@ Tests run in Node or a DOM emulation such as jsdom, not inside Obsidian, so the 
 runs in Obsidian do not fit them: there is no popout window, Node.js modules are available, mocks cast
 to `TFile`, fixtures name `.obsidian`, and the code never runs in an older Obsidian or on iOS. The
 recommended config treats files matching `**/*.{test,spec}.*` and anything under a `test/`, `tests/`,
-`__tests__/` or `__mocks__/` directory as tests, and switches off `no-global-this`, `prefer-active-doc`,
+`__tests__/` or `__mocks__/` directory as tests. So are end-to-end tests, which drive Obsidian from
+Node: files matching `**/*.e2e.*`, anything under an `e2e/`, `e2e-tests/` or `__e2e__/` directory,
+and the WebdriverIO and Playwright configs (`wdio.conf.*`, `wdio.*.conf.*` and
+`playwright.config.*`). For all of them it switches off `no-global-this`, `prefer-active-doc`,
 `prefer-create-el`, `prefer-instanceof`, `prefer-window-timers`, `no-nodejs-modules`,
-`no-tfile-tfolder-cast`, `hardcoded-config-path`, `no-unsupported-api` and `regex-lookbehind` for
-them. Every other rule, including the security rules, still applies. The community scanner does not
-lint tests at all.
+`no-tfile-tfolder-cast`, `hardcoded-config-path`, `no-unsupported-api` and `regex-lookbehind`. Every
+other rule, including the security rules, still applies. The community scanner does not lint most of
+these files at all; see its [ignored files](#community-plugin-scanner-configuration).
 
-For tests under another name, such as an `e2e/` directory, add the same overrides for its path, or
-leave the directory out with `globalIgnores`.
+For tests under another name, such as an `integration-tests/` directory, add the same overrides for
+its path, or leave the directory out with `globalIgnores`.
 
 ## Upgrading to 0.5.0
 
