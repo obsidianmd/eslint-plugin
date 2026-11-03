@@ -223,19 +223,8 @@ const recommendedPluginRulesConfigBase: RulesConfig = {
 // obsidianmd rules they only run on TS files, but they are not obsidianmd rules,
 // so they stay out of `ruleConfigs`.
 const recommendedTypeCheckedGeneralRules: RulesConfig = {
-    "@typescript-eslint/no-deprecated": [
-        "warn",
-        {
-            allow: [
-                // The standard caretPositionFromPoint only reached WebKit in
-                // Safari/iOS 17.4, so caretRangeFromPoint is still the fallback
-                // that keeps caret lookup working on older iOS and Electron.
-                // typescript-eslint matches a value specifier by name, so any
-                // deprecated `caretRangeFromPoint` is allowed, not only the DOM's.
-                { from: "lib", name: "caretRangeFromPoint" },
-            ],
-        },
-    ],
+    // Allows caretRangeFromPoint, and SettingTab#display() below minAppVersion 1.13.
+    "@typescript-eslint/no-deprecated": ["warn", ...noDeprecatedOptions(manifest)],
     // Obsidian's Setting and BaseComponent declare a chaining `then`, so the
     // upstream rule reports them as promises (#181). obsidianmd/no-misused-promises
     // is the same rule with that declaration ignored, and replaces it.
@@ -329,7 +318,7 @@ const isRuntimeOnly = (rule: string) => OBSIDIAN_RUNTIME_RULES.has(rule);
 const isWindowOnly = (rule: string) => WINDOW_ONLY_RULES.has(rule);
 const isRuntimeNotWindowOnly = (rule: string) => isRuntimeOnly(rule) && !isWindowOnly(rule);
 
-import { restrictedGlobalsOptions, restrictedImportsOptions, noUnusedExpressionsOptions, noUnusedVarsOptions } from "./ruleOptions.js";
+import { restrictedGlobalsOptions, restrictedImportsOptions, noUnusedExpressionsOptions, noUnusedVarsOptions, noDeprecatedOptions } from "./ruleOptions.js";
 
 const flatRecommendedGeneralRules: RulesConfig = {
     "no-unused-vars": "off",

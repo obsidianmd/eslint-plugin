@@ -29,6 +29,9 @@ interface ChildResult {
         ts: boolean;
         js: boolean;
     };
+    noDeprecated: {
+        tsEntry: [number, { allow: { name: string }[] }];
+    };
 }
 
 interface ChildRun {
@@ -57,13 +60,17 @@ describe("manifest fallback in the linted repo's working directory", () => {
     let desktopOnly: ChildRun;
     let stringFalse: ChildRun;
     let noManifest: ChildRun;
+    let declarativeSettings: ChildRun;
+    let preDeclarativeSettings: ChildRun;
 
     before(async function () {
         this.timeout(60000);
-        [desktopOnly, stringFalse, noManifest] = await Promise.all([
+        [desktopOnly, stringFalse, noManifest, declarativeSettings, preDeclarativeSettings] = await Promise.all([
             runWithManifest(JSON.stringify({ isDesktopOnly: true })),
             runWithManifest(JSON.stringify({ isDesktopOnly: "false" })),
             runWithManifest(null),
+            runWithManifest(JSON.stringify({ minAppVersion: "1.13.0" })),
+            runWithManifest(JSON.stringify({ minAppVersion: "1.12.7" })),
         ]);
     });
 
@@ -116,6 +123,24 @@ describe("manifest fallback in the linted repo's working directory", () => {
 
         it("are not added when there is no manifest", () => {
             assert.deepStrictEqual(noManifest.result.nodeGlobals, { ts: false, js: false });
+        });
+    });
+
+    describe("@typescript-eslint/no-deprecated in the recommended config", () => {
+        function allowed(run: ChildRun): string[] {
+            return run.result.noDeprecated.tsEntry[1].allow.map((specifier) => specifier.name);
+        }
+
+        it("allows SettingTab#display() when minAppVersion is below 1.13.0", () => {
+            assert.ok(allowed(preDeclarativeSettings).includes("display"));
+        });
+
+        it("allows SettingTab#display() when there is no manifest", () => {
+            assert.ok(allowed(noManifest).includes("display"));
+        });
+
+        it("reports SettingTab#display() from minAppVersion 1.13.0", () => {
+            assert.deepStrictEqual(allowed(declarativeSettings), ["caretRangeFromPoint"]);
         });
     });
 
