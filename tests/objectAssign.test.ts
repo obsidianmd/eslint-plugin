@@ -13,6 +13,22 @@ ruleTester.run("object-assign", objectAssignRule, {
             name: "Object.assign with empty first arg for settings is allowed",
             code: "this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());",
         },
+        {
+            name: "a target whose name does not contain default is not reported",
+            code: "Object.assign(settings, data);",
+        },
+        {
+            name: "a property as the target is not reported",
+            code: "Object.assign(this.DEFAULT_SETTINGS, data);",
+        },
+        {
+            name: "an object literal as the second argument is not reported",
+            code: "Object.assign(DEFAULT_SETTINGS, { theme: 'dark' });",
+        },
+        {
+            name: "three or more arguments are not reported",
+            code: "Object.assign(DEFAULT_SETTINGS, a, b);",
+        },
     ],
     invalid: [
         {
@@ -31,6 +47,11 @@ ruleTester.run("object-assign", objectAssignRule, {
                     }
                 }
             `,
+            errors: [{ messageId: "twoArgumentsDefault" }],
+        },
+        {
+            name: "the defaults name is matched in any case",
+            code: "Object.assign(myDefaults, data);",
             errors: [{ messageId: "twoArgumentsDefault" }],
         },
     ],

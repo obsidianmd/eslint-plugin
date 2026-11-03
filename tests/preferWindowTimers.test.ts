@@ -29,6 +29,14 @@ ruleTester.run("prefer-window-timers", preferWindowTimersRule, {
             name: "local function named setTimeout is allowed",
             code: "function setTimeout() {} setTimeout();",
         },
+        {
+            name: "an imported function named setTimeout is not reported",
+            code: "import { setTimeout } from 'node:timers/promises'; await setTimeout(10);",
+        },
+        {
+            name: "cancelAnimationFrame is not reported",
+            code: "cancelAnimationFrame(handle);",
+        },
     ],
     invalid: [
         {
@@ -90,6 +98,136 @@ ruleTester.run("prefer-window-timers", preferWindowTimersRule, {
             code: "activeWindow.requestAnimationFrame(() => {});",
             output: "window.requestAnimationFrame(() => {});",
             errors: [{ messageId: "noActiveWindowTimer", data: { name: "requestAnimationFrame" } }],
+        },
+        {
+            name: "a timer stored in a NodeJS.Timeout field gets a suggestion, not a fix",
+            code: `class View { timer: NodeJS.Timeout | null = null; start() { this.timer = setTimeout(() => {}, 10); } }`,
+            output: null,
+            errors: [{
+                messageId: "preferWindowTimer",
+                data: { name: "setTimeout" },
+                suggestions: [{ messageId: "useWindowTimer", data: { name: "setTimeout" }, output: `class View { timer: NodeJS.Timeout | null = null; start() { this.timer = window.setTimeout(() => {}, 10); } }` }],
+            }],
+        },
+        {
+            name: "a timer typed ReturnType<typeof setTimeout> gets a suggestion",
+            code: `let t: ReturnType<typeof setTimeout> = setTimeout(() => {}, 10); t;`,
+            output: null,
+            errors: [{
+                messageId: "preferWindowTimer",
+                data: { name: "setTimeout" },
+                suggestions: [{ messageId: "useWindowTimer", data: { name: "setTimeout" }, output: `let t: ReturnType<typeof setTimeout> = window.setTimeout(() => {}, 10); t;` }],
+            }],
+        },
+        {
+            name: "a returned timer gets a suggestion",
+            code: `export function schedule() { return setInterval(() => {}, 10); }`,
+            output: null,
+            errors: [{
+                messageId: "preferWindowTimer",
+                data: { name: "setInterval" },
+                suggestions: [{ messageId: "useWindowTimer", data: { name: "setInterval" }, output: `export function schedule() { return window.setInterval(() => {}, 10); }` }],
+            }],
+        },
+        {
+            name: "a timer passed on as an argument gets a suggestion",
+            code: `declare function track(t: NodeJS.Timeout): void; track(setTimeout(() => {}, 10));`,
+            output: null,
+            errors: [{
+                messageId: "preferWindowTimer",
+                data: { name: "setTimeout" },
+                suggestions: [{ messageId: "useWindowTimer", data: { name: "setTimeout" }, output: `declare function track(t: NodeJS.Timeout): void; track(window.setTimeout(() => {}, 10));` }],
+            }],
+        },
+        {
+            name: "clearTimeout with a NodeJS.Timeout argument gets a suggestion",
+            code: `declare const t: NodeJS.Timeout; clearTimeout(t);`,
+            output: null,
+            errors: [{
+                messageId: "preferWindowTimer",
+                data: { name: "clearTimeout" },
+                suggestions: [{ messageId: "useWindowTimer", data: { name: "clearTimeout" }, output: `declare const t: NodeJS.Timeout; window.clearTimeout(t);` }],
+            }],
+        },
+        {
+            name: "clearInterval with a NodeJS.Timeout | undefined argument gets a suggestion",
+            code: `declare const t: NodeJS.Timeout | undefined; clearInterval(t);`,
+            output: null,
+            errors: [{
+                messageId: "preferWindowTimer",
+                data: { name: "clearInterval" },
+                suggestions: [{ messageId: "useWindowTimer", data: { name: "clearInterval" }, output: `declare const t: NodeJS.Timeout | undefined; window.clearInterval(t);` }],
+            }],
+        },
+        {
+            name: "a discarded timer is still fixed",
+            code: `export function later() { setTimeout(() => {}, 10); }`,
+            output: `export function later() { window.setTimeout(() => {}, 10); }`,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "setTimeout" } }],
+        },
+        {
+            name: "a voided timer is still fixed",
+            code: `void setTimeout(() => {}, 10);`,
+            output: `void window.setTimeout(() => {}, 10);`,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "setTimeout" } }],
+        },
+        {
+            name: "clearTimeout with a number argument is still fixed",
+            code: `declare const n: number; clearTimeout(n);`,
+            output: `declare const n: number; window.clearTimeout(n);`,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "clearTimeout" } }],
+        },
+        {
+            name: "clearTimeout with a number | undefined argument is still fixed",
+            code: `declare const n: number | undefined; clearTimeout(n);`,
+            output: `declare const n: number | undefined; window.clearTimeout(n);`,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "clearTimeout" } }],
+        },
+        {
+            name: "clearTimeout with no argument is still fixed",
+            code: `clearTimeout();`,
+            output: `window.clearTimeout();`,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "clearTimeout" } }],
+        },
+        {
+            name: "a used requestAnimationFrame handle is still fixed, it is a number either way",
+            code: `const handle = requestAnimationFrame(() => {}); handle;`,
+            output: `const handle = window.requestAnimationFrame(() => {}); handle;`,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "requestAnimationFrame" } }],
+        },
+    ],
+});
+
+// Without type information a clear*() argument is only known to fit
+// window.clearTimeout's number | undefined when it is a number literal or undefined.
+const untypedRuleTester = new RuleTester({
+    languageOptions: { parserOptions: { project: null, projectService: false } },
+});
+
+untypedRuleTester.run("prefer-window-timers without type information", preferWindowTimersRule, {
+    valid: [],
+    invalid: [
+        {
+            name: "clearTimeout with a variable gets a suggestion without type information",
+            code: "clearTimeout(timer);",
+            output: null,
+            errors: [{
+                messageId: "preferWindowTimer",
+                data: { name: "clearTimeout" },
+                suggestions: [{ messageId: "useWindowTimer", data: { name: "clearTimeout" }, output: "window.clearTimeout(timer);" }],
+            }],
+        },
+        {
+            name: "clearTimeout with a number literal is fixed without type information",
+            code: "clearTimeout(0);",
+            output: "window.clearTimeout(0);",
+            errors: [{ messageId: "preferWindowTimer", data: { name: "clearTimeout" } }],
+        },
+        {
+            name: "a discarded setTimeout is fixed without type information",
+            code: "setTimeout(() => {}, 10);",
+            output: "window.setTimeout(() => {}, 10);",
+            errors: [{ messageId: "preferWindowTimer", data: { name: "setTimeout" } }],
         },
     ],
 });

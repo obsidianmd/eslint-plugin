@@ -10,8 +10,12 @@ ruleTester.run("no-command-in-command-name", noCommandInNameRule, {
             code: "this.addCommand({ name: 'Open a new note' });",
         },
         {
-            name: "'command' as part of larger word is allowed",
+            name: "a word that only resembles 'command' is allowed",
             code: "this.addCommand({ name: 'Accommodate the user' });",
+        },
+        {
+            name: "name from a template literal is not checked",
+            code: "this.addCommand({ name: `Run command` });",
         },
     ],
     invalid: [
@@ -23,6 +27,11 @@ ruleTester.run("no-command-in-command-name", noCommandInNameRule, {
         {
             name: "name starting with 'command:' is forbidden",
             code: "this.addCommand({ name: 'command: do something' });",
+            errors: [{ messageId: "commandInName" }],
+        },
+        {
+            name: "'command' inside a longer word is forbidden",
+            code: "this.addCommand({ name: 'Open Commander' });",
             errors: [{ messageId: "commandInName" }],
         },
     ],

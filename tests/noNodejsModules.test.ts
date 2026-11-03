@@ -157,6 +157,14 @@ ruleTester.run("no-nodejs-modules", noNodejsModules, {
                 const module = Platform.isDesktop ? await import('node:path') : await Promise.reject();
             `,
         },
+        {
+            name: "dynamic import() with a non-literal module name is not checked",
+            code: "const module = await import(moduleName);",
+        },
+        {
+            name: "require() with a non-literal module name is not checked",
+            code: "const module = require(moduleName);",
+        },
     ],
     invalid: [
         {
@@ -167,6 +175,16 @@ ruleTester.run("no-nodejs-modules", noNodejsModules, {
         {
             name: "static import of fs is forbidden",
             code: "import fs from 'fs';",
+            errors: [{ messageId: "noNodejs" }],
+        },
+        {
+            name: "static import of a built-in subpath is forbidden",
+            code: "import { readFile } from 'fs/promises';",
+            errors: [{ messageId: "noNodejs" }],
+        },
+        {
+            name: "a type-only static import is forbidden too",
+            code: "import type { Stats } from 'node:fs';",
             errors: [{ messageId: "noNodejs" }],
         },
         {

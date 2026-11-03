@@ -30,6 +30,11 @@ ruleTester.run("regex-lookbehind", regexLookbehindRule, {
             code: "const re = /(?<name>a)/;",
             options: [{ isDesktopOnly: false }],
         },
+        {
+            name: "a template literal is not checked",
+            code: "const re = new RegExp(`(?<=${prefix})x`);",
+            options: [{ isDesktopOnly: false }],
+        },
     ],
     invalid: [
         {
@@ -53,6 +58,12 @@ ruleTester.run("regex-lookbehind", regexLookbehindRule, {
         {
             name: "negative lookbehind in a RegExp string is forbidden",
             code: "const re = new RegExp('(?<!a)b');",
+            options: [{ isDesktopOnly: false }],
+            errors: [{ messageId: "lookbehind" }],
+        },
+        {
+            name: "a lookbehind in any string literal is reported",
+            code: "const pattern = '(?<!\\\\d)px';",
             options: [{ isDesktopOnly: false }],
             errors: [{ messageId: "lookbehind" }],
         },

@@ -27,6 +27,17 @@ ruleTester.run("no-deprecated-text-input-suggest", noDeprecatedSuggestRule, {
             name: "call to a different function is allowed",
             code: "someOtherFunction();",
         },
+        {
+            name: "options passed in a variable are not reported",
+            code: `
+                const options = { modifiers: [{ name: "sameWidth" }] };
+                createPopper(inputEl, suggestEl, options);
+            `,
+        },
+        {
+            name: "a call through a namespace is not reported",
+            code: `Popper.createPopper(inputEl, suggestEl, { modifiers: [{ name: "sameWidth" }] });`,
+        },
     ],
     invalid: [
         {

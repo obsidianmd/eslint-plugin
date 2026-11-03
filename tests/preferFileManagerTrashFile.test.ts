@@ -28,6 +28,15 @@ ruleTester.run("prefer-file-manager-trash-file", preferFileManagerTrashRule, {
                 vault.create('file.md', '');
             `,
         },
+        {
+            name: "the adapter's remove is not reported",
+            code: `
+                declare class DataAdapter { remove(path: string): Promise<void>; }
+                declare class Vault { adapter: DataAdapter; }
+                declare const vault: Vault;
+                vault.adapter.remove('file.md');
+            `,
+        },
     ],
     invalid: [
         {
@@ -87,6 +96,16 @@ ruleTester.run("prefer-file-manager-trash-file", preferFileManagerTrashRule, {
                     data: { methodName: "delete" },
                 },
             ],
+        },
+        {
+            name: "a Vault parameter is found by type",
+            code: `
+                declare class Vault { delete(file: unknown): Promise<void>; }
+                async function remove(v: Vault, file: unknown) {
+                    await v.delete(file);
+                }
+            `,
+            errors: [{ messageId: "preferTrashFile", data: { methodName: "delete" } }],
         },
     ],
 });

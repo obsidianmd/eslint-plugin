@@ -22,6 +22,14 @@ ruleTester.run("no-tfile-tfolder-cast", noTFileTFolderCastRule, {
             name: "type annotation is allowed",
             code: "const myFile: TFile | null = null;",
         },
+        {
+            name: "an assertion to a union, an array or a qualified name is not reported",
+            code: "const a = v as TFile | null; const b = v as TFile[]; const c = v as obsidian.TFile;",
+        },
+        {
+            name: "satisfies is not reported",
+            code: "const a = v satisfies TFile;",
+        },
     ],
     invalid: [
         {

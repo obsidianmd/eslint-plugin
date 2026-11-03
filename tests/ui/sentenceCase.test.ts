@@ -200,6 +200,30 @@ tester.run("ui-sentence-case", rule, {
             name: "a placeholder property example is allowed",
             code: "input.placeholder = 'ex. My Vault';",
         },
+        {
+            name: "text with inline code is skipped",
+            code: "new Notice('Run `npm Install` First');",
+        },
+        {
+            name: "text with HTML tags is skipped",
+            code: "el.setText('<b>Bold Title</b>');",
+        },
+        {
+            name: "text with template placeholders is skipped",
+            code: "new Notice('Saved {Count} Files'); new Notice('Moved %s To Trash');",
+        },
+        {
+            name: "a file path is skipped",
+            code: "new Notice('src/Main Plugin.ts');",
+        },
+        {
+            name: "an all-caps identifier is skipped",
+            code: "new Notice('API_KEY');",
+        },
+        {
+            name: "a template literal with expressions is not checked",
+            code: "declare const n: number; new Notice(`Saved ${n} Files`);",
+        },
     ],
     invalid: [
         {
@@ -326,6 +350,41 @@ tester.run("ui-sentence-case", rule, {
             code: "new Notice('Visit https://obsidian.md/help For Details');",
             options: [{ allowAutoFix: true }],
             output: "new Notice('Visit https://obsidian.md/help for details');",
+            errors: [{ messageId: "useSentenceCase" }],
+        },
+        {
+            name: "setButtonText is checked",
+            code: "button.setButtonText('Save All Files');",
+            errors: [{ messageId: "useSentenceCase" }],
+        },
+        {
+            name: "addRibbonIcon checks its tooltip, the second argument",
+            code: "this.addRibbonIcon('dice', 'Open Daily Note', () => {});",
+            errors: [{ messageId: "useSentenceCase" }],
+        },
+        {
+            name: "addOption checks its label, the second argument",
+            code: "dropdown.addOption('daily', 'Daily Note');",
+            errors: [{ messageId: "useSentenceCase" }],
+        },
+        {
+            name: "innerText assignment is checked",
+            code: "el.innerText = 'Open Daily Note';",
+            errors: [{ messageId: "useSentenceCase" }],
+        },
+        {
+            name: "an ariaLabel assignment is checked as aria-label",
+            code: "el.ariaLabel = 'Open Daily Note';",
+            errors: [{ messageId: "useSentenceCase" }],
+        },
+        {
+            name: "setAttribute aria-description is checked",
+            code: "el.setAttribute('aria-description', 'Opens The Daily Note');",
+            errors: [{ messageId: "useSentenceCase" }],
+        },
+        {
+            name: "a title assignment is checked",
+            code: "el.title = 'Open Daily Note';",
             errors: [{ messageId: "useSentenceCase" }],
         },
     ],

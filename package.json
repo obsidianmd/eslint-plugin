@@ -59,7 +59,7 @@
 		"eslint-doc-generator": "3.3.2",
 		"eslint-plugin-eslint-plugin": "^7.3.3",
 		"mocha": "^11.7.5",
-		"obsidian": "1.12.3",
+		"obsidian": "1.14.4",
 		"ts-node": "10.9.2",
 		"tsx": "4.22.4",
 		"typescript": "5.4.5"

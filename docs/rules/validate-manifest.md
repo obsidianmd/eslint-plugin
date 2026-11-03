@@ -29,6 +29,10 @@ plugins in development."), a description starting with a lowercase letter, and e
 other characters in a description. Whether an `id` or `name` is already taken needs the
 community directory, so only the review checks it.
 
+There is no fix. The recommended config runs this rule on `manifest.json` next to your ESLint config,
+read with the JSON language; see
+[Files linted beyond your source](../configuration.md#files-linted-beyond-your-source).
+
 ## Options
 
 <!-- Written by hand: eslint-doc-generator lists allowedWords' nested keys as if they were
@@ -40,7 +44,7 @@ top-level options. Keep this table in step with the rule's schema. -->
 | `allowedWords.id`          | Forbidden words to allow in the manifest's `id`.                                                                                                                                                                                            | String[] |
 | `allowedWords.name`        | Forbidden words to allow in the manifest's `name`.                                                                                                                                                                                          | String[] |
 | `allowedWords.description` | Forbidden words to allow in the manifest's `description`.                                                                                                                                                                                   | String[] |
-| `ignore`                   | Checks to skip entirely: `noForbiddenWords` (every word check on `id`, `name` and `description`) and `descriptionFormat` (the description's length, punctuation and name checks). A manifest cannot carry an ignore marker of its own: a comment is a JSON parse error and would stop Obsidian loading the plugin, and an ignore key ships to every user and is itself reported as a disallowed key. | String[] |
+| `ignore`                   | Checks to skip entirely: `noForbiddenWords` (every word check on `id`, `name` and `description`) and `descriptionFormat` (the description's length, punctuation and name checks). See below for why there is no in-file marker. | String[] |
 
 A manifest cannot carry an ignore marker of its own. The only marker ESLint
 understands is a comment, and a comment in strict JSON is a parse error that

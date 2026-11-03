@@ -37,6 +37,22 @@ ruleTester.run("no-static-styles-assignment", noInlineStylesRule, {
             name: "setCssProps with computed key is allowed",
             code: "el.setCssProps({ [someKey]: someValue });",
         },
+        {
+            name: "setCssStyles with CSS variable is allowed",
+            code: "el.setCssStyles({ '--some-var': 'blue' });",
+        },
+        {
+            name: "setCssProps() without arguments does not crash",
+            code: "el.setCssProps();",
+        },
+        {
+            name: "setCssStyles() without arguments does not crash",
+            code: "el.setCssStyles();",
+        },
+        {
+            name: "setCssStyles with a variable is allowed",
+            code: "el.setCssStyles(styles);",
+        },
     ],
     invalid: [
         {
@@ -68,6 +84,11 @@ ruleTester.run("no-static-styles-assignment", noInlineStylesRule, {
                     data: { property: "element.style.setProperty" },
                 },
             ],
+        },
+        {
+            name: "setProperty with a literal value is forbidden for a custom property too",
+            code: "el.style.setProperty('--my-var', 'blue');",
+            errors: [{ messageId: "avoidStyleAssignment" }],
         },
         {
             name: "setAttribute('style', literal) is forbidden",

@@ -9,6 +9,10 @@ ruleTester.run("no-default-hotkey", noDefaultHotkeyRule, {
             name: "command without hotkeys is allowed",
             code: "this.addCommand({ id: 'foo', name: 'bar' });",
         },
+        {
+            name: "command object passed by name is not checked",
+            code: "const command = { id: 'foo', name: 'bar', hotkeys: [] }; this.addCommand(command);",
+        },
     ],
     invalid: [
         {

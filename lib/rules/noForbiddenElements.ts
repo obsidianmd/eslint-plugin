@@ -1,4 +1,4 @@
-import { TSESTree } from "@typescript-eslint/utils";
+import { ASTUtils, TSESTree } from "@typescript-eslint/utils";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 // We want to catch patterns like:
@@ -19,14 +19,36 @@ import { docsUrl, ruleCreator } from "../ruleCreator.js";
  */
 const FORBIDDEN_ELEMENT_TYPES = ["link", "style"];
 
+// The documents a plugin creates elements in: `document`, `activeDocument`, and
+// a property access ending in `.document`, `.activeDocument`, `.doc` (Obsidian's
+// Node#doc) or `.ownerDocument`, such as `window.document`, `activeWindow.document`
+// or `el.doc`. An iframe's `contentDocument` is not the plugin's own document, and
+// a document held in a variable is not followed.
+const DOCUMENT_NAMES = new Set(["document", "activeDocument"]);
+const DOCUMENT_PROPERTIES = new Set(["document", "activeDocument", "doc", "ownerDocument"]);
+
+function isDocument(node: TSESTree.Node): boolean {
+    if (node.type === TSESTree.AST_NODE_TYPES.TSNonNullExpression) {
+        return isDocument(node.expression);
+    }
+    if (node.type === TSESTree.AST_NODE_TYPES.Identifier) {
+        return DOCUMENT_NAMES.has(node.name);
+    }
+    return (
+        node.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
+        !node.computed &&
+        node.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
+        DOCUMENT_PROPERTIES.has(node.property.name)
+    );
+}
+
 function isForbiddenCreateElementCall(node: TSESTree.CallExpression): string | undefined {
-    // we are looking for document.createElement(...)
+    // we are looking for document.createElement(...) on any of the documents above
     if (!(
         node.callee.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
         node.callee.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
         node.callee.property.name === "createElement" &&
-        node.callee.object.type === TSESTree.AST_NODE_TYPES.Identifier &&
-        node.callee.object.name === "document"
+        isDocument(node.callee.object)
     )) {
         return undefined;
     }
@@ -85,9 +107,30 @@ export default ruleCreator({
     },
     defaultOptions: [],
     create(context) {
+        // we are looking for Obsidian's global createEl(...), unless the file binds
+        // its own createEl. An ambient declaration (`declare function createEl(...)`)
+        // has no body, so the call still reaches the global.
+        function isForbiddenGlobalCreateElCall(node: TSESTree.CallExpression): string | undefined {
+            if (
+                node.callee.type !== TSESTree.AST_NODE_TYPES.Identifier ||
+                node.callee.name !== "createEl" ||
+                node.arguments.length === 0
+            ) {
+                return undefined;
+            }
+            const variable = ASTUtils.findVariable(context.sourceCode.getScope(node), node.callee);
+            if (variable !== null && variable.defs.some((def) => !isAmbient(def.node))) {
+                return undefined;
+            }
+            return isArgumentForbiddenElement(node.arguments[0]);
+        }
+
         return {
             CallExpression(node: TSESTree.CallExpression) {
-                const element = isForbiddenCreateElementCall(node) ?? isForbiddenCreateElCall(node);
+                const element =
+                    isForbiddenCreateElementCall(node) ??
+                    isForbiddenCreateElCall(node) ??
+                    isForbiddenGlobalCreateElCall(node);
                 if (element === "style" || element === "link") {
                     context.report({
                         node,
@@ -109,3 +152,18 @@ export default ruleCreator({
         };
     },
 });
+
+function isAmbient(node: TSESTree.Node): boolean {
+    for (let current: TSESTree.Node | undefined = node; current; current = current.parent) {
+        if (
+            (current.type === TSESTree.AST_NODE_TYPES.TSDeclareFunction ||
+                current.type === TSESTree.AST_NODE_TYPES.VariableDeclaration ||
+                current.type === TSESTree.AST_NODE_TYPES.ClassDeclaration ||
+                current.type === TSESTree.AST_NODE_TYPES.TSModuleDeclaration) &&
+            current.declare
+        ) {
+            return true;
+        }
+    }
+    return false;
+}

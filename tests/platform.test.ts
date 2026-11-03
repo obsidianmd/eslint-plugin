@@ -21,6 +21,18 @@ ruleTester.run("platform", platformRule, {
             name: "other member expressions are allowed",
             code: "console.log('test');",
         },
+        {
+            name: "navigator.userAgentData is not reported",
+            code: "const p = navigator.userAgentData.platform;",
+        },
+        {
+            name: "a computed access is not reported",
+            code: "const ua = navigator['userAgent'];",
+        },
+        {
+            name: "another window's navigator is not reported",
+            code: "const ua = activeWindow.navigator.userAgent;",
+        },
     ],
     invalid: [
         {

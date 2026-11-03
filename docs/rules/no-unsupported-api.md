@@ -6,6 +6,33 @@
 
 <!-- end auto-generated rule header -->
 
+## What is reported
+
+Using an Obsidian API that is newer than the oldest app version the plugin supports, its
+`minAppVersion` from `manifest.json` or the `minAppVersion` option below. When each API arrived is
+read from the `@since` tags in your project's own `obsidian.d.ts`; see [Requirements](#requirements).
+The uses checked are:
+
+- reading a property or calling a method, such as `this.app.renderContext`
+- calling a function or creating an instance, such as `displayTooltip()` or `new SecretComponent(app, el)`
+- extending a class, such as `class MySuggest extends AbstractInputSuggest`, and calling methods
+  inherited from it through `super`
+- a newer method on an older class, such as `setDisabled()` on a `BaseComponent`, and Obsidian's
+  additions to built-ins, such as `Array.prototype.findLastIndex`
+
+A use is allowed where a `requireApiVersion()` check proves the app is new enough, as described below.
+There is no fix: either guard the call, or raise `minAppVersion` if the plugin needs the API anyway.
+
+Not reported: members of the settings-definition types (`SettingDefinitionItem`, `SettingDefinitionGroup`,
+`SettingDefinitionControl`, the `Setting*Control` types and the rest reachable from what
+`getSettingDefinitions()` returns). Those objects are the plugin's own data, so reading `item.items` or
+`definition.control.key`, for instance to render the definitions on an older Obsidian, works on every
+version. The settings classes, such as `SettingPage` and `SettingGroup`, are still reported: they are
+runtime exports, and extending one on an older Obsidian fails when the plugin loads.
+
+The recommended config does not apply this rule to [test files](../configuration.md#test-files),
+which never run in an older Obsidian.
+
 ## Guarding with `requireApiVersion`
 
 An API newer than `minAppVersion` is allowed where a `requireApiVersion(...)` check proves the

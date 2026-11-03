@@ -49,6 +49,35 @@ ruleTester.run("no-deprecated-display", noDeprecatedDisplayRule, {
                 }
             `,
         },
+        {
+            name: "a class extending obsidian.PluginSettingTab is not matched",
+            options: [{ minAppVersion: "1.13.0" }],
+            code: `
+                declare const obsidian: { PluginSettingTab: new () => object };
+                class MyTab extends obsidian.PluginSettingTab { getSettingDefinitions() { return []; } display() {} }
+            `,
+        },
+        {
+            name: "minAppVersion defaults to manifest.json (0.15.0 here, so nothing is deprecated)",
+            code: `
+                ${MOCK_CLASS}
+                class MyTab extends PluginSettingTab {
+                    getSettingDefinitions() { return []; }
+                    display() {}
+                }
+            `,
+        },
+        {
+            name: "an unknown minAppVersion option is a no-op",
+            options: [{ minAppVersion: "latest" }],
+            code: `
+                ${MOCK_CLASS}
+                class MyTab extends PluginSettingTab {
+                    getSettingDefinitions() { return []; }
+                    display() {}
+                }
+            `,
+        },
     ],
     invalid: [
         {
@@ -100,6 +129,24 @@ ruleTester.run("no-deprecated-display", noDeprecatedDisplayRule, {
                 class MyTab extends PluginSettingTab {
                     getSettingDefinitions() { return []; }
                 }
+            `,
+        },
+        {
+            name: "a class expression's bypassed display() is flagged and removed",
+            options: [{ minAppVersion: "1.13.0" }],
+            code: `
+                ${MOCK_CLASS}
+                const MyTab = class extends PluginSettingTab {
+                    getSettingDefinitions() { return []; }
+                    display() {}
+                };
+            `,
+            errors: [{ messageId: "deprecatedDisplay" }],
+            output: `
+                ${MOCK_CLASS}
+                const MyTab = class extends PluginSettingTab {
+                    getSettingDefinitions() { return []; }
+                };
             `,
         },
     ],

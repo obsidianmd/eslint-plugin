@@ -34,6 +34,33 @@ ruleTester.run("editor-drop-paste", editorDropPasteRule, {
             `,
         },
         {
+            name: "checks are found anywhere in the handler, under any parameter name",
+            code: `
+                workspace.on('editor-drop', (e, editor) => {
+                    const text = read(e);
+                    if (e.defaultPrevented) { return; }
+                    editor.replaceSelection(text);
+                    e.preventDefault();
+                });
+            `,
+        },
+        {
+            name: "a handler passed by reference is not checked",
+            code: "workspace.on('editor-paste', this.onPaste);",
+        },
+        {
+            name: "an arrow function with an expression body is not checked",
+            code: "workspace.on('editor-paste', (evt) => handle(evt));",
+        },
+        {
+            name: "a destructured first parameter is not checked",
+            code: "workspace.on('editor-drop', ({ dataTransfer }) => { use(dataTransfer); });",
+        },
+        {
+            name: "an event name that is not a string literal is not checked",
+            code: "workspace.on(EVENT_NAME, (evt) => { use(evt); });",
+        },
+        {
             name: "registerEvent wrapping is allowed",
             code: `
                 this.registerEvent(

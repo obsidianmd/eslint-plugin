@@ -867,6 +867,12 @@ describe("no-misused-promises swap", () => {
 		assert.strictEqual(getSeverity(tsRules["obsidianmd/no-misused-promises"]), "error");
 	});
 
+	it("is not applied to JS files, which have no type information", async () => {
+		const jsRules = await rulesFor("recommended", "src/main.js");
+		const severity = getSeverity(jsRules["obsidianmd/no-misused-promises"]);
+		assert.ok(severity === "off" || !("obsidianmd/no-misused-promises" in jsRules), `got ${severity}`);
+	});
+
 	it("ruleConfigs carries no typescript-eslint rule for it", () => {
 		for (const preset of Object.values(plugin.ruleConfigs)) {
 			assert.ok(!("@typescript-eslint/no-misused-promises" in preset));
