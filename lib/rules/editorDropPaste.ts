@@ -14,7 +14,7 @@ export default ruleCreator({
         schema: [],
         messages: {
             missingDefaultPrevented:
-                "Check 'evt.defaultPrevented' at the start of '{{eventName}}' handler and return early if already handled.",
+                "Check 'evt.defaultPrevented' in the '{{eventName}}' handler and return early if another handler already handled the event.",
             missingPreventDefault:
                 "Call 'evt.preventDefault()' in '{{eventName}}' handler after handling the event.",
         },
