@@ -115,8 +115,7 @@ You'll see:
 
 ### Wrapping Plugin Rules
 
-Not possible with ESLint 9: a plugin rule object given as `rule` stops ESLint, as described under
-[What is reported](#what-is-reported).
+Use [`obsidianmd.withCustomMessages()`](#wrapping-a-plugins-rule) instead.
 
 ### Partial Message Matching
 
@@ -139,6 +138,65 @@ The rule supports partial matching, so you can match messages that contain certa
 ```
 
 This will match any `no-console` error message that includes "Unexpected console statement".
+
+## Wrapping a plugin's rule
+
+This rule only wraps core ESLint rules (see [What is reported](#what-is-reported)). For a rule from a
+plugin, use `obsidianmd.withCustomMessages(rule, messages)`. It returns the rule with your messages,
+which you register in a plugin of your own and configure with the rule's own options:
+
+```javascript
+// eslint.config.mjs
+import { defineConfig } from "eslint/config";
+import obsidianmd from "eslint-plugin-obsidianmd";
+import tseslint from "typescript-eslint";
+
+export default defineConfig([
+  ...obsidianmd.configs.recommended,
+  {
+    files: ["**/*.ts"],
+    plugins: {
+      custom: {
+        rules: {
+          "no-explicit-any": obsidianmd.withCustomMessages(tseslint.plugin.rules["no-explicit-any"], {
+            "Unexpected any": "Avoid `any`: Obsidian's API is typed, so use its types or `unknown`.",
+          }),
+        },
+      },
+    },
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off", // the recommended config enables the original
+      "custom/no-explicit-any": ["error", { ignoreRestArgs: true }],
+    },
+  },
+]);
+```
+
+`const a: any = 1;` is then reported as:
+
+```
+1:10  error  Avoid `any`: Obsidian's API is typed, so use its types or `unknown`.  custom/no-explicit-any
+```
+
+The keys of `messages` match as in this rule: a report whose message, with its placeholders filled
+in, equals or contains a key shows that key's value instead, and the first matching key wins. Unlike
+this rule:
+
+- A report that matches no key is reported unchanged, not dropped.
+- The new message replaces the whole message, without a `[rule-name]` prefix. It can use the
+  placeholders the rule reports `data` for, such as `{{name}}`.
+- Each wrapped rule has its own name and severity, and `eslint-disable` comments name it
+  (`custom/no-explicit-any`).
+
+Everything else is the wrapped rule's: its options, which ESLint checks against the rule's schema
+and fills in from its defaults, its fixes and suggestions, and its use of type information. Turn the
+original rule off where you enable the wrapped one, or both report.
+
+In an `eslint.config.ts`, take typescript-eslint's rules from `@typescript-eslint/eslint-plugin`
+(`import tsPlugin from "@typescript-eslint/eslint-plugin"`): `tseslint.plugin` is typed without them.
+
+ESLint's `--cache` does not see a change to the messages, which are not part of the rule's options:
+delete the cache file (`.eslintcache` by default) after changing them.
 
 ## When to Use
 

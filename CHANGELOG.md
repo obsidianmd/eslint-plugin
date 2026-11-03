@@ -36,6 +36,7 @@ Upgrading from 0.4.x? The breaking changes below each have a fix in
 
 ### Added
 
+- `obsidianmd.withCustomMessages(rule, messages)`, which returns a plugin's rule with its messages replaced, matched as in `rule-custom-message`. Register the result in a plugin of your own and configure it with the rule's own options; its fixes, suggestions and type information keep working. See [Wrapping a plugin's rule](docs/rules/rule-custom-message.md#wrapping-a-plugins-rule) ([#223](https://github.com/obsidianmd/eslint-plugin/pull/223)).
 - `obsidianmd/no-misused-promises`: typescript-eslint's rule without Obsidian's chaining `then` (`Setting`, `BaseComponent`) counted as a Promise ([#210](https://github.com/obsidianmd/eslint-plugin/pull/210)).
 - `isDesktopOnly` option for `no-nodejs-modules`, for repositories without a `manifest.json` ([#193](https://github.com/obsidianmd/eslint-plugin/pull/193)).
 - `obsidianmd/plain-text` language, which reads `LICENSE`, `LICENSE.md` and `LICENSE.txt` ([#192](https://github.com/obsidianmd/eslint-plugin/pull/192)).

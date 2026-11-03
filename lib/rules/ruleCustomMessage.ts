@@ -1,11 +1,17 @@
-import type { TSESLint, TSESTree } from "@typescript-eslint/utils";
+import type { TSESLint } from "@typescript-eslint/utils";
 import { builtinRules } from "eslint/use-at-your-own-risk";
+import {
+    contextWith,
+    customMessageFor,
+    isRecord,
+    messageOf,
+    type CustomMessages,
+    type WrappedReport,
+} from "../customMessages.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
-type MessageOverrides = Record<string, string>;
-
 interface RuleConfig {
-    messages: MessageOverrides;
+    messages: CustomMessages;
     options?: unknown[];
     rule?: ESLintRule;
 }
@@ -25,17 +31,6 @@ interface ESLintRule {
     create: (context: TSESLint.RuleContext<string, unknown[]>) => TSESLint.RuleListener;
 }
 
-/** What a wrapped rule passes to `context.report()`. */
-interface WrappedReport {
-    message?: unknown;
-    messageId?: unknown;
-    data?: Record<string, unknown>;
-    node?: TSESTree.Node;
-    loc?: TSESTree.SourceLocation | TSESTree.Position;
-    fix?: TSESLint.ReportFixFunction | null;
-    suggest?: unknown;
-}
-
 interface WrappedSuggestion {
     desc?: unknown;
     messageId?: unknown;
@@ -44,33 +39,6 @@ interface WrappedSuggestion {
 }
 
 type Handler = (...args: unknown[]) => void;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-/** Fills `{{ placeholders }}` from `data` the way ESLint does. */
-function interpolate(text: string, data: Record<string, unknown> | undefined): string {
-    if (!isRecord(data)) {
-        return text;
-    }
-    return text.replace(/\{\{([^{}]+)\}\}/gu, (match, term: string) => {
-        const key = term.trim();
-        return key in data ? String(data[key]) : match;
-    });
-}
-
-/** The message, or suggestion description, a report shows. */
-function messageOf(
-    report: { message?: unknown; desc?: unknown; messageId?: unknown; data?: Record<string, unknown> },
-    messages: Record<string, string> | undefined,
-): string | undefined {
-    const text = report.message ?? report.desc;
-    const template = typeof text === "string"
-        ? text
-        : typeof report.messageId === "string" ? messages?.[report.messageId] : undefined;
-    return template === undefined ? undefined : interpolate(template, report.data);
-}
 
 /**
  * Applies the `default`s of a rule's option schema to `value`, as ESLint's
@@ -240,45 +208,32 @@ export default ruleCreator<Options, MessageIds>({
                 });
             };
 
-            const wrappedContext = Object.create(context, {
-                options: {
-                    value: optionsFor(rule, config.options ?? []),
-                    writable: true,
-                    enumerable: true,
-                    configurable: true,
-                },
-                report: {
-                    value(descriptor: unknown) {
-                        if (!isRecord(descriptor)) {
-                            return;
-                        }
+            const wrappedContext = contextWith(context as TSESLint.RuleContext<string, unknown[]>, {
+                options: optionsFor(rule, config.options ?? []),
+                report(descriptor: unknown) {
+                    if (!isRecord(descriptor)) {
+                        return;
+                    }
 
-                        const report = descriptor as WrappedReport;
-                        const originalMessage = messageOf(report, ruleMessages) ?? "";
-                        const match = Object.entries(messageMap).find(([originalMsg]) =>
-                            originalMessage.includes(originalMsg),
-                        );
-                        if (!match) {
-                            return;
-                        }
+                    const report = descriptor as WrappedReport;
+                    const message = customMessageFor(report, ruleMessages, messageMap);
+                    if (message === undefined) {
+                        return;
+                    }
 
-                        const suggest = forwardSuggestions(report.suggest);
-                        // Forward where the wrapped rule reported, a node, a
-                        // location or both, and its fix and suggestions.
-                        context.report({
-                            messageId: "customMessage",
-                            data: { message: match[1], ruleName },
-                            ...(report.node && { node: report.node }),
-                            ...(report.loc && { loc: report.loc }),
-                            ...(report.fix && { fix: report.fix }),
-                            ...(suggest.length > 0 && { suggest }),
-                        } as TSESLint.ReportDescriptor<MessageIds>);
-                    },
-                    writable: true,
-                    enumerable: true,
-                    configurable: true,
+                    const suggest = forwardSuggestions(report.suggest);
+                    // Forward where the wrapped rule reported, a node, a
+                    // location or both, and its fix and suggestions.
+                    context.report({
+                        messageId: "customMessage",
+                        data: { message, ruleName },
+                        ...(report.node && { node: report.node }),
+                        ...(report.loc && { loc: report.loc }),
+                        ...(report.fix && { fix: report.fix }),
+                        ...(suggest.length > 0 && { suggest }),
+                    } as TSESLint.ReportDescriptor<MessageIds>);
                 },
-            }) as TSESLint.RuleContext<string, unknown[]>;
+            });
 
             try {
                 const ruleInstance = rule.create(wrappedContext);

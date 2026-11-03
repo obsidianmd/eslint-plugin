@@ -29,6 +29,7 @@ import ruleCustomMessage from "./rules/ruleCustomMessage.js";
 import noNodejsModules from "./rules/noNodejsModules.js";
 import noUnsupportedApi from "./rules/noUnsupportedApi.js";
 import noMisusedPromises from "./rules/noMisusedPromises.js";
+import { withCustomMessages } from "./customMessages.js";
 import { getManifest, isManifestDesktopOnly } from "./manifest.js";
 import { PlainTextLanguage } from "./plainTextLanguage.js";
 import { ui } from "./rules/ui/index.js";
@@ -75,6 +76,9 @@ interface ObsidianmdPlugin {
     rules: Record<string, RuleDefinition<RuleDefinitionTypeOptions>>;
     configs: { recommended: Linter.Config[]; recommendedWithLocalesEn: Linter.Config[] };
     ruleConfigs: { recommended: RulesConfig; recommendedTypeChecked: RulesConfig };
+    // ESLint ignores the keys of a plugin object it does not use, and names the
+    // plugin by `meta` in --print-config and --cache.
+    withCustomMessages: typeof withCustomMessages;
 }
 
 const plugin: ObsidianmdPlugin = {
@@ -146,7 +150,8 @@ const plugin: ObsidianmdPlugin = {
     ruleConfigs: {
         recommended: {} as RulesConfig,
         recommendedTypeChecked: {} as RulesConfig,
-    }
+    },
+    withCustomMessages,
 };
 
 // Rules that require type information (call getParserServices).
@@ -607,3 +612,7 @@ plugin.ruleConfigs = {
 };
 
 export default plugin;
+// Types only: at runtime the module has just its default export, as eslint-doc-generator
+// and require() of the package expect, so withCustomMessages is reached as
+// obsidianmd.withCustomMessages.
+export type { CustomMessages, WrappableRule } from "./customMessages.js";
