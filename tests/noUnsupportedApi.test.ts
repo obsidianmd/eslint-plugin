@@ -1,5 +1,7 @@
 import { RuleTester } from "@typescript-eslint/rule-tester";
-import rule from "../lib/rules/noUnsupportedApi.js";
+import assert from "node:assert";
+import ts from "typescript";
+import rule, { getPluginSuppliedTypes } from "../lib/rules/noUnsupportedApi.js";
 
 const ruleTester = new RuleTester();
 
@@ -458,6 +460,36 @@ ruleTester.run("no-unsupported-api", rule, {
                 app.renderContext;
             `,
             options: [{ minAppVersion: "1.10" }],
+        },
+        {
+            name: "members of the settings-definition types the plugin builds are not reported",
+            code: `
+                import type { SettingDefinitionItem } from 'obsidian';
+                declare const items: SettingDefinitionItem[];
+                for (const item of items) {
+                    if (item.type === 'page') {
+                        item.name;
+                        item.items;
+                    } else if ('items' in item) {
+                        item.heading;
+                        item.items;
+                    } else if (item.type === 'render') {
+                        item.render;
+                    }
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "a settings-definition control's key and default value are not reported",
+            code: `
+                import type { SettingDefinitionControl } from 'obsidian';
+                declare const definition: SettingDefinitionControl;
+                definition.control.key;
+                definition.control.defaultValue;
+                definition.desc;
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
         },
     ],
     invalid: [
@@ -971,5 +1003,71 @@ ruleTester.run("no-unsupported-api", rule, {
             options: [{ minAppVersion: "1.0.0" }],
             errors: [{ messageId: "apiNotAvailable" }],
         },
+        {
+            name: "extending SettingPage is still reported: it is a runtime export",
+            code: `
+                import { SettingPage } from 'obsidian';
+                class Page extends SettingPage {
+                    display(): void {}
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "a member of a runtime-provided interface is still reported",
+            code: `
+                import type { BasesConfigFile } from 'obsidian';
+                declare const config: BasesConfigFile;
+                config.filters;
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
     ],
+});
+
+describe("no-unsupported-api plugin-supplied types", () => {
+    const family = (source: string) =>
+        [...getPluginSuppliedTypes(ts.createSourceFile("obsidian.d.ts", source, ts.ScriptTarget.Latest, true))].sort();
+
+    it("follows properties, unions, arrays, extends and type arguments from getSettingDefinitions()", () => {
+        assert.deepStrictEqual(
+            family(`
+                export abstract class SettingTab { getSettingDefinitions(): Item[]; }
+                export type Item = Group | Leaf;
+                export interface Group { items: Leaf[]; extra: Extra<Arg>; }
+                export interface Leaf extends Base { control?: Control | string; }
+                export interface Base { name: string; }
+                export interface Control { key: string; }
+                export interface Extra<T> { value: T; }
+                export interface Arg { x: number; }
+                export interface Unrelated { y: string; }
+            `),
+            ["Arg", "Base", "Control", "Extra", "Group", "Item", "Leaf"]
+        );
+    });
+
+    it("stops at classes, function types and global augmentations", () => {
+        assert.deepStrictEqual(
+            family(`
+                export abstract class SettingTab { getSettingDefinitions(): Item[]; }
+                export interface Item {
+                    page?: () => Page;
+                    render(setting: Setting): void;
+                    desc?: string | DocumentFragment;
+                    owner: Setting;
+                }
+                export abstract class Page { display(): void; }
+                export class Setting { setName(name: string): this; }
+                export interface Ctx { a: string; }
+                declare global { interface DocumentFragment { createEl(): void; } }
+            `),
+            ["Item"]
+        );
+    });
+
+    it("is empty for obsidian types without getSettingDefinitions()", () => {
+        assert.deepStrictEqual(family(`export interface CachedMetadata { links?: string[]; }`), []);
+    });
 });

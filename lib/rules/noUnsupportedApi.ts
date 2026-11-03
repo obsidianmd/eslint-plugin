@@ -140,7 +140,7 @@ export default ruleCreator<Options, "apiNotAvailable">({
             }
 
             for (const decl of declarations) {
-                if (!isObsidianDeclaration(decl)) {
+                if (!isObsidianDeclaration(decl) || isPluginSuppliedMember(decl)) {
                     continue;
                 }
 
@@ -591,6 +591,124 @@ function getSinceTag(node: ts.Node): string | undefined {
         }
     }
     return undefined;
+}
+
+// Obsidian's settings-definition API (1.13) is data the plugin supplies:
+// getSettingDefinitions() returns objects the plugin builds, so a member of one
+// of those types is the plugin's own value and exists on every Obsidian
+// version, for instance when a plugin renders its definitions itself on an
+// older one. The family is every interface and type alias reachable from
+// getSettingDefinitions()'s return type through properties, unions, arrays,
+// `extends` and type arguments. Classes stop the walk (SettingPage, Setting and
+// the like are runtime exports), and so do function types, whose parameters
+// and results are values Obsidian provides to the plugin's callbacks, and the
+// `declare global` augmentations of DOM types.
+const pluginSuppliedTypes = new WeakMap<ts.SourceFile, Set<string>>();
+
+function isPluginSuppliedMember(declaration: ts.Declaration): boolean {
+    const parent = declaration.parent;
+    if (!ts.isInterfaceDeclaration(parent)) {
+        return false;
+    }
+    return getPluginSuppliedTypes(declaration.getSourceFile()).has(parent.name.text);
+}
+
+export function getPluginSuppliedTypes(sourceFile: ts.SourceFile): Set<string> {
+    const cached = pluginSuppliedTypes.get(sourceFile);
+    if (cached) {
+        return cached;
+    }
+
+    const declared = new Map<string, ts.Node[]>();
+    const roots: ts.TypeNode[] = [];
+    const collect = (statements: ts.NodeArray<ts.Statement>): void => {
+        for (const statement of statements) {
+            if (ts.isModuleDeclaration(statement)) {
+                // `declare global { ... }` augments DOM types such as Node and
+                // DocumentFragment at runtime; those are never plugin-supplied.
+                const isGlobal = (statement.flags & ts.NodeFlags.GlobalAugmentation) !== 0;
+                if (!isGlobal && statement.body && ts.isModuleBlock(statement.body)) {
+                    collect(statement.body.statements);
+                }
+                continue;
+            }
+            if (
+                (ts.isInterfaceDeclaration(statement) ||
+                    ts.isTypeAliasDeclaration(statement) ||
+                    ts.isClassDeclaration(statement)) &&
+                statement.name
+            ) {
+                const list = declared.get(statement.name.text) ?? [];
+                list.push(statement);
+                declared.set(statement.name.text, list);
+            }
+            if (ts.isInterfaceDeclaration(statement) || ts.isClassDeclaration(statement)) {
+                for (const member of statement.members) {
+                    if (
+                        (ts.isMethodSignature(member) || ts.isMethodDeclaration(member)) &&
+                        member.name.getText(sourceFile) === "getSettingDefinitions" &&
+                        member.type
+                    ) {
+                        roots.push(member.type);
+                    }
+                }
+            }
+        }
+    };
+    collect(sourceFile.statements);
+
+    const family = new Set<string>();
+    const visitType = (node: ts.TypeNode | undefined): void => {
+        if (!node || ts.isFunctionTypeNode(node) || ts.isConstructorTypeNode(node)) {
+            return;
+        }
+        if (ts.isTypeReferenceNode(node)) {
+            const name = ts.isIdentifier(node.typeName) ? node.typeName.text : node.typeName.right.text;
+            visitName(name);
+            node.typeArguments?.forEach(visitType);
+        } else if (ts.isUnionTypeNode(node) || ts.isIntersectionTypeNode(node)) {
+            node.types.forEach(visitType);
+        } else if (ts.isArrayTypeNode(node)) {
+            visitType(node.elementType);
+        } else if (ts.isParenthesizedTypeNode(node) || ts.isTypeOperatorNode(node)) {
+            visitType(node.type);
+        } else if (ts.isTypeLiteralNode(node)) {
+            visitMembers(node.members);
+        }
+    };
+    const visitMembers = (members: ts.NodeArray<ts.TypeElement>): void => {
+        for (const member of members) {
+            if (ts.isPropertySignature(member)) {
+                visitType(member.type);
+            }
+        }
+    };
+    const visitName = (name: string): void => {
+        const declarations = declared.get(name);
+        if (!declarations || family.has(name) || declarations.some((d) => ts.isClassDeclaration(d))) {
+            return;
+        }
+        family.add(name);
+        for (const declaration of declarations) {
+            if (ts.isTypeAliasDeclaration(declaration)) {
+                visitType(declaration.type);
+            } else if (ts.isInterfaceDeclaration(declaration)) {
+                for (const clause of declaration.heritageClauses ?? []) {
+                    for (const heritage of clause.types) {
+                        if (ts.isIdentifier(heritage.expression)) {
+                            visitName(heritage.expression.text);
+                        }
+                        heritage.typeArguments?.forEach(visitType);
+                    }
+                }
+                visitMembers(declaration.members);
+            }
+        }
+    };
+    roots.forEach(visitType);
+
+    pluginSuppliedTypes.set(sourceFile, family);
+    return family;
 }
 
 function isObsidianDeclaration(declaration: ts.Declaration): boolean {
