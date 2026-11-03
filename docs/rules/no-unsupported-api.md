@@ -30,6 +30,9 @@ Not reported: members of the settings-definition types (`SettingDefinitionItem`,
 version. The settings classes, such as `SettingPage` and `SettingGroup`, are still reported: they are
 runtime exports, and extending one on an older Obsidian fails when the plugin loads.
 
+The recommended config does not apply this rule to [test files](../configuration.md#test-files),
+which never run in an older Obsidian.
+
 ## Guarding with `requireApiVersion`
 
 An API newer than `minAppVersion` is allowed where a `requireApiVersion(...)` check proves the

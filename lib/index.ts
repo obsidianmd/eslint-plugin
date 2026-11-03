@@ -271,15 +271,18 @@ const WORKER_FILES = [
 
 // Tests run in Node or a DOM emulation, not inside Obsidian, so the rules about
 // code that runs in Obsidian do not apply to them: there is no popout window,
-// Node.js modules are available, mocks cast to TFile, and fixtures name
-// `.obsidian`. They are the window-only rules plus these. A file path is all it
-// takes to match TEST_FILES, so no security rule may be listed here; the
-// community scanner does not lint tests at all.
+// Node.js modules are available, mocks cast to TFile, fixtures name `.obsidian`,
+// and the code never runs in an older Obsidian (no-unsupported-api) or on iOS
+// before 16.4 (regex-lookbehind). They are the window-only rules plus these. A
+// file path is all it takes to match TEST_FILES, so no security rule may be
+// listed here; the community scanner does not lint tests at all.
 const OBSIDIAN_RUNTIME_RULES = new Set([
     ...WINDOW_ONLY_RULES,
     "obsidianmd/hardcoded-config-path",
     "obsidianmd/no-nodejs-modules",
     "obsidianmd/no-tfile-tfolder-cast",
+    "obsidianmd/no-unsupported-api",
+    "obsidianmd/regex-lookbehind",
 ]);
 const TEST_FILES = [
     '**/*.{test,spec}.{ts,cts,mts,tsx,js,cjs,mjs,jsx}',

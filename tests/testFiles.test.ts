@@ -6,16 +6,19 @@ import plugin from "../lib/index.js";
 // config switches off the rules about code that runs in Obsidian for them. In
 // real plugins most of these rules' findings came from test files.
 
-const OBSIDIAN_RUNTIME_RULES = [
-	"obsidianmd/hardcoded-config-path",
-	"obsidianmd/no-global-this",
-	"obsidianmd/no-nodejs-modules",
-	"obsidianmd/no-tfile-tfolder-cast",
-	"obsidianmd/prefer-active-doc",
-	"obsidianmd/prefer-create-el",
-	"obsidianmd/prefer-instanceof",
-	"obsidianmd/prefer-window-timers",
-];
+// The rules, with their severity for every other file.
+const OBSIDIAN_RUNTIME_RULES: Record<string, string> = {
+	"obsidianmd/hardcoded-config-path": "warn",
+	"obsidianmd/no-global-this": "warn",
+	"obsidianmd/no-nodejs-modules": "warn",
+	"obsidianmd/no-tfile-tfolder-cast": "warn",
+	"obsidianmd/no-unsupported-api": "error",
+	"obsidianmd/prefer-active-doc": "warn",
+	"obsidianmd/prefer-create-el": "warn",
+	"obsidianmd/prefer-instanceof": "warn",
+	"obsidianmd/prefer-window-timers": "warn",
+	"obsidianmd/regex-lookbehind": "error",
+};
 
 // A file path is all it takes to match the test block, so it must never be a
 // way around these.
@@ -25,7 +28,6 @@ const STILL_ENFORCED = {
 	"no-unsanitized/property": "error",
 	"@microsoft/sdl/no-inner-html": "warn",
 	"obsidianmd/no-forbidden-elements": "error",
-	"obsidianmd/regex-lookbehind": "error",
 	"obsidianmd/rule-custom-message": "error",
 };
 
@@ -57,7 +59,7 @@ for (const configName of ["recommended", "recommendedWithLocalesEn"] as const) {
 		for (const filename of TEST_FILES) {
 			it(`switches off the Obsidian-runtime rules for ${filename}`, async () => {
 				const { rules = {} } = await eslint.calculateConfigForFile(filename);
-				for (const rule of OBSIDIAN_RUNTIME_RULES) {
+				for (const rule of Object.keys(OBSIDIAN_RUNTIME_RULES)) {
 					assert.strictEqual(getSeverity(rules[rule] ?? "off"), "off", rule);
 				}
 			});
@@ -73,17 +75,20 @@ for (const configName of ["recommended", "recommendedWithLocalesEn"] as const) {
 		it("leaves the Obsidian-runtime rules on for other files", async () => {
 			for (const filename of NOT_TEST_FILES) {
 				const { rules = {} } = await eslint.calculateConfigForFile(filename);
-				for (const rule of OBSIDIAN_RUNTIME_RULES) {
-					// no-tfile-tfolder-cast, prefer-create-el and prefer-instanceof need type information.
+				for (const [rule, severity] of Object.entries(OBSIDIAN_RUNTIME_RULES)) {
+					// no-tfile-tfolder-cast, no-unsupported-api, prefer-create-el and
+					// prefer-instanceof need type information.
 					if (filename.endsWith(".js") && !(rule in rules)) continue;
-					assert.strictEqual(getSeverity(rules[rule]), "warn", `${rule} in ${filename}`);
+					assert.strictEqual(getSeverity(rules[rule]), severity, `${rule} in ${filename}`);
 				}
 			}
 		});
 
-		it("keeps no-nodejs-modules for worker files", async () => {
+		it("keeps the rules that are not window-only for worker files", async () => {
 			const { rules = {} } = await eslint.calculateConfigForFile("src/indexer.worker.ts");
 			assert.strictEqual(getSeverity(rules["obsidianmd/no-nodejs-modules"]), "warn");
+			assert.strictEqual(getSeverity(rules["obsidianmd/no-unsupported-api"]), "error");
+			assert.strictEqual(getSeverity(rules["obsidianmd/regex-lookbehind"]), "error");
 		});
 	});
 }
@@ -99,7 +104,8 @@ describe("linting a test file", () => {
 		"const root = \".obsidian/plugins\";",
 		"const el = document.createElement(\"div\");",
 		"setTimeout(() => globalThis.dispatchEvent(new Event(\"x\")), 0);",
-		"export const fixture = { fs, root, el };",
+		"const price = /(?<=\\$)\\d+/;",
+		"export const fixture = { fs, root, el, price };",
 		"",
 	].join("\n");
 
@@ -126,6 +132,7 @@ describe("linting a test file", () => {
 				"obsidianmd/no-nodejs-modules",
 				"obsidianmd/prefer-active-doc",
 				"obsidianmd/prefer-window-timers",
+				"obsidianmd/regex-lookbehind",
 			],
 		);
 	});
