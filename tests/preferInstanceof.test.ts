@@ -135,6 +135,158 @@ ruleTester.run("prefer-instanceof", preferInstanceofRule, {
             errors: [{ messageId: "preferInstanceof", data: { className: "HTMLDivElement" } }],
         },
         {
+            name: "the fix keeps the parentheses around an awaited value",
+            code: `
+                ${MOCK_DOM}
+                declare function getEl(): Promise<Node>;
+                async function f() { if ((await getEl()) instanceof HTMLElement) {} }
+            `,
+            output: `
+                ${MOCK_DOM}
+                declare function getEl(): Promise<Node>;
+                async function f() { if ((await getEl()).instanceOf(HTMLElement)) {} }
+            `,
+            errors: [{ messageId: "preferInstanceof", data: { className: "HTMLElement" } }],
+        },
+        {
+            name: "the fix keeps the parentheses around a type assertion",
+            code: `
+                ${MOCK_DOM}
+                declare const a: unknown;
+                if ((a as Node) instanceof Element) {}
+            `,
+            output: `
+                ${MOCK_DOM}
+                declare const a: unknown;
+                if ((a as Node).instanceOf(Element)) {}
+            `,
+            errors: [{ messageId: "preferInstanceof", data: { className: "Element" } }],
+        },
+        {
+            name: "the fix keeps the parentheses around a conditional",
+            code: `
+                ${MOCK_DOM}
+                declare const c: boolean; declare const x: HTMLElement; declare const y: HTMLElement;
+                if ((c ? x : y) instanceof HTMLDivElement) {}
+            `,
+            output: `
+                ${MOCK_DOM}
+                declare const c: boolean; declare const x: HTMLElement; declare const y: HTMLElement;
+                if ((c ? x : y).instanceOf(HTMLDivElement)) {}
+            `,
+            errors: [{ messageId: "preferInstanceof", data: { className: "HTMLDivElement" } }],
+        },
+        {
+            name: "the fix parenthesizes an unparenthesized await",
+            code: `
+                ${MOCK_DOM}
+                declare function getEl(): Promise<Node>;
+                async function f() { return await getEl() instanceof HTMLElement; }
+            `,
+            output: `
+                ${MOCK_DOM}
+                declare function getEl(): Promise<Node>;
+                async function f() { return (await getEl()).instanceOf(HTMLElement); }
+            `,
+            errors: [{ messageId: "preferInstanceof", data: { className: "HTMLElement" } }],
+        },
+        {
+            name: "the fix does not parenthesize a member chain",
+            code: `
+                ${MOCK_DOM}
+                declare const view: { containerEl: { firstChild: Node } };
+                if (view.containerEl.firstChild instanceof HTMLElement) {}
+            `,
+            output: `
+                ${MOCK_DOM}
+                declare const view: { containerEl: { firstChild: Node } };
+                if (view.containerEl.firstChild.instanceOf(HTMLElement)) {}
+            `,
+            errors: [{ messageId: "preferInstanceof", data: { className: "HTMLElement" } }],
+        },
+        {
+            name: "the fix does not parenthesize a call or a non-null assertion",
+            code: `
+                ${MOCK_DOM}
+                declare function getEl(): Node; declare const maybe: Node | null;
+                if (getEl() instanceof HTMLElement || maybe! instanceof Element) {}
+            `,
+            output: `
+                ${MOCK_DOM}
+                declare function getEl(): Node; declare const maybe: Node | null;
+                if (getEl().instanceOf(HTMLElement) || maybe!.instanceOf(Element)) {}
+            `,
+            errors: [
+                { messageId: "preferInstanceof", data: { className: "HTMLElement" } },
+                { messageId: "preferInstanceof", data: { className: "Element" } },
+            ],
+        },
+        {
+            name: "the fix does not parenthesize this",
+            code: `
+                ${MOCK_DOM}
+                class MyEl extends HTMLElement { isDiv() { return this instanceof HTMLDivElement; } }
+            `,
+            output: `
+                ${MOCK_DOM}
+                class MyEl extends HTMLElement { isDiv() { return this.instanceOf(HTMLDivElement); } }
+            `,
+            errors: [{ messageId: "preferInstanceof", data: { className: "HTMLDivElement" } }],
+        },
+        {
+            name: "the fix drops redundant parentheses around an identifier",
+            code: `
+                ${MOCK_DOM}
+                declare const el: Node;
+                if ((el) instanceof HTMLElement) {}
+            `,
+            output: `
+                ${MOCK_DOM}
+                declare const el: Node;
+                if (el.instanceOf(HTMLElement)) {}
+            `,
+            errors: [{ messageId: "preferInstanceof", data: { className: "HTMLElement" } }],
+        },
+        {
+            name: "the fix keeps a sequence on the right as one argument",
+            code: `
+                ${MOCK_DOM}
+                declare const el: Node;
+                if (el instanceof (0, HTMLElement)) {}
+            `,
+            output: `
+                ${MOCK_DOM}
+                declare const el: Node;
+                if (el.instanceOf((0, HTMLElement))) {}
+            `,
+            errors: [{ messageId: "preferInstanceof", data: { className: "(0, HTMLElement)" } }],
+        },
+        {
+            name: "the suggestion keeps the parentheses around an awaited value",
+            code: `
+                ${MOCK_DOM_NO_INSTANCEOF}
+                declare function getEl(): Promise<Node>;
+                async function f() { if ((await getEl()) instanceof HTMLElement) {} }
+            `,
+            errors: [
+                {
+                    messageId: "preferInstanceof",
+                    data: { className: "HTMLElement" },
+                    suggestions: [
+                        {
+                            messageId: "preferInstanceofSuggestion",
+                            data: { className: "HTMLElement" },
+                            output: `
+                ${MOCK_DOM_NO_INSTANCEOF}
+                declare function getEl(): Promise<Node>;
+                async function f() { if ((await getEl()).instanceOf(HTMLElement)) {} }
+            `,
+                        },
+                    ],
+                },
+            ],
+        },
+        {
             name: "instanceof on Node without instanceOf method offers suggestion instead of autofix",
             code: `
                 ${MOCK_DOM_NO_INSTANCEOF}
