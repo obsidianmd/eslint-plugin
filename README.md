@@ -18,6 +18,8 @@ npm install eslint-plugin-obsidianmd --save-dev
 
 The plugin needs Node.js 20.19+, 22.13+ or 24+, ESLint 9.19 or later, and `typescript-eslint` 8.35.1 or later. npm installs `typescript` and `typescript-eslint` alongside the plugin if your project does not already have them. `typescript-eslint` 8.70.1 or later is recommended: it fixes a `no-unnecessary-type-assertion` false positive on an object asserted to a `Record` type alias ([typescript-eslint#12856](https://github.com/typescript-eslint/typescript-eslint/issues/12856)). The configuration examples below import `defineConfig` from `eslint/config`, which ESLint added in 9.22; on an older ESLint, export the array without it.
 
+On ESLint 10, npm prints `ERESOLVE overriding peer dependency` warnings when it installs the plugin, and `npm ls --all` and `npm ls eslint` exit with `invalid: eslint@10…`. Three packages the plugin bundles do not declare ESLint 10 support yet: `@microsoft/eslint-plugin-sdl`, `eslint-plugin-import`, and `eslint-plugin-react`, which `@microsoft/eslint-plugin-sdl` installs. Linting works, so you can ignore the warnings. With npm's `strict-peer-deps` setting on, the install fails instead; turn the setting off or use ESLint 9.
+
 The plugin reads Obsidian's own type definitions rather than bundling a copy, so your project needs `obsidian` installed as well. Plugin projects generated from the sample plugin already have it:
 
 ```sh
