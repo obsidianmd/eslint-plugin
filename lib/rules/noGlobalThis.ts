@@ -14,6 +14,7 @@ import { docsUrl, ruleCreator } from "../ruleCreator.js";
 const BANNED_GLOBALS = new Set(["global", "globalThis"]);
 
 const TIMER_FUNCTIONS = new Set([
+    "cancelAnimationFrame",
     "clearInterval",
     "clearTimeout",
     "requestAnimationFrame",
