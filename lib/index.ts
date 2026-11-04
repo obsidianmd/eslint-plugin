@@ -401,6 +401,14 @@ const flatRecommendedConfig: Config[] = defineConfig([
         plugins: {
             import: importPlugin as ESLint.Plugin,
             "@microsoft/sdl": sdl as ESLint.Plugin,
+            // `depend` (since 0.3.0) and `noUnsanitizedPlugin` (since 0.2.9)
+            // run none of their rules in this block or the TS one, but a user's
+            // config object that turns one of their rules on for JS or TS files
+            // (depend/ban-dependencies also checks imports) finds the plugin
+            // only here, and fails with "Could not find plugin" without it.
+            // no-unsanitized's rules run as no-unsanitized/*, the name its own
+            // config in `extends` registers; `noUnsanitizedPlugin` is the same
+            // plugin under the name these blocks have always given it.
             depend,
             noUnsanitizedPlugin: noUnsanitizedPlugin as ESLint.Plugin,
             "eslint-comments": eslintComments,
@@ -416,6 +424,7 @@ const flatRecommendedConfig: Config[] = defineConfig([
         plugins: {
             import: importPlugin as ESLint.Plugin,
             "@microsoft/sdl": sdl as ESLint.Plugin,
+            // Kept for user configs, as in the JS block.
             depend,
             noUnsanitizedPlugin: noUnsanitizedPlugin as ESLint.Plugin,
             "eslint-comments": eslintComments,

@@ -1142,6 +1142,29 @@ describe("plugin object", () => {
 		assert.deepStrictEqual(plugin.meta, { name: packageJson.name, version: packageJson.version });
 	});
 
+	// depend and noUnsanitizedPlugin run no rule in the JS and TS blocks, but a
+	// user's config that turns one of their rules on for those files finds the
+	// plugin only there.
+	for (const filename of ["src/main.ts", "src/main.js"]) {
+		it(`registers depend and noUnsanitizedPlugin for ${filename}, for a user's config`, async () => {
+			const eslint = new ESLint({
+				overrideConfigFile: true,
+				overrideConfig: [
+					...plugin.configs.recommended,
+					{
+						files: ["**/*.{ts,js}"],
+						rules: { "depend/ban-dependencies": "warn", "noUnsanitizedPlugin/method": "warn" },
+					},
+				],
+			});
+			const rules = (await eslint.calculateConfigForFile(filename)).rules ?? {};
+			assert.deepStrictEqual(
+				["depend/ban-dependencies", "noUnsanitizedPlugin/method"].map(rule => getSeverity(rules[rule])),
+				["warn", "warn"]
+			);
+		});
+	}
+
 	it("contributes the plain-text language", () => {
 		assert.deepStrictEqual(Object.keys(plugin.languages), ["plain-text"]);
 		assert.strictEqual(plugin.languages["plain-text"], PlainTextLanguage);
