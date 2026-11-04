@@ -698,7 +698,8 @@ ruleTester.run("no-unsupported-api", rule, {
             options: [{ minAppVersion: "1.11.1" }],
         },
         // An overloaded method: a call needs the version of the overload it
-        // calls, and any other use only the earliest overload's.
+        // calls, and any other use only the earliest overload's. An overload
+        // published before its @since needs only the version that first had it.
         {
             name: "a call to an older overload of an overloaded method is allowed",
             code: `
@@ -706,7 +707,7 @@ ruleTester.run("no-unsupported-api", rule, {
                 declare const app: App;
                 declare const leaf: WorkspaceLeaf;
                 declare const setting: Setting;
-                app.workspace.duplicateLeaf(leaf); // 0.13.8; the (leaf, leafType) form is 1.1.0
+                app.workspace.duplicateLeaf(leaf); // in the 0.11.13 typings; the (leaf, leafType) form is 1.1.0
                 app.workspace.duplicateLeaf(leaf, 'vertical');
                 app.workspace.on('file-menu', () => {}); // 0.9.12
                 app.workspace.on('quit', () => {}); // 0.10.2
@@ -714,6 +715,23 @@ ruleTester.run("no-unsupported-api", rule, {
                 app.workspace.on?.('css-change', () => {});
             `,
             options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "an overload published before its @since is allowed from the version that first had it",
+            code: `
+                import { App, Editor, MarkdownView } from 'obsidian';
+                declare const app: App;
+                // @since 1.1.0 and 1.1.1 mark the widening of the view to
+                // MarkdownView | MarkdownFileInfo; the events are in the
+                // 0.12.11 and 0.12.17 typings.
+                app.workspace.on('editor-menu', (menu, editor, info) => {});
+                app.workspace.on('editor-change', (editor, info) => {});
+                app.workspace.on('editor-paste', (evt, editor, info) => {});
+                app.workspace.on('editor-drop', (evt, editor, info) => {});
+                // A callback written for the old signature.
+                app.workspace.on('editor-change', (editor: Editor, view: MarkdownView) => {});
+            `,
+            options: [{ minAppVersion: "0.15.0" }],
         },
         {
             name: "an overloaded method used without a call needs only its earliest overload",
@@ -797,23 +815,53 @@ ruleTester.run("no-unsupported-api", rule, {
                 declare const app: App;
                 app.workspace.on('files-menu', (menu, files) => {});
                 app.workspace.on('url-menu', () => {});
-                app.workspace.on('editor-menu', () => {});
-                app.workspace.on('editor-change', () => {});
-                app.workspace.on('editor-paste', () => {});
-                app.workspace.on('editor-drop', () => {});
+                app.workspace.on('window-open', () => {});
+                app.workspace.on('window-close', () => {});
                 app.workspace?.on('files-menu', () => {});
                 app.workspace.on?.('url-menu', () => {});
             `,
+            options: [{ minAppVersion: "0.15.0" }],
+            errors: [
+                { messageId: "apiNotAvailable", line: 4, data: { qualifiedName: "Workspace.on", sinceVersion: "1.4.10", minAppVersion: "0.15.0" } },
+                { messageId: "apiNotAvailable", line: 5, data: { qualifiedName: "Workspace.on", sinceVersion: "1.5.1", minAppVersion: "0.15.0" } },
+                { messageId: "apiNotAvailable", line: 6, data: { qualifiedName: "Workspace.on", sinceVersion: "0.15.3", minAppVersion: "0.15.0" } },
+                { messageId: "apiNotAvailable", line: 7, data: { qualifiedName: "Workspace.on", sinceVersion: "0.15.3", minAppVersion: "0.15.0" } },
+                { messageId: "apiNotAvailable", line: 8, data: { qualifiedName: "Workspace.on", sinceVersion: "1.4.10", minAppVersion: "0.15.0" } },
+                { messageId: "apiNotAvailable", line: 9, data: { qualifiedName: "Workspace.on", sinceVersion: "1.5.1", minAppVersion: "0.15.0" } },
+            ],
+        },
+        {
+            name: "a string literal argument picks the overload, whatever the callback's type",
+            code: `
+                import { App, Menu, TFile } from 'obsidian';
+                declare const app: App;
+                // No overload fits these callbacks under strictFunctionTypes.
+                app.workspace.on('files-menu', (menu: Menu, files: TFile[]) => {});
+                const event = 'url-menu';
+                app.workspace.on(event, (menu: Menu, url: number) => {});
+            `,
             options: [{ minAppVersion: "1.0.0" }],
             errors: [
-                { messageId: "apiNotAvailable", line: 4, data: { qualifiedName: "Workspace.on", sinceVersion: "1.4.10", minAppVersion: "1.0.0" } },
-                { messageId: "apiNotAvailable", line: 5, data: { qualifiedName: "Workspace.on", sinceVersion: "1.5.1", minAppVersion: "1.0.0" } },
-                { messageId: "apiNotAvailable", line: 6, data: { qualifiedName: "Workspace.on", sinceVersion: "1.1.0", minAppVersion: "1.0.0" } },
-                { messageId: "apiNotAvailable", line: 7, data: { qualifiedName: "Workspace.on", sinceVersion: "1.1.1", minAppVersion: "1.0.0" } },
-                { messageId: "apiNotAvailable", line: 8, data: { qualifiedName: "Workspace.on", sinceVersion: "1.1.0", minAppVersion: "1.0.0" } },
-                { messageId: "apiNotAvailable", line: 9, data: { qualifiedName: "Workspace.on", sinceVersion: "1.1.0", minAppVersion: "1.0.0" } },
-                { messageId: "apiNotAvailable", line: 10, data: { qualifiedName: "Workspace.on", sinceVersion: "1.4.10", minAppVersion: "1.0.0" } },
-                { messageId: "apiNotAvailable", line: 11, data: { qualifiedName: "Workspace.on", sinceVersion: "1.5.1", minAppVersion: "1.0.0" } },
+                { messageId: "apiNotAvailable", line: 5, data: { qualifiedName: "Workspace.on", sinceVersion: "1.4.10", minAppVersion: "1.0.0" } },
+                { messageId: "apiNotAvailable", line: 7, data: { qualifiedName: "Workspace.on", sinceVersion: "1.5.1", minAppVersion: "1.0.0" } },
+            ],
+        },
+        {
+            name: "an overload published before its @since is reported below the version that first had it",
+            code: `
+                import { App, Editor, MarkdownView } from 'obsidian';
+                declare const app: App;
+                app.workspace.on('editor-menu', () => {});
+                app.workspace.on('editor-change', (editor: Editor, view: MarkdownView) => {});
+                app.workspace.on('editor-paste', () => {});
+                app.workspace.on('editor-drop', () => {});
+            `,
+            options: [{ minAppVersion: "0.12.0" }],
+            errors: [
+                { messageId: "apiNotAvailable", line: 4, data: { qualifiedName: "Workspace.on", sinceVersion: "0.12.11", minAppVersion: "0.12.0" } },
+                { messageId: "apiNotAvailable", line: 5, data: { qualifiedName: "Workspace.on", sinceVersion: "0.12.17", minAppVersion: "0.12.0" } },
+                { messageId: "apiNotAvailable", line: 6, data: { qualifiedName: "Workspace.on", sinceVersion: "0.12.17", minAppVersion: "0.12.0" } },
+                { messageId: "apiNotAvailable", line: 7, data: { qualifiedName: "Workspace.on", sinceVersion: "0.12.17", minAppVersion: "0.12.0" } },
             ],
         },
         {
@@ -852,10 +900,16 @@ ruleTester.run("no-unsupported-api", rule, {
                 declare const app: App;
                 declare const leaf: WorkspaceLeaf;
                 app.workspace.setActiveLeaf(leaf, { focus: true });
+                // Until 0.16.3 the typings had (leaf, pushHistory?, focus?),
+                // which took this call too, but under another key than the
+                // deprecated (leaf, pushHistory, focus) of today: it is
+                // reported at 0.16.3, as before.
+                app.workspace.setActiveLeaf(leaf);
             `,
             options: [{ minAppVersion: "0.15.0" }],
             errors: [
-                { messageId: "apiNotAvailable", data: { qualifiedName: "Workspace.setActiveLeaf", sinceVersion: "0.16.3", minAppVersion: "0.15.0" } },
+                { messageId: "apiNotAvailable", line: 5, data: { qualifiedName: "Workspace.setActiveLeaf", sinceVersion: "0.16.3", minAppVersion: "0.15.0" } },
+                { messageId: "apiNotAvailable", line: 10, data: { qualifiedName: "Workspace.setActiveLeaf", sinceVersion: "0.16.3", minAppVersion: "0.15.0" } },
             ],
         },
         {
@@ -865,9 +919,10 @@ ruleTester.run("no-unsupported-api", rule, {
                 declare const app: App;
                 const duplicate = app.workspace.duplicateLeaf;
             `,
-            options: [{ minAppVersion: "0.13.0" }],
+            options: [{ minAppVersion: "0.11.0" }],
             errors: [
-                { messageId: "apiNotAvailable", data: { qualifiedName: "Workspace.duplicateLeaf", sinceVersion: "0.13.8", minAppVersion: "0.13.0" } },
+                // The (leaf, direction?) form is @since 0.13.8, and in the 0.11.13 typings.
+                { messageId: "apiNotAvailable", data: { qualifiedName: "Workspace.duplicateLeaf", sinceVersion: "0.11.13", minAppVersion: "0.11.0" } },
             ],
         },
         {
@@ -875,14 +930,14 @@ ruleTester.run("no-unsupported-api", rule, {
             code: `
                 import { App, requireApiVersion } from 'obsidian';
                 declare const app: App;
-                if (requireApiVersion("1.1.0")) {
-                    app.workspace.on('editor-change', () => {});
-                    app.workspace.on('editor-menu', () => {});
+                if (requireApiVersion("1.4.10")) {
+                    app.workspace.on('url-menu', () => {});
+                    app.workspace.on('files-menu', () => {});
                 }
             `,
             options: [{ minAppVersion: "1.0.0" }],
             errors: [
-                { messageId: "apiNotAvailable", line: 5, data: { qualifiedName: "Workspace.on", sinceVersion: "1.1.1", minAppVersion: "1.0.0" } },
+                { messageId: "apiNotAvailable", line: 5, data: { qualifiedName: "Workspace.on", sinceVersion: "1.5.1", minAppVersion: "1.0.0" } },
             ],
         },
         {
@@ -1918,6 +1973,14 @@ describe("no-unsupported-api overload resolution", function () {
                 open(options: { onOpen: (a: string) => void }): void;
                 /** @since 1.0.0 */
                 open(options: { onOpen: (a: number) => void }): void;
+                /** @since 1.5.0 */
+                emit(name: "x", value: number): void;
+                /** @since 1.0.0 */
+                emit(name: string, value: number): void;
+                /** @since 1.5.0 */
+                send(name: "x", value: number): void;
+                /** @since 1.0.0 */
+                send(name: "y", value: number): void;
             }
         `);
         fs.writeFileSync(path.join(dir, "tsconfig.json"), JSON.stringify({
@@ -1968,12 +2031,18 @@ describe("no-unsupported-api overload resolution", function () {
             `thing.listen((a: string) => {});`, // fits the 1.5.0 one only
             `thing.open({ onOpen: (a) => {} });`, // the same, as a property
             `thing.open({ onOpen: (a: string) => {} });`,
+            // The literal picks the overload only where every overload has a
+            // literal there: emit("x") fits the 1.0.0 string one as well.
+            `thing.emit("x", 1);`,
+            `// @ts-expect-error`,
+            `thing.send("x", "not a number");`, // the literal decides: 1.5.0
         ].join("\n")), [
             "7: 'Thing.mode' requires Obsidian v1.5.0, but minAppVersion is 1.0.0.",
             "11: 'Thing.pick' requires Obsidian v1.2.0, but minAppVersion is 1.0.0.",
             "13: 'Thing.on' requires Obsidian v1.5.0, but minAppVersion is 1.0.0.",
             "15: 'Thing.listen' requires Obsidian v1.5.0, but minAppVersion is 1.0.0.",
             "17: 'Thing.open' requires Obsidian v1.5.0, but minAppVersion is 1.0.0.",
+            "20: 'Thing.send' requires Obsidian v1.5.0, but minAppVersion is 1.0.0.",
         ]);
     });
 });

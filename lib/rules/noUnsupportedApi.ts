@@ -7,6 +7,8 @@ import { gt, lt, valid } from "semver";
 import ts from "typescript";
 import { getManifest } from "../manifest.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
+import { OVERLOAD_HISTORY } from "./obsidianOverloadHistory.js";
+import { getLiteralParameters, getOverloadKey, getSinceTag } from "./obsidianOverloads.js";
 
 type Options = [{ minAppVersion?: string }?];
 
@@ -205,7 +207,7 @@ export default ruleCreator<Options, "apiNotAvailable">({
 
             for (const [qualifiedName, overloads] of members) {
                 const entry = sinceMap.get(qualifiedName);
-                const sinceVersion = entry && requiredVersion(entry, overloads, call);
+                const sinceVersion = entry && requiredVersion(qualifiedName, entry, overloads, call);
 
                 if (!sinceVersion) {
                     continue;
@@ -234,8 +236,11 @@ export default ruleCreator<Options, "apiNotAvailable">({
         // when the checker can tell which one that is. Any other use, such as
         // passing the method as a value, and a call that fits several overloads
         // or none, needs the member to exist, which it does from its earliest
-        // overload on. An overload without @since needs no version.
+        // overload on. An overload without @since needs no version, and one
+        // published before its @since (see obsidianOverloadHistory.ts) needs
+        // only the version that first had it.
         function requiredVersion(
+            qualifiedName: QualifiedName,
             entry: SinceEntry,
             overloads: ts.Declaration[],
             call: TSESTree.CallExpression | undefined,
@@ -244,7 +249,8 @@ export default ruleCreator<Options, "apiNotAvailable">({
             // from another copy of the file, counts as the entry's earliest.
             const sinceOf = (declaration: ts.Declaration): Version | null => {
                 const listed = entry.find(([position]) => position === declaration.pos);
-                return listed ? toSince(listed[1]) : earliestOf(entry.map(([, since]) => toSince(since)));
+                const since = listed ? toSince(listed[1]) : earliestOf(entry.map(([, value]) => toSince(value)));
+                return since && firstPublishedSince(qualifiedName, declaration, since);
             };
             const versions = overloads.map(sinceOf);
             const earliest = earliestOf(versions);
@@ -255,15 +261,20 @@ export default ruleCreator<Options, "apiNotAvailable">({
             return (called ? sinceOf(called) : earliest) ?? undefined;
         }
 
-        // The overload `call` calls: the one the checker resolves it to, if the
-        // arguments fit it and fit no overload that needs an older version.
-        // Otherwise undefined: for a call that fits no overload the checker
-        // still returns one, and `any` arguments fit several.
+        // The overload `call` calls: the one a string literal argument picks
+        // out, or else the one the checker resolves it to, if the arguments fit
+        // it and fit no overload that needs an older version. Otherwise
+        // undefined: for a call that fits no overload the checker still returns
+        // one, and `any` arguments fit several.
         function calledOverload(
             call: TSESTree.CallExpression,
             overloads: ts.Declaration[],
             sinceOf: (declaration: ts.Declaration) => Version | null,
         ): ts.Declaration | undefined {
+            const byLiteral = overloadByLiteral(call, overloads);
+            if (byLiteral) {
+                return byLiteral;
+            }
             const tsCall = services.esTreeNodeToTSNodeMap.get(call);
             const resolved = checker.getResolvedSignature(tsCall)?.declaration;
             if (!resolved || !overloads.includes(resolved)) {
@@ -290,6 +301,35 @@ export default ruleCreator<Options, "apiNotAvailable">({
                 older.every((overload) => fitsOverload(overload, true) === false)
                 ? resolved
                 : undefined;
+        }
+
+        // The overload a string literal argument picks out, whatever the other
+        // arguments are: where every overload types the parameter at that
+        // position as a string literal, as `Workspace.on()` does with its event
+        // names, the one whose literal it is. A callback typed for another
+        // version's signature, which the checker then fits to no overload, is
+        // still a call for that event.
+        function overloadByLiteral(
+            call: TSESTree.CallExpression,
+            overloads: ts.Declaration[],
+        ): ts.Declaration | undefined {
+            const literals = overloads.map((overload) => (ts.isFunctionLike(overload) ? getLiteralParameters(overload) : []));
+            for (const [index, argument] of call.arguments.entries()) {
+                if (argument.type === AST_NODE_TYPES.SpreadElement) {
+                    return undefined;
+                }
+                if (literals.some((parameters) => parameters[index] === undefined)) {
+                    continue;
+                }
+                const type = checker.getTypeAtLocation(services.esTreeNodeToTSNodeMap.get(argument));
+                const matching = type.isStringLiteral()
+                    ? overloads.filter((_, i) => literals[i][index] === type.value)
+                    : [];
+                if (matching.length === 1) {
+                    return matching[0];
+                }
+            }
+            return undefined;
         }
 
         // Whether the arguments of `call` fit the parameters of `signature` by
@@ -529,6 +569,20 @@ function isContextSensitive(node: TSESTree.Node): boolean {
         default:
             return false;
     }
+}
+
+// The members obsidianOverloadHistory.ts has an overload of.
+const HISTORY_MEMBERS = new Set(Object.keys(OVERLOAD_HISTORY).map((key) => key.slice(0, key.indexOf("("))));
+
+// The version an overload needs: its @since, or the first published typings
+// that had it, if those are older. An overload the table does not list, as in
+// typings newer than the table, keeps its @since.
+function firstPublishedSince(qualifiedName: QualifiedName, declaration: ts.Declaration, since: Version): Version {
+    if (!HISTORY_MEMBERS.has(qualifiedName) || !ts.isFunctionLike(declaration)) {
+        return since;
+    }
+    const firstPublished = OVERLOAD_HISTORY[`${qualifiedName}${getOverloadKey(declaration)}`]?.firstPublished;
+    return firstPublished && lt(firstPublished, since) ? firstPublished : since;
 }
 
 // A @since the rule can compare, or null: none, or one that is not a version.
@@ -790,16 +844,6 @@ function getParentTypeName(declaration: ts.Declaration): string | undefined {
     }
     if (ts.isInterfaceDeclaration(parent) && parent.name) {
         return parent.name.text;
-    }
-    return undefined;
-}
-
-function getSinceTag(node: ts.Node): string | undefined {
-    const tags = ts.getJSDocTags(node);
-    for (const tag of tags) {
-        if (tag.tagName.text === "since" && typeof tag.comment === "string") {
-            return tag.comment.trim();
-        }
     }
     return undefined;
 }
