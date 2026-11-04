@@ -22,7 +22,9 @@ without the `node:` prefix and including subpaths such as `fs/promises`, loaded 
 
 A dynamic `import()` or `require()` counts as guarded inside `if (Platform.isDesktop)` (or
 `if (Platform.isDesktop && …)`), in the first branch of `Platform.isDesktop ? … : …`, to the right of
-`Platform.isDesktop && …`, and anywhere in a function whose first statement is
+`Platform.isDesktop && …`, in the `else` of `if (!Platform.isDesktop)`, the second branch of
+`!Platform.isDesktop ? … : …` and to the right of `!Platform.isDesktop || …`, and anywhere in a
+function whose first statement is
 `if (!Platform.isDesktop) return;` or `throw`, without an `else`:
 
 ```ts

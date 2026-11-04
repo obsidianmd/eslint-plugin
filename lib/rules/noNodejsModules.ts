@@ -220,6 +220,15 @@ function isPlatformIsDesktop(expr: TSESTree.Expression): boolean {
     );
 }
 
+// !Platform.isDesktop: what follows when it is false runs on desktop only.
+function isNotPlatformIsDesktop(expr: TSESTree.Expression): boolean {
+    return (
+        expr.type === AST_NODE_TYPES.UnaryExpression &&
+        expr.operator === "!" &&
+        isPlatformIsDesktop(expr.argument)
+    );
+}
+
 function extractsPlatformIsDesktop(expr: TSESTree.Expression): boolean {
     if (isPlatformIsDesktop(expr)) {
         return true;
@@ -246,6 +255,10 @@ function isGuardedByPlatformIsDesktop(node: TSESTree.Node): boolean {
                     return true;
                 }
             }
+            // if (!Platform.isDesktop) { ... } else { require(...) }
+            if (prevChild === current.alternate && isNotPlatformIsDesktop(current.test)) {
+                return true;
+            }
         } else if (current.type === AST_NODE_TYPES.ConditionalExpression) {
             if (prevChild !== current.test && prevChild !== current.alternate) {
                 if (extractsPlatformIsDesktop(current.test)) {
@@ -258,6 +271,10 @@ function isGuardedByPlatformIsDesktop(node: TSESTree.Node): boolean {
                     return true;
                 }
             }
+            // !Platform.isDesktop ? ... : import(...)
+            if (prevChild === current.alternate && isNotPlatformIsDesktop(current.test)) {
+                return true;
+            }
         } else if (
             current.type === AST_NODE_TYPES.LogicalExpression &&
             current.operator === "&&" &&
@@ -266,6 +283,14 @@ function isGuardedByPlatformIsDesktop(node: TSESTree.Node): boolean {
             if (extractsPlatformIsDesktop(current.left)) {
                 return true;
             }
+        } else if (
+            // !Platform.isDesktop || require(...)
+            current.type === AST_NODE_TYPES.LogicalExpression &&
+            current.operator === "||" &&
+            prevChild === current.right &&
+            isNotPlatformIsDesktop(current.left)
+        ) {
+            return true;
         } else if (
             current.type === AST_NODE_TYPES.FunctionDeclaration ||
             current.type === AST_NODE_TYPES.FunctionExpression ||

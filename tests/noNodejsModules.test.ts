@@ -6,6 +6,18 @@ const ruleTester = new RuleTester();
 ruleTester.run("no-nodejs-modules", noNodejsModules, {
     valid: [
         {
+            name: "the else branch of if (!Platform.isDesktop) is guarded",
+            code: 'import { Notice, Platform } from "obsidian"; if (!Platform.isDesktop) { new Notice("Desktop only"); } else { const fs = require("fs"); }',
+        },
+        {
+            name: "the alternate of a !Platform.isDesktop ternary is guarded",
+            code: 'import { Platform } from "obsidian"; const fs = !Platform.isDesktop ? null : require("fs");',
+        },
+        {
+            name: "the right side of !Platform.isDesktop || is guarded",
+            code: 'import { Platform } from "obsidian"; !Platform.isDesktop || window.require("child_process");',
+        },
+        {
             name: "importing obsidian is allowed",
             code: "import { Plugin } from 'obsidian';",
         },
@@ -232,6 +244,11 @@ ruleTester.run("no-nodejs-modules", noNodejsModules, {
         },
     ],
     invalid: [
+        {
+            name: "the branch where !Platform.isDesktop holds is not guarded",
+            code: 'import { Platform } from "obsidian"; if (!Platform.isDesktop) { require("fs"); }',
+            errors: [{ messageId: "noNodejs" }],
+        },
         {
             name: "static import of node:path is forbidden",
             code: "import path from 'node:path';",
