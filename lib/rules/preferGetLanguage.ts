@@ -1,6 +1,22 @@
 import { TSESTree } from "@typescript-eslint/utils";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
+// `x.name`, `x["name"]` or `` x[`name`] ``. A computed key such as `x[key]`
+// names none that can be read.
+function getPropertyName(node: TSESTree.MemberExpression): string | undefined {
+    const property = node.property;
+    if (!node.computed) {
+        return property.type === TSESTree.AST_NODE_TYPES.Identifier ? property.name : undefined;
+    }
+    if (property.type === TSESTree.AST_NODE_TYPES.Literal && typeof property.value === "string") {
+        return property.value;
+    }
+    if (property.type === TSESTree.AST_NODE_TYPES.TemplateLiteral && property.expressions.length === 0) {
+        return property.quasis[0].value.cooked ?? undefined;
+    }
+    return undefined;
+}
+
 export default ruleCreator({
     meta: {
         type: "problem" as const,
@@ -63,10 +79,7 @@ export default ruleCreator({
             }
 
             // Check .getItem('language')
-            if (
-                callee.property.type !== TSESTree.AST_NODE_TYPES.Identifier ||
-                callee.property.name !== "getItem"
-            ) {
+            if (getPropertyName(callee) !== "getItem") {
                 return false;
             }
 
@@ -88,8 +101,7 @@ export default ruleCreator({
             // window.localStorage.getItem('language')
             if (
                 obj.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
-                obj.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
-                obj.property.name === "localStorage"
+                getPropertyName(obj) === "localStorage"
             ) {
                 return true;
             }

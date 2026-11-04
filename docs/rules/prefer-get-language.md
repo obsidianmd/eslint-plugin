@@ -11,7 +11,8 @@
 Reading the app language the way some plugins used to, before Obsidian exposed it:
 
 - `localStorage.getItem("language")`, also through any property named `localStorage`, such as a
-  window's storage: `window.localStorage` or `activeWindow.localStorage`
+  window's storage: `window.localStorage` or `activeWindow.localStorage`, and with either name
+  spelled out in a computed access, such as `localStorage["getItem"]("language")`
 - importing or `require()`-ing `i18next-browser-languagedetector`, which detects the browser's language
   rather than Obsidian's
 
@@ -24,5 +25,5 @@ const lang = getLanguage(); // use this instead
 ```
 
 There is no fix. Not reported: other keys, `getItem("language")` on any other object, such as a
-variable holding the storage, a dynamic `import()` of the detector, and other i18n packages, such as
-`i18next` itself.
+variable holding the storage, a computed access by a variable, such as `localStorage[method]`, a
+dynamic `import()` of the detector, and other i18n packages, such as `i18next` itself.
