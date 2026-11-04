@@ -25,6 +25,10 @@ export default defineConfig([
 
 The recommended config includes ESLint core rules, typescript-eslint, and all obsidianmd rules. You only need to provide the TypeScript parser options, as described below, and ignore what is not plugin source: the `globalIgnores` entry above matches the official sample plugin's layout (see [Ignoring files](#ignoring-files)).
 
+The examples import `defineConfig` and `globalIgnores` from `eslint/config`, which needs ESLint 9.22 or
+later. The [README](../README.md#installation) lists the plugin's requirements and what to write on an
+older ESLint.
+
 ## Why you need `parserOptions`
 
 The recommended config enables typescript-eslint's type-checked rules for `.ts`/`.tsx` files. These rules require access to TypeScript's type information, which means ESLint needs to know where your `tsconfig.json` is.
@@ -43,7 +47,7 @@ The plugin intentionally does not set `parserOptions` itself. Every project has 
 }
 ```
 
-`projectService` automatically discovers the nearest `tsconfig.json` for each file. `allowDefaultProject` provides a fallback for files that are not included in any `tsconfig.json` — such as the ESLint config file itself. Without it, linting files like `eslint.config.mts` will fail with "requires type information" errors because the recommended config applies type-checked rules to all `.ts`/`.mts`/`.tsx` files.
+`projectService` automatically discovers the nearest `tsconfig.json` for each file. `allowDefaultProject` provides a fallback for files that are not included in any `tsconfig.json` — such as the ESLint config file itself. Without it, linting files like `eslint.config.mts` fails with a parsing error, *"… was not found by the project service"* (see [Common errors](#-was-not-found-by-the-project-service)).
 
 See the [typescript-eslint docs on typed linting](https://typescript-eslint.io/getting-started/typed-linting) for alternatives and advanced options like `tsconfigRootDir`.
 
@@ -106,9 +110,10 @@ so that cannot happen. The same reasoning is why `package.json` uses `language: 
 
 None of these files get the ESLint core rules: those are scoped to `.js`/`.ts` files and their
 variants. The same goes for any other JSON you lint with your own block, such as
-`{ files: ["**/*.json"], language: "json/json" }`; a core rule like `no-irregular-whitespace` cannot
-read a JSON file and would otherwise abort the run. If you lint other JavaScript-like files with your
-own parser — `.svelte` or `.vue`, say — add `js.configs.recommended` for them yourself.
+`{ files: ["**/*.json"], plugins: { json }, language: "json/json" }`, with `json` imported from
+`@eslint/json`; a core rule like `no-irregular-whitespace` cannot read a JSON file and would
+otherwise abort the run. If you lint other JavaScript-like files with your own parser — `.svelte` or
+`.vue`, say — add `js.configs.recommended` for them yourself.
 
 ## Using alongside stricter typescript-eslint configs
 
@@ -264,6 +269,18 @@ export default defineConfig([
 ]);
 ```
 
+ESLint does not support disabling all rules from a plugin with a single glob like `"obsidianmd/*": "off"`. You can set each rule to `"off"` individually, or use `ruleConfigs` to generate the overrides programmatically:
+
+```js
+{
+  files: ["scripts/**"],
+  rules: Object.fromEntries([
+    ...Object.keys(obsidianmd.ruleConfigs.recommended),
+    ...Object.keys(obsidianmd.ruleConfigs.recommendedTypeChecked),
+  ].map(rule => [rule, "off"])),
+}
+```
+
 ### Code that only runs on desktop
 
 `no-nodejs-modules` reports because Node APIs are unavailable on mobile. Where that does not apply —
@@ -289,18 +306,6 @@ The option also overrides the manifest in the other direction. Because the rule 
 `isDesktopOnly` itself, a desktop-only plugin that wants the check anyway cannot get it by raising
 the severity alone; `"obsidianmd/no-nodejs-modules": "error"` still reports nothing there. Use
 `["error", { isDesktopOnly: false }]` instead.
-
-ESLint does not support disabling all rules from a plugin with a single glob like `"obsidianmd/*": "off"`. You can set each rule to `"off"` individually, or use `ruleConfigs` to generate the overrides programmatically:
-
-```js
-{
-  files: ["scripts/**"],
-  rules: Object.fromEntries([
-    ...Object.keys(obsidianmd.ruleConfigs.recommended),
-    ...Object.keys(obsidianmd.ruleConfigs.recommendedTypeChecked),
-  ].map(rule => [rule, "off"])),
-}
-```
 
 ### Web worker files
 
@@ -380,6 +385,7 @@ files too and aborts the whole run:
 
 ```
 Error while loading rule '@typescript-eslint/await-thenable': You have used a rule which requires type information, but don't have parserOptions set to generate type information for this file. See https://tseslint.com/typed-linting for enabling linting with type information.
+Parser: typescript-eslint/parser
 Occurred while linting /path/to/your-plugin/LICENSE
 ```
 
@@ -438,9 +444,13 @@ ESLint 10 recommends, at `error`:
 `preserve-caught-error` suggests `new Error(message, { cause: error })`, which TypeScript accepts
 only with `ES2022` or later in your `tsconfig.json` `lib`; the sample plugin's is `ES2021`.
 
+`@eslint/js` is no longer installed with the plugin. If your configuration imports it, add it to your
+`devDependencies` (`npm install --save-dev @eslint/js`); projects generated from the sample plugin
+already have it. ESLint 9 depends on it itself, so npm usually still installs it; ESLint 10 does not.
+
 ### `ui/sentence-case` is off
 
-0.3.0 meant to turn it off, but it stayed on until 0.4.2. To keep it, opt in:
+0.3.0 meant to turn it off, but it stayed on through 0.4.2. To keep it, opt in:
 
 ```js
 { rules: { "obsidianmd/ui/sentence-case": ["warn", { enforceCamelCaseLower: true }] } },
@@ -486,7 +496,7 @@ A few of these are worth knowing in advance:
 - `regex-lookbehind` now also reports negative lookbehinds such as `(?<!x)`, which fail on iOS before
   16.4 just like `(?<=x)`.
 - `@typescript-eslint/no-require-imports` is off again, so a disable comment for it is reported as
-  unused; delete the comment.
+  unused; delete the comment. The same goes for `no-undef` in TypeScript files, where it is now off.
 
 ### Install `obsidian` yourself
 
@@ -499,6 +509,20 @@ Projects generated from the sample plugin already have it; otherwise run
 In a repository whose `manifest.json` sets `"isDesktopOnly": true`, raising the rule's severity no
 longer turns the check back on. Use `["error", { isDesktopOnly: false }]` (see
 [Code that only runs on desktop](#code-that-only-runs-on-desktop)).
+
+### `ruleConfigs` hold only obsidianmd rules
+
+If you build your configuration from `ruleConfigs` instead of the recommended config (see
+[Using only obsidianmd rules](#using-only-obsidianmd-rules-without-the-recommended-config)), they
+now hold exactly the obsidianmd rules the recommended config sets for source files:
+
+- `@typescript-eslint/no-deprecated` is no longer in `ruleConfigs.recommendedTypeChecked`. Add it to
+  your own rules to keep it.
+- `validate-manifest` and `validate-license` are no longer in `ruleConfigs.recommended`; in a
+  source-file block they never ran. Give them blocks of their own, as that section shows.
+- `no-nodejs-modules`, `rule-custom-message` and `no-misused-promises` are new. Turn
+  `@typescript-eslint/no-misused-promises` off in the same block (see
+  [`no-misused-promises` has a new name](#no-misused-promises-has-a-new-name)).
 
 ### Community scanner configuration
 
