@@ -130,6 +130,52 @@ ruleTester.run("editor-drop-paste", editorDropPasteRule, {
                 });
             `,
         },
+        {
+            name: "a method other than on is not checked",
+            code: "workspace.off('editor-paste', (evt) => { use(evt); }); workspace.trigger('editor-drop', (evt) => { use(evt); });",
+        },
+        {
+            name: "a call that is not a method call is not checked",
+            code: "on('editor-paste', (evt) => { use(evt); });",
+        },
+        {
+            name: "an on() call without a handler is not checked",
+            code: "workspace.on('editor-paste');",
+        },
+        {
+            name: "a computed property of the event counts",
+            code: `
+                workspace.on('editor-paste', (evt) => {
+                    if (evt["defaultPrevented"]) return;
+                    evt["preventDefault"]();
+                });
+            `,
+        },
+        {
+            name: "satisfies and an angle-bracket type assertion on the event count",
+            code: `
+                workspace.on('editor-paste', (evt) => {
+                    if ((evt satisfies Event).defaultPrevented) return;
+                    (<ClipboardEvent>evt).preventDefault();
+                });
+            `,
+        },
+        {
+            name: "defaultPrevented read by destructuring assignment or under a quoted key counts",
+            code: `
+                workspace.on('editor-paste', (evt) => {
+                    let defaultPrevented;
+                    ({ defaultPrevented } = evt);
+                    if (defaultPrevented) return;
+                    evt.preventDefault();
+                });
+                workspace.on('editor-drop', (evt) => {
+                    const { "defaultPrevented": handled } = evt;
+                    if (handled) return;
+                    evt.preventDefault();
+                });
+            `,
+        },
     ],
     invalid: [
         {
@@ -273,6 +319,73 @@ ruleTester.run("editor-drop-paste", editorDropPasteRule, {
             errors: [
                 { messageId: "missingDefaultPrevented" },
                 { messageId: "missingPreventDefault" },
+            ],
+        },
+        {
+            name: "a default value of a later parameter is not the handler's body",
+            code: `
+                workspace.on("editor-paste", (evt, done = evt.defaultPrevented, stop = evt.preventDefault()) => {
+                    use(done, stop);
+                });
+            `,
+            errors: [
+                { messageId: "missingDefaultPrevented" },
+                { messageId: "missingPreventDefault" },
+            ],
+        },
+        {
+            name: "preventDefault passed as an argument is not a call of it",
+            code: `
+                workspace.on("editor-drop", (evt) => {
+                    if (evt.defaultPrevented) return;
+                    later(evt.preventDefault);
+                });
+            `,
+            errors: [
+                { messageId: "missingPreventDefault" },
+            ],
+        },
+        {
+            name: "destructuring other properties, or a computed key, does not count",
+            code: `
+                workspace.on("editor-paste", (evt) => {
+                    const { clipboardData, [defaultPrevented]: value, ...rest } = evt;
+                    const [first] = evt;
+                    evt.preventDefault();
+                });
+            `,
+            errors: [
+                { messageId: "missingDefaultPrevented" },
+            ],
+        },
+        {
+            name: "a property of another name, plain or computed, does not count",
+            code: `
+                workspace.on("editor-drop", (evt) => {
+                    if (evt.prevented || evt[defaultPrevented]) return;
+                    evt[preventDefault]();
+                });
+            `,
+            errors: [
+                { messageId: "missingDefaultPrevented" },
+                { messageId: "missingPreventDefault" },
+            ],
+        },
+        {
+            // The third argument of on() is the `this` of the handler.
+            name: "the handler is the second argument, with a context after it",
+            code: "workspace.on('editor-drop', (evt) => { use(evt); }, this);",
+            errors: [
+                { messageId: "missingDefaultPrevented" },
+                { messageId: "missingPreventDefault" },
+            ],
+        },
+        {
+            name: "both problems are reported on the handler",
+            code: "workspace.on('editor-paste', (evt) => { use(evt); });",
+            errors: [
+                { messageId: "missingDefaultPrevented", line: 1, column: 30, endLine: 1, endColumn: 52 },
+                { messageId: "missingPreventDefault", line: 1, column: 30, endLine: 1, endColumn: 52 },
             ],
         },
     ],
