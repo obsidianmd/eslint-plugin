@@ -488,13 +488,14 @@ ruleTester.run("no-unsupported-api", rule, {
             options: [{ minAppVersion: "1.10" }],
         },
         {
-            name: "a partial minAppVersion reads its missing parts as 0",
+            // "01.010" is 1.10.0, not a version semver cannot compare.
+            name: "a partial minAppVersion reads its parts as numbers",
             code: `
                 import { App } from 'obsidian';
                 declare const app: App;
                 app.renderContext;
             `,
-            options: [{ minAppVersion: "1.10" }],
+            options: [{ minAppVersion: "01.010" }],
         },
         {
             name: "members of the settings-definition types the plugin builds are not reported",
@@ -701,7 +702,7 @@ ruleTester.run("no-unsupported-api", rule, {
                 app.renderContext;
             `,
             options: [{ minAppVersion: "1.0.0" }],
-            errors: [{ messageId: "apiNotAvailable" }],
+            errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "App.renderContext", sinceVersion: "1.10.0", minAppVersion: "1.0.0" } }],
         },
         {
             name: "Method call: App.isDarkMode requires 1.10.0",
@@ -711,7 +712,7 @@ ruleTester.run("no-unsupported-api", rule, {
                 app.isDarkMode();
             `,
             options: [{ minAppVersion: "1.0.0" }],
-            errors: [{ messageId: "apiNotAvailable" }],
+            errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "App.isDarkMode", sinceVersion: "1.10.0", minAppVersion: "1.0.0" } }],
         },
         {
             name: "Property access: App.secretStorage requires 1.11.4",
@@ -721,7 +722,7 @@ ruleTester.run("no-unsupported-api", rule, {
                 app.secretStorage;
             `,
             options: [{ minAppVersion: "1.10.0" }],
-            errors: [{ messageId: "apiNotAvailable" }],
+            errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "App.secretStorage", sinceVersion: "1.11.4", minAppVersion: "1.10.0" } }],
         },
         {
             name: "new SecretComponent requires 1.11.1",
@@ -732,7 +733,7 @@ ruleTester.run("no-unsupported-api", rule, {
                 const secret = new SecretComponent(app, el);
             `,
             options: [{ minAppVersion: "1.0.0" }],
-            errors: [{ messageId: "apiNotAvailable" }],
+            errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "SecretComponent", sinceVersion: "1.11.1", minAppVersion: "1.0.0" } }],
         },
         {
             name: "Class extension: AbstractInputSuggest requires 1.4.10",
@@ -741,7 +742,7 @@ ruleTester.run("no-unsupported-api", rule, {
                 declare class MySuggest extends AbstractInputSuggest<string> {}
             `,
             options: [{ minAppVersion: "1.0.0" }],
-            errors: [{ messageId: "apiNotAvailable" }],
+            errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "AbstractInputSuggest", sinceVersion: "1.4.10", minAppVersion: "1.0.0" } }],
         },
         {
             name: "Function displayTooltip requires 1.8.7",
@@ -751,7 +752,7 @@ ruleTester.run("no-unsupported-api", rule, {
                 displayTooltip(el, 'hello');
             `,
             options: [{ minAppVersion: "1.0.0" }],
-            errors: [{ messageId: "apiNotAvailable" }],
+            errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "displayTooltip", sinceVersion: "1.8.7", minAppVersion: "1.0.0" } }],
         },
         {
             name: "BaseComponent has no @since but setDisabled requires 1.2.3",
@@ -761,7 +762,7 @@ ruleTester.run("no-unsupported-api", rule, {
                 component.setDisabled(true);
             `,
             options: [{ minAppVersion: "1.0.0" }],
-            errors: [{ messageId: "apiNotAvailable" }],
+            errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "BaseComponent.setDisabled", sinceVersion: "1.2.3", minAppVersion: "1.0.0" } }],
         },
         {
             name: "Global augmentation: Array.findLastIndex requires 1.4.4",
@@ -770,7 +771,7 @@ ruleTester.run("no-unsupported-api", rule, {
                 [1, 2, 3].findLastIndex((x) => x > 1);
             `,
             options: [{ minAppVersion: "1.0.0" }],
-            errors: [{ messageId: "apiNotAvailable" }],
+            errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "Array.findLastIndex", sinceVersion: "1.4.4", minAppVersion: "1.0.0" } }],
         },
         {
             name: "Function getFrontMatterInfo requires 1.5.7",
@@ -779,7 +780,7 @@ ruleTester.run("no-unsupported-api", rule, {
                 getFrontMatterInfo('---\\nfoo: bar\\n---');
             `,
             options: [{ minAppVersion: "1.0.0" }],
-            errors: [{ messageId: "apiNotAvailable" }],
+            errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "getFrontMatterInfo", sinceVersion: "1.5.7", minAppVersion: "1.0.0" } }],
         },
         {
             name: "Function setTooltip requires 1.4.4",
@@ -789,7 +790,7 @@ ruleTester.run("no-unsupported-api", rule, {
                 setTooltip(el, 'hello');
             `,
             options: [{ minAppVersion: "1.0.0" }],
-            errors: [{ messageId: "apiNotAvailable" }],
+            errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "setTooltip", sinceVersion: "1.4.4", minAppVersion: "1.0.0" } }],
         },
         {
             name: "super.setValue in AbstractInputSuggest subclass requires 1.4.10",
@@ -805,7 +806,10 @@ ruleTester.run("no-unsupported-api", rule, {
                 }
             `,
             options: [{ minAppVersion: "1.0.0" }],
-            errors: [{ messageId: "apiNotAvailable" }, { messageId: "apiNotAvailable" }],
+            errors: [
+                { messageId: "apiNotAvailable", data: { qualifiedName: "AbstractInputSuggest", sinceVersion: "1.4.10", minAppVersion: "1.0.0" } },
+                { messageId: "apiNotAvailable", data: { qualifiedName: "AbstractInputSuggest.setValue", sinceVersion: "1.4.10", minAppVersion: "1.0.0" } },
+            ],
         },
         // Only class declarations were checked.
         {
@@ -857,14 +861,14 @@ ruleTester.run("no-unsupported-api", rule, {
             errors: [{ messageId: "apiNotAvailable" }],
         },
         {
-            name: "SecretStorage requires 1.11.1 but SecretStorage.setSecret requires 1.11.4,",
+            name: "a member is checked against its own @since: SecretStorage.setSecret requires 1.11.4",
             code: `
                 import { SecretStorage } from 'obsidian';
                 declare const storage: SecretStorage;
                 storage.setSecret('key', 'value');
             `,
             options: [{ minAppVersion: "1.11.1" }],
-            errors: [{ messageId: "apiNotAvailable" }],
+            errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "SecretStorage.setSecret", sinceVersion: "1.11.4", minAppVersion: "1.11.1" } }],
         },
         {
             name: "requireApiVersion with a let variable is not a guard",
@@ -1249,7 +1253,7 @@ ruleTester.run("no-unsupported-api", rule, {
                 }
             `,
             options: [{ minAppVersion: "1.0.0" }],
-            errors: [{ messageId: "apiNotAvailable" }],
+            errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "SettingPage", sinceVersion: "1.13.0", minAppVersion: "1.0.0" } }],
         },
         {
             name: "a member of a runtime-provided interface is still reported",
@@ -1259,7 +1263,7 @@ ruleTester.run("no-unsupported-api", rule, {
                 config.filters;
             `,
             options: [{ minAppVersion: "1.0.0" }],
-            errors: [{ messageId: "apiNotAvailable" }],
+            errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "BasesConfigFile.filters", sinceVersion: "1.10.0", minAppVersion: "1.0.0" } }],
         },
         {
             // The repo's own manifest.json says 0.15.0.
