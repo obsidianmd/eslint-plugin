@@ -115,6 +115,16 @@ const METHOD_STRING_ARG_POS: Record<string, number> = {
     addOption: 1, // DropdownComponent.addOption(value, label) - label is second
 };
 
+// Obsidian's DOM helpers that take a DomElementInfo or SvgElementInfo, mapped
+// to the position of that options argument: createEl(tag, o), createSvg(tag, o),
+// createDiv(o) and createSpan(o). A string there is a CSS class, not text.
+const CREATE_OPTIONS_ARG_POS = new Map<string, number>([
+    ["createEl", 1],
+    ["createSvg", 1],
+    ["createDiv", 0],
+    ["createSpan", 0],
+]);
+
 // HTML attributes that contain user-facing text
 const ATTR_TEXT_KEYS = new Set(["aria-label", "aria-description", "title", "placeholder"]);
 
@@ -288,12 +298,14 @@ export default ruleCreator({
             },
         });
 
-        // Checks createEl calls for text properties in options object
-        function checkCreateEl(node: TSESTree.CallExpression) {
-            // createEl(tag, { text: "...", title: "..." })
-            if (node.arguments.length < 2) return;
-            const arg = node.arguments[1];
-            if (arg.type === TSESTree.AST_NODE_TYPES.SpreadElement) return;
+        // Checks the options object of createEl, createDiv, createSpan and
+        // createSvg for text properties
+        function checkCreateOptions(node: TSESTree.CallExpression, name: string) {
+            // createEl(tag, { text: "...", title: "..." }), createDiv({ text: "..." })
+            const idx = CREATE_OPTIONS_ARG_POS.get(name);
+            if (idx === undefined) return;
+            const arg = node.arguments[idx];
+            if (!arg || arg.type === TSESTree.AST_NODE_TYPES.SpreadElement) return;
             inspectCreateElOptions(arg, reportIfNeeded);
         }
 
@@ -332,7 +344,7 @@ export default ruleCreator({
             const callee = node.callee;
             // Handle bare calls like createEl(...)
             if (callee.type === TSESTree.AST_NODE_TYPES.Identifier) {
-                if (callee.name === "createEl") checkCreateEl(node);
+                checkCreateOptions(node, callee.name);
                 if (callee.name === "addCommand") checkAddCommand(node);
                 return;
             }
@@ -350,7 +362,7 @@ export default ruleCreator({
             }
 
             if (name === "setAttribute") checkSetAttribute(node);
-            if (name === "createEl") checkCreateEl(node);
+            checkCreateOptions(node, name);
             if (name === "addCommand") checkAddCommand(node);
         }
 
