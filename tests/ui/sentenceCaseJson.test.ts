@@ -58,6 +58,11 @@ tester.run("ui-sentence-case-json", rule as unknown as Rule.RuleModule, {
             code: '{"open":"Open Settings"}',
         },
         {
+            name: "a JSONC locale file is not checked",
+            filename: "en.jsonc",
+            code: '{"open":"Open Settings"}',
+        },
+        {
             name: "a file that only starts with 'en' is not a locale file",
             filename: "entries.json",
             code: '{"open":"Open Settings"}',
@@ -65,7 +70,10 @@ tester.run("ui-sentence-case-json", rule as unknown as Rule.RuleModule, {
         {
             name: "URLs, date formats and REST in capitals keep their casing",
             filename: "en.json",
-            code: '{"help":"Visit https://obsidian.md/help","date":"Format: YYYY-MM-DD","rest":"Use the REST API"}',
+            // Capitals in the URL and a date mid-sentence: right after a colon
+            // the first word may take any case, so "Format: YYYY-MM-DD" passed
+            // without the date being protected.
+            code: '{"help":"Visit https://example.com/Help","date":"Dates look like YYYY-MM-DD","rest":"Use the REST API"}',
         },
     ],
     invalid: [
@@ -108,6 +116,15 @@ tester.run("ui-sentence-case-json", rule as unknown as Rule.RuleModule, {
             output: '{"quote":"Say \\"hello world\\" now"}',
             options: [{ allowAutoFix: true }],
             errors: [{ messageId: "useSentenceCase" }],
+        },
+        {
+            name: "a value in a nested locale directory with a region is checked, and reported where it is",
+            filename: "_locales/en_GB/menus.json",
+            code: '{\n  "a": "Open Settings",\n  "b": "Close All"\n}',
+            errors: [
+                { messageId: "useSentenceCase", data: { suggestion: "Open settings" }, line: 2, column: 8, endLine: 2, endColumn: 23 },
+                { messageId: "useSentenceCase", data: { suggestion: "Close all" }, line: 3, column: 8, endLine: 3, endColumn: 19 },
+            ],
         },
         {
             name: "the message gives the expected text",
