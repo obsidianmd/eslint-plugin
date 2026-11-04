@@ -23,6 +23,15 @@ The uses checked are:
 - a newer method on an older class, such as `setDisabled()` on a `BaseComponent`, and Obsidian's
   additions to built-ins, such as `Array.prototype.findLastIndex`
 
+Each overload of a method has its own `@since`, and a call needs the version of the overload it
+calls: `workspace.on("files-menu", …)` needs 1.4.10 and `workspace.on("file-menu", …)` 0.9.12, and
+`workspace.duplicateLeaf(leaf)` needs 0.13.8 while `workspace.duplicateLeaf(leaf, "tab")` needs 1.1.0.
+Any other use, such as passing the method as a value, needs only its earliest overload's version, and
+so does a call that fits no single overload by its arguments' types: one that also fits an older
+overload, as `any` arguments do, or that fits none, or passes a spread argument or calls a generic
+overload. An overload without `@since`, such as the deprecated
+`setActiveLeaf(leaf, pushHistory, focus)`, needs no version.
+
 A use is allowed where a `requireApiVersion()` check proves the app is new enough, as described below.
 There is no fix: either guard the call, or raise `minAppVersion` if the plugin needs the API anyway.
 
@@ -130,7 +139,7 @@ keeping the typings current does not raise the minimum app version you support.
 Reading the `@since` tags means parsing all of `obsidian.d.ts`, so the rule caches the result in
 `.cache/eslint-plugin-obsidianmd/since-map.json` in the `node_modules` directory that holds
 `obsidian`, normally `node_modules/.cache/eslint-plugin-obsidianmd/since-map.json`. The cache records
-the `obsidian` version it was built from and the version of this plugin that built it, and the rule
-rebuilds it when either differs, so upgrading `obsidian` or this plugin refreshes it; deleting the
-file forces a rebuild. Where the file
+the `obsidian` version it was built from, the version of this plugin that built it and the format of
+the map, and the rule rebuilds it when any of them differs, so upgrading `obsidian` or this plugin
+refreshes it; deleting the file forces a rebuild. Where the file
 cannot be written, the rule parses the typings on every ESLint run instead.

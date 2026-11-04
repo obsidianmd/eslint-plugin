@@ -17,10 +17,15 @@ const obsidianVersion = (JSON.parse(fs.readFileSync(path.join(obsidianDir, "pack
 const cachePath = path.join(obsidianDir, "..", ".cache", "eslint-plugin-obsidianmd", "since-map.json");
 const pluginVersion = (JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")) as { version: string }).version;
 
+// The shape of the entries this build writes: the @since of each declaration of
+// a name, by its position in obsidian.d.ts, with null for an undated overload.
+const format = 2;
+
 interface SinceMapCache {
+    format?: number;
     obsidianPackageVersion?: string;
     pluginVersion?: string;
-    entries: [string, string][];
+    entries: unknown[];
 }
 
 const readCache = () => JSON.parse(fs.readFileSync(cachePath, "utf8")) as SinceMapCache;
@@ -29,24 +34,42 @@ const readCache = () => JSON.parse(fs.readFileSync(cachePath, "utf8")) as SinceM
 // with the @since of each kind of declaration the rule reads.
 function assertRebuilt(): void {
     const rebuilt = readCache();
+    assert.strictEqual(rebuilt.format, format);
     assert.strictEqual(rebuilt.obsidianPackageVersion, obsidianVersion);
     assert.strictEqual(rebuilt.pluginVersion, pluginVersion);
-    const entries = new Map(rebuilt.entries);
+    const entries = new Map(rebuilt.entries as [string, [number, string | null][]][]);
     assert.deepStrictEqual(
-        ["AbstractInputSuggest", "App.renderContext", "App.isDarkMode", "WorkspaceLeaf.isDeferred", "Array.findLastIndex", "setTooltip", "Notice"].map(
-            (name) => [name, entries.get(name)],
-        ),
         [
-            ["AbstractInputSuggest", "1.4.10"],
-            ["App.renderContext", "1.10.0"],
-            ["App.isDarkMode", "1.10.0"],
-            ["WorkspaceLeaf.isDeferred", "1.7.2"],
-            ["Array.findLastIndex", "1.4.4"],
-            ["setTooltip", "1.4.4"],
-            ["Notice", "0.9.7"],
+            "AbstractInputSuggest",
+            "App.renderContext",
+            "App.isDarkMode",
+            "WorkspaceLeaf.isDeferred",
+            "Array.findLastIndex",
+            "setTooltip",
+            "Notice",
+            "Workspace.duplicateLeaf",
+            "Workspace.setActiveLeaf",
+        ].map((name) => [name, entries.get(name)?.map(([, since]) => since)]),
+        [
+            ["AbstractInputSuggest", ["1.4.10"]],
+            ["App.renderContext", ["1.10.0"]],
+            ["App.isDarkMode", ["1.10.0"]],
+            ["WorkspaceLeaf.isDeferred", ["1.7.2"]],
+            ["Array.findLastIndex", ["1.4.4"]],
+            ["setTooltip", ["1.4.4"]],
+            ["Notice", ["0.9.7"]],
+            // One per overload, each with its own @since.
+            ["Workspace.duplicateLeaf", ["0.13.8", "1.1.0"]],
+            ["Workspace.setActiveLeaf", ["0.16.3", null]],
         ],
     );
+    // Each declaration by where it starts, so no two share a position.
+    const positions = entries.get("Workspace.duplicateLeaf")?.map(([position]) => position) ?? [];
+    assert.strictEqual(new Set(positions).size, 2);
 }
+
+// A map in the current shape that claims Notice needs Obsidian 99.
+const noticeFrom99 = [["Notice", [[0, "99.0.0"]]]];
 
 // no-unsupported-api keeps the map of @since versions in memory for the whole
 // process, so each run here starts a fresh process that reads the cache file.
@@ -100,9 +123,10 @@ describe("no-unsupported-api's cached @since map", function () {
         // claiming Notice needs Obsidian 99. Reusing it would report `new Notice()`.
         fs.mkdirSync(path.dirname(cachePath), { recursive: true });
         fs.writeFileSync(cachePath, JSON.stringify({
+            format,
             obsidianPackageVersion: obsidianVersion,
             pluginVersion: "0.0.1",
-            entries: [["Notice", "99.0.0"]],
+            entries: noticeFrom99,
         }));
         assert.strictEqual(await reportsForNotice(), 0);
         assertRebuilt();
@@ -110,13 +134,50 @@ describe("no-unsupported-api's cached @since map", function () {
 
     it("is reused when this plugin version wrote it", async () => {
         const current = readCache();
-        fs.writeFileSync(cachePath, JSON.stringify({ ...current, entries: [["Notice", "99.0.0"]] }));
+        fs.writeFileSync(cachePath, JSON.stringify({ ...current, entries: noticeFrom99 }));
         assert.strictEqual(await reportsForNotice(), 1);
     });
 
     it("is rebuilt when another obsidian version wrote it, though the plugin is the same", async () => {
         fs.writeFileSync(cachePath, JSON.stringify({
+            format,
             obsidianPackageVersion: "0.0.1",
+            pluginVersion,
+            entries: noticeFrom99,
+        }));
+        assert.strictEqual(await reportsForNotice(), 0);
+        assertRebuilt();
+    });
+
+    it("is rebuilt when it holds one version per name, the format before overloads, though obsidian and the plugin are the same", async () => {
+        // What this plugin wrote before each overload had its own version: a
+        // development build of the same version can have left it behind.
+        fs.writeFileSync(cachePath, JSON.stringify({
+            obsidianPackageVersion: obsidianVersion,
+            pluginVersion,
+            entries: [["Notice", "99.0.0"]],
+        }));
+        assert.strictEqual(await reportsForNotice(), 0);
+        assertRebuilt();
+    });
+
+    it("is rebuilt when another format wrote it, though obsidian and the plugin are the same", async () => {
+        for (const other of [undefined, format - 1, format + 1]) {
+            fs.writeFileSync(cachePath, JSON.stringify({
+                format: other,
+                obsidianPackageVersion: obsidianVersion,
+                pluginVersion,
+                entries: noticeFrom99,
+            }));
+            assert.strictEqual(await reportsForNotice(), 0);
+            assertRebuilt();
+        }
+    });
+
+    it("is rebuilt when its entries are not in the shape its format names", async () => {
+        fs.writeFileSync(cachePath, JSON.stringify({
+            format,
+            obsidianPackageVersion: obsidianVersion,
             pluginVersion,
             entries: [["Notice", "99.0.0"]],
         }));
