@@ -3,6 +3,8 @@ import { disableDirectives, isDisabled, problemStart } from "../disableDirective
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 import { isReportedOnGlobalDocument } from "./preferCreateEl.js";
 
+// `window` is left alone: timers belong on the main window rather than on
+// activeWindow (see prefer-window-timers), and so do many of its other uses.
 const REPLACEMENTS: Record<string, string> = {
     document: "activeDocument",
 };
@@ -10,14 +12,6 @@ const REPLACEMENTS: Record<string, string> = {
 // The files the recommended config runs prefer-create-el on, given type
 // information: its `**/*.{ts,cts,mts,tsx}` block.
 const TYPESCRIPT_FILE = /\.(?:ts|cts|mts|tsx)$/;
-
-const WINDOW_TIMER_METHODS = new Set([
-    "clearInterval",
-    "clearTimeout",
-    "requestAnimationFrame",
-    "setInterval",
-    "setTimeout",
-]);
 
 export default ruleCreator({
     meta: {
@@ -62,9 +56,6 @@ export default ruleCreator({
                 }
 
                 const replacement = REPLACEMENTS[node.name];
-                if (!replacement) {
-                    return;
-                }
 
                 // Skip identifiers in type-level constructs (interfaces, type aliases, type annotations, etc.)
                 if (isInTypeContext(node)) {
@@ -134,17 +125,6 @@ export default ruleCreator({
                     ((node.parent.type === TSESTree.AST_NODE_TYPES.BreakStatement ||
                       node.parent.type === TSESTree.AST_NODE_TYPES.ContinueStatement) &&
                      node.parent.label === node)
-                ) {
-                    return;
-                }
-
-                // Skip window.setTimeout/clearTimeout/setInterval/clearInterval — timer functions should use window, not activeWindow
-                if (
-                    node.name === "window" &&
-                    node.parent.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
-                    node.parent.object === node &&
-                    node.parent.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
-                    WINDOW_TIMER_METHODS.has(node.parent.property.name)
                 ) {
                     return;
                 }

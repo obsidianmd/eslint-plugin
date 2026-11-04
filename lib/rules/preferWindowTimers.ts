@@ -1,5 +1,5 @@
 import { type TSESLint, TSESTree } from "@typescript-eslint/utils";
-import { getTypeInfo, isGlobalWindowAt, isTimerCallTypeSafe } from "../globalWindow.js";
+import { getTypeInfo, isGlobalWindowAt, isTimerCallTypeSafe, mayLackWindowAt } from "../globalWindow.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 const TIMER_FUNCTIONS = new Set([
@@ -65,8 +65,9 @@ export default ruleCreator({
                     // window's return and accept a number. The rewrite is applied
                     // only where that cannot change a type; elsewhere it is offered
                     // as a suggestion, since the variable's type may need to change
-                    // with it.
-                    if (isTimerCallTypeSafe(node, name, types)) {
+                    // with it. So is code that may run without a window, such as
+                    // the body of `try { … } catch {}`.
+                    if (isTimerCallTypeSafe(node, name, types) && !mayLackWindowAt(context, callee)) {
                         context.report({ node: callee, messageId: "preferWindowTimer", data: { name }, fix });
                     } else {
                         context.report({
@@ -90,14 +91,19 @@ export default ruleCreator({
                 ) {
                     const name = callee.property.name;
                     const object = callee.object;
-                    context.report({
-                        node: callee,
-                        messageId: "noActiveWindowTimer",
-                        data: { name },
-                        fix: isGlobalWindowAt(context, object)
-                            ? (fixer) => fixer.replaceText(object, "window")
-                            : null,
-                    });
+                    const fix = (fixer: TSESLint.RuleFixer) => fixer.replaceText(object, "window");
+                    if (!isGlobalWindowAt(context, object)) {
+                        context.report({ node: callee, messageId: "noActiveWindowTimer", data: { name } });
+                    } else if (mayLackWindowAt(context, object)) {
+                        context.report({
+                            node: callee,
+                            messageId: "noActiveWindowTimer",
+                            data: { name },
+                            suggest: [{ messageId: "useWindowTimer", data: { name }, fix }],
+                        });
+                    } else {
+                        context.report({ node: callee, messageId: "noActiveWindowTimer", data: { name }, fix });
+                    }
                 }
             },
         };

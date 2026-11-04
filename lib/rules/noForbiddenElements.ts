@@ -128,7 +128,6 @@ export default ruleCreator({
         },
         schema: [],
         messages: {
-            doNotAttachForbiddenElements: "Creating and attaching \"{{element}}\" elements is not allowed.",
             doNotAttachForbiddenStyleElements: "Creating and attaching \"{{element}}\" elements is not allowed. For loading CSS, use a \"styles.css\" file instead, which Obsidian loads for you.",
         },
     },
@@ -158,18 +157,12 @@ export default ruleCreator({
                     isForbiddenCreateElementCall(node) ??
                     isForbiddenCreateElCall(node) ??
                     isForbiddenGlobalCreateElCall(node);
-                if (element === "style" || element === "link") {
+                // Both forbidden elements load CSS, so the message points to
+                // styles.css.
+                if (element) {
                     context.report({
                         node,
                         messageId: "doNotAttachForbiddenStyleElements",
-                        data: {
-                            element,
-                        }
-                    });
-                } else if (element) {
-                    context.report({
-                        node,
-                        messageId: "doNotAttachForbiddenElements",
                         data: {
                             element,
                         }
