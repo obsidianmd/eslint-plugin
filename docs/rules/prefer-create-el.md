@@ -37,9 +37,9 @@ Not reported:
 - calls on anything that is not a document, and `createEl()` with a tag other than `div` or `span`
 - an iframe's document; see [Iframe documents](#iframe-documents)
 
-The recommended config switches this rule off for worker and test files, which have no Obsidian DOM
-helpers; see [Web worker files](../configuration.md#web-worker-files) and
-[Test files](../configuration.md#test-files).
+The rule needs type information, so the recommended config runs it on TypeScript files only. It
+switches the rule off for worker and test files, which have no Obsidian DOM helpers; see
+[Web worker files](../configuration.md#web-worker-files) and [Test files](../configuration.md#test-files).
 
 ### Fix or suggestion
 
@@ -72,7 +72,8 @@ did, as it does with Obsidian's types. Otherwise:
 - A `createEl` of the file's own, such as an import, when the global helper is declared: a
   suggestion, since the global helper need not do what the file's `createEl()` does.
 - A result whose type would change (a `createEl()` typed to return an `HTMLElement` against a
-  `createDiv()` that returns an `HTMLDivElement`) or a spread argument: a suggestion.
+  `createDiv()` that returns an `HTMLDivElement`) or a spread argument: a suggestion. A call that is
+  a statement of its own, whose result is not used, is still fixed when only the result type differs.
 
 On an `any` value, or with no helper declared anywhere, the replacement is fixed as before. An
 optional chain is kept: `el?.createEl("div")` becomes `el?.createDiv()`, and `doc?.createElement("p")`

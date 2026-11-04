@@ -30,8 +30,9 @@ Not reported: members of the settings-definition types (`SettingDefinitionItem`,
 version. The settings classes, such as `SettingPage` and `SettingGroup`, are still reported: they are
 runtime exports, and extending one on an older Obsidian fails when the plugin loads.
 
-The recommended config does not apply this rule to [test files](../configuration.md#test-files),
-which never run in an older Obsidian.
+The rule needs type information, so the recommended config runs it on TypeScript files only. It does
+not apply the rule to [test files](../configuration.md#test-files), which never run in an older
+Obsidian.
 
 ## Guarding with `requireApiVersion`
 
@@ -73,7 +74,9 @@ api` (which reaches `api` when the check fails), and a function declaration afte
 because a declaration is hoisted and can be called before the check.
 
 A `minAppVersion` without a patch version, such as `0.15`, is read as `0.15.0`. One with no version
-in it at all proves nothing about the app, so every versioned API is reported.
+in it at all proves nothing about the app, so every versioned API is reported. With no
+`minAppVersion` at all, neither in the option nor in the `manifest.json` of the directory ESLint runs
+from, the rule reports nothing.
 
 ## Options
 

@@ -30,9 +30,9 @@ change with it:
 
 - `setTimeout()` and `setInterval()` are fixed when their result is not used (a statement on its own,
   or `void`). A timer that is stored, returned or passed on gets a suggestion.
-- `clearTimeout()` and `clearInterval()` are fixed when their argument is a `number` or `undefined`
-  (without type information: a number literal or `undefined`). A `NodeJS.Timeout` argument gets a
-  suggestion.
+- `clearTimeout()` and `clearInterval()` are fixed when their argument is a `number`, `undefined` or
+  `any`, or is left out (without type information: a number literal or `undefined`). A
+  `NodeJS.Timeout` argument gets a suggestion.
 - `requestAnimationFrame()` and `cancelAnimationFrame()` are DOM functions either way and are always
   fixed.
 - Calls on `activeWindow` are fixed: both are a `Window`.

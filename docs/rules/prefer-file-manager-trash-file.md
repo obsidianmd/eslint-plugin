@@ -20,3 +20,5 @@ await this.app.fileManager.trashFile(file); // respects the user's choice
 
 There is no fix. Not reported: other `Vault` methods, `delete()` on anything that is not a `Vault`,
 such as a `Map` or a `Set`, and the lower-level adapter, such as `this.app.vault.adapter.remove()`.
+
+The rule needs type information, so the recommended config runs it on TypeScript files only.

@@ -9,7 +9,7 @@
 ## What is reported
 
 Inside the view factory passed to `registerView()` on your plugin, assigning a newly created view to a
-property of the plugin, through `this` or a `const` alias of it such as `const self = this`:
+property of the plugin, through `this` or a variable set to it, such as `const self = this`:
 
 ```ts
 this.registerView(VIEW_TYPE, (leaf) => (this.view = new MyView(leaf))); // reported
@@ -19,7 +19,8 @@ this.registerView(VIEW_TYPE, (leaf) => new MyView(leaf)); // create and return i
 The plugin and the view are recognised by type: the call must be on a class that extends `Plugin`, and
 the created object's class must extend `View`. The assignment is found in an arrow function's
 expression body, or as a statement or `return` directly inside the factory's body. To reach an open
-view later, use `this.app.workspace.getLeavesOfType(VIEW_TYPE)`.
+view later, use `this.app.workspace.getLeavesOfType(VIEW_TYPE)`. The rule needs type information, so
+the recommended config runs it on TypeScript files only.
 
 There is no fix. Not reported, because the rule only looks for the direct form above:
 

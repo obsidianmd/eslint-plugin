@@ -10,8 +10,8 @@
 
 Reading the app language the way some plugins used to, before Obsidian exposed it:
 
-- `localStorage.getItem("language")`, also through a window's storage such as
-  `window.localStorage` or `activeWindow.localStorage`
+- `localStorage.getItem("language")`, also through any property named `localStorage`, such as a
+  window's storage: `window.localStorage` or `activeWindow.localStorage`
 - importing or `require()`-ing `i18next-browser-languagedetector`, which detects the browser's language
   rather than Obsidian's
 
