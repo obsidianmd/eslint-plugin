@@ -272,6 +272,41 @@ export const third = { c: "Close All Tabs" }, fourth = { d: "Save All Files" };`
                 errors: [{ messageId: "useSentenceCase" }],
             },
             {
+                name: "a template literal is judged and fixed on its value, its escapes kept",
+                filename: "en.ts",
+                code: "export default { a: `Open Settings\\tNow`, b: `Open\\u0020Settings`, c: `Line One\\nLine Two` };",
+                output: "export default { a: `Open settings\\tnow`, b: `Open\\u0020settings`, c: `Line one\\nline two` };",
+                options: [{ allowAutoFix: true }],
+                errors: [
+                    { messageId: "useSentenceCase", data: { suggestion: "Open settings\tnow" } },
+                    { messageId: "useSentenceCase", data: { suggestion: "Open settings" } },
+                    { messageId: "useSentenceCase", data: { suggestion: "Line one\nline two" } },
+                ],
+            },
+            {
+                name: "a string keeps its quotes and escapes",
+                filename: "en.ts",
+                code: String.raw`export default { a: 'It\'s Open Now', b: "Say \"Open\" Now\n", c: '\u0041pply Settings' };`,
+                output: String.raw`export default { a: 'It\'s open now', b: "Say \"open\" now\n", c: '\u0041pply settings' };`,
+                options: [{ allowAutoFix: true }],
+                errors: [
+                    { messageId: "useSentenceCase", data: { suggestion: "It's open now" } },
+                    { messageId: "useSentenceCase", data: { suggestion: 'Say "open" now\n' } },
+                    { messageId: "useSentenceCase", data: { suggestion: "Apply settings" } },
+                ],
+            },
+            {
+                name: "a letter that has to change but is written as an escape is reported without a fix",
+                filename: "en.ts",
+                code: String.raw`export default { a: 'Open \u0053ettings', b: ` + "`Open \\x53ettings`" + " };",
+                output: null,
+                options: [{ allowAutoFix: true }],
+                errors: [
+                    { messageId: "useSentenceCase", data: { suggestion: "Open settings" } },
+                    { messageId: "useSentenceCase", data: { suggestion: "Open settings" } },
+                ],
+            },
+            {
                 name: "the string itself is reported",
                 filename: "en.ts",
                 code: `export default { a: "Enable Auto Reveal" };`,

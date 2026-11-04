@@ -3,6 +3,7 @@ import { docsUrl, ruleCreator } from "../../ruleCreator.js";
 import {
     createSentenceCaseReporter,
     getContextFilename,
+    getStaticStringValue,
     isEnglishLocalePath,
     resolveSentenceCaseConfig,
     SentenceCaseRuleOptions,
@@ -23,7 +24,8 @@ function isEnglishLocaleModule(
     return file != null && isEnglishLocalePath(file, ["ts", "js", "cjs", "mjs"]);
 }
 
-// Recursively collects all string literals from nested objects and arrays
+// Recursively collects all string literals, and template literals without
+// `${…}`, from nested objects and arrays, each with its value
 function collectStringLiterals(
     root: TSESTree.Expression,
     cb: (node: TSESTree.Node, value: string) => void,
@@ -34,15 +36,9 @@ function collectStringLiterals(
         if (!popped) continue;
         const current = unwrapExpression(popped);
         if (!current) continue;
-        if (current.type === TSESTree.AST_NODE_TYPES.Literal) {
-            if (typeof current.value === "string") cb(current, current.value);
-            continue;
-        }
-        if (current.type === TSESTree.AST_NODE_TYPES.TemplateLiteral) {
-            if (current.expressions.length === 0) {
-                const raw = current.quasis.map((q) => q.value.raw).join("");
-                cb(current, raw);
-            }
+        if (current.type === TSESTree.AST_NODE_TYPES.Literal || current.type === TSESTree.AST_NODE_TYPES.TemplateLiteral) {
+            const value = getStaticStringValue(current);
+            if (value !== null) cb(current, value);
             continue;
         }
         if (current.type === TSESTree.AST_NODE_TYPES.ObjectExpression) {

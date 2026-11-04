@@ -23,10 +23,14 @@ export { strings }; // checked as well, as are `export default strings` and `exp
 The object may carry `as const`, `satisfies …` or another type assertion, as in
 `export default { … } as const satisfies Record<string, string>`.
 
-The message gives the expected text, and with `allowAutoFix: true`, `--fix` rewrites the string as
-a double-quoted string. Values are judged as in [`ui/sentence-case`](sentence-case.md): URLs, date
-formats such as `YYYY-MM-DD`, brand names and "REST" written in capitals keep their casing. The
-options work as in [`ui/sentence-case`](sentence-case.md#options).
+The message gives the expected text, and with `allowAutoFix: true`, `--fix` changes the case of the
+letters that need it and keeps the string's quotes or backticks and every escape as written; a
+string where such a letter is written as an escape (`\u0053`) is reported without a fix. A template
+literal is judged on its value, with its escapes decoded. Values are judged as in
+[`ui/sentence-case`](sentence-case.md): URLs, date formats such as `YYYY-MM-DD`, brand names and
+"REST" written in capitals keep their casing, and a brand that is also an ordinary word, such as
+"Windows", may be written as that word ("Close all windows"). The options work as in
+[`ui/sentence-case`](sentence-case.md#options).
 
 Not reported: keys, an object that is not exported, an object assigned to `module.exports`, strings
 in functions, template literals with `${…}`, and modules that are not English locale files, such as
