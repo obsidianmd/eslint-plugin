@@ -1,6 +1,7 @@
 import assert from "node:assert";
 import { execFile } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -127,5 +128,51 @@ describe("no-unsupported-api's cached @since map", function () {
         fs.writeFileSync(cachePath, "{ not json");
         assert.strictEqual(await reportsForNotice(), 0);
         assertRebuilt();
+    });
+});
+
+// getManifest() reads manifest.json from the process cwd once, so the rule
+// without a minAppVersion runs in a fresh process whose cwd has no manifest.
+describe("no-unsupported-api without a minAppVersion", function () {
+    this.timeout(60000);
+
+    it("reports nothing, and does not fail, with neither the option nor a manifest", async () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), "no-unsupported-api-"));
+        const script = `
+            import path from "node:path";
+            const { Linter } = await import(${JSON.stringify(pathToFileURL(requireHere.resolve("eslint")).href)});
+            const { default: tseslint } = await import(${JSON.stringify(pathToFileURL(requireHere.resolve("typescript-eslint")).href)});
+            const { default: rule } = await import(${JSON.stringify(ruleUrl)});
+            const root = ${JSON.stringify(repoRoot)};
+            // The Linter works from the repo; only the process cwd has no manifest.
+            // The same code with the option is the control: the rule does run.
+            const lint = (entry) => new Linter({ cwd: root }).verify(
+                'import { App } from "obsidian";\\ndeclare const app: App;\\napp.renderContext;\\n',
+                [{
+                    files: ["**/*.ts"],
+                    languageOptions: {
+                        parser: tseslint.parser,
+                        parserOptions: { project: "./tsconfig.json", tsconfigRootDir: root, disallowAutomaticSingleRunInference: true },
+                    },
+                    plugins: { obsidianmd: { rules: { "no-unsupported-api": rule } } },
+                    rules: { "obsidianmd/no-unsupported-api": entry },
+                }],
+                path.join(root, "file.ts"),
+            ).map((m) => m.message);
+            console.log(JSON.stringify([lint("error"), lint(["error", { minAppVersion: "1.0.0" }])]));
+        `;
+        try {
+            const { stdout } = await promisify(execFile)(
+                process.execPath,
+                ["--import", tsxLoader, "--input-type=module", "-e", script],
+                { cwd: dir },
+            );
+            assert.deepStrictEqual(JSON.parse(stdout.trim().split("\n").pop() ?? "null"), [
+                [],
+                ["'App.renderContext' requires Obsidian v1.10.0, but minAppVersion is 1.0.0."],
+            ]);
+        } finally {
+            fs.rmSync(dir, { recursive: true });
+        }
     });
 });
