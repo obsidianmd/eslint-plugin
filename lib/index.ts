@@ -567,40 +567,28 @@ const recommendedWithLocalesEn: Config[] = defineConfig([
     {
         plugins: { json, obsidianmd: plugin },
         language: "json/json",
+        // The files the rule's own path check (isEnglishLocalePath) accepts:
+        // named "en" in any case, alone or followed by ".", "-" or "_" and
+        // more (en-US, en_GB, en.messages), or anywhere under a directory
+        // named so. Not english.json, entries.json or env.json.
         files: [
-            "**/en.json",
-            "**/en*.json",
-            "**/en/*.json",
-            "**/en/**/*.json",
+            "**/[eE][nN].json",
+            "**/[eE][nN][._-]?*.json",
+            "**/[eE][nN]/**/*.json",
+            "**/[eE][nN][._-]?*/**/*.json",
         ],
         rules: {
             "obsidianmd/ui/sentence-case-json": "warn",
         },
     },
-    // TS/JS English locale modules
+    // TS/JS English locale modules, named as the JSON files above
     {
         plugins: { obsidianmd: plugin },
         files: [
-            "**/en.ts",
-            "**/en.js",
-            "**/en.cjs",
-            "**/en.mjs",
-            "**/en-*.ts",
-            "**/en-*.js",
-            "**/en-*.cjs",
-            "**/en-*.mjs",
-            "**/en_*.ts",
-            "**/en_*.js",
-            "**/en_*.cjs",
-            "**/en_*.mjs",
-            "**/en/*.ts",
-            "**/en/*.js",
-            "**/en/*.cjs",
-            "**/en/*.mjs",
-            "**/en/**/*.ts",
-            "**/en/**/*.js",
-            "**/en/**/*.cjs",
-            "**/en/**/*.mjs",
+            "**/[eE][nN].{ts,js,cjs,mjs}",
+            "**/[eE][nN][._-]?*.{ts,js,cjs,mjs}",
+            "**/[eE][nN]/**/*.{ts,js,cjs,mjs}",
+            "**/[eE][nN][._-]?*/**/*.{ts,js,cjs,mjs}",
         ],
         rules: {
             "obsidianmd/ui/sentence-case-locale-module": "warn",
