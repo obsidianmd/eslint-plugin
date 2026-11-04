@@ -325,14 +325,54 @@ function looksLikePath(text: string, brands: readonly string[]): boolean {
     if (/(?:^|[\s'"(])\.[\w-]+\//.test(text)) return true;
     // Check for words ending in a file extension
     // Examples: "src/main.ts", "C:\\Users\\file.txt", "/home/user/doc.pdf", "file.txt", "obsidian.md"
+    //
+    // The matches come in order, so the start of each one's word is found by
+    // going on from where the last one's search stopped: searching back from
+    // each dot was quadratic in a long text of brands such as "Node.js".
+    let wordBreak = -1;
+    let searched = 0;
+    let longestBrand: number | undefined;
     for (const m of text.matchAll(/\.([a-z0-9]{1,4})(?=['"\s]|$)/gi)) {
         const dot = m.index;
         // "1.2", "v2.0.1", "$1.99": digits on both sides of the dot
         if (/^[0-9]+$/.test(m[1]) && /[0-9]/.test(text[dot - 1] ?? "")) continue;
-        const wordStart = Math.max(...[" ", "\t", "\n", "'", "\"", "("].map((c) => text.lastIndexOf(c, dot))) + 1;
-        const word = text.slice(wordStart, dot + m[0].length).toLowerCase();
-        if (brands.some((brand) => brand.toLowerCase() === word)) continue;
+        // The word starts after the last space, tab, line feed, quote or "(" before the dot
+        for (; searched < dot; searched++) {
+            if (WORD_BREAKS.has(text[searched])) wordBreak = searched;
+        }
+        const end = dot + m[0].length;
+        // Lower-casing gives at least one code point for each code point, so a
+        // word over twice as long as the longest brand in lower case is none.
+        longestBrand ??= Math.max(0, ...brands.map((brand) => brand.toLowerCase().length));
+        if (end - (wordBreak + 1) <= 2 * longestBrand) {
+            const word = text.slice(wordBreak + 1, end).toLowerCase();
+            if (brands.some((brand) => brand.toLowerCase() === word)) continue;
+        }
         return true;
+    }
+    return false;
+}
+
+// What ends the word before a file extension in looksLikePath()
+const WORD_BREAKS = new Set([" ", "\t", "\n", "'", "\"", "("]);
+
+// Whether `text` has an HTML tag: "<", an optional "/", a letter, and a ">"
+// anywhere after it, as /<\/?[a-z][^>]*>/i matches. The first tag start
+// leaves the most text for the ">", so it is the only one to look at; the
+// regex itself retries from every "<" and is quadratic on "<a<a<a…".
+function hasHtmlTag(text: string): boolean {
+    const start = /<\/?[a-z]/i.exec(text);
+    return start !== null && text.includes(">", start.index + start[0].length);
+}
+
+// Whether `text` has a `{…}` placeholder with something between the braces,
+// as /\{[^}]+\}/ matches (and so `${…}`). As in hasHtmlTag(), the first "{"
+// with something after it is the only one to look at.
+function hasBracePlaceholder(text: string): boolean {
+    for (let i = text.indexOf("{"); i !== -1; i = text.indexOf("{", i + 1)) {
+        if (i + 1 < text.length && text[i + 1] !== "}") {
+            return text.includes("}", i + 2);
+        }
     }
     return false;
 }
@@ -342,10 +382,10 @@ export function isSkippableString(text: string, brands: readonly string[] = DEFA
     if (!text) return true;
     // Inline code or HTML tags
     // Examples: "Use `npm install`", "<b>Bold text</b>", "</div>"
-    if (text.includes("`") || /<\/?[a-z][^>]*>/i.test(text)) return true;
+    if (text.includes("`") || hasHtmlTag(text)) return true;
     // Template placeholders
     // Examples: "Hello ${name}", "Welcome {user}", "File %s saved", "%1$s items"
-    if (/(\$\{[^}]+\}|\{[^}]+\}|%\d*\$?s|%s)/.test(text)) return true;
+    if (hasBracePlaceholder(text) || /%\d*\$?s/.test(text)) return true;
     // File paths
     if (looksLikePath(text, brands)) return true;
     // Keyboard shortcuts
@@ -404,6 +444,7 @@ interface BrandMatch {
 // "Windows", is not one where it is written as that word, in lower case.
 function collectBrandMatches(sentence: string, brands: readonly string[], ambiguousBrands: ReadonlySet<string>): BrandMatch[] {
     const matches: BrandMatch[] = [];
+    const taken = new RangeSet(sentence.length);
     for (const brand of brands) {
         const pattern = new RegExp(`(^|[^A-Za-z0-9])(${escapeRegExp(brand)})(?=$|[^A-Za-z0-9])`, "gi");
         let m: RegExpExecArray | null;
@@ -411,14 +452,52 @@ function collectBrandMatches(sentence: string, brands: readonly string[], ambigu
             if (ambiguousBrands.has(brand) && m[2] === brand.toLowerCase()) continue;
             const start = m.index + m[1].length;
             const end = start + brand.length;
-            if (matches.some((existing) => !(end <= existing.start || start >= existing.end))) {
+            if (taken.overlaps(start, end)) {
                 continue;
             }
+            taken.add(start, end);
             matches.push({ start, end, canonical: brand });
         }
     }
     matches.sort((a, b) => a.start - b.start);
     return matches;
+}
+
+// Non-empty character ranges [start, end) of a text, for overlap checks: by a
+// scan while there are few, and by a flag per character once there are many.
+// Checking each of many tokens against each of many ranges was quadratic in
+// a long text full of URLs or brand names; for a short text the scan is
+// cheaper than the flags.
+class RangeSet {
+    private readonly ranges: { start: number; end: number }[] = [];
+    private covered: Uint8Array | undefined;
+
+    private readonly length: number;
+
+    constructor(length: number) {
+        this.length = length;
+    }
+
+    add(start: number, end: number): void {
+        this.ranges.push({ start, end });
+        if (this.covered) {
+            this.covered.fill(1, start, end);
+        } else if (this.ranges.length > 16) {
+            this.covered = new Uint8Array(this.length);
+            for (const range of this.ranges) this.covered.fill(1, range.start, range.end);
+        }
+    }
+
+    // Whether [start, end) shares a character with one of the ranges
+    overlaps(start: number, end: number): boolean {
+        if (!this.covered) {
+            return this.ranges.some((range) => start < range.end && end > range.start);
+        }
+        for (let i = start; i < end; i++) {
+            if (this.covered[i] === 1) return true;
+        }
+        return false;
+    }
 }
 
 // Merges overlapping or adjacent character ranges into single ranges
@@ -469,11 +548,10 @@ const STRONG_DATE_FORMAT_TOKEN = "(?:YYYY|YY|MMMM|MMM|MM|DD|dddd|ddd|HH|hh|mm|ss
 // or a space after an optional comma
 const DATE_FORMAT_SEPARATOR = "(?:[-/.:_]|,?\\s)";
 
-// Text whose casing is data, not prose, so it is never re-cased: URLs, and two
-// or more date format tokens joined by separators. Each pattern is global.
+// Text whose casing is data, not prose, so it is never re-cased: URLs (see
+// urlRanges() as well), and two or more date format tokens joined by
+// separators. Each pattern is global.
 const PROTECTED_PATTERNS: readonly RegExp[] = [
-    // Examples: "https://obsidian.md/help", "obsidian://open?vault=Notes"
-    /\b[a-z][a-z0-9+.-]*:\/\/\S+/gi,
     // Examples: "www.example.com/API"
     /\bwww\.\S+/gi,
     // Examples: "YYYY-MM-DD", "DD/MM/YYYY", "HH:mm:ss"
@@ -489,17 +567,65 @@ const PROTECTED_PATTERNS: readonly RegExp[] = [
     ),
     // Tokens joined by spaces or commas, one of them a token that is never a word
     // Examples: "MMM D, YYYY", "DD MMM YYYY", "dddd, MMMM Do", "YYYY-MM-DD HH:mm"
+    // A match is only tried from the first token of a run: where one fails
+    // from a token, it fails from each token after it, and trying each of
+    // them made a long run of tokens without a match quadratic ("Do Do Do …").
     new RegExp(
-        `(?<![A-Za-z0-9])(?:(?:${SPACED_DATE_FORMAT_TOKEN}${DATE_FORMAT_SEPARATOR})+${STRONG_DATE_FORMAT_TOKEN}` +
+        `(?<![A-Za-z0-9])(?<!(?<![A-Za-z0-9])${SPACED_DATE_FORMAT_TOKEN}${DATE_FORMAT_SEPARATOR})` +
+            `(?:(?:${SPACED_DATE_FORMAT_TOKEN}${DATE_FORMAT_SEPARATOR})+${STRONG_DATE_FORMAT_TOKEN}` +
             `|${STRONG_DATE_FORMAT_TOKEN}(?=${DATE_FORMAT_SEPARATOR}${SPACED_DATE_FORMAT_TOKEN}))` +
             `(?:${DATE_FORMAT_SEPARATOR}${SPACED_DATE_FORMAT_TOKEN})*(?![A-Za-z0-9])`,
         "g",
     ),
 ];
 
+/**
+ * The ranges of the URLs in `text`, as /\b[a-z][a-z0-9+.-]*:\/\/\S+/gi finds
+ * them: "https://obsidian.md/help", "obsidian://open?vault=Notes". The regex
+ * retries from every word start in a run of scheme characters that does not
+ * end in "://", which is quadratic on text such as "a.a.a…". Here each "://"
+ * looks back over its own run once: the URL starts at the run's first letter
+ * that starts a word, and ends at the next whitespace.
+ */
+export function urlRanges(text: string): number[][] {
+    const ranges: number[][] = [];
+    let searchFrom = 0;
+    for (;;) {
+        const colon = text.indexOf("://", searchFrom);
+        if (colon === -1) {
+            return ranges;
+        }
+        searchFrom = colon + 1;
+        const rest = colon + 3;
+        if (rest >= text.length || /\s/.test(text[rest])) {
+            continue;
+        }
+        let runStart = colon;
+        while (runStart > 0 && /[A-Za-z0-9+.-]/.test(text[runStart - 1])) {
+            runStart--;
+        }
+        let start = -1;
+        for (let i = runStart; i < colon; i++) {
+            if (/[A-Za-z]/.test(text[i]) && (i === 0 || !/\w/.test(text[i - 1]))) {
+                start = i;
+                break;
+            }
+        }
+        if (start === -1) {
+            continue;
+        }
+        let end = rest;
+        while (end < text.length && !/\s/.test(text[end])) {
+            end++;
+        }
+        ranges.push([start, end]);
+        searchFrom = end;
+    }
+}
+
 // Finds the character ranges of text that must keep its casing
 function collectProtectedRanges(sentence: string): number[][] {
-    const ranges: number[][] = [];
+    const ranges: number[][] = urlRanges(sentence);
     for (const pattern of PROTECTED_PATTERNS) {
         pattern.lastIndex = 0;
         let m: RegExpExecArray | null;
@@ -508,11 +634,6 @@ function collectProtectedRanges(sentence: string): number[][] {
         }
     }
     return mergeRanges(ranges);
-}
-
-// Checks if the range [start, end) overlaps any of the given ranges
-function rangeOverlaps(ranges: number[][], start: number, end: number): boolean {
-    return ranges.some((r) => start < r[1] && end > r[0]);
 }
 
 // Cases one part of a hyphenated word: acronyms upper, all-caps case-agnostic
@@ -540,9 +661,32 @@ const LEADING_MARKER_RE = /^(?:[^\p{L}\p{N}]+|\d{1,3}[.)])$/u;
 // "[Beta] Feature" or "(Beta) Sync": the index of the word after it, which
 // keeps the case it is written in, or -1. A bracket that closes the text, as
 // in "(Open settings)", is not a label.
-function leadingLabelEnd(sentence: string): number {
-    const m = /^[^\p{L}\p{N}]*?[[(][^[\]()]*[A-Za-z0-9][^[\]()]*[\])]\s+(?=[A-Za-z0-9])/u.exec(sentence);
-    return m ? m[0].length : -1;
+//
+// It is what /^[^\p{L}\p{N}]*?[[(][^[\]()]*[A-Za-z0-9][^[\]()]*[\])]\s+(?=[A-Za-z0-9])/u
+// matches, without the regex's backtracking, quadratic on a "(" and a long
+// text with no closing bracket: an opening bracket before the first letter or
+// digit, closed by the first bracket after it, with an ASCII letter or digit
+// between, then whitespace and an ASCII letter or digit.
+export function leadingLabelEnd(sentence: string): number {
+    const firstWordChar = sentence.search(/[\p{L}\p{N}]/u);
+    const prefixEnd = firstWordChar === -1 ? sentence.length : firstWordChar;
+    for (let open = 0; open < prefixEnd; open++) {
+        if (sentence[open] !== "[" && sentence[open] !== "(") continue;
+        let close = open + 1;
+        let hasWordChar = false;
+        while (close < sentence.length && !"[]()".includes(sentence[close])) {
+            hasWordChar ||= /[A-Za-z0-9]/.test(sentence[close]);
+            close++;
+        }
+        if (hasWordChar && (sentence[close] === "]" || sentence[close] === ")")) {
+            let end = close + 1;
+            while (end < sentence.length && /\s/.test(sentence[end])) end++;
+            if (end > close + 1 && /[A-Za-z0-9]/.test(sentence[end] ?? "")) return end;
+        }
+        // No opening bracket before `close` can be closed past it: go on from there.
+        open = close - 1;
+    }
+    return -1;
 }
 
 // Applies sentence case transformation to a single sentence. With
@@ -551,9 +695,13 @@ function leadingLabelEnd(sentence: string): number {
 function transformSentence(sentence: string, opts: ReturnType<typeof normalizeOptions>, firstWordAnyCase: boolean): string {
     // URLs and format strings keep their casing, brand names inside them included
     const protectedRanges = collectProtectedRanges(sentence);
+    const protectedChars = new RangeSet(sentence.length);
+    for (const [start, end] of protectedRanges) protectedChars.add(start, end);
     // Find all brand occurrences to preserve their casing
     const brandMatches = collectBrandMatches(sentence, opts.brands, opts.ambiguousBrands)
-        .filter((match) => !rangeOverlaps(protectedRanges, match.start, match.end));
+        .filter((match) => !protectedChars.overlaps(match.start, match.end));
+    const brandChars = new RangeSet(sentence.length);
+    for (const match of brandMatches) brandChars.add(match.start, match.end);
     const brandRanges = mergeRanges(brandMatches.map((match) => [match.start, match.end]));
     const labelEnd = leadingLabelEnd(sentence);
 
@@ -642,9 +790,9 @@ function transformSentence(sentence: string, opts: ReturnType<typeof normalizeOp
         const end = start + token.length;
 
         // Skip if token overlaps brand
-        if (brandMatches.some((match) => !(end <= match.start || start >= match.end))) continue;
+        if (brandChars.overlaps(start, end)) continue;
         // Skip if token is part of a URL or format string
-        if (rangeOverlaps(protectedRanges, start, end)) continue;
+        if (protectedChars.overlaps(start, end)) continue;
 
         // Skip first token if it's the first alpha token (already handled above)
         if (firstAlpha >= 0 && start <= firstAlpha && firstAlpha < end) continue;
@@ -732,7 +880,10 @@ function sentenceCaseSuggestionWithOptions(
 
     const segments: Segment[] = [];
     let lastIndex = 0;
-    const delimiterRe = /([.?!:;]+)(\s+|$)/g;
+    // A run of punctuation is only tried from its start: a try from inside
+    // the run fails wherever one from its start failed, and retrying from
+    // each character makes a long run quadratic.
+    const delimiterRe = /(?<![.?!:;])([.?!:;]+)(\s+|$)/g;
     let match: RegExpExecArray | null;
     while ((match = delimiterRe.exec(text))) {
         const punctStart = match.index;
@@ -745,9 +896,10 @@ function sentenceCaseSuggestionWithOptions(
 
     if (lastIndex < text.length) {
         const remainder = text.slice(lastIndex);
-        const trailingWhitespaceMatch = remainder.match(/\s+$/);
-        const whitespace = trailingWhitespaceMatch ? trailingWhitespaceMatch[0] : "";
-        const core = whitespace ? remainder.slice(0, -whitespace.length) : remainder;
+        // trimEnd() removes what \s matches. /\s+$/ would retry from every
+        // whitespace character that is not at the end, quadratic on a long run.
+        const core = remainder.trimEnd();
+        const whitespace = remainder.slice(core.length);
         segments.push({ core, punct: "", whitespace });
     }
 

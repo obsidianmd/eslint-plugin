@@ -30,6 +30,9 @@ const MODULE_SCOPES = new Set<string>(["module", "global", "tsModule"]);
 
 type MessageIds = "preferActive" | "useActiveDocument" | "useActiveDocumentSince";
 
+// Each scope's references by the identifier that makes them.
+const referencesByScope = new WeakMap<object, Map<TSESTree.Node, TSESLint.Scope.Reference>>();
+
 export default ruleCreator<MinAppVersionOptions, MessageIds>({
     meta: {
         type: "suggestion" as const,
@@ -232,12 +235,24 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
             return !isComparedOrStored(node);
         }
 
-        // The reference `node` makes, from the scope it is in.
+        // The reference `node` makes, from the scope it is in. Each scope's
+        // references are mapped once (referencesByScope): searching them for
+        // each `document` was quadratic in a scope with many references.
         function findReference(
             scope: ReturnType<typeof context.sourceCode.getScope>,
             node: TSESTree.Identifier,
         ): TSESLint.Scope.Reference | undefined {
-            return scope.references.find((ref) => ref.identifier === node);
+            let references = referencesByScope.get(scope);
+            if (!references) {
+                references = new Map();
+                for (const reference of scope.references) {
+                    if (!references.has(reference.identifier)) {
+                        references.set(reference.identifier, reference);
+                    }
+                }
+                referencesByScope.set(scope, references);
+            }
+            return references.get(node);
         }
 
         // Whether the document itself is compared, as in `target === document`,
@@ -349,7 +364,9 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
         function findVariable(scope: ReturnType<typeof context.sourceCode.getScope>, name: string): { defs: unknown[] } | null {
             let current: typeof scope | null = scope;
             while (current) {
-                const variable = current.variables.find((v) => v.name === name);
+                // By name, rather than a search of each scope's variables: the
+                // global scope holds every name of TypeScript's lib.
+                const variable = current.set.get(name);
                 if (variable) {
                     return variable;
                 }

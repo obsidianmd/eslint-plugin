@@ -194,12 +194,12 @@ function decidingConditions(node: TSESTree.Node): TSESTree.Node[] {
                 if (parent.test && parent.test !== child) {
                     conditions.push(parent.test);
                 }
-                conditions.push(...earlierExitTests(parent.consequent, child));
+                conditions.push(...earlierExitTests(parent.consequent, child, parent.test !== child));
                 break;
             case TSESTree.AST_NODE_TYPES.BlockStatement:
             case TSESTree.AST_NODE_TYPES.Program:
             case TSESTree.AST_NODE_TYPES.StaticBlock:
-                conditions.push(...earlierExitTests(parent.body, child));
+                conditions.push(...earlierExitTests(parent.body, child, true));
                 break;
             default:
                 break;
@@ -208,22 +208,25 @@ function decidingConditions(node: TSESTree.Node): TSESTree.Node[] {
     return conditions;
 }
 
-// The tests of the `if`s before `child` in `statements` that leave early.
-function earlierExitTests(statements: readonly TSESTree.Node[], child: TSESTree.Node): TSESTree.Node[] {
-    const tests: TSESTree.Node[] = [];
-    for (const statement of statements) {
-        if (statement === child) {
-            break;
-        }
-        if (
-            statement.type === TSESTree.AST_NODE_TYPES.IfStatement &&
-            (exits(statement.consequent) || (statement.alternate !== null && exits(statement.alternate)))
-        ) {
-            tests.push(statement.test);
-        }
+// The tests of the `if`s before `child` in `statements` that leave early, or
+// of all of them when `child` is not one of the statements (`inList` false).
+// The `if`s of each list are found once: going over the statements before
+// each node was quadratic in a long list of nodes to decide.
+function earlierExitTests(statements: readonly TSESTree.Node[], child: TSESTree.Node, inList: boolean): TSESTree.Node[] {
+    let exitIfs = exitIfsCache.get(statements);
+    if (!exitIfs) {
+        exitIfs = statements.filter(
+            (statement): statement is TSESTree.IfStatement =>
+                statement.type === TSESTree.AST_NODE_TYPES.IfStatement &&
+                (exits(statement.consequent) || (statement.alternate !== null && exits(statement.alternate))),
+        );
+        exitIfsCache.set(statements, exitIfs);
     }
-    return tests;
+    // The statements before `child` are those that end before it starts.
+    return exitIfs.filter((statement) => !inList || statement.range[1] <= child.range[0]).map((statement) => statement.test);
 }
+
+const exitIfsCache = new WeakMap<readonly TSESTree.Node[], TSESTree.IfStatement[]>();
 
 /** The declared type of the global `window`, with type information. */
 export function getGlobalWindowType(types: TypeInfo, node: TSESTree.Node): ts.Type | null {
@@ -290,11 +293,16 @@ interface WindowCheck {
     presentWhenTrue: boolean | undefined;
 }
 
+// A check as the file holds it, with the function (or Program) it is in.
+interface FoundWindowCheck extends WindowCheck {
+    scope: TSESTree.Node;
+}
+
 interface WindowFacts {
-    checks: WindowCheck[];
+    checks: FoundWindowCheck[];
     // Checks of Obsidian's `activeDocument` or `activeWindow`, which tell
     // nothing about the window itself.
-    obsidianChecks: WindowCheck[];
+    obsidianChecks: FoundWindowCheck[];
     // Each `try` whose block reads the window, so throws without one.
     windowTries: TSESTree.TryStatement[];
     // The reads and calls that hold a check whose meaning is known:
@@ -316,6 +324,10 @@ const windowFactsCache = new WeakMap<TSESTree.Program, WindowFacts>();
 // each read of `browser` is a check of its own.
 // With `anyCheck`, a check that decides whether `node` runs counts whatever it
 // finds: one that proves the window is there does not prove Obsidian is.
+//
+// Each check's function is found once per file, and `node`'s once per call:
+// finding them for every check and every node was quadratic in a file with
+// many checks and many nodes to decide.
 function followsWindowCheck(sourceCode: Context["sourceCode"], node: TSESTree.Node, anyCheck = false): boolean {
     const facts = getWindowFacts(sourceCode);
     return (
@@ -324,14 +336,14 @@ function followsWindowCheck(sourceCode: Context["sourceCode"], node: TSESTree.No
     );
 }
 
-function followsCheck(checks: WindowCheck[], node: TSESTree.Node, anyCheck: boolean): boolean {
-    return checks.some(({ condition, presentWhenTrue }) => {
-        const scope = enclosingFunction(condition);
+function followsCheck(checks: FoundWindowCheck[], node: TSESTree.Node, anyCheck: boolean): boolean {
+    let nodeScope: TSESTree.Node | undefined;
+    return checks.some(({ condition, presentWhenTrue, scope }) => {
         if (condition.range[1] > node.range[0] || !contains(scope, node)) {
             return false;
         }
         const value = presentWhenTrue === undefined && !anyCheck ? undefined : conditionValueAt(condition, node);
-        return value === undefined ? enclosingFunction(node) === scope : anyCheck || value !== presentWhenTrue;
+        return value === undefined ? (nodeScope ??= enclosingFunction(node)) === scope : anyCheck || value !== presentWhenTrue;
     });
 }
 
@@ -588,11 +600,11 @@ function isNode(value: unknown): value is TSESTree.Node {
 function addWindowCheck(
     sourceCode: Context["sourceCode"],
     facts: WindowFacts,
-    checks: WindowCheck[],
+    checks: FoundWindowCheck[],
     check: WindowCheck,
     followed: Set<TSESTree.Node>,
 ): void {
-    checks.push(check);
+    checks.push({ ...check, scope: enclosingFunction(check.condition) });
     // `!` keeps what the value says; `&&` and `||` lose it.
     let value: TSESTree.Node = check.condition;
     let presentWhenTrue = check.presentWhenTrue;

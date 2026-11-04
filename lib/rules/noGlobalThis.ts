@@ -530,7 +530,9 @@ export default ruleCreator({
         function findVariable(scope: ReturnType<typeof context.sourceCode.getScope>, name: string): { defs: unknown[] } | null {
             let current: typeof scope | null = scope;
             while (current) {
-                const variable = current.variables.find((v) => v.name === name);
+                // By name, rather than a search of each scope's variables: the
+                // global scope holds every name of TypeScript's lib.
+                const variable = current.set.get(name);
                 if (variable) {
                     return variable;
                 }
