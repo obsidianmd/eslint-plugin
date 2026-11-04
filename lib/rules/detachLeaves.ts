@@ -108,18 +108,23 @@ export default ruleCreator({
         // runs), `async` (it returns a promise), a static or computed one,
         // overloads, another member that may be named onunload, and one whose
         // removal would let the members around it run together.
+        //
+        // espree, ESLint's own parser, gives a method none of typescript-estree's
+        // `decorators`, `optional` or `typeParameters`; each read here has to
+        // hold when it is missing. A fixer that throws stops the lint run.
         function removeMethod(
             fixer: TSESLint.RuleFixer,
             method: TSESTree.MethodDefinition,
         ): TSESLint.RuleFix | null {
             const classBody = method.parent;
             const classNode = classBody.parent;
+            const decorators: readonly TSESTree.Decorator[] | undefined = method.decorators;
             if (
                 method.kind !== "method" ||
                 method.static ||
                 method.computed ||
                 method.optional ||
-                method.decorators.length > 0 ||
+                (decorators?.length ?? 0) > 0 ||
                 method.value.params.length > 0 ||
                 method.value.async ||
                 method.value.generator ||
