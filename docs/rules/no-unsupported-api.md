@@ -15,7 +15,8 @@ The uses checked are:
 
 - reading a property or calling a method, such as `this.app.renderContext`
 - calling a function or creating an instance, such as `displayTooltip()` or `new SecretComponent(app, el)`
-- extending a class, such as `class MySuggest extends AbstractInputSuggest`, and calling methods
+- extending a class, such as `class MySuggest extends AbstractInputSuggest`, also in a class
+  expression such as `const MySuggest = class extends AbstractInputSuggest {}`, and calling methods
   inherited from it through `super`
 - a newer method on an older class, such as `setDisabled()` on a `BaseComponent`, and Obsidian's
   additions to built-ins, such as `Array.prototype.findLastIndex`

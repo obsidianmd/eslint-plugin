@@ -97,17 +97,9 @@ export default ruleCreator<Options, "apiNotAvailable">({
                 checkSymbol(node, symbol);
             },
 
-            ClassDeclaration(node: TSESTree.ClassDeclaration) {
-                if (!node.superClass) {
-                    return;
-                }
-                if (node.superClass.type !== AST_NODE_TYPES.Identifier) {
-                    return;
-                }
-                const tsNode = services.esTreeNodeToTSNodeMap.get(node.superClass);
-                const symbol = checker.getSymbolAtLocation(tsNode);
-                checkSymbol(node.superClass, symbol);
-            },
+            ClassDeclaration: checkSuperClass,
+            // `const Suggest = class extends AbstractInputSuggest<string> {}`
+            ClassExpression: checkSuperClass,
 
             CallExpression(node: TSESTree.CallExpression) {
                 if (node.callee.type !== AST_NODE_TYPES.Identifier) {
@@ -118,6 +110,21 @@ export default ruleCreator<Options, "apiNotAvailable">({
                 checkSymbol(node.callee, symbol);
             },
         };
+
+        // A superclass named by an identifier. One named by a property access,
+        // such as `obsidian.AbstractInputSuggest`, is a MemberExpression,
+        // checked above.
+        function checkSuperClass(node: TSESTree.ClassDeclaration | TSESTree.ClassExpression): void {
+            if (!node.superClass) {
+                return;
+            }
+            if (node.superClass.type !== AST_NODE_TYPES.Identifier) {
+                return;
+            }
+            const tsNode = services.esTreeNodeToTSNodeMap.get(node.superClass);
+            const symbol = checker.getSymbolAtLocation(tsNode);
+            checkSymbol(node.superClass, symbol);
+        }
 
         function resolveSymbol(symbol: ts.Symbol): ts.Symbol {
             if (symbol.flags & ts.SymbolFlags.Alias) {
