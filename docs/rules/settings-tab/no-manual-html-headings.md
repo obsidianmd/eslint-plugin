@@ -50,8 +50,19 @@ offered as a suggestion instead. A heading kept in a variable that is never read
 too.
 
 ```ts
-containerEl.createEl("h4", { text: "Display", cls: "my-heading" }); // suggestion: the class is dropped
+containerEl.createEl("h4", { text: "Display", cls: "my-heading" });
+// suggestion, with type information: new Setting(containerEl).setName("Display").setClass("my-heading").setHeading()
+containerEl.createEl("h4", { text: "Display", attr: { id: "display" } });
+// suggestion: new Setting(containerEl).setName("Display").setHeading(), "dropping the `attr` option"
 ```
+
+With type information, where Obsidian's declarations give `Setting` a `setClass()` that takes the
+`cls` value (a string; an array of classes does not fit), the suggestion keeps the class with
+`.setClass()`. The class then moves from the heading element (the `<h4>`) to the setting's element,
+`settingEl`, so a style that selects the heading by it, such as `h4.my-heading`, no longer applies:
+check your CSS before you apply it. Without type information the class is dropped, like the other
+options. Whatever the suggestion drops, its description names: the other options (`attr`, `title`,
+`parent`, …), a `text` option that `.setText()` replaces, and the callback.
 
 There is no fix or suggestion where the rewrite would not compile or would lose the text: the
 heading element is used afterwards (read from a variable, chained on, passed on or returned), the

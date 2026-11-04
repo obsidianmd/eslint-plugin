@@ -19,12 +19,29 @@ type SettingRef =
     | { variable: Variable; importDecl: null }
     | { variable: null; importDecl: TSESTree.ImportDeclaration };
 
-// What the rewrite needs from TypeScript: the types `new Setting(…)` and
-// `.setName(…)` accept.
+// What the rewrite needs from TypeScript: the types `new Setting(…)`,
+// `.setName(…)` and `.setClass(…)` accept, the last empty when Setting has no
+// setClass().
 interface SettingTypes {
     checker: ts.TypeChecker;
     containerTypes: ts.Type[];
     nameTypes: ts.Type[];
+    classTypes: ts.Type[];
+}
+
+type SuggestionId =
+    | "replaceWithSettingHeading"
+    | "replaceWithSettingHeadingDropping"
+    | "replaceWithSettingHeadingClass"
+    | "replaceWithSettingHeadingClassDropping";
+
+interface Rewrite {
+    offer: "fix" | "suggest";
+    fix: TSESLint.ReportFixFunction;
+    // How the suggestion describes the rewrite: whether it keeps the class
+    // with setClass(), and what it drops.
+    suggestion: SuggestionId;
+    dropped: string;
 }
 
 export default ruleCreator({
@@ -40,6 +57,12 @@ export default ruleCreator({
                 "For a consistent UI use `new Setting(containerEl).setName(...).setHeading()` instead of creating HTML heading elements directly.",
             replaceWithSettingHeading:
                 "Replace with `new Setting(...).setName(...).setHeading()`.",
+            replaceWithSettingHeadingDropping:
+                "Replace with `new Setting(...).setName(...).setHeading()`, dropping {{dropped}}.",
+            replaceWithSettingHeadingClass:
+                "Replace with `new Setting(...).setName(...).setHeading()`, moving the class to the setting's element with `setClass()`.",
+            replaceWithSettingHeadingClassDropping:
+                "Replace with `new Setting(...).setName(...).setHeading()`, moving the class to the setting's element with `setClass()` and dropping {{dropped}}.",
         },
         schema: [],
         fixable: "code" as const,
@@ -99,7 +122,7 @@ export default ruleCreator({
                     context.report({
                         node,
                         messageId: "headingEl",
-                        suggest: [{ messageId: "replaceWithSettingHeading", fix: rewrite.fix }],
+                        suggest: [{ messageId: rewrite.suggestion, data: { dropped: rewrite.dropped }, fix: rewrite.fix }],
                     });
                 } else {
                     context.report({ node, messageId: "headingEl" });
@@ -110,20 +133,25 @@ export default ruleCreator({
         // The rewrite to `new Setting(<parent>).setName(<text>).setHeading()` and
         // how to offer it. It is a fix only where the heading element was never
         // used, no option or callback is dropped, and the parent and the text are
-        // known to fit `Setting`. Null where it would not parse or compile, or
-        // would lose the text.
+        // known to fit `Setting`. A `cls` option is kept with `.setClass()` where
+        // the types show Setting has it, but the class then goes on the setting's
+        // element instead of a heading element, so that is a suggestion too.
+        // Anything else the rewrite drops, the suggestion's description names.
+        // Null where it would not parse or compile, or would lose the text.
         function planRewrite(
             node: TSESTree.CallExpression,
             callee: TSESTree.MemberExpression,
-        ): { offer: "fix" | "suggest"; fix: TSESLint.ReportFixFunction } | null {
-            // Whether the rewrite drops something the call did: an option other
-            // than `text`, or the callback.
-            let lossy = node.arguments.length > 2;
+        ): Rewrite | null {
             if (node.arguments.some((arg) => arg.type === TSESTree.AST_NODE_TYPES.SpreadElement)) {
                 return null;
             }
+            const droppedCallback = node.arguments.length > 2;
+            // The options the rewrite does not keep, as written in the code.
+            const droppedOptions: TSESTree.Property[] = [];
 
             let textNode: TSESTree.Expression | null = null;
+            let textProp: TSESTree.Property | null = null;
+            let clsProp: TSESTree.Property | null = null;
             const optionsArg = node.arguments[1];
             if (optionsArg) {
                 if (optionsArg.type !== TSESTree.AST_NODE_TYPES.ObjectExpression) {
@@ -138,10 +166,21 @@ export default ruleCreator({
                     ) {
                         return null;
                     }
-                    if (propertyName(prop.key) === "text") {
+                    // A repeated key keeps its last value, as in the object.
+                    const name = propertyName(prop.key);
+                    if (name === "text") {
+                        if (textProp) {
+                            droppedOptions.push(textProp);
+                        }
+                        textProp = prop;
                         textNode = prop.value as TSESTree.Expression;
+                    } else if (name === "cls") {
+                        if (clsProp) {
+                            droppedOptions.push(clsProp);
+                        }
+                        clsProp = prop;
                     } else {
-                        lossy = true;
+                        droppedOptions.push(prop);
                     }
                 }
             }
@@ -167,8 +206,8 @@ export default ruleCreator({
                 target = parent.parent;
                 nameNode = parent.parent.arguments[0];
                 nameFromSetText = true;
-                if (textNode) {
-                    lossy = true;
+                if (textProp) {
+                    droppedOptions.push(textProp);
                 }
             }
             if (target.parent?.type === TSESTree.AST_NODE_TYPES.ChainExpression) {
@@ -209,9 +248,25 @@ export default ruleCreator({
                     (nameNode === null || nameFromSetText || isKnownString(nameNode));
             }
 
+            // setClass() takes a string of classes; `cls` may also be an array.
+            const classNode = clsProp?.value as TSESTree.Expression | undefined;
+            const keepsClass =
+                classNode !== undefined &&
+                types !== null &&
+                types.classTypes.length > 0 &&
+                isAssignable(types, classNode, types.classTypes);
+            if (clsProp && !keepsClass) {
+                droppedOptions.push(clsProp);
+            }
+
+            // The calls go in the order their arguments ran: the options before
+            // a setText() argument, and in the object in the order written.
+            const nameCall = `.setName(${nameNode ? argText(nameNode) : '""'})`;
+            const classCall = keepsClass ? `.setClass(${argText(classNode)})` : "";
+            const classFirst = keepsClass && nameNode !== null && classNode.range[0] < nameNode.range[0];
             const replacement =
                 `new Setting(${argText(receiver)})` +
-                `.setName(${nameNode ? argText(nameNode) : '""'})` +
+                (classFirst ? classCall + nameCall : nameCall + classCall) +
                 ".setHeading()";
             const lastSpecifier = settingRef.importDecl?.specifiers.at(-1);
             const fix: TSESLint.ReportFixFunction = (fixer) => {
@@ -222,7 +277,20 @@ export default ruleCreator({
                 return fixes;
             };
 
-            return { offer: discarded && !lossy && typesFit ? "fix" : "suggest", fix };
+            const dropped = describeDropped(
+                droppedOptions
+                    .sort((a, b) => a.range[0] - b.range[0])
+                    .map((prop) => propertyName(prop.key) ?? sourceCode.getText(prop.key)),
+                droppedCallback,
+            );
+            const lossy = clsProp !== null || dropped !== "";
+            let suggestion: SuggestionId;
+            if (keepsClass) {
+                suggestion = dropped ? "replaceWithSettingHeadingClassDropping" : "replaceWithSettingHeadingClass";
+            } else {
+                suggestion = dropped ? "replaceWithSettingHeadingDropping" : "replaceWithSettingHeading";
+            }
+            return { offer: discarded && !lossy && typesFit ? "fix" : "suggest", fix, suggestion, dropped };
         }
 
         function propertyName(key: TSESTree.Node): string | null {
@@ -354,10 +422,20 @@ export default ruleCreator({
                 .map((s) => s.getParameters()[0])
                 .filter((p): p is ts.Symbol => p !== undefined)
                 .map((p) => checker.getTypeOfSymbolAtLocation(p, location));
+            const setClass = instanceType.getProperty("setClass");
+            const classTypes = setClass
+                ? checker
+                    .getTypeOfSymbolAtLocation(setClass, location)
+                    .getCallSignatures()
+                    .map((s) => s.getParameters()[0])
+                    .filter((p): p is ts.Symbol => p !== undefined)
+                    .map((p) => checker.getTypeOfSymbolAtLocation(p, location))
+                : [];
             return {
                 checker,
                 containerTypes: signatures.map((s) => checker.getTypeOfSymbolAtLocation(s.getParameters()[0], location)),
                 nameTypes,
+                classTypes,
             };
         }
 
@@ -521,6 +599,21 @@ export default ruleCreator({
         }
     },
 });
+
+// What the rewrite drops, for the suggestion's description: "the `attr` and
+// `title` options and the callback". Empty when it drops nothing.
+function describeDropped(options: string[], callback: boolean): string {
+    const parts: string[] = [];
+    const names = [...new Set(options)].map((name) => `\`${name}\``);
+    if (names.length > 0) {
+        const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+        parts.push(`the ${list} option${names.length === 1 ? "" : "s"}`);
+    }
+    if (callback) {
+        parts.push("the callback");
+    }
+    return parts.join(" and ");
+}
 
 // Whether a call with one argument fits the signature: it has a first
 // parameter, and every later one is optional or a rest parameter.
