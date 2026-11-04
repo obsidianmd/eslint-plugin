@@ -33,7 +33,10 @@ text with inline code, HTML or placeholders (`{{count}}`) is not checked. The op
 [`ui/sentence-case`](sentence-case.md#options).
 
 Not reported: keys, array elements, non-string values, and files that are not English locale files,
-such as `fr.json`, or `entries.json` and `english.json`, which only start with "en".
+such as `fr.json`, or `entries.json` and `english.json`, which only start with "en". Only the part
+of the path inside ESLint's working directory counts, as for the config's globs, so a folder above
+the project named `en`, as in `C:\Users\en\plugin\src\settings.json`, does not make the files
+under it locale files.
 
 The rule reads the file with the `json/json` language from `@eslint/json`, which
 `recommendedWithLocalesEn` sets up for these files, the same files the rule takes for English locale

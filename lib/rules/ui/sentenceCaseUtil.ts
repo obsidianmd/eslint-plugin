@@ -232,16 +232,33 @@ export function getContextFilename<MessageId extends string>(
     return typeof filename === "string" ? filename : null;
 }
 
+// The part of a path that is inside `cwd`, or the whole path for a file
+// outside it or without a cwd. A Windows path is compared without case.
+function pathInsideCwd(filePath: string, cwd: string | undefined): string {
+    const normalized = normalizePath(filePath);
+    if (!cwd) return normalized;
+    const base = normalizePath(cwd).replace(/\/+$/, "") + "/";
+    const windows = /^[A-Za-z]:\//.test(base);
+    const inside = windows
+        ? normalized.toLowerCase().startsWith(base.toLowerCase())
+        : normalized.startsWith(base);
+    return inside ? normalized.slice(base.length) : normalized;
+}
+
 // Checks if a file path matches the pattern for English locale files: a file
 // or directory named "en" in any case, alone or followed by ".", "-" or "_"
 // and more (en-US, en_GB, en.messages), with one of `extensions`. The
 // recommendedWithLocalesEn globs in lib/index.ts select the same files; the
-// extension is matched in its case, as ESLint matches those globs.
+// extension is matched in its case, as ESLint matches those globs. Only the
+// part of the path inside `cwd` counts, as for the globs, so a folder above
+// the project named "en", as in "C:\Users\en\plugin\src\settings.json",
+// does not make a file a locale file.
 export function isEnglishLocalePath(
     filePath: string,
     extensions: readonly string[],
+    cwd?: string,
 ): boolean {
-    const normalized = normalizePath(filePath);
+    const normalized = pathInsideCwd(filePath, cwd);
     const normalizedExtensions = extensions.map((ext) => ext.replace(/^\./, ""));
     const extensionPattern = normalizedExtensions.map(escapeRegExp).join("|");
     const regex = new RegExp(

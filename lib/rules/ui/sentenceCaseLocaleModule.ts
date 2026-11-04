@@ -21,7 +21,7 @@ function isEnglishLocaleModule(
     context: TSESLint.RuleContext<MessageId, SentenceCaseRuleOptions>,
 ): boolean {
     const file = getContextFilename(context);
-    return file != null && isEnglishLocalePath(file, ["ts", "js", "cjs", "mjs"]);
+    return file != null && isEnglishLocalePath(file, ["ts", "js", "cjs", "mjs"], context.cwd);
 }
 
 // Recursively collects all string literals, and template literals without

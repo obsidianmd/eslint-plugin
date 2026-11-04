@@ -73,7 +73,7 @@ const rule: SentenceCaseJsonRuleDefinition = {
     },
     create(context) {
         // Only English locale files hold English UI text.
-        if (!isEnglishLocalePath(context.physicalFilename, ["json"])) {
+        if (!isEnglishLocalePath(context.physicalFilename, ["json"], context.cwd)) {
             return {};
         }
         const { evaluatorOptions, allowAutoFix } = resolveSentenceCaseConfig(context.options);

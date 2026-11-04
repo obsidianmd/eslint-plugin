@@ -34,7 +34,9 @@ literal is judged on its value, with its escapes decoded. Values are judged as i
 
 Not reported: keys, an object that is not exported, an object assigned to `module.exports`, strings
 in functions, template literals with `${…}`, and modules that are not English locale files, such as
-`fr.ts`.
+`fr.ts`. Only the part of the path inside ESLint's working directory counts, as for the config's
+globs, so a folder above the project named `en` or `en-*`, as in `~/en-tools/plugin/src/data.ts`,
+does not make the modules under it locale modules.
 
 `recommendedWithLocalesEn` runs this rule on the same files the rule takes for English locale
 modules: `.ts`, `.js`, `.cjs` and `.mjs` files named `en`, `en-*`, `en_*` or `en.*`, with `en` in
