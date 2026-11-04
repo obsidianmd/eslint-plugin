@@ -41,6 +41,46 @@ ruleTester.run("no-manual-html-headings", noManualHeadingsRule, {
                 el.createEl("h2", { text: "Title" });
             `,
         },
+        // The nearest enclosing class decides whether a heading is in a settings tab.
+        {
+            name: "a heading in a class nested in a settings tab is not checked",
+            code: obsidianTab(`
+                class Renderer {
+                    render(el: HTMLElement): void {
+                        el.createEl("h2", { text: "Title" });
+                    }
+                }
+                const View = class {
+                    render(el: HTMLElement): void {
+                        el.createEl("h3", { text: "Title" });
+                    }
+                };`),
+        },
+        {
+            name: "a heading after a settings tab nested in another class is not checked",
+            code: `
+                import { PluginSettingTab } from "obsidian";
+                class Plugin {
+                    load(el: HTMLElement): void {
+                        class MyTab extends PluginSettingTab {
+                            display(): void {}
+                        }
+                        el.createEl("h2", { text: "Title" });
+                    }
+                }
+            `,
+        },
+        {
+            name: "a heading in a class expression that does not extend PluginSettingTab is not checked",
+            code: `
+                import { Modal } from "obsidian";
+                const MyModal = class extends Modal {
+                    onOpen(): void {
+                        this.contentEl.createEl("h2", { text: "Title" });
+                    }
+                };
+            `,
+        },
     ],
     invalid: [
         {
@@ -301,6 +341,99 @@ ruleTester.run("no-manual-html-headings", noManualHeadingsRule, {
             output: null,
             errors: [{ messageId: "headingEl", suggestions: [] }],
         },
+        // A class nested in the tab used to end the check for the rest of the tab.
+        {
+            name: "a heading after a class nested in the tab is reported",
+            code: obsidianTab(`
+                class Inner {}
+                containerEl.createEl("h2", { text: "Advanced" });`),
+            output: obsidianTab(`
+                class Inner {}
+                new Setting(containerEl).setName("Advanced").setHeading();`),
+            errors: [{ messageId: "headingEl" }],
+        },
+        {
+            name: "a heading in a method after one holding a class expression is reported",
+            code: `
+                import { PluginSettingTab, Setting } from "obsidian";
+                class MyTab extends PluginSettingTab {
+                    renderer = class {};
+                    display(): void {
+                        this.containerEl.createEl("h2", { text: "Advanced" });
+                    }
+                }
+            `,
+            output: `
+                import { PluginSettingTab, Setting } from "obsidian";
+                class MyTab extends PluginSettingTab {
+                    renderer = class {};
+                    display(): void {
+                        new Setting(this.containerEl).setName("Advanced").setHeading();
+                    }
+                }
+            `,
+            errors: [{ messageId: "headingEl" }],
+        },
+        {
+            name: "a heading in a callback or a nested function of the tab is reported",
+            code: obsidianTab(`
+                class Inner {}
+                [1].forEach(() => { containerEl.createEl("h3", { text: "Sync" }); });
+                function renderSection(el: HTMLElement): void { el.createEl("h3", { text: "Sync" }); }`),
+            output: obsidianTab(`
+                class Inner {}
+                [1].forEach(() => { new Setting(containerEl).setName("Sync").setHeading(); });
+                function renderSection(el: HTMLElement): void { new Setting(el).setName("Sync").setHeading(); }`),
+            errors: [{ messageId: "headingEl" }, { messageId: "headingEl" }],
+        },
+        {
+            name: "a settings tab written as a class expression is checked",
+            code: `
+                import { PluginSettingTab, Setting } from "obsidian";
+                export const MyTab = class extends PluginSettingTab {
+                    display(): void {
+                        this.containerEl.createEl("h2", { text: "Advanced" });
+                    }
+                };
+            `,
+            output: `
+                import { PluginSettingTab, Setting } from "obsidian";
+                export const MyTab = class extends PluginSettingTab {
+                    display(): void {
+                        new Setting(this.containerEl).setName("Advanced").setHeading();
+                    }
+                };
+            `,
+            errors: [{ messageId: "headingEl" }],
+        },
+        {
+            name: "a settings tab nested in another class is checked",
+            code: `
+                import { PluginSettingTab, Setting } from "obsidian";
+                class Plugin {
+                    makeTab() {
+                        return class extends PluginSettingTab {
+                            display(): void {
+                                this.containerEl.createEl("h2", { text: "Advanced" });
+                            }
+                        };
+                    }
+                }
+            `,
+            output: `
+                import { PluginSettingTab, Setting } from "obsidian";
+                class Plugin {
+                    makeTab() {
+                        return class extends PluginSettingTab {
+                            display(): void {
+                                new Setting(this.containerEl).setName("Advanced").setHeading();
+                            }
+                        };
+                    }
+                }
+            `,
+            errors: [{ messageId: "headingEl" }],
+        },
         {
             name: "a Setting without setHeading() (older Obsidian typings) has no fix",
             code: `
@@ -345,6 +478,28 @@ untypedRuleTester.run("no-manual-html-headings without type information", noManu
                 { messageId: "headingEl", suggestions: [] },
                 { messageId: "headingEl" },
             ],
+        },
+        {
+            name: "this.containerEl of a settings tab written as a class expression is fixed",
+            code: `
+                import { PluginSettingTab, Setting } from "obsidian";
+                const MyTab = class extends PluginSettingTab {
+                    display() {
+                        class Inner {}
+                        this.containerEl.createEl("h2", { text: "Advanced" });
+                    }
+                };
+            `,
+            output: `
+                import { PluginSettingTab, Setting } from "obsidian";
+                const MyTab = class extends PluginSettingTab {
+                    display() {
+                        class Inner {}
+                        new Setting(this.containerEl).setName("Advanced").setHeading();
+                    }
+                };
+            `,
+            errors: [{ messageId: "headingEl" }],
         },
         {
             name: "a parameter typed as an HTML element is fixed, its string-typed text too",

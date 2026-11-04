@@ -53,22 +53,25 @@ export default ruleCreator({
         const services = sourceCode.parserServices;
         const program = services?.program ?? null;
         const nodeMap = services?.esTreeNodeToTSNodeMap ?? null;
-        let insidePluginSettingTab = false;
+        // For each enclosing class, whether it is a settings tab. The nearest one
+        // decides: a class nested in a tab is checked on its own terms, and the
+        // tab is checked again after it. Functions do not count, so a callback or
+        // a nested function in the tab is in the tab.
+        const classStack: boolean[] = [];
+        const enterClass = (node: TSESTree.ClassDeclaration | TSESTree.ClassExpression) => {
+            classStack.push(isPluginSettingTab(node));
+        };
+        const exitClass = () => {
+            classStack.pop();
+        };
 
         return {
-            ClassDeclaration(node: TSESTree.ClassDeclaration) {
-                if (
-                    node.superClass?.type === TSESTree.AST_NODE_TYPES.Identifier &&
-                    node.superClass.name === "PluginSettingTab"
-                ) {
-                    insidePluginSettingTab = true;
-                }
-            },
-            "ClassDeclaration:exit"() {
-                insidePluginSettingTab = false;
-            },
+            ClassDeclaration: enterClass,
+            "ClassDeclaration:exit": exitClass,
+            ClassExpression: enterClass,
+            "ClassExpression:exit": exitClass,
             CallExpression(node: TSESTree.CallExpression) {
-                if (!insidePluginSettingTab) return;
+                if (!classStack.at(-1)) return;
 
                 const callee = node.callee;
                 if (

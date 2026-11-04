@@ -11,14 +11,18 @@
 ## What is reported
 
 A heading element (`h1` to `h6`) created with `createEl()` on an element, such as
-`containerEl.createEl("h2", { text: "Advanced" })`, inside a class declaration that extends
-`PluginSettingTab`. Obsidian's setting headings keep the settings UI consistent:
+`containerEl.createEl("h2", { text: "Advanced" })`, inside a class that extends `PluginSettingTab`,
+declared or as a class expression, including in its callbacks and nested functions. Obsidian's
+setting headings keep the settings UI consistent:
 
 ```ts
 new Setting(containerEl).setName("Advanced").setHeading();
 ```
 
-Headings created outside a settings tab are not reported.
+Headings created outside a settings tab are not reported. The nearest enclosing class decides, so a
+heading in a class nested in the tab, such as a helper class of its own, is not reported either,
+while the rest of the tab still is. A superclass written as a property access
+(`obsidian.PluginSettingTab`) is not recognised.
 
 ## Fixes and suggestions
 
