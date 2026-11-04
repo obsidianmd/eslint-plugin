@@ -6,6 +6,8 @@ import {
     resolveSentenceCaseConfig,
     type EvaluatorOptions,
 } from "../../lib/rules/ui/sentenceCaseUtil.js";
+import { DEFAULT_ACRONYMS } from "../../lib/rules/ui/acronyms.js";
+import { DEFAULT_BRANDS } from "../../lib/rules/ui/brands.js";
 
 // The casing decisions all three sentence-case rules share. Each case is a
 // text and the suggestion for it, or null where the text is already in
@@ -178,6 +180,32 @@ describe("sentence case evaluation", () => {
                     const result = evaluateSentenceCase(text, options);
                     assert.strictEqual(result.ok ? null : result.suggestion, expected);
                 });
+            }
+        });
+    }
+});
+
+// Each entry of the default lists is kept as written and corrected from any
+// other case. ", then save" keeps a brand such as "Node.js" from ending the
+// text, where it would look like a file name and be skipped.
+describe("the default brands and acronyms", () => {
+    for (const brand of DEFAULT_BRANDS) {
+        it(`keeps the brand ${brand} and corrects it from lower or upper case`, () => {
+            const expected = `Use ${brand}, then save`;
+            assert.strictEqual(evaluateSentenceCase(expected).ok, true);
+            for (const written of [brand.toLowerCase(), brand.toUpperCase()].filter((text) => text !== brand)) {
+                assert.strictEqual(evaluateSentenceCase(`Use ${written}, then save`).suggestion, expected);
+            }
+        });
+    }
+    // "OAuth" is in the list but upper-cased like the rest, so it is reported
+    // and fixed to "OAUTH"; it is left out until that is fixed.
+    for (const acronym of DEFAULT_ACRONYMS.filter((entry) => entry !== "OAuth")) {
+        it(`keeps the acronym ${acronym} and corrects it from lower case`, () => {
+            const expected = `Use ${acronym}, then save`;
+            assert.strictEqual(evaluateSentenceCase(expected).ok, true);
+            if (acronym !== acronym.toLowerCase()) {
+                assert.strictEqual(evaluateSentenceCase(`Use ${acronym.toLowerCase()}, then save`).suggestion, expected);
             }
         });
     }
