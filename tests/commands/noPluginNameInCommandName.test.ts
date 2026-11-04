@@ -56,6 +56,27 @@ ruleTester.run("no-plugin-name-in-command-name", noPluginNameRule, {
             code: "this.addCommand({ name: 'Open: a note' });",
             options: [{ pluginName: " " }],
         },
+        {
+            name: "only a method call named addCommand is checked",
+            code: "this.addCommands({ name: 'My Awesome Plugin: Open' }); addCommand({ name: 'My Awesome Plugin: Open' }); class A { #addCommand(o: object) {} run() { this.#addCommand({ name: 'My Awesome Plugin: Open' }); } }",
+            options: [{ pluginName: "My Awesome Plugin" }],
+        },
+        {
+            name: "a command given as something other than an object literal is not checked",
+            code: "this.addCommand(makeCommand({ name: 'My Awesome Plugin: Open' }));",
+            options: [{ pluginName: "My Awesome Plugin" }],
+        },
+        {
+            name: "a name that is not a string is not checked",
+            code: "this.addCommand({ name: 1 }); this.addCommand({ name: null }); this.addCommand({ name: /My Awesome Plugin: Open/ });",
+            options: [{ pluginName: "My Awesome Plugin" }],
+        },
+        {
+            // "Git" followed by U+0308, a combining diaeresis, or by a digit.
+            name: "a combining mark or a digit is part of the word",
+            code: "this.addCommand({ name: 'Open Git\\u0308 notes' }); this.addCommand({ name: 'Open Git2 notes' }); this.addCommand({ name: 'Open 2Git notes' });",
+            options: [{ pluginName: "Git" }],
+        },
     ],
     invalid: [
         {
@@ -117,6 +138,19 @@ ruleTester.run("no-plugin-name-in-command-name", noPluginNameRule, {
             name: "plugin name defaults to manifest.json's name",
             code: "this.addCommand({ name: 'Sample Plugin: Open a new note' });",
             errors: [{ messageId: "pluginName" }],
+        },
+        {
+            name: "a spread in the command object is skipped, and the name still checked",
+            code: "this.addCommand({ ...base, name: 'My Awesome Plugin: Open' });",
+            options: [{ pluginName: "My Awesome Plugin" }],
+            errors: [{ messageId: "pluginName", line: 1, column: 28, endLine: 1, endColumn: 59 }],
+        },
+        {
+            // pluginName wins over the manifest's "Sample Plugin".
+            name: "the pluginName option replaces manifest.json's name",
+            code: "this.addCommand({ name: 'Sample Plugin: open' }); this.addCommand({ name: 'My Awesome Plugin: open' });",
+            options: [{ pluginName: "My Awesome Plugin" }],
+            errors: [{ messageId: "pluginName", column: 69 }],
         },
     ],
 });

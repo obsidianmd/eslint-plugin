@@ -21,6 +21,14 @@ ruleTester.run("no-default-hotkey", noDefaultHotkeyRule, {
             name: "another quoted key is not hotkeys",
             code: "this.addCommand({ 'id': 'foo', 'name': 'bar', 'hotkey': [] });",
         },
+        {
+            name: "only a method call named addCommand is checked",
+            code: "this.addCommands({ hotkeys: [] }); addCommand({ hotkeys: [] }); class A { #addCommand(o: object) {} run() { this.#addCommand({ hotkeys: [] }); } }",
+        },
+        {
+            name: "a command given as something other than an object literal is not checked",
+            code: "this.addCommand(makeCommand({ hotkeys: [] }));",
+        },
     ],
     invalid: [
         {
@@ -37,6 +45,11 @@ ruleTester.run("no-default-hotkey", noDefaultHotkeyRule, {
             name: "a quoted hotkeys key is forbidden",
             code: "this.addCommand({ \"id\": \"foo\", \"hotkeys\": [] }); this.addCommand({ 'hotkeys': [] }); this.addCommand({ ['hotkeys']: [] });",
             errors: [{ messageId: "hotkeys" }, { messageId: "hotkeys" }, { messageId: "hotkeys" }],
+        },
+        {
+            name: "a spread in the command object is skipped, and the hotkeys still checked",
+            code: "this.addCommand({ ...base, hotkeys: [] });",
+            errors: [{ messageId: "hotkeys", line: 1, column: 28, endLine: 1, endColumn: 39 }],
         },
     ],
 });

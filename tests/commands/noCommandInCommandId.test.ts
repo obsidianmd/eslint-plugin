@@ -33,6 +33,18 @@ ruleTester.run("no-command-in-command-id", noCommandInIdRule, {
             name: "another quoted key is not the id",
             code: "this.addCommand({ 'id': 'open-note', 'name': 'Open command', 'idCommand': 'command' });",
         },
+        {
+            name: "only a method call named addCommand is checked",
+            code: "this.addCommands({ id: 'open-command' }); addCommand({ id: 'open-command' }); class A { #addCommand(o: object) {} run() { this.#addCommand({ id: 'open-command' }); } }",
+        },
+        {
+            name: "a command given as something other than an object literal is not checked",
+            code: "this.addCommand(makeCommand({ id: 'open-command' }));",
+        },
+        {
+            name: "a id that is not a string is not checked",
+            code: "this.addCommand({ id: 1 }); this.addCommand({ id: null }); this.addCommand({ id: /open-command/ });",
+        },
     ],
     invalid: [
         {
@@ -64,6 +76,11 @@ ruleTester.run("no-command-in-command-id", noCommandInIdRule, {
             name: "a quoted id key is checked",
             code: "this.addCommand({ \"id\": \"open-command\", \"name\": \"Open\" }); this.addCommand({ 'id': 'runCommand' }); this.addCommand({ ['id']: 'command-palette' });",
             errors: [{ messageId: "commandInId" }, { messageId: "commandInId" }, { messageId: "commandInId" }],
+        },
+        {
+            name: "a spread in the command object is skipped, and the id still checked",
+            code: "this.addCommand({ ...base, id: 'open-command' });",
+            errors: [{ messageId: "commandInId", line: 1, column: 28, endLine: 1, endColumn: 46 }],
         },
     ],
 });
