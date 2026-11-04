@@ -293,11 +293,16 @@ interface WindowCheck {
     presentWhenTrue: boolean | undefined;
 }
 
+// A check as the file holds it, with the function (or Program) it is in.
+interface FoundWindowCheck extends WindowCheck {
+    scope: TSESTree.Node;
+}
+
 interface WindowFacts {
-    checks: WindowCheck[];
+    checks: FoundWindowCheck[];
     // Checks of Obsidian's `activeDocument` or `activeWindow`, which tell
     // nothing about the window itself.
-    obsidianChecks: WindowCheck[];
+    obsidianChecks: FoundWindowCheck[];
     // Each `try` whose block reads the window, so throws without one.
     windowTries: TSESTree.TryStatement[];
     // The reads and calls that hold a check whose meaning is known:
@@ -319,6 +324,10 @@ const windowFactsCache = new WeakMap<TSESTree.Program, WindowFacts>();
 // each read of `browser` is a check of its own.
 // With `anyCheck`, a check that decides whether `node` runs counts whatever it
 // finds: one that proves the window is there does not prove Obsidian is.
+//
+// Each check's function is found once per file, and `node`'s once per call:
+// finding them for every check and every node was quadratic in a file with
+// many checks and many nodes to decide.
 function followsWindowCheck(sourceCode: Context["sourceCode"], node: TSESTree.Node, anyCheck = false): boolean {
     const facts = getWindowFacts(sourceCode);
     return (
@@ -327,14 +336,14 @@ function followsWindowCheck(sourceCode: Context["sourceCode"], node: TSESTree.No
     );
 }
 
-function followsCheck(checks: WindowCheck[], node: TSESTree.Node, anyCheck: boolean): boolean {
-    return checks.some(({ condition, presentWhenTrue }) => {
-        const scope = enclosingFunction(condition);
+function followsCheck(checks: FoundWindowCheck[], node: TSESTree.Node, anyCheck: boolean): boolean {
+    let nodeScope: TSESTree.Node | undefined;
+    return checks.some(({ condition, presentWhenTrue, scope }) => {
         if (condition.range[1] > node.range[0] || !contains(scope, node)) {
             return false;
         }
         const value = presentWhenTrue === undefined && !anyCheck ? undefined : conditionValueAt(condition, node);
-        return value === undefined ? enclosingFunction(node) === scope : anyCheck || value !== presentWhenTrue;
+        return value === undefined ? (nodeScope ??= enclosingFunction(node)) === scope : anyCheck || value !== presentWhenTrue;
     });
 }
 
@@ -591,11 +600,11 @@ function isNode(value: unknown): value is TSESTree.Node {
 function addWindowCheck(
     sourceCode: Context["sourceCode"],
     facts: WindowFacts,
-    checks: WindowCheck[],
+    checks: FoundWindowCheck[],
     check: WindowCheck,
     followed: Set<TSESTree.Node>,
 ): void {
-    checks.push(check);
+    checks.push({ ...check, scope: enclosingFunction(check.condition) });
     // `!` keeps what the value says; `&&` and `||` lose it.
     let value: TSESTree.Node = check.condition;
     let presentWhenTrue = check.presentWhenTrue;
