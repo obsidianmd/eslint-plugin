@@ -33,12 +33,16 @@ ruleTester.run("platform", platformRule, {
             name: "another window's navigator is not reported",
             code: "const ua = activeWindow.navigator.userAgent;",
         },
+        {
+            name: "userAgent or platform of another object is not reported",
+            code: "const a = request.userAgent; const b = process.platform; const c = window.process.platform;",
+        },
     ],
     invalid: [
         {
             name: "navigator.userAgent is forbidden",
             code: "const ua = navigator.userAgent;",
-            errors: [{ messageId: "avoidNavigator" }],
+            errors: [{ messageId: "avoidNavigator", line: 1, column: 12, endColumn: 31 }],
         },
         {
             name: "navigator.platform is forbidden",
@@ -48,7 +52,7 @@ ruleTester.run("platform", platformRule, {
         {
             name: "window.navigator.userAgent is forbidden",
             code: "const ua = window.navigator.userAgent;",
-            errors: [{ messageId: "avoidNavigator" }],
+            errors: [{ messageId: "avoidNavigator", line: 1, column: 12, endColumn: 38 }],
         },
         {
             name: "window.navigator.platform is forbidden",
