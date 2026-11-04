@@ -608,6 +608,29 @@ through ESLint's API instead, for example in a script that runs with `CI=true`, 
 `parserOptions.disallowAutomaticSingleRunInference: true` or the environment variable
 `TSESTREE_SINGLE_RUN=false`, or use `projectService` as the examples here do.
 
+### "Cannot redefine plugin "@typescript-eslint"" or "Cannot redefine plugin "json""
+
+```
+ConfigError: Config "typescript-eslint/base": Key "plugins": Cannot redefine plugin "@typescript-eslint".
+```
+
+Your config imports `typescript-eslint` or `@eslint/json` itself, as
+[Using alongside stricter typescript-eslint configs](#using-alongside-stricter-typescript-eslint-configs)
+does, and your project has a different copy of the package from the one the plugin uses. ESLint does not
+accept two different plugins under one name. `npm ls typescript-eslint @eslint/json` (with Yarn 1,
+`yarn why typescript-eslint`) lists the copies.
+
+- With `@eslint/json` 0.x, upgrade to 2.x (see [Upgrading to 0.5.0](#eslintjson-2)).
+- With Yarn 1, an exact version in your `package.json`, such as `"typescript-eslint": "8.59.1"` or
+  `"@eslint/json": "2.0.0"`, makes Yarn install the newest matching version for the plugin next to
+  yours. Use a caret range (`"^8.59.1"`), or give the plugin your copy with `resolutions`:
+
+  ```json
+  "resolutions": { "typescript-eslint": "8.59.1" }
+  ```
+
+  npm and pnpm give the plugin your copy without this.
+
 ### "Configuration for rule "0" is invalid"
 
 This happens when `obsidianmd.configs.recommended` is spread into a `rules` object instead of into the top-level config array. The recommended config is an **array of config objects**, not a rules object:
