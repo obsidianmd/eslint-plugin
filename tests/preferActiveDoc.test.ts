@@ -1,5 +1,11 @@
+import assert from "node:assert";
+import path from "node:path";
 import { RuleTester } from "@typescript-eslint/rule-tester";
+import { type ESLint, Linter } from "eslint";
+import { describe, it } from "mocha";
+import tseslint from "typescript-eslint";
 import preferActiveDocRule from "../lib/rules/preferActiveDoc.js";
+import preferCreateElRule from "../lib/rules/preferCreateEl.js";
 
 const ruleTester = new RuleTester();
 
@@ -335,4 +341,97 @@ typedJsRuleTester.run("prefer-active-doc in a JavaScript file with type informat
             errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
         },
     ],
+});
+
+describe("prefer-active-doc where a comment turns prefer-create-el off", () => {
+    const filename = path.join(process.cwd(), "file.ts");
+
+    // Both rules as the recommended config runs them, under `obsidianmd/`, on a
+    // TypeScript file with type information.
+    function reported(lines: string[]): string[] {
+        const messages = new Linter().verify(
+            lines.join("\n") + "\n",
+            [
+                {
+                    files: ["**/*.ts"],
+                    languageOptions: {
+                        parser: tseslint.parser,
+                        parserOptions: {
+                            project: "./tsconfig.json",
+                            tsconfigRootDir: process.cwd(),
+                            // With CI=true, typescript-eslint otherwise builds the program once
+                            // from the files on disk and ignores the code linted here.
+                            disallowAutomaticSingleRunInference: true,
+                        },
+                    },
+                    linterOptions: { reportUnusedDisableDirectives: "error" },
+                    plugins: {
+                        obsidianmd: {
+                            rules: { "prefer-active-doc": preferActiveDocRule, "prefer-create-el": preferCreateElRule },
+                        } as unknown as ESLint.Plugin,
+                    },
+                    rules: { "obsidianmd/prefer-active-doc": "error", "obsidianmd/prefer-create-el": "error" },
+                },
+            ],
+            filename,
+        );
+        assert.deepStrictEqual(messages.filter((m) => m.fatal).map((m) => m.message), []);
+        return messages.map((m) => `${m.line}:${m.ruleId ?? "(directive)"}`);
+    }
+
+    it("without a comment, only prefer-create-el reports the call", () => {
+        assert.deepStrictEqual(reported(['export const el = document.createElement("canvas");']), [
+            "1:obsidianmd/prefer-create-el",
+        ]);
+    });
+
+    it("eslint-disable-next-line for prefer-create-el leaves the call to prefer-active-doc", () => {
+        assert.deepStrictEqual(
+            reported([
+                "// eslint-disable-next-line obsidianmd/prefer-create-el -- canvas size is set before use",
+                'export const el = document.createElement("canvas");',
+            ]),
+            ["2:obsidianmd/prefer-active-doc"],
+        );
+    });
+
+    it("eslint-disable-line for prefer-create-el, in a list with another rule", () => {
+        assert.deepStrictEqual(
+            reported(['export const el = document.createElement("canvas"); // eslint-disable-line no-console, obsidianmd/prefer-create-el']),
+            // no-console is not enabled here, so its part of the comment is unused.
+            ["1:obsidianmd/prefer-active-doc", "1:(directive)"],
+        );
+    });
+
+    it("an eslint-disable/eslint-enable range for prefer-create-el", () => {
+        assert.deepStrictEqual(
+            reported([
+                "/* eslint-disable obsidianmd/prefer-create-el -- sandbox code */",
+                'export const a = document.createElement("style");',
+                "/* eslint-enable obsidianmd/prefer-create-el -- host code */",
+                'export const b = document.createElement("div");',
+            ]),
+            ["2:obsidianmd/prefer-active-doc", "4:obsidianmd/prefer-create-el"],
+        );
+    });
+
+    it("a comment turning both rules off reports nothing", () => {
+        assert.deepStrictEqual(
+            reported([
+                "// eslint-disable-next-line obsidianmd/prefer-create-el, obsidianmd/prefer-active-doc -- reason",
+                'export const el = document.createElement("canvas");',
+            ]),
+            [],
+        );
+    });
+
+    it("a comment for another rule leaves the call to prefer-create-el", () => {
+        assert.deepStrictEqual(
+            reported([
+                "// eslint-disable-next-line no-console -- reason",
+                'export const el = document.createElement("canvas");',
+            ]),
+            ["1:(directive)", "2:obsidianmd/prefer-create-el"],
+        );
+    });
 });
