@@ -440,6 +440,12 @@ ruleTester.run("prefer-window-timers", preferWindowTimersRule, {
             errors: [{ messageId: "preferWindowTimer", data: { name: "clearTimeout" }, suggestions: [] }],
         },
         {
+            name: "a unary operator other than ! on the check does not decide it",
+            code: `export function stop(n: number) { if (+(typeof window === "undefined")) { clearTimeout(n); } }`,
+            output: null,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "clearTimeout" }, suggestions: [] }],
+        },
+        {
             name: "a check in one branch of a conditional does not decide the other branch",
             code: `export const stop = (n: number, ready: boolean) => ready ? typeof window === "undefined" : clearTimeout(n);`,
             output: null,
