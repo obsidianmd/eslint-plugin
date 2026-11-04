@@ -54,7 +54,8 @@ ruleTester.run("prefer-setting-definitions", preferSettingDefinitionsRule, {
                     display() {}
                 }
             `,
-            errors: [{ messageId: "missingSettingDefinitions" }],
+            // The class name is highlighted, not the whole class.
+            errors: [{ messageId: "missingSettingDefinitions", line: 3, column: 23, endLine: 3, endColumn: 28 }],
         },
         {
             name: "a class expression without getSettingDefinitions() is reported",
@@ -62,7 +63,8 @@ ruleTester.run("prefer-setting-definitions", preferSettingDefinitionsRule, {
                 ${MOCK_CLASS}
                 const MyTab = class extends PluginSettingTab { display() {} };
             `,
-            errors: [{ messageId: "missingSettingDefinitions" }],
+            // An anonymous class is highlighted at its superclass.
+            errors: [{ messageId: "missingSettingDefinitions", line: 3, column: 45, endColumn: 61 }],
         },
     ],
 });
