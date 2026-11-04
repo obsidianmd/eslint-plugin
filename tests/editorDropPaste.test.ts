@@ -74,6 +74,62 @@ ruleTester.run("editor-drop-paste", editorDropPasteRule, {
                 );
             `,
         },
+        {
+            name: "optional chaining on the event counts for both",
+            code: `
+                workspace.on('editor-paste', (evt) => {
+                    if (evt?.defaultPrevented) return;
+                    evt?.preventDefault();
+                });
+            `,
+        },
+        {
+            name: "an optional call of preventDefault counts",
+            code: `
+                workspace.on('editor-drop', (evt) => {
+                    if (evt.defaultPrevented) return;
+                    evt.preventDefault?.();
+                });
+            `,
+        },
+        {
+            name: "a non-null assertion or a type assertion on the event counts",
+            code: `
+                workspace.on('editor-paste', (evt) => {
+                    if (evt!.defaultPrevented) return;
+                    (evt as ClipboardEvent).preventDefault();
+                });
+            `,
+        },
+        {
+            name: "defaultPrevented read by destructuring counts",
+            code: `
+                workspace.on('editor-paste', (evt) => {
+                    const { defaultPrevented } = evt;
+                    if (defaultPrevented) return;
+                    evt.preventDefault();
+                });
+            `,
+        },
+        {
+            name: "the checks may be in a nested function that sees the parameter",
+            code: `
+                workspace.on('editor-drop', (evt) => {
+                    if (evt.defaultPrevented) return;
+                    files(evt).forEach(() => { evt.preventDefault(); });
+                });
+            `,
+        },
+        {
+            name: "a parameter written with a type annotation is the same parameter",
+            code: `
+                workspace.on('editor-paste', (evt: ClipboardEvent, editor: Editor) => {
+                    if (evt.defaultPrevented) return;
+                    editor.replaceSelection('x');
+                    evt.preventDefault();
+                });
+            `,
+        },
     ],
     invalid: [
         {
@@ -129,6 +185,89 @@ ruleTester.run("editor-drop-paste", editorDropPasteRule, {
             code: `
                 workspace.on('editor-paste', function(evt, editor, info) {
                     editor.replaceSelection('pasted');
+                });
+            `,
+            errors: [
+                { messageId: "missingDefaultPrevented" },
+                { messageId: "missingPreventDefault" },
+            ],
+        },
+        {
+            // "type.defaultPrevented" contains "e.defaultPrevented", and the
+            // string contains "e.preventDefault()".
+            name: "another object's defaultPrevented and a string do not count",
+            code: `
+                workspace.on("editor-paste", (e) => {
+                    if (type.defaultPrevented) return;
+                    log("e.preventDefault()");
+                });
+            `,
+            errors: [
+                { messageId: "missingDefaultPrevented" },
+                { messageId: "missingPreventDefault" },
+            ],
+        },
+        {
+            name: "a comment does not count",
+            code: `
+                workspace.on("editor-drop", (evt) => {
+                    if (ready) {
+                        /* evt.defaultPrevented */
+                        // evt.preventDefault()
+                        handle(evt);
+                    }
+                });
+            `,
+            errors: [
+                { messageId: "missingDefaultPrevented" },
+                { messageId: "missingPreventDefault" },
+            ],
+        },
+        {
+            name: "a shadowing parameter of the same name in a nested function does not count",
+            code: `
+                workspace.on("editor-paste", (evt) => {
+                    other.on("x", (evt) => {
+                        if (evt.defaultPrevented) return;
+                        evt.preventDefault();
+                    });
+                });
+            `,
+            errors: [
+                { messageId: "missingDefaultPrevented" },
+                { messageId: "missingPreventDefault" },
+            ],
+        },
+        {
+            name: "a shadowing variable of the same name in a nested block does not count",
+            code: `
+                workspace.on("editor-drop", (evt) => {
+                    if (evt.defaultPrevented) return;
+                    for (const evt of queue) { evt.preventDefault(); }
+                });
+            `,
+            errors: [
+                { messageId: "missingPreventDefault" },
+            ],
+        },
+        {
+            name: "preventDefault read but not called does not count",
+            code: `
+                workspace.on("editor-paste", (evt) => {
+                    if (evt.defaultPrevented) return;
+                    const handled = evt.preventDefault;
+                });
+            `,
+            errors: [
+                { messageId: "missingPreventDefault" },
+            ],
+        },
+        {
+            name: "a property of the event's property does not count",
+            code: `
+                workspace.on("editor-drop", (evt) => {
+                    if (evt.detail.defaultPrevented) return;
+                    evt.target.preventDefault();
                 });
             `,
             errors: [

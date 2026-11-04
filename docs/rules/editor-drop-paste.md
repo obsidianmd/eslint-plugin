@@ -28,6 +28,13 @@ this.registerEvent(
 );
 ```
 
+They count with optional chaining (`evt?.defaultPrevented`, `evt?.preventDefault()`), after a
+type assertion (`evt!`, `evt as ClipboardEvent`) and in a function nested in the handler, and
+`const { defaultPrevented } = evt` reads it too. They must be on the parameter itself: a variable of
+the same name declared inside the handler, another object's property (`other.defaultPrevented`,
+`evt.target.preventDefault()`), a `preventDefault` that is not called, and the words in a string or
+a comment do not count.
+
 Not reported: a handler passed by reference (`this.onPaste`), an arrow function with an expression
 body, a handler with no parameters or whose first parameter is destructured, and an event name that
 is not a string literal.
