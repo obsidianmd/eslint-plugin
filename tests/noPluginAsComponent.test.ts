@@ -13,6 +13,13 @@ const MOCK_API = `
     declare class Modal { constructor(app: App); } // Modal does not extend Component
 
     declare class MarkdownRenderer {
+        static renderInto(
+            app: App,
+            markdown: string,
+            el: HTMLElement,
+            sourcePath: string,
+            component: Component
+        ): Promise<void>;
         static render(
             app: App,
             markdown: string,
@@ -53,6 +60,37 @@ ruleTester.run("no-plugin-as-component", noPluginAsComponentRule, {
                 }
             `,
         },
+        {
+            name: "another method of MarkdownRenderer, or render() on something else, is not checked",
+            code: `
+                ${MOCK_API}
+                declare const app: App;
+                declare const el: HTMLElement;
+                declare const preview: { render(app: App, markdown: string, el: HTMLElement, sourcePath: string, component: Component): void };
+                declare function render(app: App, markdown: string, el: HTMLElement, sourcePath: string, component: Component): void;
+                class MyPlugin extends Plugin {
+                    myMethod() {
+                        MarkdownRenderer.renderInto(app, '', el, '', this);
+                        preview.render(app, '', el, '', this);
+                        render(app, '', el, '', this);
+                    }
+                }
+            `,
+        },
+        {
+            name: "a render() call without a component does not crash",
+            code: `
+                ${MOCK_API}
+                declare const app: App;
+                declare const el: HTMLElement;
+                class MyPlugin extends Plugin {
+                    myMethod() {
+                        // @ts-expect-error -- the component is missing
+                        MarkdownRenderer.render(app, '', el, '');
+                    }
+                }
+            `,
+        },
     ],
     invalid: [
         {
@@ -67,7 +105,30 @@ ruleTester.run("no-plugin-as-component", noPluginAsComponentRule, {
                     }
                 }
             `,
+            errors: [{ messageId: "avoidNewComponent", column: 66, endColumn: 81 }],
+        },
+        {
+            name: "a new plugin instance is reported once, as a new component",
+            code: `
+                ${MOCK_API}
+                declare const app: App;
+                declare const el: HTMLElement;
+                declare class MyPlugin extends Plugin {}
+                MarkdownRenderer.render(app, '', el, '', new MyPlugin());
+            `,
             errors: [{ messageId: "avoidNewComponent" }],
+        },
+        {
+            name: "a value of a type parameter constrained to Plugin is forbidden",
+            code: `
+                ${MOCK_API}
+                declare const app: App;
+                declare const el: HTMLElement;
+                function show<T extends Plugin>(plugin: T) {
+                    MarkdownRenderer.render(app, '', el, '', plugin);
+                }
+            `,
+            errors: [{ messageId: "avoidPluginComponent" }],
         },
         {
             name: "this from Plugin class as component is forbidden",
