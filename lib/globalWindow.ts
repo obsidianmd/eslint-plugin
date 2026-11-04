@@ -88,10 +88,32 @@ export function isResultDiscarded(node: TSESTree.Expression): boolean {
     );
 }
 
-// Spares the AST walk in a file without a window check.
-const WINDOW_CHECK_TEXT = /\btypeof[\s(]+(?:[\w$]+\s*\??\.\s*)*(?:window|document)\b|["'`](?:window|document)["'`]\s+in\b/;
-const ENVIRONMENT_GLOBALS = new Set(["window", "document"]);
-const windowChecksCache = new WeakMap<TSESTree.Program, TSESTree.Node[]>();
+// Names that are there only with a window, and names that only a web worker
+// has. A worker check does not prove a window either way: Node has neither.
+const WINDOW_NAMES = new Set(["window", "document"]);
+const WORKER_NAMES = new Set([
+    "importScripts",
+    "WorkerGlobalScope",
+    "DedicatedWorkerGlobalScope",
+    "SharedWorkerGlobalScope",
+    "ServiceWorkerGlobalScope",
+]);
+// The global object, as `globalThis.window` or `self.document` reads it.
+const GLOBAL_OBJECTS = new Set(["globalThis", "global", "self"]);
+const EQUALITY_OPERATORS = new Set(["===", "!==", "==", "!="]);
+
+interface WindowCheck {
+    // `typeof window === "undefined"`, `"window" in globalThis`, the
+    // `globalThis.window` of `!globalThis.window`, or a read of a constant or
+    // a call of a function whose value is such a check.
+    condition: TSESTree.Node;
+    // Whether the window is there when `condition` is true, or undefined when
+    // that does not follow, as for `typeof window` on its own, a worker check
+    // or `typeof window !== "undefined" && ready`.
+    presentWhenTrue: boolean | undefined;
+}
+
+const windowChecksCache = new WeakMap<TSESTree.Program, WindowCheck[]>();
 
 // A check before `node` says the code also runs where there is no window, as
 // in `typeof window === "undefined" ? globalThis.setTimeout(…) : window.setTimeout(…)`,
@@ -101,45 +123,60 @@ const windowChecksCache = new WeakMap<TSESTree.Program, TSESTree.Node[]>();
 // `if (typeof document === "undefined") return;` before it, or the branch of
 // `typeof window !== "undefined" ? … : …` that it is in. A check that does not
 // decide it, such as `const browser = typeof window !== "undefined"`, still
-// counts in the same function, but not in the functions nested in it.
+// counts in the same function, but not in the functions nested in it; there,
+// each read of `browser` is a check of its own.
 function followsWindowCheck(sourceCode: Context["sourceCode"], node: TSESTree.Node): boolean {
-    return getWindowChecks(sourceCode).some((check) => {
-        const scope = enclosingFunction(check);
-        if (check.range[1] > node.range[0] || !contains(scope, node)) {
+    return getWindowChecks(sourceCode).some(({ condition, presentWhenTrue }) => {
+        const scope = enclosingFunction(condition);
+        if (condition.range[1] > node.range[0] || !contains(scope, node)) {
             return false;
         }
-        const present = windowPresenceAt(check, node);
-        return present === undefined ? enclosingFunction(node) === scope : !present;
+        const value = presentWhenTrue === undefined ? undefined : conditionValueAt(condition, node);
+        return value === undefined ? enclosingFunction(node) === scope : value !== presentWhenTrue;
     });
 }
 
-// Whether the window is there at `node`, as far as `check` decides it.
-function windowPresenceAt(check: TSESTree.Node, node: TSESTree.Node): boolean | undefined {
-    let condition: TSESTree.Node = check;
-    // Whether the window is there when `condition` is true.
-    let presentWhenTrue: boolean;
-    if (check.type === TSESTree.AST_NODE_TYPES.BinaryExpression) {
+// The condition `check` (see isWindowCheck) makes.
+function toWindowCheck(check: TSESTree.Node, name: string): WindowCheck {
+    const forWindow = WINDOW_NAMES.has(name);
+    if (check.type === TSESTree.AST_NODE_TYPES.BinaryExpression && check.operator === "in") {
         // "window" in globalThis
-        presentWhenTrue = true;
-    } else {
-        // typeof window === "undefined", typeof document !== "object"
-        const comparison = check.parent;
-        if (
-            comparison?.type !== TSESTree.AST_NODE_TYPES.BinaryExpression ||
-            !["===", "!==", "==", "!="].includes(comparison.operator)
-        ) {
-            return undefined;
-        }
-        const other = comparison.left === check ? comparison.right : comparison.left;
-        if (other.type !== TSESTree.AST_NODE_TYPES.Literal || typeof other.value !== "string") {
-            return undefined;
-        }
-        const equal = comparison.operator === "===" || comparison.operator === "==";
-        presentWhenTrue = equal === (other.value !== "undefined");
-        condition = comparison;
+        return { condition: check, presentWhenTrue: forWindow ? true : undefined };
     }
-    const value = conditionValueAt(condition, node);
-    return value === undefined ? undefined : value === presentWhenTrue;
+    const comparison = check.parent;
+    const isTypeof = check.type === TSESTree.AST_NODE_TYPES.UnaryExpression && check.operator === "typeof";
+    if (comparison?.type === TSESTree.AST_NODE_TYPES.BinaryExpression && EQUALITY_OPERATORS.has(comparison.operator)) {
+        const other = comparison.left === check ? comparison.right : comparison.left;
+        const equal = comparison.operator === "===" || comparison.operator === "==";
+        if (isTypeof) {
+            // typeof window === "undefined", typeof document !== "object"
+            const type =
+                other.type === TSESTree.AST_NODE_TYPES.Literal && typeof other.value === "string"
+                    ? other.value
+                    : undefined;
+            return {
+                condition: type === undefined ? check : comparison,
+                presentWhenTrue: forWindow && type !== undefined ? equal === (type !== "undefined") : undefined,
+            };
+        }
+        // globalThis.window === undefined, globalThis.document != null. Only
+        // undefined tells: `globalThis.window === null` is false either way.
+        const looselyNull =
+            comparison.operator.length === 2 &&
+            other.type === TSESTree.AST_NODE_TYPES.Literal &&
+            other.value === null;
+        const absent = isUndefined(other) || looselyNull;
+        return { condition: comparison, presentWhenTrue: forWindow && absent ? !equal : undefined };
+    }
+    // `typeof window` on its own; `!globalThis.window`, `globalThis.document?.body`
+    return { condition: check, presentWhenTrue: forWindow && !isTypeof ? true : undefined };
+}
+
+function isUndefined(node: TSESTree.Node): boolean {
+    return (
+        (node.type === TSESTree.AST_NODE_TYPES.Identifier && node.name === "undefined") ||
+        (node.type === TSESTree.AST_NODE_TYPES.UnaryExpression && node.operator === "void")
+    );
 }
 
 // What `condition` is known to have evaluated to where `node` runs, from the
@@ -212,29 +249,35 @@ function exits(statement: TSESTree.Statement): boolean {
     }
 }
 
-// `typeof window`, `typeof globalThis.document`, `"window" in globalThis`.
-function getWindowChecks(sourceCode: Context["sourceCode"]): TSESTree.Node[] {
+// Every window check in the file, found on the AST alone, so that no comment,
+// spacing or escape inside a check can hide it. The walk runs once per file,
+// and only when a rule asks: about 20 ms for a 500 KiB file.
+function getWindowChecks(sourceCode: Context["sourceCode"]): WindowCheck[] {
     const cached = windowChecksCache.get(sourceCode.ast);
     if (cached) {
         return cached;
     }
-    const checks: TSESTree.Node[] = [];
-    if (WINDOW_CHECK_TEXT.test(sourceCode.text)) {
-        const visit = (node: TSESTree.Node): void => {
-            if (isWindowCheck(node)) {
-                checks.push(node);
-            }
-            for (const key of sourceCode.visitorKeys[node.type] ?? []) {
-                const child: unknown = (node as unknown as Record<string, unknown>)[key];
-                for (const item of Array.isArray(child) ? child : [child]) {
+    const checks: WindowCheck[] = [];
+    const followed = new Set<TSESTree.Node>();
+    const visit = (node: TSESTree.Node): void => {
+        const name = checkedName(node);
+        if (name !== undefined) {
+            addWindowCheck(sourceCode, checks, toWindowCheck(node, name), followed);
+        }
+        for (const key of sourceCode.visitorKeys[node.type] ?? []) {
+            const child: unknown = (node as unknown as Record<string, unknown>)[key];
+            if (Array.isArray(child)) {
+                for (const item of child) {
                     if (isNode(item)) {
                         visit(item);
                     }
                 }
+            } else if (isNode(child)) {
+                visit(child);
             }
-        };
-        visit(sourceCode.ast);
-    }
+        }
+    };
+    visit(sourceCode.ast);
     windowChecksCache.set(sourceCode.ast, checks);
     return checks;
 }
@@ -243,32 +286,240 @@ function isNode(value: unknown): value is TSESTree.Node {
     return typeof value === "object" && value !== null && typeof (value as { type?: unknown }).type === "string";
 }
 
+// Adds `check`, and where its value is held for later, each read of it:
+// `const browser = typeof window !== "undefined"` makes `browser` a check
+// wherever it is read, and `const hasWindow = () => "window" in globalThis`
+// makes each `hasWindow()` one.
+function addWindowCheck(
+    sourceCode: Context["sourceCode"],
+    checks: WindowCheck[],
+    check: WindowCheck,
+    followed: Set<TSESTree.Node>,
+): void {
+    checks.push(check);
+    // `!` keeps what the value says; `&&` and `||` lose it.
+    let value: TSESTree.Node = check.condition;
+    let presentWhenTrue = check.presentWhenTrue;
+    for (let parent = value.parent; parent; parent = value.parent) {
+        if (parent.type === TSESTree.AST_NODE_TYPES.UnaryExpression && parent.operator === "!") {
+            presentWhenTrue = presentWhenTrue === undefined ? undefined : !presentWhenTrue;
+        } else if (parent.type === TSESTree.AST_NODE_TYPES.LogicalExpression) {
+            presentWhenTrue = undefined;
+        } else {
+            break;
+        }
+        value = parent;
+    }
+    const holder = valueHolder(value);
+    if (!holder || followed.has(holder.declaration)) {
+        return;
+    }
+    followed.add(holder.declaration);
+    const held = holder.exact ? presentWhenTrue : undefined;
+    // A function declaration also declares its parameters.
+    const variable = sourceCode.getDeclaredVariables(holder.declaration).find((v) => v.name === holder.name);
+    for (const reference of variable?.references ?? []) {
+        const read = reference.identifier;
+        if (!reference.isRead() || read.type !== TSESTree.AST_NODE_TYPES.Identifier) {
+            continue;
+        }
+        if (!holder.isFunction) {
+            addWindowCheck(sourceCode, checks, { condition: read, presentWhenTrue: held }, followed);
+        } else if (read.parent.type === TSESTree.AST_NODE_TYPES.CallExpression && read.parent.callee === read) {
+            addWindowCheck(sourceCode, checks, { condition: read.parent, presentWhenTrue: held }, followed);
+        }
+    }
+}
+
+// The declaration that holds `value` for later: the `const`, `let` or `var`
+// it initialises, or the function that returns it. `exact` when that is all
+// it can be: a `const`, or a function that does nothing else.
+function valueHolder(
+    value: TSESTree.Node,
+): { declaration: TSESTree.Node; name: string; isFunction: boolean; exact: boolean } | undefined {
+    const parent = value.parent;
+    if (
+        parent?.type === TSESTree.AST_NODE_TYPES.VariableDeclarator &&
+        parent.init === value &&
+        parent.id.type === TSESTree.AST_NODE_TYPES.Identifier
+    ) {
+        return { declaration: parent, name: parent.id.name, isFunction: false, exact: parent.parent.kind === "const" };
+    }
+    let fn: TSESTree.Node | undefined;
+    let exact = false;
+    if (parent?.type === TSESTree.AST_NODE_TYPES.ArrowFunctionExpression && parent.body === value) {
+        // const hasWindow = () => typeof window !== "undefined";
+        fn = parent;
+        exact = true;
+    } else if (parent?.type === TSESTree.AST_NODE_TYPES.ReturnStatement) {
+        // function hasWindow() { return typeof window !== "undefined"; }
+        fn = enclosingFunction(parent);
+        const body = fn.type === TSESTree.AST_NODE_TYPES.Program ? undefined : (fn as TSESTree.FunctionLike).body;
+        exact =
+            body?.type === TSESTree.AST_NODE_TYPES.BlockStatement && body.body.length === 1 && body.body[0] === parent;
+    }
+    if (fn?.type === TSESTree.AST_NODE_TYPES.FunctionDeclaration && fn.id) {
+        return { declaration: fn, name: fn.id.name, isFunction: true, exact };
+    }
+    if (
+        (fn?.type === TSESTree.AST_NODE_TYPES.ArrowFunctionExpression ||
+            fn?.type === TSESTree.AST_NODE_TYPES.FunctionExpression) &&
+        fn.parent.type === TSESTree.AST_NODE_TYPES.VariableDeclarator &&
+        fn.parent.init === fn &&
+        fn.parent.id.type === TSESTree.AST_NODE_TYPES.Identifier
+    ) {
+        const exactConst = exact && fn.parent.parent.kind === "const";
+        return { declaration: fn.parent, name: fn.parent.id.name, isFunction: true, exact: exactConst };
+    }
+    return undefined;
+}
+
 /**
- * Whether `node` checks for a window: `typeof window`, `typeof document`,
- * `typeof globalThis.window`, `"window" in globalThis`. Rewriting the
- * `globalThis` in such a check to `window` would throw where it is false.
+ * Whether `node` checks for a window, or for a web worker, which has none:
+ *
+ * - `typeof` one of `window`, `document`, `importScripts` or the
+ *   `WorkerGlobalScope`s, or of a property with such a name anywhere in a
+ *   chain: `typeof globalThis.document`, `typeof globalThis?.["window"]`,
+ *   `typeof globalThis.window?.document`;
+ * - `"window" in globalThis`, `` `document` in self ``;
+ * - `globalThis.window`, `global.window` or `self.document` (any such chain on
+ *   the global object) tested on its own: `!globalThis.window`,
+ *   `if (globalThis.document)`, `globalThis.window && …`,
+ *   `globalThis.window === undefined`, `globalThis.document?.body`.
+ *
+ * Rewriting the `globalThis` in such a check to `window` would throw where it is false.
  */
 export function isWindowCheck(node: TSESTree.Node): boolean {
-    if (node.type === TSESTree.AST_NODE_TYPES.UnaryExpression && node.operator === "typeof") {
-        const arg =
-            node.argument.type === TSESTree.AST_NODE_TYPES.ChainExpression ? node.argument.expression : node.argument;
-        if (arg.type === TSESTree.AST_NODE_TYPES.Identifier) {
-            return ENVIRONMENT_GLOBALS.has(arg.name);
+    return checkedName(node) !== undefined;
+}
+
+/**
+ * Whether `node` is part of a window check: the `globalThis` in
+ * `typeof globalThis.document`, `"window" in globalThis` or
+ * `!(globalThis as any).window`. As `window`, the check would throw where it
+ * is false.
+ */
+export function isInWindowCheck(node: TSESTree.Node): boolean {
+    let current = node;
+    for (;;) {
+        if (isWindowCheck(current)) {
+            return true;
         }
-        return (
-            arg.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
-            !arg.computed &&
-            arg.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
-            ENVIRONMENT_GLOBALS.has(arg.property.name)
-        );
+        const parent = current.parent;
+        if (!parent) {
+            return false;
+        }
+        if (!isChainLink(parent, current)) {
+            return isWindowCheck(parent);
+        }
+        current = parent;
     }
-    return (
-        node.type === TSESTree.AST_NODE_TYPES.BinaryExpression &&
-        node.operator === "in" &&
-        node.left.type === TSESTree.AST_NODE_TYPES.Literal &&
-        typeof node.left.value === "string" &&
-        ENVIRONMENT_GLOBALS.has(node.left.value)
-    );
+}
+
+// The window or worker name that `node` checks for, if it is a window check.
+function checkedName(node: TSESTree.Node): string | undefined {
+    if (node.type === TSESTree.AST_NODE_TYPES.UnaryExpression && node.operator === "typeof") {
+        const arg = skipChainAndCasts(node.argument);
+        return arg.type === TSESTree.AST_NODE_TYPES.Identifier ? environmentName(arg.name) : chainedName(arg);
+    }
+    if (node.type === TSESTree.AST_NODE_TYPES.BinaryExpression && node.operator === "in") {
+        const key = node.left.type === TSESTree.AST_NODE_TYPES.PrivateIdentifier ? undefined : staticString(node.left);
+        return key === undefined ? undefined : environmentName(key);
+    }
+    return isOnlyTested(node) ? chainedName(node, GLOBAL_OBJECTS) : undefined;
+}
+
+function environmentName(name: string): string | undefined {
+    return WINDOW_NAMES.has(name) || WORKER_NAMES.has(name) ? name : undefined;
+}
+
+// The window or worker name of a property in the member chain `node`, as in
+// `globalThis.document` or `globalThis.window?.document`; with `roots`, only in
+// a chain on an object of one of those names.
+function chainedName(node: TSESTree.Node, roots?: Set<string>): string | undefined {
+    let name: string | undefined;
+    let current = skipChainAndCasts(node);
+    while (current.type === TSESTree.AST_NODE_TYPES.MemberExpression) {
+        const key = current.computed
+            ? staticString(current.property)
+            : current.property.type === TSESTree.AST_NODE_TYPES.Identifier
+              ? current.property.name
+              : undefined;
+        name ??= key === undefined ? undefined : environmentName(key);
+        current = skipChainAndCasts(current.object);
+    }
+    if (roots && !(current.type === TSESTree.AST_NODE_TYPES.Identifier && roots.has(current.name))) {
+        return undefined;
+    }
+    return name;
+}
+
+// Whether only the truth of `node` is used: `!node`, `node && …`, `if (node)`,
+// `node === undefined`, `node?.x`.
+function isOnlyTested(node: TSESTree.Node): boolean {
+    const parent = node.parent;
+    switch (parent?.type) {
+        case TSESTree.AST_NODE_TYPES.UnaryExpression:
+            return parent.operator === "!";
+        case TSESTree.AST_NODE_TYPES.LogicalExpression:
+            // The right of `a && b` is its value, unless that is only tested too.
+            return parent.left === node || isOnlyTested(parent);
+        case TSESTree.AST_NODE_TYPES.BinaryExpression:
+            return EQUALITY_OPERATORS.has(parent.operator);
+        case TSESTree.AST_NODE_TYPES.IfStatement:
+        case TSESTree.AST_NODE_TYPES.ConditionalExpression:
+        case TSESTree.AST_NODE_TYPES.WhileStatement:
+        case TSESTree.AST_NODE_TYPES.DoWhileStatement:
+        case TSESTree.AST_NODE_TYPES.ForStatement:
+            return parent.test === node;
+        case TSESTree.AST_NODE_TYPES.MemberExpression:
+            return parent.object === node && parent.optional;
+        case TSESTree.AST_NODE_TYPES.CallExpression:
+            return parent.callee === node && parent.optional;
+        default:
+            return false;
+    }
+}
+
+// Whether `parent` reads a property of `child` or only changes its type:
+// `child.x`, `child?.x`, `child!`, `child as T`.
+function isChainLink(parent: TSESTree.Node, child: TSESTree.Node): boolean {
+    switch (parent.type) {
+        case TSESTree.AST_NODE_TYPES.MemberExpression:
+            return parent.object === child;
+        case TSESTree.AST_NODE_TYPES.ChainExpression:
+        case TSESTree.AST_NODE_TYPES.TSNonNullExpression:
+        case TSESTree.AST_NODE_TYPES.TSAsExpression:
+        case TSESTree.AST_NODE_TYPES.TSSatisfiesExpression:
+        case TSESTree.AST_NODE_TYPES.TSTypeAssertion:
+            return parent.expression === child;
+        default:
+            return false;
+    }
+}
+
+function skipChainAndCasts(node: TSESTree.Node): TSESTree.Node {
+    while (
+        node.type === TSESTree.AST_NODE_TYPES.ChainExpression ||
+        node.type === TSESTree.AST_NODE_TYPES.TSNonNullExpression ||
+        node.type === TSESTree.AST_NODE_TYPES.TSAsExpression ||
+        node.type === TSESTree.AST_NODE_TYPES.TSSatisfiesExpression ||
+        node.type === TSESTree.AST_NODE_TYPES.TSTypeAssertion
+    ) {
+        node = node.expression;
+    }
+    return node;
+}
+
+// The value of a string literal, or of a template literal without expressions.
+function staticString(node: TSESTree.Node): string | undefined {
+    if (node.type === TSESTree.AST_NODE_TYPES.Literal) {
+        return typeof node.value === "string" ? node.value : undefined;
+    }
+    if (node.type === TSESTree.AST_NODE_TYPES.TemplateLiteral && node.expressions.length === 0) {
+        return node.quasis[0].value.cooked ?? undefined;
+    }
+    return undefined;
 }
 
 function enclosingFunction(node: TSESTree.Node): TSESTree.Node {

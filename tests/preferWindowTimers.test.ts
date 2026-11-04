@@ -366,6 +366,50 @@ ruleTester.run("prefer-window-timers", preferWindowTimersRule, {
             errors: [{ messageId: "preferWindowTimer", data: { name: "setTimeout" } }],
         },
 
+        // --- A constant or a function that holds a check ---
+        ...[
+            ["a constant that says there is no window", `const hasWindow = typeof window !== "undefined"; export function later(fn: () => void) { if (!hasWindow) { setTimeout(fn, 0); } }`],
+            ["a let, which can change, even where it says the window is there", `let hasWindow = typeof window !== "undefined"; export function later(fn: () => void) { if (hasWindow) { setTimeout(fn, 0); } }`],
+            ["a negated test of globalThis.window", `const noWindow = !globalThis.window; export function later(fn: () => void) { if (noWindow) { setTimeout(fn, 0); } }`],
+            ["two checks joined by &&, which does not say which failed", `const isBrowser = typeof window !== "undefined" && typeof document !== "undefined"; export function later(fn: () => void) { if (isBrowser) { setTimeout(fn, 0); } }`],
+            ["a function that returns a check", `function hasWindow() { return typeof window !== "undefined"; } export function later(fn: () => void) { if (!hasWindow()) { setTimeout(fn, 0); } }`],
+            ["an arrow function that returns an in check", `const hasWindow = () => "window" in globalThis; export function later(fn: () => void) { if (!hasWindow()) { setTimeout(fn, 0); } }`],
+            ["a function expression that returns a check", `const hasDocument = function () { return typeof document !== "undefined"; }; export function later(fn: () => void) { if (!hasDocument()) { setTimeout(fn, 0); } }`],
+            ["a function that also returns something else", `declare const ready: boolean; function hasWindow() { if (!ready) return false; return typeof window !== "undefined"; } export function later(fn: () => void) { if (hasWindow()) { setTimeout(fn, 0); } }`],
+            ["a constant set from such a function", `const hasWindow = () => typeof window !== "undefined"; const browser = hasWindow(); export function later(fn: () => void) { if (!browser) { setTimeout(fn, 0); } }`],
+            ["a worker check", `const isWorker = typeof importScripts === "function"; export function later(fn: () => void) { if (isWorker) { setTimeout(fn, 0); } }`],
+            ["a worker check that is false, as Node has no worker either", `const isWorker = typeof importScripts === "function"; export function later(fn: () => void) { if (!isWorker) { setTimeout(fn, 0); } }`],
+        ].map(([form, code]) => ({
+            name: `a timer after ${form} is reported only`,
+            code,
+            output: null,
+            errors: [{ messageId: "preferWindowTimer" as const, data: { name: "setTimeout" }, suggestions: [] }],
+        })),
+        {
+            name: "the branch where a constant says the window is there is fixed",
+            code: `const hasWindow = typeof window !== "undefined"; export function later(fn: () => void) { if (hasWindow) { setTimeout(fn, 0); } }`,
+            output: `const hasWindow = typeof window !== "undefined"; export function later(fn: () => void) { if (hasWindow) { window.setTimeout(fn, 0); } }`,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "setTimeout" } }],
+        },
+        {
+            name: "the branch where a function says the window is there is fixed",
+            code: `function hasWindow() { return typeof window !== "undefined"; } export function later(fn: () => void) { if (hasWindow()) { setTimeout(fn, 0); } }`,
+            output: `function hasWindow() { return typeof window !== "undefined"; } export function later(fn: () => void) { if (hasWindow()) { window.setTimeout(fn, 0); } }`,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "setTimeout" } }],
+        },
+        {
+            name: "a typeof check against a template literal does not prove the window exists",
+            code: "export function later(fn: () => void) { if (typeof window !== `undefined`) { setTimeout(fn, 0); } }",
+            output: null,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "setTimeout" }, suggestions: [] }],
+        },
+        {
+            name: "a function that calls itself is followed once",
+            code: `function hasWindow(): boolean { return typeof window !== "undefined" || hasWindow(); } export function later(fn: () => void) { if (!hasWindow()) { setTimeout(fn, 0); } }`,
+            output: null,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "setTimeout" }, suggestions: [] }],
+        },
+
         // --- Where the check decides whether the call runs ---
         {
             name: "the right of && after a check that window exists is fixed",
@@ -525,6 +569,91 @@ untypedRuleTester.run("prefer-window-timers without type information", preferWin
             output: null,
             errors: [{ messageId: "preferWindowTimer", data: { name: "setTimeout" }, suggestions: [] }],
         },
+    ],
+});
+
+// Every form of window check the rule recognises, each written four ways: with
+// single spaces, with a comment between every two tokens, with newlines and
+// tabs, and with no space where none is needed. `_` marks where tokens meet.
+// In the branch that runs without a window, `window.setTimeout` would throw.
+const NO_WINDOW_THEN = [
+    ["typeof window", `typeof_window_===_"undefined"`],
+    ["typeof (window)", `typeof_(_window_)_===_"undefined"`],
+    ["the comparison written the other way round", `"undefined"_===_typeof_window`],
+    ["a template literal type", "typeof_window_==_`undefined`"],
+    ["typeof document compared with another type", `typeof_document_!==_"object"`],
+    ["typeof globalThis.window", `typeof_globalThis_._window_===_"undefined"`],
+    ["typeof globalThis?.document", `typeof_globalThis_?._document_===_"undefined"`],
+    ["a string key", `typeof_globalThis_[_"document"_]_===_"undefined"`],
+    ["a template literal key", "typeof_globalThis_[_`window`_]_===_\"undefined\""],
+    ["typeof self.document", `typeof_self_._document_===_"undefined"`],
+    ["an optional chain past window", `typeof_globalThis_._window_?._document_===_"undefined"`],
+    // TypeScript allows no line break before `as`.
+    ["a cast", `typeof_(_globalThis as any_)_._document_===_"undefined"`],
+    ["a negated in check", `!_(_"window"_in_globalThis_)`],
+    ["a negated in check with a template literal", "!_(_`document`_in_globalThis_)"],
+    ["a negated globalThis.window", `!_globalThis_._window`],
+    ["a negated global.window", `!_global_._window`],
+    ["a negated self.document", `!_self_._document`],
+    ["a negated string key", `!_globalThis_[_"document"_]`],
+    ["globalThis.window compared with undefined", `globalThis_._window_===_undefined`],
+    ["globalThis.document compared loosely with null", `globalThis_._document_==_null`],
+    ["globalThis.window compared with void 0", `globalThis_._window_===_void_0`],
+    ["typeof importScripts, as in a worker", `typeof_importScripts_===_"function"`],
+    ["typeof WorkerGlobalScope, as in a worker", `typeof_WorkerGlobalScope_!==_"undefined"`],
+    ["typeof importScripts that is undefined, as Node has no window either", `typeof_importScripts_===_"undefined"`],
+    ["an in check for importScripts", `"importScripts"_in_globalThis`],
+];
+const NO_WINDOW_ELSE = [
+    ["an in check", `"window"_in_globalThis`],
+    ["globalThis.document", `globalThis_._document`],
+    ["typeof window that is defined", `typeof_window_!==_"undefined"`],
+];
+const SPELLINGS: [string, (condition: string) => string][] = [
+    ["single spaces", (condition) => condition.replaceAll("_", " ")],
+    ["comments", (condition) => condition.replaceAll("_", " /* no DOM */ ")],
+    ["newlines and tabs", (condition) => condition.replaceAll("_", "\n\t")],
+    ["no spaces", (condition) => condition.replace(/(.)_(?=(.))/g, (_, before: string, after: string) => (/[\w$]/.test(before) && /[\w$]/.test(after) ? `${before} ` : before))],
+];
+
+untypedRuleTester.run("prefer-window-timers in every form of window check", preferWindowTimersRule, {
+    valid: [],
+    invalid: [
+        ...NO_WINDOW_THEN.flatMap(([form, condition]) =>
+            SPELLINGS.map(([spelling, spell]) => ({
+                name: `the branch without a window, after ${form} with ${spelling}, is reported only`,
+                code: `export function later(fn: () => void) { if (${spell(condition)}) { setTimeout(fn, 0); } }`,
+                output: null,
+                errors: [{ messageId: "preferWindowTimer" as const, data: { name: "setTimeout" }, suggestions: [] }],
+            })),
+        ),
+        ...NO_WINDOW_ELSE.flatMap(([form, condition]) =>
+            SPELLINGS.map(([spelling, spell]) => ({
+                name: `the else branch of ${form} with ${spelling} is reported only`,
+                code: `export function later(fn: () => void) { if (${spell(condition)}) { window.setTimeout(fn, 0); } else { setTimeout(fn, 0); } }`,
+                output: null,
+                errors: [{ messageId: "preferWindowTimer" as const, data: { name: "setTimeout" }, suggestions: [] }],
+            })),
+        ),
+        // The branch where the check proves the window is there, and look-alikes
+        // that are not window checks: still fixed.
+        ...[
+            ["the branch where typeof globalThis with a string key proves the window", `if (typeof globalThis["window"] !== "undefined") { setTimeout(fn, 0); }`],
+            ["the branch where globalThis.window is there", `if (globalThis.window) { setTimeout(fn, 0); }`],
+            ["the branch where globalThis.document is not undefined", `if (globalThis.document !== undefined) { setTimeout(fn, 0); }`],
+            ["the branch where globalThis.document is not null", `if (globalThis.document != null) { setTimeout(fn, 0); }`],
+            ["code after an early return on a missing globalThis.window", `if (!globalThis.window) return; setTimeout(fn, 0);`],
+            ["code after an early return on a missing self.document", `if (!self.document) { return; } setTimeout(fn, 0);`],
+            ["a test of another property of globalThis", `if (!globalThis.crypto) { setTimeout(fn, 0); }`],
+            ["a test of window.document, which already needs a window", `if (!window.document) { setTimeout(fn, 0); }`],
+            ["typeof a property of window, which already needs a window", `if (typeof window.app === "undefined") { setTimeout(fn, 0); }`],
+            ["an in check for another name", "if (!(`requestIdleCallback` in globalThis)) { setTimeout(fn, 0); }"],
+        ].map(([form, body]) => ({
+            name: `${form} is fixed`,
+            code: `export function later(fn: () => void) { ${body} }`,
+            output: `export function later(fn: () => void) { ${body.replace("setTimeout(fn", "window.setTimeout(fn")} }`,
+            errors: [{ messageId: "preferWindowTimer" as const, data: { name: "setTimeout" } }],
+        })),
     ],
 });
 

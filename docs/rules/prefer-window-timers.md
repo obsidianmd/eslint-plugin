@@ -47,13 +47,41 @@ on `activeWindow` are not fixed there either:
 - a local binding named `window` is in scope, such as a Playwright page in
   `const window = await app.firstWindow()`, so `window.setTimeout` would call that binding
 - with type information, the project declares no `window` because it has no DOM lib
-- an earlier `typeof window` or `typeof document` check shows that the code also runs without a
-  window, as in `typeof window === "undefined" ? setTimeout(fn, ms) : window.setTimeout(fn, ms)`.
+- an earlier [window check](#window-checks) shows that the code also runs without a window, as in
+  `typeof window === "undefined" ? setTimeout(fn, ms) : window.setTimeout(fn, ms)`.
   Where the check proves that the window exists, such as inside
   `if (typeof window !== "undefined") { … }`, the rules above apply
 
 Not reported: calls on `window` already or on another window such as `el.win`, a function of your own
 or an import with one of these names, and other functions such as `requestIdleCallback`.
+
+## Window checks
+
+These count as a check for a window, however they are spaced or commented:
+
+- `typeof window`, `typeof document`, or `typeof` a property named `window` or `document`, such as
+  `typeof globalThis.document`, `typeof globalThis?.["window"]` or `typeof self.document`
+- `"window" in globalThis` or `"document" in globalThis`, also with a template literal
+- `globalThis.window`, `global.window` or `self.document` tested on its own: `!globalThis.window`,
+  `if (globalThis.document)`, `globalThis.window === undefined`, `globalThis.document?.body`
+- a check for a web worker, which has no window: `typeof importScripts`, `typeof WorkerGlobalScope`
+  (or another `WorkerGlobalScope`), or `"importScripts" in globalThis`. It never proves that the
+  window exists, since Node has neither
+- a read of a variable set to a check, or a call of a function that returns one, declared in the same
+  file: `const hasWindow = typeof window !== "undefined";` makes `if (!hasWindow) { … }` a check,
+  and so does `function hasWindow() { return "window" in globalThis; }` for `if (!hasWindow()) { … }`.
+  Only a `const`, or a function that does nothing else, can prove the window exists where it is
+  true, and not when it joins checks with `&&` or `||`
+
+A check decides where the code runs through `if`, `?:`, `&&`, `||` and `!`, and through an `if` before
+the code that returns, throws, breaks or continues. A check that does not decide it, such as
+`const browser = typeof window !== "undefined";` on its own, counts for the rest of its function, but
+not in the functions nested in it.
+
+Not recognised: a check in another file (`import { isBrowser } from "./env"`), one held in a class
+member or an object property (`this.isBrowser`), and a `try`/`catch`. There, code that runs without a
+window can still be fixed, so keep it in a web worker or test file, where the recommended config
+switches this rule off, or disable the rule for it.
 
 ## Web workers and tests
 
