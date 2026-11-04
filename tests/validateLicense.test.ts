@@ -34,18 +34,21 @@ const SAMPLE_LINE = "Copyright (C) 2020-2025 by Dynalist Inc.";
 
 ruleTester.run("validate-license", licenseRule as unknown as Rule.RuleModule, {
     valid: [
+        // A line with a holder other than the sample's is not checked at all,
+        // whatever its year: the year checks are pinned by the invalid cases
+        // with the sample holder.
         {
-            name: "copyright with year range ending at current year is valid",
+            name: "own copyright with a range ending in the current year is valid",
             filename: "LICENSE",
             code: `Copyright (C) 2020-${currentYear} by John Doe`,
         },
         {
-            name: "copyright with current year only is valid",
+            name: "own copyright with the current year is valid",
             filename: "LICENSE",
             code: `Copyright (C) ${currentYear} by John Doe`,
         },
         {
-            name: "copyright with next year is valid",
+            name: "own copyright with next year is valid",
             filename: "LICENSE",
             code: `Copyright (C) ${currentYear + 1} by John Doe`,
         },
@@ -84,7 +87,7 @@ ruleTester.run("validate-license", licenseRule as unknown as Rule.RuleModule, {
             code: LGPL_3_0,
         },
         {
-            name: "copyright with disableUnchangedYear skips year check",
+            name: "own copyright with an old year is valid with disableUnchangedYear too",
             filename: "LICENSE",
             code: `Copyright (C) 2001 by John Doe`,
             options: [{ currentYear: currentYear, disableUnchangedYear: true }],
