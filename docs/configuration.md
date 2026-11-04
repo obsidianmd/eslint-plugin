@@ -85,11 +85,12 @@ never visit them, and the rules covering them silently do nothing:
 }
 ```
 
-`LICENSE` is matched exactly, alongside `LICENSE.md` and `LICENSE.txt`, and only next to your
-`eslint.config.mjs`: in a monorepo, `packages/foo/LICENSE` is not linted. A licence file under any
-other name or path is not linted; point `validate-license` at it with your own `files` entry —
-`["COPYING"]`, or `["packages/*/LICENSE"]` for a monorepo — using the language the plugin
-contributes:
+`LICENSE` is matched exactly, case included, alongside `LICENSE.md` and `LICENSE.txt`, and only
+next to your `eslint.config.mjs`. ESLint matches `files` by case on every system, so `License` and
+`Manifest.json` are not linted, also on Windows and macOS. In a monorepo, `packages/foo/LICENSE` is
+not linted. A licence file under any other name or path is not linted; point `validate-license` at
+it with your own `files` entry — `["COPYING"]`, or `["packages/*/LICENSE"]` for a monorepo — using
+the language the plugin contributes:
 
 ```js
 {
