@@ -20,6 +20,9 @@ const strings = { openNote: "Open note" };
 export { strings }; // checked as well, as are `export default strings` and `export const x = { … }`
 ```
 
+The object may carry `as const`, `satisfies …` or another type assertion, as in
+`export default { … } as const satisfies Record<string, string>`.
+
 The message gives the expected text, and with `allowAutoFix: true`, `--fix` rewrites the string as
 a double-quoted string. Values are judged as in [`ui/sentence-case`](sentence-case.md): URLs, date
 formats such as `YYYY-MM-DD`, brand names and "REST" written in capitals keep their casing. The

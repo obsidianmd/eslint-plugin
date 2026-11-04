@@ -78,6 +78,21 @@ try {
                 filename: "en.ts",
                 code: "declare const n: number; export default { saved: `Saved ${n} Files` };",
             },
+            {
+                name: "sentence case in a default export with as const or satisfies is allowed",
+                filename: "en.ts",
+                code: `export default { autoReveal: "Enable auto-reveal" } as const satisfies Record<string, string>;`,
+            },
+            {
+                name: "a non-English locale module with a type assertion is not checked",
+                filename: "fr.ts",
+                code: `export default { autoReveal: "Enable Auto Reveal" } satisfies Record<string, string>;`,
+            },
+            {
+                name: "a default-exported array with a type assertion is not checked, as without one",
+                filename: "en.ts",
+                code: `export default ["Enable Auto Reveal"] as const;`,
+            },
         ],
         invalid: [
             {
@@ -136,6 +151,53 @@ export default strings;`,
                 code: `const strings = { autoReveal: "Enable Auto Reveal" };
 export { strings };`,
                 errors: [{ messageId: "useSentenceCase" }],
+            },
+            {
+                name: "a default-exported object with satisfies is checked",
+                filename: "en.ts",
+                code: `export default { a: "Enable Auto Reveal" } satisfies Record<string, string>;`,
+                errors: [{ messageId: "useSentenceCase" }],
+            },
+            {
+                name: "a default-exported object with as const is checked",
+                filename: "en.ts",
+                code: `export default { a: "Enable Auto Reveal", b: { c: "Open Settings" } } as const;`,
+                errors: [{ messageId: "useSentenceCase" }, { messageId: "useSentenceCase" }],
+            },
+            {
+                name: "a default-exported object with as const satisfies is checked and fixed",
+                filename: "en.ts",
+                code: `export default { a: "Enable Auto Reveal" } as const satisfies Record<string, string>;`,
+                output: `export default { a: "Enable auto reveal" } as const satisfies Record<string, string>;`,
+                options: [{ allowAutoFix: true }],
+                errors: [{ messageId: "useSentenceCase" }],
+            },
+            {
+                name: "a default-exported object with an angle-bracket type assertion is checked",
+                filename: "en.ts",
+                code: `export default <const>{ a: "Enable Auto Reveal" };`,
+                errors: [{ messageId: "useSentenceCase" }],
+            },
+            {
+                name: "a parenthesized default-exported object is checked",
+                filename: "en.ts",
+                code: `export default ({ a: "Enable Auto Reveal" } satisfies Record<string, string>);`,
+                errors: [{ messageId: "useSentenceCase" }],
+            },
+            {
+                name: "a default-exported variable with a type assertion is checked",
+                filename: "en.ts",
+                code: `const strings = { a: "Enable Auto Reveal" };
+export default strings as Record<string, string>;`,
+                errors: [{ messageId: "useSentenceCase" }],
+            },
+            {
+                name: "an angle-bracket type assertion on a variable or named export is checked",
+                filename: "en.ts",
+                code: `const strings = <const>{ a: "Enable Auto Reveal" };
+export default strings;
+export const more = <const>{ b: "Open Settings" };`,
+                errors: [{ messageId: "useSentenceCase" }, { messageId: "useSentenceCase" }],
             },
         ],
     });

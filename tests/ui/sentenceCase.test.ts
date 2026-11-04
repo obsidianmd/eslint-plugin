@@ -293,6 +293,11 @@ tester.run("ui-sentence-case", rule, {
             errors: [{ messageId: "useSentenceCase" }],
         },
         {
+            name: "createEl options behind an angle-bracket type assertion are checked",
+            code: "createEl('div', <DomElementInfo>{ title: 'Open Settings' });",
+            errors: [{ messageId: "useSentenceCase" }],
+        },
+        {
             name: "createEl nested title with title case is forbidden",
             code: "createEl('div', { nested: { title: 'Open Settings' } });",
             errors: [{ messageId: "useSentenceCase" }],

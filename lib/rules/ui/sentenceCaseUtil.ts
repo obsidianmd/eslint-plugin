@@ -164,7 +164,9 @@ export function isExpressionNode(node: TSESTree.Node | null | undefined): node i
     }
 }
 
-// Unwraps TypeScript type assertions and non-null assertions to get the underlying expression
+// Unwraps TypeScript type assertions (`x as T`, `<T>x`), `satisfies` and
+// non-null assertions to get the underlying expression. Parentheses leave no
+// node in the AST, so they need no unwrapping.
 export function unwrapExpression(
     node: TSESTree.Node | null | undefined,
 ): TSESTree.Expression | null {
@@ -172,6 +174,7 @@ export function unwrapExpression(
     while (current) {
         if (
             current.type === TSESTree.AST_NODE_TYPES.TSAsExpression ||
+            current.type === TSESTree.AST_NODE_TYPES.TSTypeAssertion ||
             current.type === TSESTree.AST_NODE_TYPES.TSSatisfiesExpression ||
             current.type === TSESTree.AST_NODE_TYPES.TSNonNullExpression
         ) {
