@@ -16,7 +16,7 @@ Next, install `eslint-plugin-obsidianmd`:
 npm install eslint-plugin-obsidianmd --save-dev
 ```
 
-The plugin needs Node.js 20.19+, 22.13+ or 24+, ESLint 9.19 or later, and `typescript-eslint` 8.35.1 or later. npm installs `typescript` and `typescript-eslint` alongside the plugin if your project does not already have them. `typescript-eslint` 8.70.1 or later is recommended: it fixes a `no-unnecessary-type-assertion` false positive on an object asserted to a `Record` type alias ([typescript-eslint#12856](https://github.com/typescript-eslint/typescript-eslint/issues/12856)). The configuration examples below import `defineConfig` and `globalIgnores` from `eslint/config`, which ESLint added in 9.22. On an older ESLint, write `{ ignores: [...] }` instead of `globalIgnores([...])`, and export the array without `defineConfig`, or, where an example uses `extends`, wrap it in `tseslint.config(...)` instead.
+The plugin needs Node.js 20.19+, 22.13+ or 24+, ESLint 9.19 or later, and `typescript-eslint` 8.35.1 or later. npm installs `typescript` and `typescript-eslint` alongside the plugin if your project does not already have them. `typescript-eslint` 8.70.1 or later is recommended: it fixes a `no-unnecessary-type-assertion` false positive on an empty object asserted to a `Record` type alias ([typescript-eslint#12856](https://github.com/typescript-eslint/typescript-eslint/issues/12856)). The configuration examples below import `defineConfig` and `globalIgnores` from `eslint/config`, which ESLint added in 9.22. On an older ESLint, write `{ ignores: [...] }` instead of `globalIgnores([...])`, and export the array without `defineConfig`, or, where an example uses `extends`, wrap it in `tseslint.config(...)` instead.
 
 On ESLint 10, npm prints `ERESOLVE overriding peer dependency` warnings when it installs the plugin, and `npm ls --all` and `npm ls eslint` exit with `invalid: eslint@10…`. Three packages the plugin bundles do not declare ESLint 10 support yet: `@microsoft/eslint-plugin-sdl`, `eslint-plugin-import`, and `eslint-plugin-react`, which `@microsoft/eslint-plugin-sdl` installs. Linting works, so you can ignore the warnings. With npm's `strict-peer-deps` setting on, the install fails instead; turn the setting off or use ESLint 9.
 
@@ -149,10 +149,11 @@ For advanced usage — layering stricter typescript-eslint configs, ignoring fil
 
 Checks UI strings for sentence case. The rule reports warnings but doesn't change text unless you run ESLint with `--fix` and enable `allowAutoFix`.
 
-- Off in the `recommended` configs from 0.5.0 (0.3.0 meant to turn it off, but it stayed on until 0.4.2); turn it on yourself, as in the example below
+- Off in the `recommended` configs from 0.5.0 (0.3.0 meant to turn it off, but it stayed on through 0.4.2); turn it on yourself, as in the example below
 - Locale checks for English JSON and TS/JS modules are on in `recommendedWithLocalesEn`
 - By default allows CamelCase words like `AutoReveal`
 - Set `enforceCamelCaseLower: true` to flag CamelCase as incorrect
+- `brands` and `acronyms` replace the built-in lists (which include `Obsidian`, `GitHub`, `URL` and `PDF`) rather than adding to them, so list every brand and acronym your UI text uses
 
 ### Usage (flat config)
 
@@ -182,6 +183,7 @@ export default defineConfig([
       "obsidianmd/ui/sentence-case": [
         "warn",
         {
+          // These replace the built-in lists: add back any you use, such as "Obsidian" or "URL"
           brands: ["YourBrand"],
           acronyms: ["OK"],
           enforceCamelCaseLower: true,
@@ -195,7 +197,7 @@ export default defineConfig([
 ### Notes
 
 - Hyphenated words: `Auto-Reveal` becomes `auto-reveal`
-- Locale file patterns in `recommendedWithLocalesEn`: JSON files named `en*.json` or under an `en/` directory, and modules (`.ts`, `.js`, `.cjs`, `.mjs`) named `en`, `en-*` or `en_*`, or under an `en/` directory
+- Locale file patterns in `recommendedWithLocalesEn`: JSON files named `en.json`, `en-*.json`, `en_*.json` or `en.*.json`, or under an `en/` directory, and modules (`.ts`, `.js`, `.cjs`, `.mjs`) named `en`, `en-*` or `en_*`, or under an `en/` directory
 
 ### Known limitations
 
