@@ -1,4 +1,7 @@
+import assert from "node:assert";
 import { RuleTester } from "@typescript-eslint/rule-tester";
+import { Linter } from "eslint";
+import { describe, it } from "mocha";
 import noDeprecatedDisplayRule from "../../lib/rules/settingsTab/noDeprecatedDisplay.js";
 
 const MOCK_CLASS = `declare class PluginSettingTab {}`;
@@ -113,6 +116,25 @@ ruleTester.run("no-deprecated-display", noDeprecatedDisplayRule, {
             `,
         },
         {
+            name: "an empty-array stub seen through satisfies, an angle-bracket or a non-null assertion is not reported",
+            options: [{ minAppVersion: "1.13.0" }],
+            code: `
+                ${MOCK_CLASS}
+                class SatisfiesStub extends PluginSettingTab {
+                    getSettingDefinitions() { return [] satisfies unknown[]; }
+                    display(): void {}
+                }
+                class AssertionStub extends PluginSettingTab {
+                    getSettingDefinitions() { return <unknown[]>[]; }
+                    display(): void {}
+                }
+                class NonNullStub extends PluginSettingTab {
+                    getSettingDefinitions() { return []!; }
+                    display(): void {}
+                }
+            `,
+        },
+        {
             // chem-search: ({}).length > 0 is false, so display() renders.
             name: "getSettingDefinitions() that returns {} is not reported either",
             options: [{ minAppVersion: "1.13.0" }],
@@ -182,6 +204,93 @@ ruleTester.run("no-deprecated-display", noDeprecatedDisplayRule, {
                 ${MOCK_CLASS}
                 class MyTab extends PluginSettingTab {
                     ${DEFINITIONS}
+                }
+            `,
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "the suggestion removes a stray semicolon after the display() method",
+            options: [{ minAppVersion: "1.13.0" }],
+            code: `
+                ${MOCK_CLASS}
+                class MyTab extends PluginSettingTab {
+                    ${DEFINITIONS}
+                    display() {};
+                }
+            `,
+            output: null,
+            errors: [
+                {
+                    messageId: "deprecatedDisplay",
+                    suggestions: [
+                        {
+                            messageId: "removeDisplay",
+                            output: `
+                ${MOCK_CLASS}
+                class MyTab extends PluginSettingTab {
+                    ${DEFINITIONS}
+                }
+            `,
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "the suggestion keeps CRLF line endings, removing the display() line whole",
+            options: [{ minAppVersion: "1.13.0" }],
+            code: [
+                MOCK_CLASS,
+                "class MyTab extends PluginSettingTab {",
+                "    display() {}",
+                `    ${DEFINITIONS}`,
+                "}",
+            ].join("\r\n"),
+            output: null,
+            errors: [
+                {
+                    messageId: "deprecatedDisplay",
+                    suggestions: [
+                        {
+                            messageId: "removeDisplay",
+                            output: [
+                                MOCK_CLASS,
+                                "class MyTab extends PluginSettingTab {",
+                                `    ${DEFINITIONS}`,
+                                "}",
+                            ].join("\r\n"),
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            // Only a function returning [] is known to be a stub.
+            name: "getSettingDefinitions as a field holding a function is reported",
+            options: [{ minAppVersion: "1.13.0" }],
+            code: `
+                ${MOCK_CLASS}
+                declare function buildDefinitions(): { name: string }[];
+                class MyTab extends PluginSettingTab {
+                    getSettingDefinitions = buildDefinitions;
+                    display() {}
+                }
+            `,
+            output: null,
+            errors: [
+                {
+                    messageId: "deprecatedDisplay",
+                    suggestions: [
+                        {
+                            messageId: "removeDisplay",
+                            output: `
+                ${MOCK_CLASS}
+                declare function buildDefinitions(): { name: string }[];
+                class MyTab extends PluginSettingTab {
+                    getSettingDefinitions = buildDefinitions;
                 }
             `,
                         },
@@ -308,6 +417,32 @@ ruleTester.run("no-deprecated-display", noDeprecatedDisplayRule, {
             ],
         },
         {
+            // The comment may be about the member before display(), so it stays.
+            name: "a trailing comment is kept when display() shares its line with another member",
+            options: [{ minAppVersion: "1.13.0" }],
+            code: `
+                ${MOCK_CLASS}
+                const MyTab = class extends PluginSettingTab { ${DEFINITIONS} display() {} // tab
+                };
+            `,
+            output: null,
+            errors: [
+                {
+                    messageId: "deprecatedDisplay",
+                    suggestions: [
+                        {
+                            messageId: "removeDisplay",
+                            output: `
+                ${MOCK_CLASS}
+                const MyTab = class extends PluginSettingTab { ${DEFINITIONS}  // tab
+                };
+            `,
+                        },
+                    ],
+                },
+            ],
+        },
+        {
             // display() is still the fallback whenever the array comes back empty.
             name: "getSettingDefinitions() that returns [] only sometimes is reported, with a suggestion",
             options: [{ minAppVersion: "1.13.0" }],
@@ -345,4 +480,25 @@ ruleTester.run("no-deprecated-display", noDeprecatedDisplayRule, {
             ],
         },
     ],
+});
+
+describe("no-deprecated-display with a getSettingDefinitions() that returns nothing", () => {
+    // Whether such a tab is reported is not pinned here: only that the rule
+    // reads these bodies without crashing.
+    for (const [name, body] of [
+        ["an empty body", "{}"],
+        ["a bare return", "{ return; }"],
+        ["one statement that is not a return", "{ this.build(); }"],
+    ]) {
+        it(`does not crash on ${name}`, () => {
+            const messages = new Linter().verify(
+                `class MyTab extends PluginSettingTab { getSettingDefinitions() ${body} display() {} }`,
+                [{
+                    plugins: { obsidianmd: { rules: { "no-deprecated-display": noDeprecatedDisplayRule as never } } },
+                    rules: { "obsidianmd/no-deprecated-display": ["warn", { minAppVersion: "1.13.0" }] },
+                }],
+            );
+            assert.deepStrictEqual(messages.filter((message) => message.fatal), []);
+        });
+    }
 });
