@@ -108,10 +108,13 @@ export default ruleCreator({
             },
         };
 
+        // A scope's variables by name. Searching its `variables` array instead
+        // costs the number of variables in each scope up to the global one,
+        // which holds every name of TypeScript's lib, for each timer call.
         function findVariable(scope: ReturnType<typeof context.sourceCode.getScope>, name: string): { defs: unknown[] } | null {
             let current: typeof scope | null = scope;
             while (current) {
-                const variable = current.variables.find((v) => v.name === name);
+                const variable = current.set.get(name);
                 if (variable) {
                     return variable;
                 }
