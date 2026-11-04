@@ -3,6 +3,7 @@ import { docsUrl } from "../../ruleCreator.js";
 import {
     createSentenceCaseEvaluator,
     isEnglishLocalePath,
+    recaseStringSource,
     resolveSentenceCaseConfig,
     SentenceCaseRuleConfig,
 } from "./sentenceCaseUtil.js";
@@ -90,12 +91,17 @@ const rule: SentenceCaseJsonRuleDefinition = {
                 if (suggestion === undefined) {
                     return;
                 }
+                // The fix changes the case of letters only, keeping every
+                // escape; there is none where a letter to change is an escape.
+                const replacement = allowAutoFix
+                    ? recaseStringSource(context.sourceCode.getText(value), value.value, suggestion)
+                    : null;
                 context.report({
                     node: value,
                     messageId: "useSentenceCase",
                     data: { suggestion },
-                    ...(allowAutoFix
-                        ? { fix: (fixer) => fixer.replaceText(value, JSON.stringify(suggestion)) }
+                    ...(replacement !== null
+                        ? { fix: (fixer) => fixer.replaceText(value, replacement) }
                         : {}),
                 });
             },

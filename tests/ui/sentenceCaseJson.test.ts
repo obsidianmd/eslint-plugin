@@ -118,6 +118,26 @@ tester.run("ui-sentence-case-json", rule as unknown as Rule.RuleModule, {
             errors: [{ messageId: "useSentenceCase" }],
         },
         {
+            name: "auto-fix keeps every escape as written",
+            filename: "en.json",
+            code: String.raw`{"a":"\u004fpen Settings\nNow","b":"Open\/Close All","c":"Say \"Hi\" \u00e9 Now"}`,
+            output: String.raw`{"a":"\u004fpen settings\nnow","b":"Open\/close all","c":"Say \"hi\" \u00e9 now"}`,
+            options: [{ allowAutoFix: true }],
+            errors: [
+                { messageId: "useSentenceCase", data: { suggestion: "Open settings\nnow" } },
+                { messageId: "useSentenceCase", data: { suggestion: "Open/close all" } },
+                { messageId: "useSentenceCase", data: { suggestion: 'Say "hi" \u00e9 now' } },
+            ],
+        },
+        {
+            name: "a letter that has to change but is written as an escape is reported without a fix",
+            filename: "en.json",
+            code: String.raw`{"a":"Open \u0053ettings"}`,
+            output: null,
+            options: [{ allowAutoFix: true }],
+            errors: [{ messageId: "useSentenceCase", data: { suggestion: "Open settings" } }],
+        },
+        {
             name: "a value in a nested locale directory with a region is checked, and reported where it is",
             filename: "_locales/en_GB/menus.json",
             code: '{\n  "a": "Open Settings",\n  "b": "Close All"\n}',
