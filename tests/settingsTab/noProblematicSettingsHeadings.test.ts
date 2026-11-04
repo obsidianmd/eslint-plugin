@@ -43,6 +43,25 @@ ruleTester.run("no-problematic-settings-headings", rule, {
             `,
         },
         {
+            name: "a heading without setName() is not checked, and does not crash",
+            code: tab(`new Setting(this.containerEl).setHeading();`),
+        },
+        {
+            name: "a chain that does not start from new Setting() is not checked",
+            code: `
+                declare class Row { constructor(el: HTMLElement); setName(name: string): this; setHeading(): this; }
+                ${tab(`
+                this.heading.setName("General").setHeading();
+                new Row(this.containerEl).setName("General").setHeading();`)}
+            `,
+        },
+        {
+            // "" is a name, so the manifest's ("Sample Plugin" here) is not used either.
+            name: "an empty pluginName turns the plugin-name check off",
+            code: tab(`new Setting(this.containerEl).setName("Sample Plugin").setHeading();`),
+            options: [{ pluginName: "" }],
+        },
+        {
             name: "a heading whose name is not a string literal is not checked",
             code: `
                 ${MOCK_CLASS}
@@ -263,6 +282,77 @@ ruleTester.run("no-problematic-settings-headings", rule, {
             code: tab(`
                 const generalHeading = new Setting(this.containerEl).setName("General").setHeading();
                 generalHeading.setClass("x");`),
+            output: null,
+            errors: [{ messageId: "general", suggestions: [] }],
+        },
+        {
+            name: "removing a heading with a tooltip or a disabled state is a suggestion",
+            code: tab(`
+                new Setting(this.containerEl).setName("General").setTooltip("Applies everywhere.").setHeading();
+                new Setting(this.containerEl).setName("General").setDisabled(true).setHeading();`),
+            output: null,
+            errors: [
+                {
+                    messageId: "general",
+                    suggestions: [{ messageId: "removeHeading", output: tab(`
+                ;
+                new Setting(this.containerEl).setName("General").setDisabled(true).setHeading();`) }],
+                },
+                {
+                    messageId: "general",
+                    suggestions: [{ messageId: "removeHeading", output: tab(`
+                new Setting(this.containerEl).setName("General").setTooltip("Applies everywhere.").setHeading();
+                ;`) }],
+                },
+            ],
+        },
+        {
+            name: "a heading on a plain variable, or with a template literal class, is removed",
+            code: tab(`
+                [this.containerEl].forEach((el) => { new Setting(el).setName("General").setHeading(); });
+                new Setting(this.containerEl).setName("General").setHeading().setClass(\`heading-\${this.id}\`);`),
+            output: tab(`
+                [this.containerEl].forEach((el) => { ; });
+                ;`),
+            errors: [{ messageId: "general" }, { messageId: "general" }],
+        },
+        {
+            name: "removing a heading whose class or parent is computed with a side effect is a suggestion",
+            code: tab(`
+                new Setting(this.containerEl).setName("General").setHeading().setClass(this.headingClass());
+                new Setting(this.containerEl).setName("General").setHeading().setClass(\`heading-\${this.nextId()}\`);
+                new Setting(this.sections[this.index++]).setName("General").setHeading();`),
+            output: null,
+            errors: [
+                {
+                    messageId: "general",
+                    suggestions: [{ messageId: "removeHeading", output: tab(`
+                ;
+                new Setting(this.containerEl).setName("General").setHeading().setClass(\`heading-\${this.nextId()}\`);
+                new Setting(this.sections[this.index++]).setName("General").setHeading();`) }],
+                },
+                {
+                    messageId: "general",
+                    suggestions: [{ messageId: "removeHeading", output: tab(`
+                new Setting(this.containerEl).setName("General").setHeading().setClass(this.headingClass());
+                ;
+                new Setting(this.sections[this.index++]).setName("General").setHeading();`) }],
+                },
+                {
+                    messageId: "general",
+                    suggestions: [{ messageId: "removeHeading", output: tab(`
+                new Setting(this.containerEl).setName("General").setHeading().setClass(this.headingClass());
+                new Setting(this.containerEl).setName("General").setHeading().setClass(\`heading-\${this.nextId()}\`);
+                ;`) }],
+                },
+            ],
+        },
+        {
+            name: "a heading whose method is passed on is not removed",
+            code: `
+                declare function register(fn: unknown): void;
+                ${tab(`register(new Setting(this.containerEl).setName("General").setHeading().setClass);`)}
+            `,
             output: null,
             errors: [{ messageId: "general", suggestions: [] }],
         },
