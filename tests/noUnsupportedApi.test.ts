@@ -526,6 +526,171 @@ ruleTester.run("no-unsupported-api", rule, {
             `,
             options: [{ minAppVersion: "1.0.0" }],
         },
+        // Each guard shape below fails if its recognition is removed.
+        {
+            name: "API guarded by requireApiVersion on the right of && is allowed",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                declare const enabled: boolean;
+                if (enabled && requireApiVersion("1.10.0")) {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "two requireApiVersion calls with && use the higher version, written first",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                if (requireApiVersion("1.11.4") && requireApiVersion("1.0.0")) {
+                    app.secretStorage;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "two requireApiVersion calls with || use the lower version, written second",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                if (requireApiVersion("1.11.0") || requireApiVersion("1.10.0")) {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "API after other statements that follow the early exit is allowed",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                declare function log(): void;
+                function f() {
+                    if (!requireApiVersion("1.10.0")) return;
+                    log();
+                    log();
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "API after a continue or break in each kind of loop is allowed",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                declare const items: string[];
+                declare const record: Record<string, string>;
+                declare let more: boolean;
+                for (let i = 0; i < items.length; i++) {
+                    if (!requireApiVersion("1.10.0")) continue;
+                    app.renderContext;
+                }
+                for (const key in record) {
+                    if (!requireApiVersion("1.10.0")) break;
+                    app.renderContext;
+                }
+                while (more) {
+                    if (!requireApiVersion("1.10.0")) break;
+                    app.renderContext;
+                }
+                do {
+                    if (!requireApiVersion("1.10.0")) continue;
+                    app.renderContext;
+                } while (more);
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "API after a continue out of a switch inside a loop is allowed",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                declare const items: string[];
+                for (const item of items) {
+                    switch (item) {
+                        case "a":
+                            if (!requireApiVersion("1.10.0")) continue;
+                            app.renderContext;
+                    }
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "API after a labelled continue or break is allowed",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                declare const items: string[];
+                outer: for (const a of items) {
+                    for (const b of items) {
+                        if (!requireApiVersion("1.10.0")) continue outer;
+                        app.renderContext;
+                    }
+                }
+                loop: for (const a of items) {
+                    body: {
+                        if (!requireApiVersion("1.10.0")) continue loop;
+                        app.renderContext;
+                    }
+                }
+                block: {
+                    if (!requireApiVersion("1.10.0")) break block;
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "API after a throw in a static block is allowed",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                class Loader {
+                    static {
+                        if (!requireApiVersion("1.10.0")) throw new Error("Obsidian is too old");
+                        app.renderContext;
+                    }
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "API guarded by one const result read twice is allowed",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                const supported = requireApiVersion("1.10.0");
+                const alias = supported;
+                if (supported || alias) {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "a getter available at minAppVersion is allowed",
+            code: `
+                import { WorkspaceLeaf } from 'obsidian';
+                declare const leaf: WorkspaceLeaf;
+                leaf.isDeferred;
+            `,
+            options: [{ minAppVersion: "1.7.2" }],
+        },
+        {
+            name: "a namespace import's APIs available at minAppVersion are allowed",
+            code: `
+                import * as obsidian from 'obsidian';
+                declare const app: obsidian.App;
+                declare const el: HTMLElement;
+                new obsidian.SecretComponent(app, el);
+                obsidian.setTooltip(el, 'hello');
+            `,
+            options: [{ minAppVersion: "1.11.1" }],
+        },
     ],
     invalid: [
         {
@@ -1096,7 +1261,315 @@ ruleTester.run("no-unsupported-api", rule, {
             options: [{ minAppVersion: "1.0.0" }],
             errors: [{ messageId: "apiNotAvailable" }],
         },
+        {
+            // The repo's own manifest.json says 0.15.0.
+            name: "without the option, minAppVersion is read from manifest.json",
+            code: `
+                import { App } from 'obsidian';
+                declare const app: App;
+                app.renderContext;
+            `,
+            errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "App.renderContext", sinceVersion: "1.10.0", minAppVersion: "0.15.0" } }],
+        },
+        {
+            name: "a minAppVersion with only a major version is read as x.0.0",
+            code: `
+                import { setTooltip } from 'obsidian';
+                declare const el: HTMLElement;
+                setTooltip(el, 'hello');
+            `,
+            options: [{ minAppVersion: "1" }],
+            errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "setTooltip", sinceVersion: "1.4.4", minAppVersion: "1" } }],
+        },
+        {
+            name: "a getter is reported: WorkspaceLeaf.isDeferred requires 1.7.2",
+            code: `
+                import { WorkspaceLeaf } from 'obsidian';
+                declare const leaf: WorkspaceLeaf;
+                leaf.isDeferred;
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "WorkspaceLeaf.isDeferred", sinceVersion: "1.7.2", minAppVersion: "1.0.0" } }],
+        },
+        {
+            // Workspace.on has an overload per event; 'quit' is the last, @since 0.10.2.
+            name: "an overloaded method is reported once",
+            code: `
+                import { App } from 'obsidian';
+                declare const app: App;
+                app.workspace.on('quit', () => {});
+            `,
+            options: [{ minAppVersion: "0.10.0" }],
+            errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "Workspace.on", sinceVersion: "0.10.2", minAppVersion: "0.10.0" } }],
+        },
+        {
+            name: "a namespace import's class, superclass and function are each reported once",
+            code: `
+                import * as obsidian from 'obsidian';
+                declare const app: obsidian.App;
+                declare const el: HTMLElement;
+                new obsidian.SecretComponent(app, el);
+                abstract class Suggest extends obsidian.AbstractInputSuggest<string> {}
+                obsidian.setTooltip(el, 'hello');
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [
+                { messageId: "apiNotAvailable", data: { qualifiedName: "SecretComponent", sinceVersion: "1.11.1", minAppVersion: "1.0.0" }, line: 5, column: 21, endColumn: 45 },
+                { messageId: "apiNotAvailable", data: { qualifiedName: "AbstractInputSuggest", sinceVersion: "1.4.10", minAppVersion: "1.0.0" }, line: 6 },
+                { messageId: "apiNotAvailable", data: { qualifiedName: "setTooltip", sinceVersion: "1.4.4", minAppVersion: "1.0.0" }, line: 7 },
+            ],
+        },
+        // Each "not a guard" case below fails if it is treated as a guard.
+        {
+            name: "requireApiVersion with a spread argument is not a guard",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                declare const versions: "1.10.0"[];
+                if (requireApiVersion(...versions)) {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "requireApiVersion with a union of a version and a non-version is not a guard",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                declare const late: boolean;
+                if (requireApiVersion(late ? "1.10.0" : "latest")) {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "requireApiVersion with a constant that is not a full version is not a guard",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                const version = "1.10";
+                if (requireApiVersion(version)) {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "requireApiVersion without an argument is not a guard",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                if (requireApiVersion()) {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "another function called with a version is not a guard",
+            code: `
+                import { App } from 'obsidian';
+                declare const app: App;
+                declare function isAtLeast(version: string): boolean;
+                if (isAtLeast("1.10.0")) {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "an undeclared identifier is not a guard",
+            code: `
+                import { App } from 'obsidian';
+                declare const app: App;
+                if (supported) {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "a binding destructured from a requireApiVersion call is not a guard",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                const { valueOf } = requireApiVersion("1.10.0");
+                if (valueOf) {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "typeof and void of requireApiVersion are not guards",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                if (typeof requireApiVersion("1.10.0")) {
+                    app.renderContext;
+                }
+                if (void requireApiVersion("1.10.0")) {
+                    // never
+                } else {
+                    app.isDarkMode();
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [
+                { messageId: "apiNotAvailable", data: { qualifiedName: "App.renderContext", sinceVersion: "1.10.0", minAppVersion: "1.0.0" } },
+                { messageId: "apiNotAvailable", data: { qualifiedName: "App.isDarkMode", sinceVersion: "1.10.0", minAppVersion: "1.0.0" } },
+            ],
+        },
+        {
+            name: "an early exit on a ?? is not a guard: its left side may be false",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                declare const flag: boolean | undefined;
+                function f() {
+                    if (flag ?? !requireApiVersion("1.10.0")) return;
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "consts that refer to each other are not a guard, and do not loop forever",
+            code: `
+                import { App } from 'obsidian';
+                declare const app: App;
+                const a: boolean = b;
+                const b: boolean = a;
+                if (a) {
+                    app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "two requireApiVersion calls with || are not a guard when either is too low",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                if (requireApiVersion("1.11.4") || requireApiVersion("1.0.0")) {
+                    app.secretStorage;
+                }
+                if (requireApiVersion("1.0.0") || requireApiVersion("1.11.4")) {
+                    app.secretStorage;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable", line: 5 }, { messageId: "apiNotAvailable", line: 8 }],
+        },
+        {
+            name: "an exported function declaration after an early exit is hoisted and not guarded",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                if (!requireApiVersion("1.10.0")) throw new Error("Obsidian is too old");
+                export function read() {
+                    return app.renderContext;
+                }
+                export default function () {
+                    return app.isDarkMode();
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable", line: 6 }, { messageId: "apiNotAvailable", line: 9 }],
+        },
+        {
+            name: "an early exit after the API, later in the same list, is not a guard",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                declare function log(): void;
+                function f() {
+                    log();
+                    app.renderContext;
+                    if (!requireApiVersion("1.10.0")) return;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "a continue inside a switch outside a loop is not an early exit",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                declare const mode: number;
+                switch (mode) {
+                    case 1:
+                        if (!requireApiVersion("1.10.0")) continue;
+                        app.renderContext;
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "a jump out of a static block to a loop around its class is not an early exit",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                declare const items: string[];
+                for (const item of items) {
+                    class Loader {
+                        static {
+                            if (!requireApiVersion("1.10.0")) continue;
+                            app.renderContext;
+                        }
+                    }
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
+        {
+            name: "an API in requireApiVersion's own argument is not guarded by it",
+            code: `
+                import { requireApiVersion, App } from 'obsidian';
+                declare const app: App;
+                declare function run(): void;
+                requireApiVersion(app.isDarkMode() ? "1.10.0" : "1.10.0") && run();
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }],
+        },
     ],
+});
+
+// Without the obsidian package in the program there is nothing to check
+// against, and nothing to report.
+new RuleTester({
+    languageOptions: {
+        parserOptions: { project: "./tsconfig.json", tsconfigRootDir: `${process.cwd()}/tests/fixtures/no-dom` },
+    },
+}).run("no-unsupported-api without the obsidian package", rule, {
+    valid: [
+        {
+            name: "a program without obsidian.d.ts is not checked",
+            code: `
+                declare function requireApiVersion(version: string): boolean;
+                declare const app: { renderContext: unknown; isDarkMode(): boolean };
+                app.renderContext;
+                app.isDarkMode();
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+    ],
+    invalid: [],
 });
 
 describe("no-unsupported-api plugin-supplied types", () => {
@@ -1134,6 +1607,72 @@ describe("no-unsupported-api plugin-supplied types", () => {
                 export class Setting { setName(name: string): this; }
                 export interface Ctx { a: string; }
                 declare global { interface DocumentFragment { createEl(): void; } }
+            `),
+            ["Item"]
+        );
+    });
+
+    it("follows intersections, parentheses, readonly arrays, type literals and qualified names", () => {
+        assert.deepStrictEqual(
+            family(`
+                export abstract class SettingTab { getSettingDefinitions(): readonly (A & B)[]; }
+                export interface A { nested: { deep: C }; }
+                export interface B { qualified: ns.D; }
+                export interface C { x: string; }
+                export interface D { y: string; }
+            `),
+            ["A", "B", "C", "D"]
+        );
+    });
+
+    it("follows the type arguments of an extends clause", () => {
+        assert.deepStrictEqual(
+            family(`
+                export abstract class SettingTab { getSettingDefinitions(): Item[]; }
+                export interface Item extends Base<Arg> {}
+                export interface Base<T> { value: T; }
+                export interface Arg { x: number; }
+            `),
+            ["Arg", "Base", "Item"]
+        );
+    });
+
+    it("reads the declarations inside a declare module block", () => {
+        assert.deepStrictEqual(
+            family(`
+                declare module "obsidian" {
+                    export abstract class SettingTab { getSettingDefinitions(): Item[]; }
+                    export interface Item { control: Control; }
+                    export interface Control { key: string; }
+                }
+            `),
+            ["Control", "Item"]
+        );
+    });
+
+    it("starts only from getSettingDefinitions() and follows only properties", () => {
+        assert.deepStrictEqual(
+            family(`
+                export abstract class SettingTab {
+                    getSettingDefinitions(): Item[];
+                    getOther(): Other;
+                }
+                export interface Item { make(): Made; }
+                export interface Other { x: string; }
+                export interface Made { y: string; }
+            `),
+            ["Item"]
+        );
+    });
+
+    it("stops at a name that is a class as well as an interface", () => {
+        assert.deepStrictEqual(
+            family(`
+                export abstract class SettingTab { getSettingDefinitions(): Item[]; }
+                export interface Item { owner: Merged; }
+                export interface Merged { extra: Extra; }
+                export class Merged {}
+                export interface Extra { x: string; }
             `),
             ["Item"]
         );

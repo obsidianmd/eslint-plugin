@@ -14,6 +14,38 @@ const ruleUrl = new URL("../lib/rules/noUnsupportedApi.ts", import.meta.url).hre
 const obsidianDir = path.dirname(requireHere.resolve("obsidian/package.json"));
 const obsidianVersion = (JSON.parse(fs.readFileSync(path.join(obsidianDir, "package.json"), "utf8")) as { version: string }).version;
 const cachePath = path.join(obsidianDir, "..", ".cache", "eslint-plugin-obsidianmd", "since-map.json");
+const pluginVersion = (JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")) as { version: string }).version;
+
+interface SinceMapCache {
+    obsidianPackageVersion?: string;
+    pluginVersion?: string;
+    entries: [string, string][];
+}
+
+const readCache = () => JSON.parse(fs.readFileSync(cachePath, "utf8")) as SinceMapCache;
+
+// A map rebuilt from obsidian.d.ts: written for this obsidian and this plugin,
+// with the @since of each kind of declaration the rule reads.
+function assertRebuilt(): void {
+    const rebuilt = readCache();
+    assert.strictEqual(rebuilt.obsidianPackageVersion, obsidianVersion);
+    assert.strictEqual(rebuilt.pluginVersion, pluginVersion);
+    const entries = new Map(rebuilt.entries);
+    assert.deepStrictEqual(
+        ["AbstractInputSuggest", "App.renderContext", "App.isDarkMode", "WorkspaceLeaf.isDeferred", "Array.findLastIndex", "setTooltip", "Notice"].map(
+            (name) => [name, entries.get(name)],
+        ),
+        [
+            ["AbstractInputSuggest", "1.4.10"],
+            ["App.renderContext", "1.10.0"],
+            ["App.isDarkMode", "1.10.0"],
+            ["WorkspaceLeaf.isDeferred", "1.7.2"],
+            ["Array.findLastIndex", "1.4.4"],
+            ["setTooltip", "1.4.4"],
+            ["Notice", "0.9.7"],
+        ],
+    );
+}
 
 // no-unsupported-api keeps the map of @since versions in memory for the whole
 // process, so each run here starts a fresh process that reads the cache file.
@@ -72,13 +104,28 @@ describe("no-unsupported-api's cached @since map", function () {
             entries: [["Notice", "99.0.0"]],
         }));
         assert.strictEqual(await reportsForNotice(), 0);
-        const rebuilt = JSON.parse(fs.readFileSync(cachePath, "utf8")) as { pluginVersion?: string };
-        assert.notStrictEqual(rebuilt.pluginVersion, "0.0.1");
+        assertRebuilt();
     });
 
     it("is reused when this plugin version wrote it", async () => {
-        const current = JSON.parse(fs.readFileSync(cachePath, "utf8")) as { pluginVersion?: string; entries: [string, string][] };
+        const current = readCache();
         fs.writeFileSync(cachePath, JSON.stringify({ ...current, entries: [["Notice", "99.0.0"]] }));
         assert.strictEqual(await reportsForNotice(), 1);
+    });
+
+    it("is rebuilt when another obsidian version wrote it, though the plugin is the same", async () => {
+        fs.writeFileSync(cachePath, JSON.stringify({
+            obsidianPackageVersion: "0.0.1",
+            pluginVersion,
+            entries: [["Notice", "99.0.0"]],
+        }));
+        assert.strictEqual(await reportsForNotice(), 0);
+        assertRebuilt();
+    });
+
+    it("is rebuilt, without failing the lint, when it is not JSON", async () => {
+        fs.writeFileSync(cachePath, "{ not json");
+        assert.strictEqual(await reportsForNotice(), 0);
+        assertRebuilt();
     });
 });
