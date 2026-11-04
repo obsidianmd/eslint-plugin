@@ -20,6 +20,14 @@ ruleTester.run("vault-iterate", vaultIterateRule, {
             code: 'this.app.store.getFiles().find(f => f.path === "foo");',
         },
         {
+            name: "find with path comparison on getFiles() of an object not named vault is allowed",
+            code: 'store.getFiles().find(f => f.path === "foo");',
+        },
+        {
+            name: "filter() with a path comparison is allowed: it does not stop at one file",
+            code: 'vault.getFiles().filter(f => f.path === "foo");',
+        },
+        {
             name: "find with path comparison on a computed vault access is allowed",
             code: 'this.app["vault"].getFiles().find(f => f.path === "foo");',
         },
@@ -51,7 +59,14 @@ ruleTester.run("vault-iterate", vaultIterateRule, {
         },
         {
             name: "comparing the path with a value built from the file is allowed",
-            code: "vault.getFiles().find(f => `${f.parent?.path}/${name}.md` === f.path);",
+            code: `
+                vault.getFiles().find(f => \`\${f.parent?.path}/\${name}.md\` === f.path);
+                vault.getFiles().find(f => f.path === \`\${f.parent?.path}/\${name}.md\`);
+            `,
+        },
+        {
+            name: "comparing the file's name rather than its path is allowed",
+            code: 'vault.getFiles().find(f => f.name === "foo.md");',
         },
         {
             name: "a path that must differ is allowed",
@@ -70,6 +85,14 @@ ruleTester.run("vault-iterate", vaultIterateRule, {
                 vault.getFiles().find(async (f) => f.path === path);
                 vault.getFiles().find(async function (f) { return path === f.path; });
                 vault.getFiles().find(function* (f) { return f.path === path; });
+            `,
+        },
+        {
+            name: "a predicate passed by name, a find() without one, or find() on something other than a call is not checked",
+            code: `
+                vault.getFiles().find(matchesPath);
+                vault.getFiles().find();
+                this.files.find((f) => f.path === path);
             `,
         },
         {
