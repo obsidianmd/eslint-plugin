@@ -86,8 +86,12 @@ function mismatches(
     const fatal = messages.filter((m) => m.fatal);
     assert.deepStrictEqual(fatal.map((m) => m.message), [], code);
     const reported = new Set(messages.filter((m) => m.ruleId === "test/r").map((m) => `${m.line}:${m.column}`));
+    // Linter has getSuppressedMessages() at runtime; ESLint's types don't declare it.
+    const suppressedMessages = (
+        linter as Linter & { getSuppressedMessages(): Linter.SuppressedLintMessage[] }
+    ).getSuppressedMessages();
     const suppressed = new Set(
-        linter.getSuppressedMessages().filter((m) => m.ruleId === "test/r").map((m) => `${m.line}:${m.column}`),
+        suppressedMessages.filter((m) => m.ruleId === "test/r").map((m) => `${m.line}:${m.column}`),
     );
     assert.strictEqual(reported.size + suppressed.size, predictions.length, code);
     totals.disabled += suppressed.size;
