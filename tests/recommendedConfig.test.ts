@@ -1211,6 +1211,19 @@ describe("rules from ESLint and other plugins", () => {
 		);
 	});
 
+	// Since 0.1.x the list held a bare "warn", meant as a severity, which
+	// no-restricted-globals reads as one more global name.
+	it("no-restricted-globals names only app, fetch and localStorage", async () => {
+		const rules = await rulesFor("recommended", "src/main.js");
+		const [, ...options] = rules["no-restricted-globals"] as [unknown, ...unknown[]];
+		assert.deepStrictEqual(
+			options.map(o => typeof o === "string" ? o : (o as { name: string }).name),
+			["app", "fetch", "localStorage"]
+		);
+		const messages = await lintRecommended("src/main.js", "warn(\"x\");\n");
+		assert.deepStrictEqual(messages.filter(m => m.ruleId === "no-restricted-globals").map(m => m.message), []);
+	});
+
 	it("no-restricted-imports reports axios and a moment value import, but not a moment type import", async () => {
 		const messages = await lintRecommended(
 			"file.ts",

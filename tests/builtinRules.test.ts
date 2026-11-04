@@ -1125,6 +1125,13 @@ function testExplicitlyConfiguredRules(): void {
                 code: "const app = getApp(); app.vault;",
                 options: restrictedGlobalsOptions,
             },
+            {
+                // A stray "warn" in the list, written as a severity, made `warn`
+                // a restricted global name.
+                name: "a global named warn is allowed",
+                code: "warn('x');",
+                options: restrictedGlobalsOptions,
+            },
         ],
         invalid: [
             {
