@@ -41,6 +41,16 @@ ruleTester.run("prefer-get-language", preferGetLanguageRule, {
             name: "require() of another module, or without an argument, is not reported",
             code: "const i18next = require('i18next'); require();",
         },
+        {
+            name: "a computed access by a variable is not reported",
+            code: `
+                const getItem = "key";
+                localStorage[getItem]("language");
+                function read(localStorage: "sessionStorage") {
+                    return window[localStorage].getItem("language");
+                }
+            `,
+        },
     ],
     invalid: [
         {
@@ -62,6 +72,19 @@ ruleTester.run("prefer-get-language", preferGetLanguageRule, {
             name: "require i18next-browser-languagedetector is forbidden",
             code: "const LanguageDetector = require('i18next-browser-languagedetector');",
             errors: [{ messageId: "i18nextDetector" }],
+        },
+        {
+            name: "a computed access with the name spelled out is reported",
+            code: `
+                localStorage["getItem"]("language");
+                localStorage[\`getItem\`]("language");
+                window["localStorage"].getItem("language");
+            `,
+            errors: [
+                { messageId: "localStorageLanguage", line: 2 },
+                { messageId: "localStorageLanguage", line: 3 },
+                { messageId: "localStorageLanguage", line: 4 },
+            ],
         },
         {
             name: "another window's localStorage is reported",

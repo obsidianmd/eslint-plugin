@@ -45,6 +45,17 @@ ruleTester.run("prefer-file-manager-trash-file", preferFileManagerTrashRule, {
             `,
         },
         {
+            name: "a computed method named by a variable is not reported",
+            code: `
+                declare class Vault { trash(file: unknown): void; delete(file: unknown): void; read(file: unknown): void; }
+                declare const vault: Vault;
+                const trash = "read";
+                const method: "read" | "delete" = Math.random() > 1 ? "delete" : "read";
+                vault[trash](someFile);
+                vault[method](someFile);
+            `,
+        },
+        {
             name: "delete on a nullable non-Vault object is allowed",
             code: `
                 declare const cache: Map<string, number> | null;
@@ -85,6 +96,19 @@ ruleTester.run("prefer-file-manager-trash-file", preferFileManagerTrashRule, {
             errors: [
                 { messageId: "preferTrashFile", data: { methodName: "trash" }, line: 5 },
                 { messageId: "preferTrashFile", data: { methodName: "delete" }, line: 6 },
+            ],
+        },
+        {
+            name: "a computed method with the name spelled out is forbidden",
+            code: `
+                declare class Vault { trash(file: unknown): void; delete(file: unknown): void; }
+                declare const vault: Vault;
+                vault["trash"](someFile);
+                vault[\`delete\`](someFile);
+            `,
+            errors: [
+                { messageId: "preferTrashFile", data: { methodName: "trash" }, line: 4, column: 23, endColumn: 30 },
+                { messageId: "preferTrashFile", data: { methodName: "delete" }, line: 5 },
             ],
         },
         {

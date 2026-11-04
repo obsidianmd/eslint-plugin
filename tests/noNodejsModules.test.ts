@@ -271,8 +271,82 @@ ruleTester.run("no-nodejs-modules", noNodejsModules, {
                 };
             `,
         },
+        {
+            name: "a default parameter of a function inside a guard is guarded by it",
+            code: `
+                if (Platform.isDesktop) {
+                    const load = (fs = require('fs')) => fs;
+                    function read({ path = require('path') } = {}) { return path; }
+                }
+            `,
+        },
+        {
+            name: "a function in a default parameter is guarded by the guard at its own start",
+            code: `
+                function setup(load = () => { if (!Platform.isDesktop) return; return require('fs'); }) {
+                    return load;
+                }
+            `,
+        },
+        {
+            name: "a computed Platform key spelled out as a string is the same guard",
+            code: `
+                if (Platform["isDesktop"]) { require('fs'); }
+                Platform[\`isDesktop\`] && require('path');
+            `,
+        },
     ],
     invalid: [
+        {
+            name: "a guard at the start of a function does not cover its default parameters",
+            code: `
+                function load(fs = require('fs')) {
+                    if (!Platform.isDesktop) return;
+                    return fs;
+                }
+                const read = (path = require('path')) => {
+                    if (!Platform.isDesktop) throw new Error('Desktop only');
+                    return path;
+                };
+                const open = function ({ os = require('os') } = {}, [cp = require('child_process')] = []) {
+                    if (!Platform.isDesktop) return;
+                    return [os, cp];
+                };
+                class Store {
+                    load(crypto = require('crypto')) {
+                        if (!Platform.isDesktop) return;
+                        return crypto;
+                    }
+                }
+            `,
+            errors: [
+                { messageId: "noNodejs", data: { module: "fs" } },
+                { messageId: "noNodejs", data: { module: "path" } },
+                { messageId: "noNodejs", data: { module: "os" } },
+                { messageId: "noNodejs", data: { module: "child_process" } },
+                { messageId: "noNodejs", data: { module: "crypto" } },
+            ],
+        },
+        {
+            name: "window[`require`]() is forbidden like window['require']()",
+            code: "window[`require`]('fs');",
+            errors: [{ messageId: "noNodejs", data: { module: "fs" } }],
+        },
+        {
+            name: "a computed Platform key named by a variable is not a guard",
+            code: `
+                const isDesktop = "isMobile";
+                if (Platform[isDesktop]) { require('fs'); }
+                function load() {
+                    if (!Platform[isDesktop]) return;
+                    return require('path');
+                }
+            `,
+            errors: [
+                { messageId: "noNodejs", data: { module: "fs" } },
+                { messageId: "noNodejs", data: { module: "path" } },
+            ],
+        },
         {
             name: "the branch where !Platform.isDesktop holds is not guarded",
             code: 'import { Platform } from "obsidian"; if (!Platform.isDesktop) { require("fs"); }',

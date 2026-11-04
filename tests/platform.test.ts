@@ -26,8 +26,14 @@ ruleTester.run("platform", platformRule, {
             code: "const p = navigator.userAgentData.platform;",
         },
         {
-            name: "a computed access is not reported",
-            code: "const ua = navigator['userAgent'];",
+            name: "a computed access by a variable is not reported",
+            code: `
+                const userAgent = "appVersion";
+                const ua = navigator[userAgent];
+                function read(navigator: "clipboard", platform: "language") {
+                    return [window[navigator].platform, window.navigator[platform]];
+                }
+            `,
         },
         {
             name: "another window's navigator is not reported",
@@ -58,6 +64,21 @@ ruleTester.run("platform", platformRule, {
             name: "window.navigator.platform is forbidden",
             code: "const p = window.navigator.platform;",
             errors: [{ messageId: "avoidNavigator" }],
+        },
+        {
+            name: "a computed access with the name spelled out is forbidden",
+            code: `
+                const ua = navigator["userAgent"];
+                const p = navigator[\`platform\`];
+                const wua = window["navigator"]["userAgent"];
+                const wp = window[\`navigator\`].platform;
+            `,
+            errors: [
+                { messageId: "avoidNavigator", line: 2 },
+                { messageId: "avoidNavigator", line: 3 },
+                { messageId: "avoidNavigator", line: 4 },
+                { messageId: "avoidNavigator", line: 5 },
+            ],
         },
         {
             name: "navigator.userAgent in condition is forbidden",
