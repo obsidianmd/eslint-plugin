@@ -389,7 +389,7 @@ function valueHolder(
  *
  * Rewriting the `globalThis` in such a check to `window` would throw where it is false.
  */
-export function isWindowCheck(node: TSESTree.Node): boolean {
+function isWindowCheck(node: TSESTree.Node): boolean {
     return checkedName(node) !== undefined;
 }
 

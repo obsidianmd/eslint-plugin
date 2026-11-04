@@ -4,9 +4,9 @@ import {
     getGlobalWindowType,
     getTypeInfo,
     isGlobalWindowAt,
+    isInWindowCheck,
     isResultDiscarded,
     isTimerCallTypeSafe,
-    isWindowCheck,
     type TypeInfo,
 } from "../globalWindow.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
@@ -110,22 +110,16 @@ export default ruleCreator({
             if (!isGlobalWindowAt(context, node)) {
                 return "none";
             }
-            const parent = node.parent;
-
-            // `"window" in globalThis`: as `window`, the check would throw
-            // where it is false.
-            if (isWindowCheck(parent)) {
+            // `"window" in globalThis`, `typeof globalThis["document"]`,
+            // `!globalThis.window`: as `window`, the check would throw where
+            // it is false.
+            if (isInWindowCheck(node)) {
                 return "none";
             }
+            const parent = node.parent;
 
             // globalThis.x, globalThis["x"]
             if (parent.type === TSESTree.AST_NODE_TYPES.MemberExpression && parent.object === node) {
-                // typeof globalThis.document, the same check
-                const outer =
-                    parent.parent.type === TSESTree.AST_NODE_TYPES.ChainExpression ? parent.parent.parent : parent.parent;
-                if (isWindowCheck(outer)) {
-                    return "none";
-                }
                 const name = staticPropertyName(parent);
                 if (name === null) {
                     return "suggest";

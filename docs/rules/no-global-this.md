@@ -68,12 +68,14 @@ Neither a fix nor a suggestion is offered where `window` would be wrong:
 - with type information, the project declares no `window` because it has no DOM lib, or `window`
   has no such property. For example, `globalThis.MathJax` compiles without `noImplicitAny`, but
   `window.MathJax` does not
-- an earlier `typeof window` or `typeof document` check shows that the code also runs without a
-  window, as in `typeof window !== "undefined" ? window : globalThis`, or after
+- an earlier [window check](prefer-window-timers.md#window-checks) shows that the code also runs
+  without a window, as in `typeof window !== "undefined" ? window : globalThis`, or after
   `if (typeof window !== "undefined") return window;`. Where the check proves that the window
   exists, such as after `if (typeof document === "undefined") return;`, the rules above apply
-- the reference is such a check itself, as in `typeof globalThis.window` or
-  `"document" in globalThis`, which would throw as `window` where there is no window
+- the reference is such a check itself, as in `typeof globalThis.window`,
+  `typeof globalThis["document"]`, `"document" in globalThis` or `!globalThis.window`, which would
+  throw as `window` where there is no window. A `typeof` with a key that is not written out, such as
+  `typeof globalThis[key]`, gets a suggestion
 
 ## Web workers
 
