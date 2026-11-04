@@ -41,11 +41,15 @@ editor suggestion, which you review before applying:
   along with it;
 - when the tab declares an `update` of its own;
 - in a `function` callback whose `this` is not typed as the tab;
-- when the promise of an `async display()` is awaited or returned, since `update()` returns `void`.
+- when the promise of an `async display()` is awaited or returned, since `update()` returns `void`;
+- in a member whose name is computed from a value the code does not give, such as `[KEY]()` with
+  `KEY` imported, which may be `update()`.
 
 A call that passes arguments, or one in the tab's own `update()` or directly in
 `getSettingDefinitions()`, is reported without a fix or suggestion: `update()` takes no arguments,
-and it calls `getSettingDefinitions()`, so the renamed call would end up calling itself.
+and it calls `getSettingDefinitions()`, so the renamed call would end up calling itself. Those
+members count under any name that is `update` or `getSettingDefinitions` when the class is
+defined: `update()`, `"update"()`, `["update"]()`, or `[key]()` with `const key = "update"`.
 
 Only a class that extends `PluginSettingTab` by that name is checked, declared, `abstract` or as a
 class expression; a superclass written as a property access (`obsidian.PluginSettingTab`) is not. The version comes from the `minAppVersion` option, or else from `manifest.json` in the directory
