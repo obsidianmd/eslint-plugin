@@ -70,7 +70,7 @@ rules that only reported, `prefer-active-doc` among them, now offer one.
 - `rule-custom-message`'s `rule:` option, for wrapping a rule passed as an object. It never worked on ESLint 9 or 10, which copy rule options with `structuredClone` and cannot copy a rule's functions, so a config using it stopped ESLint before linting. Use `obsidianmd.withCustomMessages()` for a plugin's rule ([#223](https://github.com/obsidianmd/eslint-plugin/pull/223)).
 - The unused `eslint-plugin-security`, `eslint-plugin-json-schema-validator` and `@typescript-eslint/types` dependencies, and the build-only `@types/eslint` and `@types/node`, which are no longer installed for you ([#201](https://github.com/obsidianmd/eslint-plugin/pull/201), [#212](https://github.com/obsidianmd/eslint-plugin/pull/212)).
 - The hand-written root `index.d.ts`, which was never published; the package's types are unchanged ([#206](https://github.com/obsidianmd/eslint-plugin/pull/206)).
-- The compiled tests and the non-working `eslint-plugin-obsidian` executable from the published package: 0.4.2 had 223 files and 495 kB unpacked, 0.5.0 has 127 files and 443 kB ([#213](https://github.com/obsidianmd/eslint-plugin/pull/213)).
+- The compiled tests and the non-working `eslint-plugin-obsidian` executable from the published package: 0.4.2 had 223 files and 495 kB unpacked; 0.5.0 has 147 files and 628 kB, all of them the plugin itself ([#213](https://github.com/obsidianmd/eslint-plugin/pull/213)).
 
 ### Fixed
 
