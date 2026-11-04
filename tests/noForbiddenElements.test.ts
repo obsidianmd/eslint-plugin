@@ -1,4 +1,5 @@
 import { RuleTester } from "@typescript-eslint/rule-tester";
+import globals from "globals";
 import noForbiddenElements from "lib/rules/noForbiddenElements.js";
 
 const ruleTester = new RuleTester();
@@ -64,6 +65,34 @@ ruleTester.run("no-forbidden-elements", noForbiddenElements, {
         {
             name: "createEl('div') on a call result is allowed",
             code: "const div = containerEl.createDiv().createEl('div');",
+        },
+        {
+            name: "createElement() and createEl() without arguments are not reported",
+            code: "document.createElement(); containerEl.createEl();",
+        },
+        {
+            name: "a template literal that starts with a forbidden tag and has an expression is not a literal tag name",
+            code: "document.createElement(`style${suffix}`); createEl(`link${suffix}`); containerEl.createEl(`style${suffix}`);",
+        },
+        {
+            name: "a tag that is not a string is not reported",
+            code: "document.createElement(0 as never); createEl(null as never); containerEl.createEl(1 as never);",
+        },
+        {
+            name: "a custom element whose name starts with a forbidden tag is allowed",
+            code: "document.createElement('style-editor'); createEl('link-preview'); containerEl.createEl('style-panel');",
+        },
+        {
+            name: "another bare function called with a forbidden tag is not reported",
+            code: "log('style'); render('link');",
+        },
+        {
+            name: "a locally defined const createEl is not Obsidian's",
+            code: "const createEl = (tag: string) => tag;\nconst style = createEl('style');",
+        },
+        {
+            name: "a computed member named like a document property is not followed",
+            code: "const style = docs[doc].createElement('style');",
         },
     ],
     invalid: [
@@ -161,6 +190,19 @@ ruleTester.run("no-forbidden-elements", noForbiddenElements, {
             errors: [{ messageId: "doNotAttachForbiddenStyleElements" }]
         },
         {
+            name: "an ambient declare const createEl is still Obsidian's global",
+            code: "declare const createEl: (tag: string) => HTMLElement;\nconst style = createEl('style');",
+            errors: [{ messageId: "doNotAttachForbiddenStyleElements", data: { element: "style" } }]
+        },
+        {
+            name: "a document or a tag name with satisfies is still a document and a literal tag name",
+            code: "(activeDocument satisfies Document).createElement('style'); createEl('link' satisfies string);",
+            errors: [
+                { messageId: "doNotAttachForbiddenStyleElements", data: { element: "style" } },
+                { messageId: "doNotAttachForbiddenStyleElements", data: { element: "link" } },
+            ]
+        },
+        {
             name: "createEl('style') on the element a call returns is forbidden",
             code: "const style = containerEl.createDiv().createEl('style');",
             errors: [{ messageId: "doNotAttachForbiddenStyleElements", data: { element: "style" } }]
@@ -210,5 +252,26 @@ ruleTester.run("no-forbidden-elements", noForbiddenElements, {
             code: "const styleSheet = document.createElement('link');\n styleSheet.rel = 'stylesheet';\n styleSheet.href = this.app.vault.adapter.getResourcePath(`${this.manifest.dir}/styles.css`);\n document.head.appendChild(styleSheet);",
             errors: [{ messageId: "doNotAttachForbiddenStyleElements" }]
         }
+    ],
+});
+
+// The recommended config declares Obsidian's globals, createEl among them. A
+// global is a variable without a declaration in the file: still Obsidian's.
+const globalsRuleTester = new RuleTester({
+    languageOptions: { globals: { ...globals.browser, activeDocument: "readonly", createEl: "readonly" } },
+});
+
+globalsRuleTester.run("no-forbidden-elements with the recommended config's globals", noForbiddenElements, {
+    valid: [],
+    invalid: [
+        {
+            name: "global createEl('style') and document.createElement('link') are forbidden",
+            code: "createEl('style'); document.createElement('link'); activeDocument.createElement('style');",
+            errors: [
+                { messageId: "doNotAttachForbiddenStyleElements", data: { element: "style" } },
+                { messageId: "doNotAttachForbiddenStyleElements", data: { element: "link" } },
+                { messageId: "doNotAttachForbiddenStyleElements", data: { element: "style" } },
+            ],
+        },
     ],
 });
