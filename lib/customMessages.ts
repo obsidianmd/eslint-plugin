@@ -31,6 +31,42 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/**
+ * An object whose own properties are its entries: `{ … }`, one without a
+ * prototype, or a class instance, but not a Map, a Set or a Date, which keep
+ * theirs elsewhere and would read as empty.
+ */
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+    return isRecord(value) && Object.prototype.toString.call(value) === "[object Object]";
+}
+
+/** What `value` is, for an error message: "a Map", "an array", "a number", "null". */
+function kindOf(value: unknown): string {
+    if (value === null || value === undefined) {
+        return String(value);
+    }
+    let kind: string = typeof value;
+    if (Array.isArray(value)) {
+        kind = "array";
+    } else if (typeof value === "object") {
+        const constructor: unknown = (Object.getPrototypeOf(value) as { constructor?: unknown } | null)?.constructor;
+        kind = typeof constructor === "function" && constructor.name !== "" ? constructor.name : "object";
+    }
+    return `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`;
+}
+
+/**
+ * Why `messages` is not a map of messages to the messages to show instead,
+ * or undefined when it is one: a plain object whose values are strings.
+ */
+export function messagesProblem(messages: unknown): string | undefined {
+    if (!isPlainRecord(messages)) {
+        return `not ${kindOf(messages)}`;
+    }
+    const entry = Object.entries(messages).find(([, value]) => typeof value !== "string");
+    return entry && `the value of ${JSON.stringify(entry[0])} is ${kindOf(entry[1])}, not a string`;
+}
+
 /** Fills `{{ placeholders }}` from `data` the way ESLint does. */
 function interpolate(text: string, data: Record<string, unknown> | undefined): string {
     if (!isRecord(data)) {
@@ -152,9 +188,10 @@ export function withCustomMessages<Rule extends WrappableRule>(rule: Rule, messa
             "withCustomMessages() takes a rule object with a create() function, such as somePlugin.rules[\"rule-name\"], as its first argument.",
         );
     }
-    if (!isRecord(messages) || Object.values(messages).some((value) => typeof value !== "string")) {
+    const problem = messagesProblem(messages);
+    if (problem !== undefined) {
         throw new TypeError(
-            "withCustomMessages() takes an object mapping messages to the messages to show instead as its second argument.",
+            `withCustomMessages() takes an object mapping messages to the messages to show instead as its second argument, ${problem}.`,
         );
     }
     const custom: CustomMessages = { ...messages };

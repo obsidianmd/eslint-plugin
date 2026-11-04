@@ -368,6 +368,79 @@ ruleTester.run("prefer-update-over-display", preferUpdateOverDisplayRule, {
             errors: [{ messageId: "preferUpdate", suggestions: [] }],
         },
         {
+            name: "this.display() inside an update() computed from a string is reported without a fix",
+            options: [{ minAppVersion: "1.13.0" }],
+            code: `
+                ${MOCK_CLASS}
+                class StringTab extends PluginSettingTab {
+                    ["update"](): void {
+                        this.display();
+                    }
+                }
+                class TemplateTab extends PluginSettingTab {
+                    [\`update\`] = () => {
+                        this.display();
+                    };
+                }
+                class DefinitionsTab extends PluginSettingTab {
+                    ["getSettingDefinitions"]() {
+                        this.display();
+                        return [];
+                    }
+                }
+            `,
+            output: null,
+            errors: [
+                { messageId: "preferUpdate", suggestions: [] },
+                { messageId: "preferUpdate", suggestions: [] },
+                { messageId: "preferUpdate", suggestions: [] },
+            ],
+        },
+        {
+            // [key]() is update(), so the rename would make it call itself.
+            name: "this.display() in a member computed from a variable that holds update is reported without a fix",
+            options: [{ minAppVersion: "1.13.0" }],
+            code: `
+                ${MOCK_CLASS}
+                const key = "update";
+                class MyTab extends PluginSettingTab {
+                    [key]() { this.display(); }
+                }
+            `,
+            output: null,
+            errors: [{ messageId: "preferUpdate", suggestions: [] }],
+        },
+        {
+            // KEY may be "update".
+            name: "this.display() in a member computed from an unknown value gets a suggestion only",
+            options: [{ minAppVersion: "1.13.0" }],
+            code: `
+                ${MOCK_CLASS}
+                import { KEY } from "./keys";
+                class MyTab extends PluginSettingTab {
+                    [KEY]() { this.display(); }
+                }
+            `,
+            output: null,
+            errors: [
+                {
+                    messageId: "preferUpdate",
+                    suggestions: [
+                        {
+                            messageId: "replaceWithUpdate",
+                            output: `
+                ${MOCK_CLASS}
+                import { KEY } from "./keys";
+                class MyTab extends PluginSettingTab {
+                    [KEY]() { this.update(); }
+                }
+            `,
+                        },
+                    ],
+                },
+            ],
+        },
+        {
             name: "a computed member named by a variable called update is not the tab's update()",
             options: [{ minAppVersion: "1.13.0" }],
             code: `

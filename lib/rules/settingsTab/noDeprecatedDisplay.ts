@@ -1,4 +1,4 @@
-import { TSESTree } from "@typescript-eslint/utils";
+import { TSESLint, TSESTree } from "@typescript-eslint/utils";
 import { gte as semverGte } from "semver";
 import { docsUrl, ruleCreator } from "../../ruleCreator.js";
 import {
@@ -44,7 +44,7 @@ export default ruleCreator<Options, "deprecatedDisplay" | "removeDisplay">({
             // display() is only dead code once getSettingDefinitions() exists to
             // take over rendering — otherwise display() is still doing the work.
             const definitions = findClassMember(node, "getSettingDefinitions");
-            if (!definitions || returnsNoDefinitions(definitions)) {
+            if (!definitions || returnsNoDefinitions(definitions, context.sourceCode.visitorKeys)) {
                 return;
             }
             const display = findClassMember(node, "display");
@@ -112,13 +112,17 @@ export default ruleCreator<Options, "deprecatedDisplay" | "removeDisplay">({
 });
 
 /**
- * Whether getSettingDefinitions() is a stub that only returns an empty array
- * (`return [];`, or `() => []`), typically added to satisfy
- * prefer-setting-definitions. Obsidian renders a tab declaratively only when
- * the array is non-empty, so display() is still what renders this one.
+ * Whether getSettingDefinitions() is a stub that never returns definitions,
+ * typically added to satisfy prefer-setting-definitions: every `return` in it
+ * returns nothing or an empty literal (`return [];`, `() => []`, `return;`,
+ * `{}`), and a body without a `return` returns undefined. Obsidian skips
+ * display() only when the array is non-empty ("Not called when
+ * getSettingDefinitions returns a non-empty array", in obsidian.d.ts), so
+ * display() is still what renders this tab.
  */
 function returnsNoDefinitions(
     member: TSESTree.MethodDefinition | TSESTree.PropertyDefinition,
+    visitorKeys: TSESLint.SourceCode["visitorKeys"],
 ): boolean {
     const fn = member.value;
     if (
@@ -128,20 +132,50 @@ function returnsNoDefinitions(
         return false;
     }
     if (fn.body.type !== TSESTree.AST_NODE_TYPES.BlockStatement) {
-        return isEmptyLiteral(fn.body);
+        return isNoDefinitions(fn.body);
     }
-    const statements = fn.body.body;
-    return (
-        statements.length === 1 &&
-        statements[0].type === TSESTree.AST_NODE_TYPES.ReturnStatement &&
-        statements[0].argument !== null &&
-        isEmptyLiteral(statements[0].argument)
+    return ownReturns(fn.body, visitorKeys).every(
+        (statement) => statement.argument === null || isNoDefinitions(statement.argument),
     );
 }
 
-// `[]`, or `{}` (no `length`, so also never rendered declaratively), seen
-// through a type assertion such as `[] as SettingDefinitionItem[]`.
-function isEmptyLiteral(node: TSESTree.Expression): boolean {
+// The return statements of the function whose body `node` is in, leaving out
+// those of the functions nested in it.
+function ownReturns(node: TSESTree.Node, visitorKeys: TSESLint.SourceCode["visitorKeys"]): TSESTree.ReturnStatement[] {
+    const returns: TSESTree.ReturnStatement[] = [];
+    const visit = (current: TSESTree.Node): void => {
+        if (current.type === TSESTree.AST_NODE_TYPES.ReturnStatement) {
+            returns.push(current);
+        }
+        for (const key of visitorKeys[current.type] ?? []) {
+            const child: unknown = (current as unknown as Record<string, unknown>)[key];
+            for (const item of Array.isArray(child) ? child : [child]) {
+                if (isNode(item) && !isFunction(item)) {
+                    visit(item);
+                }
+            }
+        }
+    };
+    visit(node);
+    return returns;
+}
+
+function isNode(value: unknown): value is TSESTree.Node {
+    return typeof value === "object" && value !== null && typeof (value as { type?: unknown }).type === "string";
+}
+
+function isFunction(node: TSESTree.Node): boolean {
+    return (
+        node.type === TSESTree.AST_NODE_TYPES.FunctionDeclaration ||
+        node.type === TSESTree.AST_NODE_TYPES.FunctionExpression ||
+        node.type === TSESTree.AST_NODE_TYPES.ArrowFunctionExpression
+    );
+}
+
+// `[]`, `{}` (no `length`, so also never rendered declaratively), `undefined`,
+// `null` or `void 0`, seen through a type assertion such as
+// `[] as SettingDefinitionItem[]`.
+function isNoDefinitions(node: TSESTree.Expression): boolean {
     let expression = node;
     while (
         expression.type === TSESTree.AST_NODE_TYPES.TSAsExpression ||
@@ -153,6 +187,9 @@ function isEmptyLiteral(node: TSESTree.Expression): boolean {
     }
     return (
         (expression.type === TSESTree.AST_NODE_TYPES.ArrayExpression && expression.elements.length === 0) ||
-        (expression.type === TSESTree.AST_NODE_TYPES.ObjectExpression && expression.properties.length === 0)
+        (expression.type === TSESTree.AST_NODE_TYPES.ObjectExpression && expression.properties.length === 0) ||
+        (expression.type === TSESTree.AST_NODE_TYPES.Identifier && expression.name === "undefined") ||
+        (expression.type === TSESTree.AST_NODE_TYPES.Literal && expression.raw === "null") ||
+        (expression.type === TSESTree.AST_NODE_TYPES.UnaryExpression && expression.operator === "void")
     );
 }

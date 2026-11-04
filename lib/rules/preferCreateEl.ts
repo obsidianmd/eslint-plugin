@@ -554,9 +554,8 @@ export default ruleCreator({
         ): { defs: unknown[] } | null {
             let current: typeof scope | null = scope;
             while (current) {
-                const variable = current.variables.find(
-                    (v) => v.name === name,
-                );
+                // By name, rather than a search of each scope's variables.
+                const variable = current.set.get(name);
                 if (variable) {
                     return variable;
                 }

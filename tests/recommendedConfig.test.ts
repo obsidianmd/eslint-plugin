@@ -1142,6 +1142,29 @@ describe("plugin object", () => {
 		assert.deepStrictEqual(plugin.meta, { name: packageJson.name, version: packageJson.version });
 	});
 
+	// depend and noUnsanitizedPlugin run no rule in the JS and TS blocks, but a
+	// user's config that turns one of their rules on for those files finds the
+	// plugin only there.
+	for (const filename of ["src/main.ts", "src/main.js"]) {
+		it(`registers depend and noUnsanitizedPlugin for ${filename}, for a user's config`, async () => {
+			const eslint = new ESLint({
+				overrideConfigFile: true,
+				overrideConfig: [
+					...plugin.configs.recommended,
+					{
+						files: ["**/*.{ts,js}"],
+						rules: { "depend/ban-dependencies": "warn", "noUnsanitizedPlugin/method": "warn" },
+					},
+				],
+			});
+			const rules = (await eslint.calculateConfigForFile(filename)).rules ?? {};
+			assert.deepStrictEqual(
+				["depend/ban-dependencies", "noUnsanitizedPlugin/method"].map(rule => getSeverity(rules[rule])),
+				["warn", "warn"]
+			);
+		});
+	}
+
 	it("contributes the plain-text language", () => {
 		assert.deepStrictEqual(Object.keys(plugin.languages), ["plain-text"]);
 		assert.strictEqual(plugin.languages["plain-text"], PlainTextLanguage);
@@ -1209,6 +1232,19 @@ describe("rules from ESLint and other plugins", () => {
 				[3, "Unexpected use of 'localStorage'. Prefer `App#saveLocalStorage` / `App#loadLocalStorage` functions to write / read localStorage data that's unique to a vault."],
 			]
 		);
+	});
+
+	// Since 0.1.x the list held a bare "warn", meant as a severity, which
+	// no-restricted-globals reads as one more global name.
+	it("no-restricted-globals names only app, fetch and localStorage", async () => {
+		const rules = await rulesFor("recommended", "src/main.js");
+		const [, ...options] = rules["no-restricted-globals"] as [unknown, ...unknown[]];
+		assert.deepStrictEqual(
+			options.map(o => typeof o === "string" ? o : (o as { name: string }).name),
+			["app", "fetch", "localStorage"]
+		);
+		const messages = await lintRecommended("src/main.js", "warn(\"x\");\n");
+		assert.deepStrictEqual(messages.filter(m => m.ruleId === "no-restricted-globals").map(m => m.message), []);
 	});
 
 	it("no-restricted-imports reports axios and a moment value import, but not a moment type import", async () => {

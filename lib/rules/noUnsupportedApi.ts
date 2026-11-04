@@ -6,22 +6,35 @@ import { fileURLToPath } from "node:url";
 import { gt, lt, valid } from "semver";
 import ts from "typescript";
 import { getManifest } from "../manifest.js";
+import { toVersion } from "../minAppVersion.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
+import { OVERLOAD_HISTORY } from "./obsidianOverloadHistory.js";
+import { getLiteralParameters, getOverloadKey, getSinceTag } from "./obsidianOverloads.js";
 
 type Options = [{ minAppVersion?: string }?];
 
 type QualifiedName = string;
 type Version = string;
 type SinceVersion = Version;
-type SinceMap = Map<QualifiedName, SinceVersion>;
+// The @since of each declaration of a name in obsidian.d.ts, by the position the
+// declaration starts at (its `pos`). A method has a declaration per overload, and
+// each can carry its own version; an overload without @since is listed with null.
+type SinceEntry = [position: number, since: SinceVersion | null][];
+type SinceMap = Map<QualifiedName, SinceEntry>;
 
 interface SinceMapCache {
+    // The shape of `entries`, so a build that changes it without a new plugin
+    // version, as in development, does not read a map in the old shape.
+    format?: number;
     obsidianPackageVersion: Version;
     // The version of this plugin that wrote the cache, so a release that builds
     // the map differently does not reuse a map an older one wrote.
     pluginVersion?: string;
-    entries: [QualifiedName, SinceVersion][];
+    entries: [QualifiedName, SinceEntry][];
 }
+
+// A cache without `format` holds one version per name; 2 holds a SinceEntry.
+const SINCE_MAP_FORMAT = 2;
 
 const PLUGIN_VERSION = readPluginVersion();
 
@@ -97,6 +110,7 @@ export default ruleCreator<Options, "apiNotAvailable">({
         }
         const sinceMap = buildSinceMap(dtsPath);
         const reported = new WeakSet<TSESTree.Node>();
+        const earlyExits = new WeakMap<TSESTree.Node, EarlyExit[]>();
 
         return {
             MemberExpression(node: TSESTree.MemberExpression) {
@@ -109,7 +123,11 @@ export default ruleCreator<Options, "apiNotAvailable">({
 
                 const tsNode = services.esTreeNodeToTSNodeMap.get(node);
                 const symbol = checker.getSymbolAtLocation(tsNode);
-                checkSymbol(node, symbol);
+                const call =
+                    node.parent.type === AST_NODE_TYPES.CallExpression && node.parent.callee === node
+                        ? node.parent
+                        : undefined;
+                checkSymbol(node, symbol, call);
             },
 
             NewExpression(node: TSESTree.NewExpression) {
@@ -131,7 +149,7 @@ export default ruleCreator<Options, "apiNotAvailable">({
                 }
                 const tsNode = services.esTreeNodeToTSNodeMap.get(node.callee);
                 const symbol = checker.getSymbolAtLocation(tsNode);
-                checkSymbol(node.callee, symbol);
+                checkSymbol(node.callee, symbol, node);
             },
         };
 
@@ -157,9 +175,11 @@ export default ruleCreator<Options, "apiNotAvailable">({
             return symbol;
         }
 
+        // `call` is the call `node` is the callee of, if any.
         function checkSymbol(
             node: TSESTree.Node,
-            symbol?: ts.Symbol
+            symbol?: ts.Symbol,
+            call?: TSESTree.CallExpression,
         ): void {
             if (!symbol || reported.has(node)) {
                 return;
@@ -170,6 +190,10 @@ export default ruleCreator<Options, "apiNotAvailable">({
                 return;
             }
 
+            // The declarations of each Obsidian member the symbol stands for:
+            // one per overload for a method, and a member of each type for a
+            // property of a union.
+            const members = new Map<QualifiedName, ts.Declaration[]>();
             for (const decl of declarations) {
                 if (!isObsidianDeclaration(decl) || isPluginSuppliedMember(decl)) {
                     continue;
@@ -180,8 +204,12 @@ export default ruleCreator<Options, "apiNotAvailable">({
                 const qualifiedName = parentName
                     ? `${parentName}.${symbolName}`
                     : symbolName;
-                const sinceTag = sinceMap.get(qualifiedName);
-                const sinceVersion = sinceTag && toVersion(sinceTag);
+                members.set(qualifiedName, [...(members.get(qualifiedName) ?? []), decl]);
+            }
+
+            for (const [qualifiedName, overloads] of members) {
+                const entry = sinceMap.get(qualifiedName);
+                const sinceVersion = entry && requiredVersion(qualifiedName, entry, overloads, call);
 
                 if (!sinceVersion) {
                     continue;
@@ -203,6 +231,151 @@ export default ruleCreator<Options, "apiNotAvailable">({
                     return;
                 }
             }
+        }
+
+        // The version a use of a member needs, from the @since of its
+        // declarations. A call needs the version of the overload it calls,
+        // when the checker can tell which one that is. Any other use, such as
+        // passing the method as a value, and a call that fits several overloads
+        // or none, needs the member to exist, which it does from its earliest
+        // overload on. An overload without @since needs no version, and one
+        // published before its @since (see obsidianOverloadHistory.ts) needs
+        // only the version that first had it.
+        function requiredVersion(
+            qualifiedName: QualifiedName,
+            entry: SinceEntry,
+            overloads: ts.Declaration[],
+            call: TSESTree.CallExpression | undefined,
+        ): Version | undefined {
+            // A declaration the entry does not list, as when the cache was built
+            // from another copy of the file, counts as the entry's earliest.
+            const sinceOf = (declaration: ts.Declaration): Version | null => {
+                const listed = entry.find(([position]) => position === declaration.pos);
+                const since = listed ? toSince(listed[1]) : earliestOf(entry.map(([, value]) => toSince(value)));
+                return since && firstPublishedSince(qualifiedName, declaration, since);
+            };
+            const versions = overloads.map(sinceOf);
+            const earliest = earliestOf(versions);
+            if (!call || versions.every((version) => version === earliest)) {
+                return earliest ?? undefined;
+            }
+            const called = calledOverload(call, overloads, sinceOf);
+            return (called ? sinceOf(called) : earliest) ?? undefined;
+        }
+
+        // The overload `call` calls: the one a string literal argument picks
+        // out, or else the one the checker resolves it to, if the arguments fit
+        // it and fit no overload that needs an older version. Otherwise
+        // undefined: for a call that fits no overload the checker still returns
+        // one, and `any` arguments fit several.
+        function calledOverload(
+            call: TSESTree.CallExpression,
+            overloads: ts.Declaration[],
+            sinceOf: (declaration: ts.Declaration) => Version | null,
+        ): ts.Declaration | undefined {
+            const byLiteral = overloadByLiteral(call, overloads);
+            if (byLiteral) {
+                return byLiteral;
+            }
+            const tsCall = services.esTreeNodeToTSNodeMap.get(call);
+            const resolved = checker.getResolvedSignature(tsCall)?.declaration;
+            if (!resolved || !overloads.includes(resolved)) {
+                return undefined;
+            }
+            const since = sinceOf(resolved);
+            const older = overloads.filter((overload) => {
+                const version = sinceOf(overload);
+                return overload !== resolved && since !== null && (version === null || lt(version, since));
+            });
+            if (older.length === 0) {
+                return resolved;
+            }
+            // The overloads as the callee's type has them, with its type
+            // arguments and `this` filled in.
+            const signatures = checker
+                .getNonNullableType(checker.getTypeAtLocation(tsCall.expression))
+                .getCallSignatures();
+            const fitsOverload = (overload: ts.Declaration, lenient: boolean) => {
+                const signature = signatures.find((candidate) => candidate.declaration === overload);
+                return signature && fits(signature, call, tsCall, lenient);
+            };
+            return fitsOverload(resolved, false) === true &&
+                older.every((overload) => fitsOverload(overload, true) === false)
+                ? resolved
+                : undefined;
+        }
+
+        // The overload a string literal argument picks out, whatever the other
+        // arguments are: where every overload types the parameter at that
+        // position as a string literal, as `Workspace.on()` does with its event
+        // names, the one whose literal it is. A callback typed for another
+        // version's signature, which the checker then fits to no overload, is
+        // still a call for that event.
+        function overloadByLiteral(
+            call: TSESTree.CallExpression,
+            overloads: ts.Declaration[],
+        ): ts.Declaration | undefined {
+            const literals = overloads.map((overload) => (ts.isFunctionLike(overload) ? getLiteralParameters(overload) : []));
+            for (const [index, argument] of call.arguments.entries()) {
+                if (argument.type === AST_NODE_TYPES.SpreadElement) {
+                    return undefined;
+                }
+                if (literals.some((parameters) => parameters[index] === undefined)) {
+                    continue;
+                }
+                const type = checker.getTypeAtLocation(services.esTreeNodeToTSNodeMap.get(argument));
+                const matching = type.isStringLiteral()
+                    ? overloads.filter((_, i) => literals[i][index] === type.value)
+                    : [];
+                if (matching.length === 1) {
+                    return matching[0];
+                }
+            }
+            return undefined;
+        }
+
+        // Whether the arguments of `call` fit the parameters of `signature` by
+        // type, or undefined where that cannot be told: a spread argument, a
+        // rest parameter, a generic signature. With `lenient`, for an overload
+        // the call does not resolve to, an argument holding a function with a
+        // parameter left untyped is undecided too: that parameter took its type
+        // from the overload the call resolves to, and would take this one's here.
+        function fits(
+            signature: ts.Signature,
+            call: TSESTree.CallExpression,
+            tsCall: ts.Node,
+            lenient: boolean,
+        ): boolean | undefined {
+            const parameters = signature.getParameters();
+            const declarations = parameters.map((parameter) => parameter.valueDeclaration);
+            if (
+                signature.typeParameters?.length ||
+                typeof checker.isTypeAssignableTo !== "function" ||
+                call.arguments.some((argument) => argument.type === AST_NODE_TYPES.SpreadElement) ||
+                !declarations.every(
+                    (declaration): declaration is ts.ParameterDeclaration =>
+                        declaration !== undefined && ts.isParameter(declaration) && !declaration.dotDotDotToken,
+                )
+            ) {
+                return undefined;
+            }
+            const required = declarations.filter((declaration) => !declaration.questionToken && !declaration.initializer).length;
+            if (call.arguments.length < required || call.arguments.length > parameters.length) {
+                return false;
+            }
+            let decided = true;
+            for (const [index, argument] of call.arguments.entries()) {
+                const argumentType = checker.getTypeAtLocation(services.esTreeNodeToTSNodeMap.get(argument));
+                const parameterType = checker.getTypeOfSymbolAtLocation(parameters[index], tsCall);
+                if (checker.isTypeAssignableTo(argumentType, parameterType)) {
+                    continue;
+                }
+                if (!lenient || !isContextSensitive(argument)) {
+                    return false;
+                }
+                decided = false;
+            }
+            return decided || undefined;
         }
 
         // The guard version a `requireApiVersion(...)` argument proves: a string
@@ -331,8 +504,8 @@ export default ruleCreator<Options, "apiNotAvailable">({
                     }
                 } else if (
                     !isHoistedFunction(prevChild) &&
-                    getEarlierStatements(current, prevChild).some((statement) =>
-                        covers(versionAfterEarlyExit(statement)),
+                    getEarlyExits(current).some(
+                        (exit) => exit.end <= prevChild.range[0] && covers(exit.version),
                     )
                 ) {
                     return true;
@@ -341,6 +514,25 @@ export default ruleCreator<Options, "apiNotAvailable">({
                 current = current.parent;
             }
             return false;
+        }
+
+        // The early exits of a statement list, with the version each proves
+        // for the statements after it. Read once per list: going over the
+        // statements before each reported node is quadratic in a long list
+        // that reports many.
+        function getEarlyExits(container: TSESTree.Node): EarlyExit[] {
+            let exits = earlyExits.get(container);
+            if (!exits) {
+                exits = [];
+                for (const statement of getStatements(container)) {
+                    const version = versionAfterEarlyExit(statement);
+                    if (version !== undefined) {
+                        exits.push({ end: statement.range[1], version });
+                    }
+                }
+                earlyExits.set(container, exits);
+            }
+            return exits;
         }
 
         // The version proven for the statements after `if (test) <exit>`, which
@@ -362,17 +554,63 @@ export default ruleCreator<Options, "apiNotAvailable">({
     }
 });
 
-// A version semver can compare: as written when valid, a bare "x" or "x.y" with
-// the missing parts read as 0 ("0.15" is 0.15.0), else undefined. Nothing looser:
-// semver's coerce would read "x99.0.0" as 99.0.0, and a manifest could then
-// switch the rule off with a minAppVersion Obsidian does not read that way.
-function toVersion(raw: string): Version | undefined {
-    const version = valid(raw);
-    if (version) {
-        return version;
+// Whether an argument's type depends on the parameter it is passed to: a
+// function with a parameter left untyped, also as a property, an element or a
+// branch of the argument, as `{ onOpen: (leaf) => {} }` or `ok ? (a) => a : f`.
+function isContextSensitive(node: TSESTree.Node): boolean {
+    switch (node.type) {
+        case AST_NODE_TYPES.ArrowFunctionExpression:
+        case AST_NODE_TYPES.FunctionExpression:
+            return node.params.some((param) => !("typeAnnotation" in param && param.typeAnnotation));
+        case AST_NODE_TYPES.ObjectExpression:
+            return node.properties.some((property) =>
+                isContextSensitive(property.type === AST_NODE_TYPES.Property ? property.value : property.argument),
+            );
+        case AST_NODE_TYPES.ArrayExpression:
+            return node.elements.some((element) => element !== null && isContextSensitive(element));
+        case AST_NODE_TYPES.SpreadElement:
+            return isContextSensitive(node.argument);
+        case AST_NODE_TYPES.ConditionalExpression:
+            return isContextSensitive(node.consequent) || isContextSensitive(node.alternate);
+        case AST_NODE_TYPES.LogicalExpression:
+            return isContextSensitive(node.left) || isContextSensitive(node.right);
+        default:
+            return false;
     }
-    const partial = /^(\d+)(?:\.(\d+))?$/.exec(raw.trim());
-    return partial ? `${Number(partial[1])}.${Number(partial[2] ?? 0)}.0` : undefined;
+}
+
+// The members obsidianOverloadHistory.ts has an overload of.
+const HISTORY_MEMBERS = new Set(Object.keys(OVERLOAD_HISTORY).map((key) => key.slice(0, key.indexOf("("))));
+
+// The version an overload needs: its @since, or the first published typings
+// that had it, if those are older. An overload the table does not list, as in
+// typings newer than the table, keeps its @since.
+function firstPublishedSince(qualifiedName: QualifiedName, declaration: ts.Declaration, since: Version): Version {
+    if (!HISTORY_MEMBERS.has(qualifiedName) || !ts.isFunctionLike(declaration)) {
+        return since;
+    }
+    const firstPublished = OVERLOAD_HISTORY[`${qualifiedName}${getOverloadKey(declaration)}`]?.firstPublished;
+    return firstPublished && lt(firstPublished, since) ? firstPublished : since;
+}
+
+// A @since the rule can compare, or null: none, or one that is not a version.
+function toSince(raw: string | null): Version | null {
+    return (raw !== null && toVersion(raw)) || null;
+}
+
+// The lowest of the versions, or null, available from the start, when one of
+// them is null or there are none.
+function earliestOf(versions: (Version | null)[]): Version | null {
+    let earliest: Version | null = null;
+    for (const version of versions) {
+        if (version === null) {
+            return null;
+        }
+        if (earliest === null || lt(version, earliest)) {
+            earliest = version;
+        }
+    }
+    return earliest;
 }
 
 function higherOf(a: Version | undefined, b: Version | undefined): Version | undefined {
@@ -401,23 +639,27 @@ function isHoistedFunction(node: TSESTree.Node): boolean {
     return node.type === AST_NODE_TYPES.FunctionDeclaration;
 }
 
-// The statements that run before `child` in a statement list it belongs to.
-function getEarlierStatements(container: TSESTree.Node, child: TSESTree.Node): TSESTree.Statement[] {
-    let statements: TSESTree.Node[];
+// An `if` that returns or throws, in a statement list: the statements after
+// it, those that start at or after `end`, run only with `version` proven.
+interface EarlyExit {
+    end: number;
+    version: Version;
+}
+
+// The statements of a statement list, in order. Those that run before a child
+// of the list are those that end before the child starts.
+function getStatements(container: TSESTree.Node): TSESTree.Statement[] {
     switch (container.type) {
         case AST_NODE_TYPES.BlockStatement:
         case AST_NODE_TYPES.StaticBlock:
+            return container.body;
         case AST_NODE_TYPES.Program:
-            statements = container.body;
-            break;
+            return container.body as TSESTree.Statement[];
         case AST_NODE_TYPES.SwitchCase:
-            statements = container.consequent;
-            break;
+            return container.consequent;
         default:
             return [];
     }
-    const index = statements.indexOf(child);
-    return index > 0 ? (statements.slice(0, index) as TSESTree.Statement[]) : [];
 }
 
 // Whether running `statement` always leaves the statement list it sits in:
@@ -497,7 +739,9 @@ function buildSinceMap(dtsPath: string): SinceMap {
     }
 
     const sinceMap: SinceMap = new Map();
-    const content = readFileSync(dtsPath, "utf8");
+    // Without a byte order mark, as TypeScript reads the file for the program,
+    // so the positions here are those of the program's declarations.
+    const content = readFileSync(dtsPath, "utf8").replace(/^﻿/, "");
     const sourceFile = ts.createSourceFile(
         "obsidian.d.ts",
         content,
@@ -506,6 +750,11 @@ function buildSinceMap(dtsPath: string): SinceMap {
     );
 
     visit(sourceFile);
+    for (const [name, entry] of sinceMap) {
+        if (entry.every(([, since]) => since === null)) {
+            sinceMap.delete(name);
+        }
+    }
 
     if (obsidianVersion) {
         saveSinceMapCache(dtsPath, obsidianVersion, sinceMap);
@@ -516,37 +765,19 @@ function buildSinceMap(dtsPath: string): SinceMap {
     return sinceMap;
 
     function visit(node: ts.Node): void {
-        const sinceVersion = getSinceTag(node);
-
-        if (ts.isClassDeclaration(node) && node.name) {
-            if (sinceVersion) {
-                sinceMap.set(node.name.text, sinceVersion);
+        if (
+            (ts.isClassDeclaration(node) ||
+                ts.isInterfaceDeclaration(node) ||
+                ts.isFunctionDeclaration(node) ||
+                ts.isTypeAliasDeclaration(node) ||
+                ts.isEnumDeclaration(node)) &&
+            node.name
+        ) {
+            record(node.name.text, node);
+            if (ts.isClassDeclaration(node) || ts.isInterfaceDeclaration(node)) {
+                visitMembers(node.name.text, node.members);
             }
-            visitMembers(node.name.text, node.members);
-        } else if (ts.isInterfaceDeclaration(node) && node.name) {
-            if (sinceVersion) {
-                sinceMap.set(node.name.text, sinceVersion);
-            }
-            visitMembers(node.name.text, node.members);
-        } else if (ts.isFunctionDeclaration(node) && node.name) {
-            if (sinceVersion) {
-                sinceMap.set(node.name.text, sinceVersion);
-            }
-        } else if (ts.isTypeAliasDeclaration(node) && node.name) {
-            if (sinceVersion) {
-                sinceMap.set(node.name.text, sinceVersion);
-            }
-        } else if (ts.isEnumDeclaration(node) && node.name) {
-            if (sinceVersion) {
-                sinceMap.set(node.name.text, sinceVersion);
-            }
-        } else if (ts.isModuleDeclaration(node)) {
-            ts.forEachChild(node, visit);
-        } else if (ts.isModuleBlock(node)) {
-            ts.forEachChild(node, visit);
-        }
-
-        if (ts.isSourceFile(node)) {
+        } else if (ts.isSourceFile(node) || ts.isModuleDeclaration(node) || ts.isModuleBlock(node)) {
             ts.forEachChild(node, visit);
         }
     }
@@ -556,10 +787,6 @@ function buildSinceMap(dtsPath: string): SinceMap {
         members: ts.NodeArray<ts.Node>,
     ): void {
         for (const member of members) {
-            const sinceVersion = getSinceTag(member);
-            if (!sinceVersion) {
-                continue;
-            }
             let memberName: string | undefined;
             if (
                 ts.isMethodDeclaration(member) ||
@@ -572,20 +799,49 @@ function buildSinceMap(dtsPath: string): SinceMap {
                 memberName = member.name?.getText(sourceFile);
             }
             if (memberName) {
-                sinceMap.set(`${parentName}.${memberName}`, sinceVersion);
+                record(`${parentName}.${memberName}`, member);
             }
         }
     }
+
+    // Each declaration with @since, by its own JSDoc. An overload without one is
+    // listed as null, so a call to it is not given a sibling's version; any
+    // other declaration without one, such as an interface merged into a dated
+    // class, adds nothing.
+    function record(name: string, declaration: ts.Node): void {
+        const since = getSinceTag(declaration) ?? null;
+        if (
+            since === null &&
+            !ts.isFunctionDeclaration(declaration) &&
+            !ts.isMethodDeclaration(declaration) &&
+            !ts.isMethodSignature(declaration)
+        ) {
+            return;
+        }
+        const entry = sinceMap.get(name) ?? [];
+        entry.push([declaration.pos, since]);
+        sinceMap.set(name, entry);
+    }
 }
 
+// Looked up once per program rather than once per file: a program can hold
+// thousands of source files.
+const dtsPaths = new WeakMap<ts.Program, string | undefined>();
+
 function findObsidianDtsPath(program: ts.Program): string | undefined {
+    if (dtsPaths.has(program)) {
+        return dtsPaths.get(program);
+    }
+    let found: string | undefined;
     for (const sourceFile of program.getSourceFiles()) {
         const normalized = sourceFile.fileName.replace(/\\/g, "/");
         if (normalized.includes("/obsidian/obsidian.d.ts")) {
-            return sourceFile.fileName;
+            found = sourceFile.fileName;
+            break;
         }
     }
-    return undefined;
+    dtsPaths.set(program, found);
+    return found;
 }
 
 function getCachePath(dtsPath: string): string {
@@ -610,16 +866,6 @@ function getParentTypeName(declaration: ts.Declaration): string | undefined {
     }
     if (ts.isInterfaceDeclaration(parent) && parent.name) {
         return parent.name.text;
-    }
-    return undefined;
-}
-
-function getSinceTag(node: ts.Node): string | undefined {
-    const tags = ts.getJSDocTags(node);
-    for (const tag of tags) {
-        if (tag.tagName.text === "since" && typeof tag.comment === "string") {
-            return tag.comment.trim();
-        }
     }
     return undefined;
 }
@@ -752,7 +998,12 @@ function loadCachedSinceMap(dtsPath: string, obsidianVersion: string): SinceMap 
         const cachePath = getCachePath(dtsPath);
         const raw = readFileSync(cachePath, "utf8");
         const cache = JSON.parse(raw) as SinceMapCache;
-        if (cache.obsidianPackageVersion === obsidianVersion && cache.pluginVersion === PLUGIN_VERSION) {
+        if (
+            cache.format === SINCE_MAP_FORMAT &&
+            cache.obsidianPackageVersion === obsidianVersion &&
+            cache.pluginVersion === PLUGIN_VERSION &&
+            isSinceEntries(cache.entries)
+        ) {
             return new Map(cache.entries);
         }
 
@@ -762,11 +1013,32 @@ function loadCachedSinceMap(dtsPath: string, obsidianVersion: string): SinceMap 
     }
 }
 
+// Entries in the shape the rule reads, so a damaged file is rebuilt rather than
+// read wrong.
+function isSinceEntries(entries: unknown): entries is [QualifiedName, SinceEntry][] {
+    return (
+        Array.isArray(entries) &&
+        entries.every(
+            (item: unknown) =>
+                Array.isArray(item) &&
+                typeof item[0] === "string" &&
+                Array.isArray(item[1]) &&
+                (item[1] as unknown[]).every(
+                    (listed) =>
+                        Array.isArray(listed) &&
+                        typeof listed[0] === "number" &&
+                        (listed[1] === null || typeof listed[1] === "string"),
+                ),
+        )
+    );
+}
+
 function saveSinceMapCache(dtsPath: string, obsidianVersion: string, sinceMap: SinceMap): void {
     try {
         const cachePath = getCachePath(dtsPath);
         mkdirSync(dirname(cachePath), { recursive: true });
         const cache: SinceMapCache = {
+            format: SINCE_MAP_FORMAT,
             obsidianPackageVersion: obsidianVersion,
             pluginVersion: PLUGIN_VERSION,
             entries: [...sinceMap.entries()],

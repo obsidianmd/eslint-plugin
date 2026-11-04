@@ -8,9 +8,9 @@
 
 ## What is reported
 
-A settings tab without a `display()` method (or a `display` class field) while `minAppVersion` is
-below 1.13.0, the first version that renders declarative settings from `getSettingDefinitions()`.
-Before 1.13 such a tab shows nothing.
+A settings tab without a `display()` method (or a `display` class field, also written `"display"` or
+`["display"]`) while `minAppVersion` is below 1.13.0, the first version that renders declarative
+settings from `getSettingDefinitions()`. Before 1.13 such a tab shows nothing.
 
 ```ts
 // minAppVersion 1.12.0

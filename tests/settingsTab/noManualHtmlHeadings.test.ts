@@ -1,4 +1,7 @@
+import assert from "node:assert";
 import { RuleTester } from "@typescript-eslint/rule-tester";
+import { Linter } from "eslint";
+import tseslint from "typescript-eslint";
 import noManualHeadingsRule from "../../lib/rules/settingsTab/noManualHtmlHeadings.js";
 
 const MOCK_CLASS = `
@@ -168,7 +171,7 @@ ruleTester.run("no-manual-html-headings", noManualHeadingsRule, {
             `,
         },
         {
-            name: "options other than text are not carried over, so the rewrite is a suggestion",
+            name: "a cls option is dropped where Setting has no setClass(), and the suggestion says so",
             code: `
                 ${MOCK_CLASS}
                 class MyTab extends PluginSettingTab {
@@ -181,7 +184,8 @@ ruleTester.run("no-manual-html-headings", noManualHeadingsRule, {
             errors: [{
                 messageId: "headingEl",
                 suggestions: [{
-                    messageId: "replaceWithSettingHeading",
+                    messageId: "replaceWithSettingHeadingDropping",
+                    data: { dropped: "the `cls` option" },
                     output: `
                 ${MOCK_CLASS}
                 class MyTab extends PluginSettingTab {
@@ -273,26 +277,116 @@ ruleTester.run("no-manual-html-headings", noManualHeadingsRule, {
             }],
         },
         {
-            name: "an attr option is not carried over, so the rewrite is a suggestion (linear-calendar)",
+            name: "an attr option is not carried over, so the rewrite is a suggestion that names it (linear-calendar)",
             code: obsidianTab(`containerEl.createEl("h4", { text: "Start date", attr: { style: "margin-top: 0;" } });`),
             output: null,
             errors: [{
                 messageId: "headingEl",
                 suggestions: [{
-                    messageId: "replaceWithSettingHeading",
+                    messageId: "replaceWithSettingHeadingDropping",
+                    data: { dropped: "the `attr` option" },
                     output: obsidianTab(`new Setting(containerEl).setName("Start date").setHeading();`),
                 }],
             }],
         },
         {
-            name: "a callback is not carried over, so the rewrite is a suggestion",
+            name: "a callback is not carried over, so the rewrite is a suggestion that names it",
             code: obsidianTab(`containerEl.createEl("h4", { text: "Start date" }, (el) => el.addClass("x"));`),
             output: null,
             errors: [{
                 messageId: "headingEl",
                 suggestions: [{
-                    messageId: "replaceWithSettingHeading",
+                    messageId: "replaceWithSettingHeadingDropping",
+                    data: { dropped: "the callback" },
                     output: obsidianTab(`new Setting(containerEl).setName("Start date").setHeading();`),
+                }],
+            }],
+        },
+        {
+            // various-complements, src/setting/settings.ts: the class moves from
+            // the <h3> to the setting's element, so it is still a suggestion.
+            name: "a cls option is kept with setClass() where Setting has it",
+            code: `
+                declare const text: string;
+                declare const cls: string;
+                ${obsidianTab(`containerEl.createEl("h3", { text, cls });`)}
+            `,
+            output: null,
+            errors: [{
+                messageId: "headingEl",
+                suggestions: [{
+                    messageId: "replaceWithSettingHeadingClass",
+                    output: `
+                declare const text: string;
+                declare const cls: string;
+                ${obsidianTab(`new Setting(containerEl).setName(text).setClass(cls).setHeading();`)}
+            `,
+                }],
+            }],
+        },
+        {
+            name: "a cls option before the text, or with setText(), is set first, in the order the code ran",
+            code: `
+                declare function t(key: string): string;
+                declare function headingClass(): string;
+                ${obsidianTab(`
+                containerEl.createEl("h3", { cls: headingClass(), text: t("sync") });
+                containerEl.createEl("h3", { cls: "sync" }).setText(t("sync"));`)}
+            `,
+            output: null,
+            errors: [
+                {
+                    messageId: "headingEl",
+                    suggestions: [{
+                        messageId: "replaceWithSettingHeadingClass",
+                        output: `
+                declare function t(key: string): string;
+                declare function headingClass(): string;
+                ${obsidianTab(`
+                new Setting(containerEl).setClass(headingClass()).setName(t("sync")).setHeading();
+                containerEl.createEl("h3", { cls: "sync" }).setText(t("sync"));`)}
+            `,
+                    }],
+                },
+                {
+                    messageId: "headingEl",
+                    suggestions: [{
+                        messageId: "replaceWithSettingHeadingClass",
+                        output: `
+                declare function t(key: string): string;
+                declare function headingClass(): string;
+                ${obsidianTab(`
+                containerEl.createEl("h3", { cls: headingClass(), text: t("sync") });
+                new Setting(containerEl).setClass("sync").setName(t("sync")).setHeading();`)}
+            `,
+                    }],
+                },
+            ],
+        },
+        {
+            // setClass() takes a string; an array of classes does not fit it.
+            name: "a cls array is dropped, and the suggestion says so",
+            code: obsidianTab(`containerEl.createEl("h3", { text: "Sync", cls: ["a", "b"] });`),
+            output: null,
+            errors: [{
+                messageId: "headingEl",
+                suggestions: [{
+                    messageId: "replaceWithSettingHeadingDropping",
+                    data: { dropped: "the `cls` option" },
+                    output: obsidianTab(`new Setting(containerEl).setName("Sync").setHeading();`),
+                }],
+            }],
+        },
+        {
+            name: "a cls option is kept and every other option and the callback are named as dropped",
+            code: obsidianTab(`containerEl.createEl("h3", { text: "Sync", attr: { id: "sync" }, cls: "sync", "title": "Sync" }, (el) => el.hide());`),
+            output: null,
+            errors: [{
+                messageId: "headingEl",
+                suggestions: [{
+                    messageId: "replaceWithSettingHeadingClassDropping",
+                    data: { dropped: "the `attr` and `title` options and the callback" },
+                    output: obsidianTab(`new Setting(containerEl).setName("Sync").setClass("sync").setHeading();`),
                 }],
             }],
         },
@@ -483,6 +577,146 @@ ruleTester.run("no-manual-html-headings", noManualHeadingsRule, {
             errors: [{ messageId: "headingEl", suggestions: [] }],
         },
         {
+            // `new Setting(this.containerEl)` would be TS2554, "Expected 0
+            // arguments, but got 1".
+            name: "a Setting whose constructor takes no parameter has no fix",
+            code: `
+                declare class Setting { setName(name: string): this; setHeading(): this; }
+                declare class PluginSettingTab { containerEl: HTMLElement; }
+                class MyTab extends PluginSettingTab {
+                    display(): void {
+                        this.containerEl.createEl("h2", { text: "A" });
+                    }
+                }
+            `,
+            output: null,
+            errors: [{ messageId: "headingEl", suggestions: [] }],
+        },
+        {
+            name: "a Setting with an explicit constructor() has no fix either",
+            code: `
+                declare class Setting { constructor(); setName(name: string): this; setHeading(): this; }
+                declare class PluginSettingTab { containerEl: HTMLElement; }
+                class MyTab extends PluginSettingTab {
+                    display(): void {
+                        this.containerEl.createEl("h2", { text: "A" });
+                    }
+                }
+            `,
+            output: null,
+            errors: [{ messageId: "headingEl", suggestions: [] }],
+        },
+        {
+            name: "a Setting that cannot be constructed has no fix",
+            code: `
+                declare const Setting: { setName(name: string): unknown };
+                declare class PluginSettingTab { containerEl: HTMLElement; }
+                class MyTab extends PluginSettingTab {
+                    display(): void {
+                        this.containerEl.createEl("h2", { text: "A" });
+                    }
+                }
+            `,
+            output: null,
+            errors: [{ messageId: "headingEl", suggestions: [] }],
+        },
+        {
+            // The second overload takes the container, so the rewrite compiles.
+            name: "a Setting with a constructor overload that takes the container is fixed",
+            code: `
+                declare class Setting { constructor(); constructor(el: HTMLElement); setName(name: string): this; setHeading(): this; }
+                declare class PluginSettingTab { containerEl: HTMLElement; }
+                class MyTab extends PluginSettingTab {
+                    display(): void {
+                        this.containerEl.createEl("h2", { text: "A" });
+                    }
+                }
+            `,
+            output: `
+                declare class Setting { constructor(); constructor(el: HTMLElement); setName(name: string): this; setHeading(): this; }
+                declare class PluginSettingTab { containerEl: HTMLElement; }
+                class MyTab extends PluginSettingTab {
+                    display(): void {
+                        new Setting(this.containerEl).setName("A").setHeading();
+                    }
+                }
+            `,
+            errors: [{ messageId: "headingEl" }],
+        },
+        {
+            name: "a Setting whose constructor needs a second argument has no fix",
+            code: `
+                declare class Setting { constructor(el: HTMLElement, mode: number); setName(name: string): this; setHeading(): this; }
+                declare class PluginSettingTab { containerEl: HTMLElement; }
+                class MyTab extends PluginSettingTab {
+                    display(): void {
+                        this.containerEl.createEl("h2", { text: "A" });
+                    }
+                }
+            `,
+            output: null,
+            errors: [{ messageId: "headingEl", suggestions: [] }],
+        },
+        {
+            name: "a Setting whose constructor takes optional and rest arguments after the container is fixed",
+            code: `
+                declare class Setting { constructor(el: HTMLElement, mode?: number, ...rest: string[]); setName(name: string): this; setHeading(): this; }
+                declare class PluginSettingTab { containerEl: HTMLElement; }
+                class MyTab extends PluginSettingTab {
+                    display(): void {
+                        this.containerEl.createEl("h2", { text: "A" });
+                    }
+                }
+            `,
+            output: `
+                declare class Setting { constructor(el: HTMLElement, mode?: number, ...rest: string[]); setName(name: string): this; setHeading(): this; }
+                declare class PluginSettingTab { containerEl: HTMLElement; }
+                class MyTab extends PluginSettingTab {
+                    display(): void {
+                        new Setting(this.containerEl).setName("A").setHeading();
+                    }
+                }
+            `,
+            errors: [{ messageId: "headingEl" }],
+        },
+        {
+            name: "a Setting with no constructor parameter in the overload the container fits has no fix",
+            code: `
+                declare class Setting { constructor(); constructor(el: DocumentFragment); setName(name: string): this; setHeading(): this; }
+                declare class PluginSettingTab { containerEl: HTMLElement; }
+                class MyTab extends PluginSettingTab {
+                    display(): void {
+                        this.containerEl.createEl("h2", { text: "A" });
+                    }
+                }
+            `,
+            output: null,
+            errors: [{ messageId: "headingEl", suggestions: [] }],
+        },
+        {
+            // `new` on an `any` compiles, so the syntax decides, as without type information.
+            name: "a Setting typed any is fixed as without type information",
+            code: `
+                declare const Setting: any;
+                declare class PluginSettingTab { containerEl: HTMLElement; }
+                class MyTab extends PluginSettingTab {
+                    display(): void {
+                        this.containerEl.createEl("h2", { text: "A" });
+                    }
+                }
+            `,
+            output: `
+                declare const Setting: any;
+                declare class PluginSettingTab { containerEl: HTMLElement; }
+                class MyTab extends PluginSettingTab {
+                    display(): void {
+                        new Setting(this.containerEl).setName("A").setHeading();
+                    }
+                }
+            `,
+            errors: [{ messageId: "headingEl" }],
+        },
+        {
             name: "a local interface named Setting cannot be constructed, so there is no fix",
             code: `
                 import { PluginSettingTab } from "obsidian";
@@ -562,13 +796,14 @@ ruleTester.run("no-manual-html-headings", noManualHeadingsRule, {
             errors: [{ messageId: "headingEl", suggestions: [] }],
         },
         {
-            name: "text replaced by setText() is lost, so the rewrite to the setText() name is a suggestion",
+            name: "text replaced by setText() is lost, so the rewrite to the setText() name is a suggestion that names it",
             code: obsidianTab(`containerEl.createEl("h2", { text: "General" }).setText("Advanced");`),
             output: null,
             errors: [{
                 messageId: "headingEl",
                 suggestions: [{
-                    messageId: "replaceWithSettingHeading",
+                    messageId: "replaceWithSettingHeadingDropping",
+                    data: { dropped: "the `text` option" },
                     output: obsidianTab(`new Setting(containerEl).setName("Advanced").setHeading();`),
                 }],
             }],
@@ -638,6 +873,34 @@ const untypedRuleTester = new RuleTester({
 untypedRuleTester.run("no-manual-html-headings without type information", noManualHeadingsRule, {
     valid: [],
     invalid: [
+        {
+            // Only Obsidian's declarations show that Setting has setClass().
+            name: "a cls option is dropped, and the suggestion says so",
+            code: obsidianTab(`containerEl.createEl("h2", { text: "Sync", cls: "sync" });`),
+            output: null,
+            errors: [{
+                messageId: "headingEl",
+                suggestions: [{
+                    messageId: "replaceWithSettingHeadingDropping",
+                    data: { dropped: "the `cls` option" },
+                    output: obsidianTab(`new Setting(containerEl).setName("Sync").setHeading();`),
+                }],
+            }],
+        },
+        {
+            // The last text wins, as in the object; the first is not kept.
+            name: "a text option given twice keeps the last, and names the first as dropped",
+            code: obsidianTab(`containerEl.createEl("h2", { text: "General", text: "Sync" });`),
+            output: null,
+            errors: [{
+                messageId: "headingEl",
+                suggestions: [{
+                    messageId: "replaceWithSettingHeadingDropping",
+                    data: { dropped: "the `text` option" },
+                    output: obsidianTab(`new Setting(containerEl).setName("Sync").setHeading();`),
+                }],
+            }],
+        },
         {
             name: "this.containerEl and a binding taken from it are fixed",
             code: obsidianTab(`
@@ -1003,4 +1266,50 @@ untypedRuleTester.run("no-manual-html-headings without type information", noManu
             ],
         },
     ],
+});
+
+// The suggestion's description says what the rewrite does not keep.
+describe("no-manual-html-headings suggestion descriptions", () => {
+    const descriptions = (body: string, typed = false) =>
+        new Linter().verify(obsidianTab(body), [{
+            files: ["**/*.ts"],
+            languageOptions: {
+                parser: tseslint.parser,
+                // With CI=true, typescript-eslint would otherwise build the program
+                // once from file.ts on disk, and type-check that instead of `body`.
+                ...(typed && {
+                    parserOptions: {
+                        project: "./tsconfig.json",
+                        tsconfigRootDir: process.cwd(),
+                        disallowAutomaticSingleRunInference: true,
+                    },
+                }),
+            },
+            plugins: { obsidianmd: { rules: { "no-manual-html-headings": noManualHeadingsRule as never } } },
+            rules: { "obsidianmd/no-manual-html-headings": "error" },
+        }], "file.ts").map((message) => message.suggestions?.map((suggestion) => suggestion.desc) ?? message.message);
+
+    it("say that the class moves to the setting's element, with type information", () => {
+        assert.deepStrictEqual(
+            descriptions(`
+                containerEl.createEl("h3", { text: "Sync", cls: "sync" });
+                containerEl.createEl("h3", { text: "Sync", cls: "sync", attr: { id: "a" } });`, true),
+            [
+                ["Replace with `new Setting(...).setName(...).setHeading()`, moving the class to the setting's element with `setClass()`."],
+                ["Replace with `new Setting(...).setName(...).setHeading()`, moving the class to the setting's element with `setClass()` and dropping the `attr` option."],
+            ],
+        );
+    });
+
+    it("name the options and the callback that are dropped", () => {
+        assert.deepStrictEqual(descriptions(`containerEl.createEl("h3", { text: "Sync", cls: "sync", attr: { id: "a" }, title: "t" }, (el) => el.hide());`), [[
+            "Replace with `new Setting(...).setName(...).setHeading()`, dropping the `cls`, `attr` and `title` options and the callback.",
+        ]]);
+    });
+
+    it("say nothing is dropped where nothing is", () => {
+        assert.deepStrictEqual(descriptions(`el.createEl("h3", { text: "Sync" });`), [[
+            "Replace with `new Setting(...).setName(...).setHeading()`.",
+        ]]);
+    });
 });

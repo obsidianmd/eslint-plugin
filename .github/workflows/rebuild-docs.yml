@@ -10,14 +10,23 @@ on:
 permissions:
     contents: write
 
+# Two quick pushes to master must not race to push docs commits.
+concurrency:
+    group: rebuild-docs
+    cancel-in-progress: false
+
 jobs:
     docs:
         runs-on: ubuntu-latest
 
         steps:
-            - uses: actions/checkout@v4
+            # The push credential is not left in .git/config for the install
+            # scripts and the build to read; the push step passes it itself.
+            - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+              with:
+                  persist-credentials: false
             - name: Use Node.js 22
-              uses: actions/setup-node@v4
+              uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
               with:
                   node-version: 22.x
                   cache: "npm"
@@ -26,9 +35,12 @@ jobs:
             - run: npm run init:eslint-docs
             - run: npm run update:eslint-docs
             - run: npm run check:eslint-docs
-            - run: |
+            # Only the generated docs, not whatever else the build left behind.
+            - env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
                   git config --local user.name 'Obsidian Bot'
                   git config --local user.email 'admin@obsidian.md'
-                  git add .
+                  git add README.md docs
                   git commit -m "chore: Update documentation" || exit 0
-                  git push
+                  git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:master

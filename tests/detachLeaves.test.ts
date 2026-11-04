@@ -1,4 +1,5 @@
 import { RuleTester } from "@typescript-eslint/rule-tester";
+import { RuleTester as EslintRuleTester, type Rule } from "eslint";
 import detachLeavesRule from "../lib/rules/detachLeaves.js";
 
 const ruleTester = new RuleTester();
@@ -30,6 +31,15 @@ ruleTester.run("detach-leaves", detachLeavesRule, {
         {
             name: "onunload as an arrow-function property is not checked",
             code: 'class MyPlugin { onunload = () => { this.app.workspace.detachLeavesOfType("foo"); }; }',
+        },
+        {
+            // The key is whatever the variable holds, here "dispose".
+            name: "a computed key named by a variable is not onunload",
+            code: 'const onunload = "dispose";\nclass Cache { [onunload]() { this.app.workspace.detachLeavesOfType("foo"); } }',
+        },
+        {
+            name: "a computed string other than onunload is not checked",
+            code: 'class MyPlugin { ["onload"]() { this.app.workspace.detachLeavesOfType("foo"); } }',
         },
     ],
     invalid: [
@@ -578,10 +588,136 @@ ruleTester.run("detach-leaves", detachLeavesRule, {
             output: IMPORT + "abstract class MyPlugin extends Plugin {\n    abstract helper(): void\n    onunload() {}\n    [Symbol.iterator]() {}\n}",
         },
         {
+            name: "a quoted onunload is onunload",
+            code: 'class MyPlugin { "onunload"() { this.app.workspace.detachLeavesOfType("foo"); } }',
+            errors: [{ messageId: "onunload" }],
+            output: 'class MyPlugin { "onunload"() {} }',
+        },
+        {
+            name: "a quoted onunload in a Plugin goes like an unquoted one",
+            code: IMPORT + 'class MyPlugin extends Plugin {\n    "onunload"() {\n        this.app.workspace.detachLeavesOfType("foo");\n    }\n}',
+            errors: [{ messageId: "onunload" }],
+            output: IMPORT + "class MyPlugin extends Plugin {}",
+        },
+        {
+            name: "an onunload computed from a string is onunload, and keeps the method",
+            code: IMPORT + [
+                "class StringPlugin extends Plugin {",
+                '    ["onunload"]() {',
+                '        this.app.workspace.detachLeavesOfType("foo");',
+                "    }",
+                "}",
+                "class TemplatePlugin extends Plugin {",
+                "    [`onunload`]() {",
+                '        this.app.workspace.detachLeavesOfType("foo");',
+                "    }",
+                "}",
+            ].join("\n"),
+            errors: [{ messageId: "onunload" }, { messageId: "onunload" }],
+            output: IMPORT + [
+                "class StringPlugin extends Plugin {",
+                '    ["onunload"]() {}',
+                "}",
+                "class TemplatePlugin extends Plugin {",
+                "    [`onunload`]() {}",
+                "}",
+            ].join("\n"),
+        },
+        {
+            // KEY may be "onunload": removing the method would let [KEY]() run
+            // in its place.
+            name: "a member computed from an unknown value keeps the method",
+            code: 'import { Plugin } from "obsidian";\nimport { KEY } from "./keys";\nclass MyPlugin extends Plugin {\n    [KEY]() {}\n    onunload() {\n        this.app.workspace.detachLeavesOfType("foo");\n    }\n}',
+            errors: [{ messageId: "onunload" }],
+            output: 'import { Plugin } from "obsidian";\nimport { KEY } from "./keys";\nclass MyPlugin extends Plugin {\n    [KEY]() {}\n    onunload() {}\n}',
+        },
+        {
+            name: "a member computed from a known value other than onunload lets the method go",
+            code: IMPORT + 'const KEY = "dispose";\nclass MyPlugin extends Plugin {\n    [KEY]() {}\n    onunload() {\n        this.app.workspace.detachLeavesOfType("foo");\n    }\n}',
+            errors: [{ messageId: "onunload" }],
+            output: IMPORT + 'const KEY = "dispose";\nclass MyPlugin extends Plugin {\n    [KEY]() {}\n}',
+        },
+        {
             name: "a field without a semicolon before the last member does not keep it",
             code: IMPORT + 'class MyPlugin extends Plugin {\n    handlers = {}\n    onunload() {\n        this.app.workspace.detachLeavesOfType("foo");\n    }\n}',
             errors: [{ messageId: "onunload" }],
             output: IMPORT + "class MyPlugin extends Plugin {\n    handlers = {}\n}",
+        },
+    ],
+});
+
+// ESLint's own parser, espree, with no languageOptions.parser: the recommended
+// config's JavaScript files, and `ruleConfigs.recommended`, which is documented
+// to work with any parser. Its methods have no `decorators`, `optional` or
+// `typeParameters`, so the fix may not assume typescript-estree's defaults for
+// them; reading `decorators.length` threw inside context.report() and stopped
+// the whole lint run.
+const method = (name: string, body = 'this.app.workspace.detachLeavesOfType("foo");') =>
+    `${name}() {\n        ${body}\n    }`;
+new EslintRuleTester().run("detach-leaves with ESLint's default parser", detachLeavesRule as unknown as Rule.RuleModule, {
+    valid: [
+        { name: "onunload without detachLeavesOfType", code: "class MyPlugin { onunload() { this.cleanUp(); } }" },
+        {
+            name: "a computed key named by a variable",
+            code: 'const onunload = "dispose";\nclass Cache { [onunload]() { this.app.workspace.detachLeavesOfType("foo"); } }',
+        },
+        { name: "a private #onunload", code: 'class MyPlugin { #onunload() { this.app.workspace.detachLeavesOfType("foo"); } }' },
+        { name: "an arrow-function property", code: 'class MyPlugin { onunload = () => { this.app.workspace.detachLeavesOfType("foo"); }; }' },
+    ],
+    invalid: [
+        {
+            name: "the method goes in a class that extends Obsidian's Plugin",
+            code: IMPORT + `class MyPlugin extends Plugin {\n    ${method("onunload")}\n}`,
+            errors: [{ messageId: "onunload" }],
+            output: IMPORT + "class MyPlugin extends Plugin {}",
+        },
+        {
+            name: "the call goes, and the method stays, in a class that does not extend Plugin",
+            code: 'class MyPlugin { onunload() { this.app.workspace.detachLeavesOfType("foo"); } }',
+            errors: [{ messageId: "onunload" }],
+            output: "class MyPlugin { onunload() {} }",
+        },
+        {
+            name: "a quoted onunload goes like an unquoted one",
+            code: IMPORT + `class MyPlugin extends Plugin {\n    ${method('"onunload"')}\n}`,
+            errors: [{ messageId: "onunload" }],
+            output: IMPORT + "class MyPlugin extends Plugin {}",
+        },
+        {
+            name: "an onunload computed from a string keeps the method",
+            code: IMPORT + `class StringPlugin extends Plugin {\n    ${method('["onunload"]')}\n}\nclass TemplatePlugin extends Plugin {\n    ${method("[`onunload`]")}\n}`,
+            errors: [{ messageId: "onunload" }, { messageId: "onunload" }],
+            output: IMPORT + 'class StringPlugin extends Plugin {\n    ["onunload"]() {}\n}\nclass TemplatePlugin extends Plugin {\n    [`onunload`]() {}\n}',
+        },
+        {
+            name: "a member computed from an unknown value keeps the method",
+            code: `${IMPORT}import { KEY } from "./keys";\nclass MyPlugin extends Plugin {\n    [KEY]() {}\n    ${method("onunload")}\n}`,
+            errors: [{ messageId: "onunload" }],
+            output: `${IMPORT}import { KEY } from "./keys";\nclass MyPlugin extends Plugin {\n    [KEY]() {}\n    onunload() {}\n}`,
+        },
+        {
+            name: "a member computed from a known value other than onunload lets the method go",
+            code: `${IMPORT}const KEY = "dispose";\nclass MyPlugin extends Plugin {\n    [KEY]() {}\n    ${method("onunload")}\n}`,
+            errors: [{ messageId: "onunload" }],
+            output: `${IMPORT}const KEY = "dispose";\nclass MyPlugin extends Plugin {\n    [KEY]() {}\n}`,
+        },
+        {
+            name: "an async, static, getter or generator onunload, or one with a parameter, keeps the method",
+            code: IMPORT + [
+                `class A extends Plugin {\n    ${method("async onunload")}\n}`,
+                `class B extends Plugin {\n    ${method("static onunload")}\n}`,
+                `class C extends Plugin {\n    ${method("get onunload")}\n}`,
+                `class D extends Plugin {\n    ${method("*onunload")}\n}`,
+                `class E extends Plugin {\n    onunload(reason = this.track()) {\n        this.app.workspace.detachLeavesOfType("foo");\n    }\n}`,
+            ].join("\n"),
+            errors: Array.from({ length: 5 }, () => ({ messageId: "onunload" })),
+            output: IMPORT + [
+                "class A extends Plugin {\n    async onunload() {}\n}",
+                "class B extends Plugin {\n    static onunload() {}\n}",
+                "class C extends Plugin {\n    get onunload() {}\n}",
+                "class D extends Plugin {\n    *onunload() {}\n}",
+                "class E extends Plugin {\n    onunload(reason = this.track()) {}\n}",
+            ].join("\n"),
         },
     ],
 });

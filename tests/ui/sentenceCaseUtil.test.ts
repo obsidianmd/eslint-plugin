@@ -3,11 +3,12 @@ import {
     createSentenceCaseEvaluator,
     evaluateSentenceCase,
     isSkippableString,
+    recaseStringSource,
     resolveSentenceCaseConfig,
     type EvaluatorOptions,
 } from "../../lib/rules/ui/sentenceCaseUtil.js";
 import { DEFAULT_ACRONYMS } from "../../lib/rules/ui/acronyms.js";
-import { DEFAULT_BRANDS } from "../../lib/rules/ui/brands.js";
+import { DEFAULT_AMBIGUOUS_BRANDS, DEFAULT_BRANDS } from "../../lib/rules/ui/brands.js";
 
 // The casing decisions all three sentence-case rules share. Each case is a
 // text and the suggestion for it, or null where the text is already in
@@ -39,6 +40,25 @@ const cases: Record<string, Case[]> = {
         ["Done; next step", null],
         ["Note: Open It", "Note: Open it"],
     ],
+    "after an abbreviation such as e.g. the next word may take either case": [
+        ["Choose a folder, e.g. notes", null],
+        ["Choose a folder, e.g. Notes", null],
+        ["Pick one, eg. notes", null],
+        ["Use any file, i.e. one note", null],
+        ["Images, videos, etc. are kept", null],
+        ["Images, videos, etc. Are kept", null],
+        ["Compare local vs. remote", null],
+        ["See the guide, cf. the docs", null],
+        ["It takes approx. ten seconds", null],
+        ["Notes, incl. archived ones", null],
+        ["Notes, esp. new ones", null],
+        ["No. of items", null],
+        // Only the next word: the words after it are later words.
+        ["Choose a folder, e.g. Daily Notes", "Choose a folder, e.g. Daily notes"],
+        // A word that only ends like one is not an abbreviation.
+        ["Eat your veg. open it", "Eat your veg. Open it"],
+        ["Saved files. open it", "Saved files. Open it"],
+    ],
     "what comes before the first word": [
         ["  Open settings", null],
         ["  open settings", "  Open settings"],
@@ -49,6 +69,85 @@ const cases: Record<string, Case[]> = {
         ["(open settings)", "(Open settings)"],
         // Other text before it makes it a later word.
         ["50% Complete", "50% complete"],
+        // So does a number: the word after it is not capitalized.
+        ["2 files selected", null],
+        ["2 Files selected", "2 files selected"],
+        ["10 GitHub repos found", null],
+        ["2 api keys found", "2 API keys found"],
+        ["1) open settings", null],
+        // A word that starts with a number keeps its letters as written.
+        ["1st place", null],
+        ["10x faster", null],
+        ["10X faster", null],
+        ["3D view", null],
+        ["2-factor sign-in", null],
+        ["2fa settings", "2FA settings"],
+        ["10x Faster", "10x faster"],
+        // Emoji with a variation selector, a skin tone, a flag or a keycap are not text.
+        ["⚠️ Open settings", null],
+        ["⚠️ open settings", "⚠️ Open settings"],
+        ["👍🏽 Open settings", null],
+        ["🇬🇧 Open settings", null],
+        ["1️⃣ Open settings", null],
+        ["#️⃣ Open settings", null],
+        // After punctuation, a bullet, an arrow or quotes, the first word keeps
+        // the case it is written in; the words after it are later words.
+        ["* Required field", null],
+        ["* required field", null],
+        ["#tags found", null],
+        ["#Tags found", null],
+        ["- Item", null],
+        ["- open settings", null],
+        ["- Open Settings", "- Open settings"],
+        ["• Bullet point", null],
+        ["→ Next", null],
+        ["→ next step", null],
+        ["...Loading", null],
+        ["...loading", null],
+        ["1) Open settings", null],
+        ["(1) Open settings", null],
+        ["– Item One", "– Item one"],
+        // A label in brackets: its first word and the first word after it keep their case.
+        ["[Beta] Feature", null],
+        ["[beta] feature", null],
+        ["[Beta] feature", null],
+        ["[BETA] Feature", null],
+        ["[Beta] Feature Flags", "[Beta] Feature flags"],
+        ["[1] Open settings", null],
+        ["✅ [Beta] Feature", null],
+        ["- [Beta] Feature", null],
+        ["[Work In Progress] Feature", "[Work in progress] Feature"],
+        ["[Beta] api keys", "[Beta] API keys"],
+        ["[Beta] github sync", "[Beta] GitHub sync"],
+        ["(Beta) Sync", null],
+        ["(Beta) sync", null],
+        // A word right after "(" is still the first word, as before.
+        ["(beta) sync", "(Beta) sync"],
+        ["(Optional) Value", null],
+        // A bracket that closes the text is not a label.
+        ["[open settings]", null],
+        // Other letters before the first word still make it a later word.
+        ["Über Settings", "Über settings"],
+        // A first word in quotes keeps the case it is written in.
+        ['"Open" settings', null],
+        ['"open" settings', null],
+        ["'Open' settings", null],
+        ["“Open” settings", null],
+        ["(“Open”) settings", null],
+        ['"Open" Settings', '"Open" settings'],
+        ['"Open Settings" now', '"Open settings" now'],
+    ],
+    "a word that starts with a number keeps its letters anywhere": [
+        ["Open 3D view", null],
+        ["Open 3d view", null],
+        ["Use 4K images", null],
+        ["Finish 1st", null],
+        ["Get 10x Faster", "Get 10x faster"],
+        ["Use 2-Factor Sign-In", "Use 2-Factor sign-in"],
+        // An acronym is still an acronym.
+        ["Enable 2fa", "Enable 2FA"],
+        // A word that only contains a number is a word.
+        ["Use V2 Sync", "Use v2 sync"],
     ],
     "acronyms are upper case wherever they are": [
         ["Export as pdf", "Export as PDF"],
@@ -60,9 +159,19 @@ const cases: Record<string, Case[]> = {
         ["Api-Based Sync", "API-based sync"],
         ["Use the api. pdf export", "Use the API. PDF export"],
     ],
+    "an acronym in mixed case keeps the casing it is listed in": [
+        ["Sign in with OAuth", null],
+        ["Sign in with oauth", "Sign in with OAuth"],
+        ["Sign in with OAUTH", "Sign in with OAuth"],
+        ["OAuth settings", null],
+        ["oauth settings", "OAuth settings"],
+        ["Use oauth-based sign-in", "Use OAuth-based sign-in"],
+    ],
     "configured acronyms replace the defaults and are matched in any case": [
         ["Use abc", "Use ABC", { acronyms: ["abc"] }],
         ["Use pdf", null, { acronyms: ["ABC"] }],
+        ["Use mytool", "Use MyTool", { acronyms: ["MyTool"] }],
+        ["Use MYTOOL", "Use MyTool", { acronyms: ["MyTool"] }],
     ],
     "an acronym that is also a word keeps all caps only when written so": [
         ["Use the REST API", null],
@@ -87,6 +196,29 @@ const cases: Record<string, Case[]> = {
         ["Sync with obsidian sync", "Sync with Obsidian Sync"],
         ["Install node.js, then restart", "Install Node.js, then restart"],
         ["Use VS Code", null],
+    ],
+    "a brand that is also an ordinary word keeps either casing": [
+        ["Close all windows", null],
+        ["Install on Windows", null],
+        ["Move the cursor to the end", null],
+        ["Open in Cursor", null],
+        ["Leave some slack", null],
+        ["Post to Slack", null],
+        ["Press x to close", null],
+        ["Share on X", null],
+        ["The notion of time", null],
+        ["Import from Notion", null],
+        ["Views react to changes", null],
+        ["React to changes", null],
+        ["Built with React", null],
+        ["Close windows-only panes", null],
+        // Any other casing is the brand's.
+        ["Close all WINDOWS", "Close all Windows"],
+        ["Import from nOTION", "Import from Notion"],
+        // The first word of a sentence is still capitalized.
+        ["windows are closed", "Windows are closed"],
+        // The brand's casing is kept as written, even in title case.
+        ["Close All Windows", "Close all Windows"],
     ],
     "a brand is matched only as whole words": [
         ["Open Gitea Settings", "Open gitea settings"],
@@ -138,6 +270,37 @@ const cases: Record<string, Case[]> = {
         ["Use DD/MM/YYYY Format", "Use DD/MM/YYYY format"],
         // A single token is a word.
         ["Use MM Format", "Use mm format"],
+        // A time format may end in an AM/PM token after a space.
+        ["Format: hh:mm A", null],
+        ["Use h:mm a here", null],
+        ["Use HH:mm:ss A, then save", null],
+        ["Use hh:mmA here", null],
+        // "A" without a time format before it is a word.
+        ["Create A new note", "Create a new note"],
+        ["Note: Create A New Note", "Note: Create a new note"],
+        ["Use DD/MM/YYYY A Format", "Use DD/MM/YYYY a format"],
+        // Tokens joined by spaces or commas, with one that is never a word.
+        ["Use MMM D, YYYY here", null],
+        ["Use DD MMM YYYY here", null],
+        ["Use YYYY-MM-DD HH:mm here", null],
+        ["Use dddd, MMMM Do here", null],
+        ["Use MMM D, YYYY h:mm A here", null],
+        ["Format: MMM D, YYYY", null],
+        ["MMM D, YYYY is the default", null],
+        ["Use DD MMM YYYY Format", "Use DD MMM YYYY format"],
+        // Tokens that are also words are words when nothing else joins them.
+        ["Create A New Note", "Create a new note"],
+        ["Do A Barrel Roll", "Do a barrel roll"],
+        ["Use D M H", "Use d m h"],
+        ["Pick A D Grade", "Pick a d grade"],
+    ],
+    "a version number or a brand with a dot is checked": [
+        ["Version 1.2 Released", "Version 1.2 released"],
+        ["Install Node.js First", "Install Node.js first"],
+        ["Install node.js First", "Install Node.js first"],
+        ["Requires Obsidian 1.5.0 Or Later", "Requires Obsidian 1.5.0 or later"],
+        ["Costs $1.99 Now", "Costs $1.99 now"],
+        ['Version "1.2" Released', 'Version "1.2" released'],
     ],
 };
 
@@ -158,6 +321,27 @@ const skippable: [text: string, skipped: boolean][] = [
     ["Open README.MD File", true],
     ['Open "Template.md" Now', true],
     ["Open 'Template.md' Now", true],
+    ["Open config.json", true],
+    ["See docs/readme.md", true],
+    ["Saved to Notes/Daily.md", true],
+    ["Open Daily.md Now", true],
+    ["Visit obsidian.md", true],
+    ["https://x.com/a.b", true],
+    ["Open https://X.com/A.b Now", true],
+    ["C:\\Users\\Me\\File.txt", true],
+    [".obsidian/plugins", true],
+    ["Open .obsidian/plugins Folder", true],
+    ["Edit the .git/config File", true],
+    ["Saved backup.001 Here", true],
+    ["Open Main.js Here", true],
+    // A number, or a brand such as "Node.js", is not a file name.
+    ["Version 1.2 Released", false],
+    ["Update To v2.1 Now", false],
+    ["Requires Obsidian 1.5.0 Or Later", false],
+    ['Version "1.2" Released', false],
+    ["Install Node.js First", false],
+    ["Install Node.js", false],
+    ["Uses Node.js 'Fs' Module", false],
     ["Press Ctrl+S", true],
     ["Press Shift+Enter To Send", true],
     ["Press Option+Click", true],
@@ -186,26 +370,29 @@ describe("sentence case evaluation", () => {
 });
 
 // Each entry of the default lists is kept as written and corrected from any
-// other case. ", then save" keeps a brand such as "Node.js" from ending the
-// text, where it would look like a file name and be skipped.
+// other case. A brand that is also an ordinary word is the only exception:
+// written in lower case it is that word, and is left alone.
 describe("the default brands and acronyms", () => {
     for (const brand of DEFAULT_BRANDS) {
-        it(`keeps the brand ${brand} and corrects it from lower or upper case`, () => {
+        const ambiguous = DEFAULT_AMBIGUOUS_BRANDS.includes(brand);
+        it(`keeps the brand ${brand} and corrects it from ${ambiguous ? "upper case, and keeps it in lower case" : "lower or upper case"}`, () => {
             const expected = `Use ${brand}, then save`;
             assert.strictEqual(evaluateSentenceCase(expected).ok, true);
             for (const written of [brand.toLowerCase(), brand.toUpperCase()].filter((text) => text !== brand)) {
-                assert.strictEqual(evaluateSentenceCase(`Use ${written}, then save`).suggestion, expected);
+                const keptAsWritten = ambiguous && written === brand.toLowerCase();
+                assert.strictEqual(evaluateSentenceCase(`Use ${written}, then save`).suggestion, keptAsWritten ? undefined : expected);
             }
         });
     }
-    // "OAuth" is in the list but upper-cased like the rest, so it is reported
-    // and fixed to "OAUTH"; it is left out until that is fixed.
-    for (const acronym of DEFAULT_ACRONYMS.filter((entry) => entry !== "OAuth")) {
-        it(`keeps the acronym ${acronym} and corrects it from lower case`, () => {
+    it("lists only brands of the default list as ambiguous", () => {
+        assert.deepStrictEqual(DEFAULT_AMBIGUOUS_BRANDS.filter((brand) => !DEFAULT_BRANDS.includes(brand)), []);
+    });
+    for (const acronym of DEFAULT_ACRONYMS) {
+        it(`keeps the acronym ${acronym} and corrects it from lower and upper case`, () => {
             const expected = `Use ${acronym}, then save`;
             assert.strictEqual(evaluateSentenceCase(expected).ok, true);
-            if (acronym !== acronym.toLowerCase()) {
-                assert.strictEqual(evaluateSentenceCase(`Use ${acronym.toLowerCase()}, then save`).suggestion, expected);
+            for (const written of [acronym.toLowerCase(), acronym.toUpperCase()].filter((text) => text !== acronym)) {
+                assert.strictEqual(evaluateSentenceCase(`Use ${written}, then save`).suggestion, expected);
             }
         });
     }
@@ -239,4 +426,41 @@ describe("sentence case rule options", () => {
             assert.strictEqual(suggestFor("Open settings"), undefined);
         }
     });
+});
+
+// The autofix of all three rules: the source of the string, rewritten so it
+// holds the suggestion, with only the case of letters written as themselves
+// changed. Null means no fix.
+describe("rewriting a string's source for the fix", () => {
+    const cases: [source: string, value: string, suggestion: string, expected: string | null][] = [
+        [String.raw`'Open Settings'`, "Open Settings", "Open settings", String.raw`'Open settings'`],
+        [String.raw`"Say \"Open\" Now"`, 'Say "Open" Now', 'Say "open" now', String.raw`"Say \"open\" now"`],
+        [String.raw`'Open\tNow\\Here'`, "Open\tNow\\Here", "Open\tnow\\here", String.raw`'Open\tnow\\here'`],
+        [String.raw`'\x4Fpen \u{1F600} Now'`, "Open \u{1F600} Now", "Open \u{1F600} now", String.raw`'\x4Fpen \u{1F600} now'`],
+        [String.raw`'\u0041pply \0 Now'`, "Apply \0 Now", "Apply \0 now", String.raw`'\u0041pply \0 now'`],
+        ["'Open \\\r\nNow'", "Open Now", "Open now", "'Open \\\r\nnow'"],
+        ["`Open\r\nNow\rToo`", "Open\nNow\nToo", "Open\nnow\ntoo", "`Open\r\nnow\rtoo`"],
+        ["`Open \\${x} Now`", "Open ${x} Now", "Open ${x} now", "`Open \\${x} now`"],
+        // A letter to change is an escape.
+        [String.raw`'Open \u0053ettings'`, "Open Settings", "Open settings", null],
+        [String.raw`'Open \x53ettings'`, "Open Settings", "Open settings", null],
+        [String.raw`'Open \Settings'`, "Open Settings", "Open settings", null],
+        // A legacy octal escape is not decoded.
+        [String.raw`'Open Settings\101'`, "Open SettingsA", "Open settingsa", null],
+        [String.raw`'Open Settings\8'`, "Open Settings8", "Open settings8", null],
+        // The source does not hold the value.
+        [String.raw`'Open Now'`, "Open Later", "Open later", null],
+        [String.raw`'Open \u00'`, "Open", "Open", null],
+        [String.raw`'Open \u{110000}'`, "Open", "Open", null],
+        // Not a quoted string, or not only a change of case.
+        ["Open Now", "Open Now", "Open now", null],
+        [String.raw`'Open Now"`, "Open Now", "Open now", null],
+        [String.raw`'Open Now'`, "Open Now", "Open new", null],
+        [String.raw`'Open Now'`, "Open Now", "Open now!", null],
+    ];
+    for (const [source, value, suggestion, expected] of cases) {
+        it(`${JSON.stringify(source)} becomes ${JSON.stringify(expected)}`, () => {
+            assert.strictEqual(recaseStringSource(source, value, suggestion), expected);
+        });
+    }
 });

@@ -10,7 +10,6 @@ export const restrictedGlobalsOptions = [
         message:
             "Avoid using the global app object. Instead use the reference provided by your plugin instance.",
     },
-    "warn",
     {
         name: "fetch",
         message:

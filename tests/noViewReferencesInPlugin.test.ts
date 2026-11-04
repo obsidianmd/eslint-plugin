@@ -225,6 +225,49 @@ ruleTester.run("no-view-references-in-plugin", noViewReferencesRule, {
             errors: [{ messageId: "avoidViewReference" }],
         },
         {
+            name: "an instance of a generic view class is reported",
+            code: `
+                ${MOCK_API}
+                class GenericView<T> extends View { state?: T }
+                class MyPlugin extends Plugin {
+                    view: GenericView<string>;
+                    onload() {
+                        this.registerView('my-view', (leaf) => this.view = new GenericView<string>());
+                    }
+                }
+            `,
+            errors: [{ messageId: "avoidViewReference" }],
+        },
+        {
+            name: "a view whose base class is generic is reported",
+            code: `
+                ${MOCK_API}
+                class StateView<T> extends View { state?: T }
+                class SettingsView extends StateView<{ open: boolean }> { }
+                class MyPlugin extends Plugin {
+                    view: SettingsView;
+                    onload() {
+                        this.registerView('my-view', (leaf) => this.view = new SettingsView());
+                    }
+                }
+            `,
+            errors: [{ messageId: "avoidViewReference" }],
+        },
+        {
+            name: "a plugin whose base class is generic is checked",
+            code: `
+                ${MOCK_API}
+                class SettingsPlugin<T> extends Plugin { settings?: T }
+                class MyPlugin extends SettingsPlugin<{ open: boolean }> {
+                    view: MyCustomView;
+                    onload() {
+                        this.registerView('my-view', (leaf) => this.view = new MyCustomView());
+                    }
+                }
+            `,
+            errors: [{ messageId: "avoidViewReference" }],
+        },
+        {
             name: "a this typed by a type parameter constrained to Plugin is checked",
             code: `
                 ${MOCK_API}

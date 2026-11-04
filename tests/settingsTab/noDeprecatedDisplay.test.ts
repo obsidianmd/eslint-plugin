@@ -146,6 +146,83 @@ ruleTester.run("no-deprecated-display", noDeprecatedDisplayRule, {
                 }
             `,
         },
+        {
+            // Obsidian skips display() only when getSettingDefinitions()
+            // returns a non-empty array, so one that returns nothing leaves
+            // display() rendering the tab.
+            name: "getSettingDefinitions() that returns nothing leaves display() rendering the tab",
+            options: [{ minAppVersion: "1.13.0" }],
+            code: `
+                ${MOCK_CLASS}
+                class EmptyBody extends PluginSettingTab {
+                    getSettingDefinitions() {}
+                    display() { this.containerEl.createEl("p", { text: "rendered by display()" }); }
+                }
+                class BareReturn extends PluginSettingTab {
+                    getSettingDefinitions() { return; }
+                    display() {}
+                }
+                class ReturnsUndefined extends PluginSettingTab {
+                    getSettingDefinitions() { return undefined; }
+                    display() {}
+                }
+                class ReturnsNull extends PluginSettingTab {
+                    getSettingDefinitions() { return null; }
+                    display() {}
+                }
+                class ReturnsVoid extends PluginSettingTab {
+                    getSettingDefinitions() { return void 0; }
+                    display() {}
+                }
+                class OnlyAComment extends PluginSettingTab {
+                    getSettingDefinitions() {
+                        // TODO: move the settings over
+                    }
+                    display() {}
+                }
+                class NoReturn extends PluginSettingTab {
+                    getSettingDefinitions() { this.build(); }
+                    build() {}
+                    display() {}
+                }
+                class ArrowEmptyBody extends PluginSettingTab {
+                    getSettingDefinitions = () => {};
+                    display() {}
+                }
+                class ArrowUndefined extends PluginSettingTab {
+                    getSettingDefinitions = () => undefined;
+                    display() {}
+                }
+            `,
+        },
+        {
+            // The key is whatever the variable holds, here "show".
+            name: "a computed member named by a variable called display is not display()",
+            options: [{ minAppVersion: "1.13.0" }],
+            code: `
+                ${MOCK_CLASS}
+                const display = "show";
+                class MyTab extends PluginSettingTab {
+                    ${DEFINITIONS}
+                    [display]() {}
+                }
+            `,
+        },
+        {
+            name: "a getSettingDefinitions() whose every return is empty is a stub",
+            options: [{ minAppVersion: "1.13.0" }],
+            code: `
+                ${MOCK_CLASS}
+                declare const ready: boolean;
+                class MyTab extends PluginSettingTab {
+                    getSettingDefinitions() {
+                        if (!ready) return;
+                        return [];
+                    }
+                    display() {}
+                }
+            `,
+        },
     ],
     invalid: [
         {
@@ -479,18 +556,119 @@ ruleTester.run("no-deprecated-display", noDeprecatedDisplayRule, {
                 },
             ],
         },
+        {
+            name: "display() and getSettingDefinitions() computed from strings are both recognised",
+            options: [{ minAppVersion: "1.13.0" }],
+            code: `
+                ${MOCK_CLASS}
+                class MyTab extends PluginSettingTab {
+                    ["getSettingDefinitions"]() { return [{ name: "Mode" }]; }
+                    ["display"]() {}
+                }
+            `,
+            output: null,
+            errors: [
+                {
+                    messageId: "deprecatedDisplay",
+                    suggestions: [
+                        {
+                            messageId: "removeDisplay",
+                            output: `
+                ${MOCK_CLASS}
+                class MyTab extends PluginSettingTab {
+                    ["getSettingDefinitions"]() { return [{ name: "Mode" }]; }
+                }
+            `,
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "getSettingDefinitions() that returns nothing only sometimes is reported",
+            options: [{ minAppVersion: "1.13.0" }],
+            code: `
+                ${MOCK_CLASS}
+                declare const ready: boolean;
+                class MyTab extends PluginSettingTab {
+                    getSettingDefinitions() {
+                        if (!ready) return;
+                        return [{ name: "Mode" }];
+                    }
+                    display() {}
+                }
+            `,
+            output: null,
+            errors: [
+                {
+                    messageId: "deprecatedDisplay",
+                    suggestions: [
+                        {
+                            messageId: "removeDisplay",
+                            output: `
+                ${MOCK_CLASS}
+                declare const ready: boolean;
+                class MyTab extends PluginSettingTab {
+                    getSettingDefinitions() {
+                        if (!ready) return;
+                        return [{ name: "Mode" }];
+                    }
+                }
+            `,
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            // Only the method's own returns count, not those of a function in it.
+            name: "an empty return in a nested function does not make getSettingDefinitions() a stub",
+            options: [{ minAppVersion: "1.13.0" }],
+            code: `
+                ${MOCK_CLASS}
+                class MyTab extends PluginSettingTab {
+                    getSettingDefinitions() {
+                        const none = () => [];
+                        [1].forEach(function () { return; });
+                        return [{ name: "Mode", none }];
+                    }
+                    display() {}
+                }
+            `,
+            output: null,
+            errors: [
+                {
+                    messageId: "deprecatedDisplay",
+                    suggestions: [
+                        {
+                            messageId: "removeDisplay",
+                            output: `
+                ${MOCK_CLASS}
+                class MyTab extends PluginSettingTab {
+                    getSettingDefinitions() {
+                        const none = () => [];
+                        [1].forEach(function () { return; });
+                        return [{ name: "Mode", none }];
+                    }
+                }
+            `,
+                        },
+                    ],
+                },
+            ],
+        },
     ],
 });
 
-describe("no-deprecated-display with a getSettingDefinitions() that returns nothing", () => {
-    // Whether such a tab is reported is not pinned here: only that the rule
-    // reads these bodies without crashing.
+describe("no-deprecated-display with a getSettingDefinitions() that returns nothing, without type information", () => {
     for (const [name, body] of [
         ["an empty body", "{}"],
         ["a bare return", "{ return; }"],
+        ["return undefined", "{ return undefined; }"],
         ["one statement that is not a return", "{ this.build(); }"],
+        ["a nested function that returns definitions", "{ const build = () => [{ name: \"Mode\" }]; build(); }"],
     ]) {
-        it(`does not crash on ${name}`, () => {
+        it(`does not report display() for ${name}`, () => {
             const messages = new Linter().verify(
                 `class MyTab extends PluginSettingTab { getSettingDefinitions() ${body} display() {} }`,
                 [{
@@ -498,7 +676,18 @@ describe("no-deprecated-display with a getSettingDefinitions() that returns noth
                     rules: { "obsidianmd/no-deprecated-display": ["warn", { minAppVersion: "1.13.0" }] },
                 }],
             );
-            assert.deepStrictEqual(messages.filter((message) => message.fatal), []);
+            assert.deepStrictEqual(messages.map((message) => message.message), []);
         });
     }
+
+    it("still reports display() when getSettingDefinitions() returns definitions", () => {
+        const messages = new Linter().verify(
+            `class MyTab extends PluginSettingTab { getSettingDefinitions() { return [{ name: "Mode" }]; } display() {} }`,
+            [{
+                plugins: { obsidianmd: { rules: { "no-deprecated-display": noDeprecatedDisplayRule as never } } },
+                rules: { "obsidianmd/no-deprecated-display": ["warn", { minAppVersion: "1.13.0" }] },
+            }],
+        );
+        assert.deepStrictEqual(messages.map((message) => message.messageId), ["deprecatedDisplay"]);
+    });
 });

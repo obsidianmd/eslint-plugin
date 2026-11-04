@@ -4,6 +4,8 @@
 
 ⚠️ This rule _warns_ in the following configs: ✅ `recommended`, 🇬🇧 `recommendedWithLocalesEn`.
 
+💡 This rule is manually fixable by [editor suggestions](https://eslint.org/docs/latest/use/core-concepts#rule-suggestions).
+
 <!-- end auto-generated rule header -->
 
 ## What is reported
@@ -28,6 +30,40 @@ otherwise matched as written, punctuation included.
 Not reported: a name built from a template literal or a variable, and a command object defined
 elsewhere and passed to `addCommand()` by name. With no plugin name to compare with, because there
 is neither the option nor a `manifest.json`, or with a blank one, nothing is reported.
+
+## Suggestion
+
+Your editor offers to remove the plugin name from the command name, which Obsidian shows after the
+plugin name already, as in "Word Tally: Count words". It is a suggestion, never `--fix`, since the
+name users see changes:
+
+```ts
+// manifest.json: { "name": "Word Tally", ... }
+this.addCommand({ id: "count", name: "Word Tally: Count words", callback }); // suggests "Count words"
+this.addCommand({ id: "count", name: "Count words (Word Tally)", callback }); // suggests "Count words"
+this.addCommand({ id: "pdf", name: "Word Tally - pdf export", callback }); // suggests "PDF export"
+```
+
+It removes the plugin name, matched as the rule matches it, where it labels the command:
+
+- at the start, with the separator after it: `:`, `|`, `/`, `>`, `»`, `›`, `→`, `·`, `•`, `–` or
+  `—` with or without spaces, `-` with spaces, or only spaces before a word, as in "Git commit";
+- at the end, with the separator before it, the same ones except spaces alone;
+- in brackets, `(…)` or `[…]`, at the start or the end.
+
+Every occurrence goes. Where the plugin name at the start began with a capital, the name that is
+left starts the way [ui/sentence-case](../ui/sentence-case.md) would have it: "Open note",
+"PDF export", "iOS sync". That only raises letters of the first word: "Open Recent Files" stays as it
+is, for ui/sentence-case to report. The string keeps its quotes and its escapes.
+
+Not offered where:
+
+- nothing would be left, as for "Word Tally" or "Word Tally:";
+- the plugin name is part of the sentence, where the rest would not read or would mean something
+  else: "Open Word Tally settings", "Count with Word Tally", "Word Tally-based count",
+  "Word Tally's settings", "Count words (for Word Tally)";
+- the rest would start or end with a separator or a bracket, as for "Word Tally: - count";
+- the letter to capitalize is written as an escape, as in `"Word Tally: count"`.
 
 ## Further reading
 

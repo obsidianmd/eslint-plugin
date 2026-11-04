@@ -38,6 +38,19 @@ ruleTester.run("require-display", requireDisplayRule, {
             `,
         },
         {
+            name: "display() computed from a string counts as provided",
+            options: [{ minAppVersion: "1.12.0" }],
+            code: `
+                ${MOCK_CLASS}
+                class StringTab extends PluginSettingTab {
+                    ["display"]() {}
+                }
+                class TemplateTab extends PluginSettingTab {
+                    [\`display\`] = () => {};
+                }
+            `,
+        },
+        {
             name: "a static block or an index signature before display() does not end the search",
             options: [{ minAppVersion: "1.12.0" }],
             code: `

@@ -32,6 +32,7 @@ import noMisusedPromises from "./rules/noMisusedPromises.js";
 import { withCustomMessages } from "./customMessages.js";
 import { getManifest, isManifestDesktopOnly } from "./manifest.js";
 import { PlainTextLanguage } from "./plainTextLanguage.js";
+import { readPluginPackageJson } from "./pluginPackageJson.js";
 import { ui } from "./rules/ui/index.js";
 import { browserOnlyGlobalsOff } from "./workerGlobals.js";
 
@@ -43,29 +44,20 @@ import sdl from "@microsoft/eslint-plugin-sdl";
 import * as importPlugin from "eslint-plugin-import";
 import depend from 'eslint-plugin-depend';
 import globals from "globals";
-import fs from "node:fs";
-import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { type Config, defineConfig } from "@eslint/config-helpers";
 import type { RulesConfig } from "@eslint/core";
 import noUnsanitizedPlugin from "eslint-plugin-no-unsanitized";
 import eslintComments from "@eslint-community/eslint-plugin-eslint-comments";
 
-interface PackageJson {
-    name: string;
-    version: string;
-}
-
 const manifest = getManifest();
-// fileURLToPath handles file:// URLs correctly on all platforms (including Windows),
-// unlike new URL().pathname which yields /C:/... on Windows.
-const currentDir = import.meta.dirname ?? path.dirname(fileURLToPath(import.meta.url));
-// Resolve package.json from both possible locations: the path differs between
-// source layout (../package.json) and build output (../../package.json).
-const packageJsonPath = fs.existsSync(path.join(currentDir, "../../package.json"))
-    ? path.join(currentDir, "../../package.json")
-    : path.join(currentDir, "../package.json");
-const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8")) as PackageJson;
+// package.json is ../package.json from lib/ in the source and ../../package.json
+// from dist/lib/ in the build; readPluginPackageJson tells it from a
+// package.json above a checkout by its name.
+const packageJson = readPluginPackageJson(import.meta.url);
+if (!packageJson) {
+    throw new Error(`eslint-plugin-obsidianmd: cannot find its own package.json above ${fileURLToPath(import.meta.url)}`);
+}
 
 // The plugin's public type. The rules and configs are typed with the user's own
 // ESLint (a peer dependency) rather than @eslint/core and
@@ -409,6 +401,14 @@ const flatRecommendedConfig: Config[] = defineConfig([
         plugins: {
             import: importPlugin as ESLint.Plugin,
             "@microsoft/sdl": sdl as ESLint.Plugin,
+            // `depend` (since 0.3.0) and `noUnsanitizedPlugin` (since 0.2.9)
+            // run none of their rules in this block or the TS one, but a user's
+            // config object that turns one of their rules on for JS or TS files
+            // (depend/ban-dependencies also checks imports) finds the plugin
+            // only here, and fails with "Could not find plugin" without it.
+            // no-unsanitized's rules run as no-unsanitized/*, the name its own
+            // config in `extends` registers; `noUnsanitizedPlugin` is the same
+            // plugin under the name these blocks have always given it.
             depend,
             noUnsanitizedPlugin: noUnsanitizedPlugin as ESLint.Plugin,
             "eslint-comments": eslintComments,
@@ -424,6 +424,7 @@ const flatRecommendedConfig: Config[] = defineConfig([
         plugins: {
             import: importPlugin as ESLint.Plugin,
             "@microsoft/sdl": sdl as ESLint.Plugin,
+            // Kept for user configs, as in the JS block.
             depend,
             noUnsanitizedPlugin: noUnsanitizedPlugin as ESLint.Plugin,
             "eslint-comments": eslintComments,

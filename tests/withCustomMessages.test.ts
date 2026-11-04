@@ -180,6 +180,37 @@ describe("withCustomMessages", () => {
         assert.throws(() => withCustomMessages(coreRule("no-console"), ["Custom"] as never), notMessages);
     });
 
+    // A Map or a Date keeps its entries out of its own properties, so it read
+    // as no messages, and the rule kept every message of its own.
+    it("rejects a Map, a Date or a function, naming what it was given", () => {
+        const rule = coreRule("no-console");
+        assert.throws(
+            () => withCustomMessages(rule, new Map([["Unexpected console statement", "Custom"]]) as never),
+            { name: "TypeError", message: "withCustomMessages() takes an object mapping messages to the messages to show instead as its second argument, not a Map." },
+        );
+        assert.throws(() => withCustomMessages(rule, new Date() as never), /, not a Date\.$/);
+        assert.throws(() => withCustomMessages(rule, (() => "Custom") as never), /, not a function\.$/);
+        assert.throws(() => withCustomMessages(rule, ["Custom"] as never), /, not an array\.$/);
+        assert.throws(() => withCustomMessages(rule, undefined as never), /, not undefined\.$/);
+    });
+
+    it("names the message whose replacement is not a string", () => {
+        assert.throws(
+            () => withCustomMessages(coreRule("no-console"), { "Unexpected console statement": 1 } as never),
+            /second argument, the value of "Unexpected console statement" is a number, not a string\.$/,
+        );
+    });
+
+    it("takes an object without a prototype, or a class instance, whose own properties are the messages", () => {
+        const bare = Object.assign(Object.create(null) as Record<string, string>, { "Unexpected console statement": "Bare" });
+        class Messages { "Unexpected console statement" = "Instance"; }
+        assert.deepStrictEqual(messagesOf(lint(withCustomMessages(coreRule("no-console"), bare), "error", "console.log(1);")), ["Bare"]);
+        assert.deepStrictEqual(
+            messagesOf(lint(withCustomMessages(coreRule("no-console"), new Messages() as unknown as Record<string, string>), "error", "console.log(1);")),
+            ["Instance"],
+        );
+    });
+
     it("keeps the messages it was given, though the object changes later", () => {
         const messages: Record<string, string> = { "Unexpected console statement": "Custom" };
         const rule = withCustomMessages(coreRule("no-console"), messages);

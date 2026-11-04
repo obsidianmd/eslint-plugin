@@ -1,6 +1,7 @@
-import { type TSESLint, TSESTree } from "@typescript-eslint/utils";
+import { ASTUtils, type TSESLint, TSESTree } from "@typescript-eslint/utils";
 import { gte as semverGte } from "semver";
 import ts from "typescript";
+import { staticMemberName } from "../../memberName.js";
 import { docsUrl, ruleCreator } from "../../ruleCreator.js";
 import {
     DECLARATIVE_MIN_VERSION,
@@ -76,24 +77,33 @@ export default ruleCreator<Options, "preferUpdate" | "replaceWithUpdate">({
             // update() calls getSettingDefinitions() and then, for an
             // imperative tab, display(): renaming a call in either of them (or
             // in the tab's own update() override) makes it call itself.
-            if (callsBackIntoUpdate(node, tab)) {
+            const callsBack = callsBackIntoUpdate(node, tab);
+            if (callsBack === true) {
                 return "none";
+            }
+            if (callsBack === "maybe") {
+                return "suggest";
             }
             return isSettingTabUpdate(callee.object, node) ? "fix" : "suggest";
         }
 
         // Whether the call sits anywhere in the tab's own `update` member, or
-        // directly (not in a callback) in its getSettingDefinitions().
+        // directly (not in a callback) in its getSettingDefinitions(). "maybe"
+        // in a member computed from a value the code does not give, such as
+        // an import: `[KEY]() {}` may be either.
         function callsBackIntoUpdate(
             node: TSESTree.CallExpression,
             tab: ClassNode,
-        ): boolean {
+        ): boolean | "maybe" {
             let nearestFunction: TSESTree.Node | null = null;
             let current: TSESTree.Node = node;
             while (current.parent) {
                 const parent: TSESTree.Node = current.parent;
                 if (parent === tab.body) {
-                    const name = memberName(current);
+                    const name = memberName(current, context.sourceCode);
+                    if (name === undefined) {
+                        return "maybe";
+                    }
                     return (
                         name === "update" ||
                         (name === "getSettingDefinitions" &&
@@ -210,22 +220,26 @@ function isFunction(node: TSESTree.Node): boolean {
     );
 }
 
-function memberName(member: TSESTree.Node): string | null {
+// The name a method or a field has when the class is defined: the one its key
+// spells out, or the value of a computed key where the code gives it
+// (`const key = "refresh"; [key]() {}`). Null for another member or a name
+// that is not a string, undefined where the value is not known.
+function memberName(member: TSESTree.Node, sourceCode: TSESLint.SourceCode): string | null | undefined {
     if (
-        (member.type !== TSESTree.AST_NODE_TYPES.MethodDefinition &&
-            member.type !== TSESTree.AST_NODE_TYPES.PropertyDefinition) ||
-        member.computed
+        member.type !== TSESTree.AST_NODE_TYPES.MethodDefinition &&
+        member.type !== TSESTree.AST_NODE_TYPES.PropertyDefinition
     ) {
         return null;
     }
-    const key = member.key;
-    if (key.type === TSESTree.AST_NODE_TYPES.Identifier) {
-        return key.name;
+    const name = staticMemberName(member);
+    if (name !== null || !member.computed) {
+        return name;
     }
-    if (key.type === TSESTree.AST_NODE_TYPES.Literal && typeof key.value === "string") {
-        return key.value;
+    const value = ASTUtils.getStaticValue(member.key, sourceCode.getScope(member));
+    if (value === null) {
+        return undefined;
     }
-    return null;
+    return typeof value.value === "string" ? value.value : null;
 }
 
 function isResultDiscarded(node: TSESTree.CallExpression): boolean {

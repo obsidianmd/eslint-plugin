@@ -1,0 +1,13 @@
+{
+	"compilerOptions": {
+		"target": "es2022",
+		"module": "nodenext",
+		"lib": ["es2022", "dom"],
+		"strict": true,
+		"skipLibCheck": true,
+		"noEmit": true,
+		"types": [],
+		"paths": { "obsidian": ["./obsidian.d.ts"] }
+	},
+	"include": ["file.ts", "obsidian.d.ts"]
+}

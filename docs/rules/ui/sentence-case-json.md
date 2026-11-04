@@ -24,14 +24,19 @@ elements. Values in nested objects are.
 ```
 
 Here `"Open Settings"` is reported; `"Open settings"` would pass. The message gives the expected
-text, and with `allowAutoFix: true`, `--fix` rewrites the value as a valid JSON string. Values are
-judged as in [`ui/sentence-case`](sentence-case.md): URLs, date formats such as `YYYY-MM-DD`, brand
-names and "REST" written in capitals keep their casing, and text with inline code, HTML or
-placeholders (`{{count}}`) is not checked. The options work as in
+text, and with `allowAutoFix: true`, `--fix` changes the case of the letters that need it and keeps
+every escape as written; a value where such a letter is written as an escape (`\u0053`) is reported
+without a fix. Values are judged as in [`ui/sentence-case`](sentence-case.md): URLs, date formats
+such as `YYYY-MM-DD`, brand names and "REST" written in capitals keep their casing, a brand that is
+also an ordinary word, such as "Windows", may be written as that word ("Close all windows"), and
+text with inline code, HTML or placeholders (`{{count}}`) is not checked. The options work as in
 [`ui/sentence-case`](sentence-case.md#options).
 
 Not reported: keys, array elements, non-string values, and files that are not English locale files,
-such as `fr.json`, or `entries.json` and `english.json`, which only start with "en".
+such as `fr.json`, or `entries.json` and `english.json`, which only start with "en". Only the part
+of the path inside ESLint's working directory counts, as for the config's globs, so a folder above
+the project named `en`, as in `C:\Users\en\plugin\src\settings.json`, does not make the files
+under it locale files.
 
 The rule reads the file with the `json/json` language from `@eslint/json`, which
 `recommendedWithLocalesEn` sets up for these files, the same files the rule takes for English locale
