@@ -145,6 +145,33 @@ ruleTester.run("no-plugin-as-component", noPluginAsComponentRule, {
             errors: [{ messageId: "avoidPluginComponent" }],
         },
         {
+            name: "an instance of a generic plugin class is forbidden",
+            code: `
+                ${MOCK_API}
+                declare const app: App;
+                declare const el: HTMLElement;
+                declare class SettingsPlugin<T> extends Plugin { settings: T }
+                declare const plugin: SettingsPlugin<{ open: boolean }>;
+                MarkdownRenderer.render(app, '', el, '', plugin);
+            `,
+            errors: [{ messageId: "avoidPluginComponent" }],
+        },
+        {
+            name: "this in a plugin whose base class is generic is forbidden",
+            code: `
+                ${MOCK_API}
+                declare const app: App;
+                declare const el: HTMLElement;
+                declare class SettingsPlugin<T> extends Plugin { settings: T }
+                class MyPlugin extends SettingsPlugin<{ open: boolean }> {
+                    myMethod() {
+                        MarkdownRenderer.render(app, '', el, '', this);
+                    }
+                }
+            `,
+            errors: [{ messageId: "avoidPluginComponent" }],
+        },
+        {
             name: "variable holding plugin instance as component is forbidden",
             code: `
                 ${MOCK_API}
