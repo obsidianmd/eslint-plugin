@@ -196,6 +196,19 @@ ruleTester.run("no-deprecated-display", noDeprecatedDisplayRule, {
             `,
         },
         {
+            // The key is whatever the variable holds, here "show".
+            name: "a computed member named by a variable called display is not display()",
+            options: [{ minAppVersion: "1.13.0" }],
+            code: `
+                ${MOCK_CLASS}
+                const display = "show";
+                class MyTab extends PluginSettingTab {
+                    ${DEFINITIONS}
+                    [display]() {}
+                }
+            `,
+        },
+        {
             name: "a getSettingDefinitions() whose every return is empty is a stub",
             options: [{ minAppVersion: "1.13.0" }],
             code: `
@@ -536,6 +549,34 @@ ruleTester.run("no-deprecated-display", noDeprecatedDisplayRule, {
                         if (!ready) return [];
                         return [{ name: "Mode" }];
                     }
+                }
+            `,
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "display() and getSettingDefinitions() computed from strings are both recognised",
+            options: [{ minAppVersion: "1.13.0" }],
+            code: `
+                ${MOCK_CLASS}
+                class MyTab extends PluginSettingTab {
+                    ["getSettingDefinitions"]() { return [{ name: "Mode" }]; }
+                    ["display"]() {}
+                }
+            `,
+            output: null,
+            errors: [
+                {
+                    messageId: "deprecatedDisplay",
+                    suggestions: [
+                        {
+                            messageId: "removeDisplay",
+                            output: `
+                ${MOCK_CLASS}
+                class MyTab extends PluginSettingTab {
+                    ["getSettingDefinitions"]() { return [{ name: "Mode" }]; }
                 }
             `,
                         },

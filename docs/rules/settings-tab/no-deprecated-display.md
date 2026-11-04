@@ -10,9 +10,9 @@
 
 ## What is reported
 
-A `display()` method (or `display` class field) on a settings tab that also implements
-`getSettingDefinitions()`, once `minAppVersion` is 1.13.0 or later. Obsidian then renders the
-declarative settings and never calls `display()`.
+A `display()` method (or `display` class field, also written `"display"` or `["display"]`) on a
+settings tab that also implements `getSettingDefinitions()`, once `minAppVersion` is 1.13.0 or
+later. Obsidian then renders the declarative settings and never calls `display()`.
 
 Below 1.13, or without `getSettingDefinitions()`, `display()` still does the work and is not
 reported. Neither is it when `getSettingDefinitions()` never returns definitions: when every

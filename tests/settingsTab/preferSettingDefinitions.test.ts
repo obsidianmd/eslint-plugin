@@ -27,6 +27,18 @@ ruleTester.run("prefer-setting-definitions", preferSettingDefinitionsRule, {
             `,
         },
         {
+            name: "getSettingDefinitions() under a quoted or computed string name counts as provided",
+            code: `
+                ${MOCK_CLASS}
+                class QuotedTab extends PluginSettingTab {
+                    "getSettingDefinitions"() { return []; }
+                }
+                class ComputedTab extends PluginSettingTab {
+                    ["getSettingDefinitions"]() { return []; }
+                }
+            `,
+        },
+        {
             name: "abstract base class is skipped",
             code: `
                 ${MOCK_CLASS}
@@ -56,6 +68,18 @@ ruleTester.run("prefer-setting-definitions", preferSettingDefinitionsRule, {
             `,
             // The class name is highlighted, not the whole class.
             errors: [{ messageId: "missingSettingDefinitions", line: 3, column: 23, endLine: 3, endColumn: 28 }],
+        },
+        {
+            name: "a computed member named by a variable called getSettingDefinitions is not getSettingDefinitions()",
+            code: `
+                ${MOCK_CLASS}
+                const getSettingDefinitions = "definitions";
+                class MyTab extends PluginSettingTab {
+                    [getSettingDefinitions]() { return []; }
+                    display() {}
+                }
+            `,
+            errors: [{ messageId: "missingSettingDefinitions" }],
         },
         {
             name: "a class expression without getSettingDefinitions() is reported",
