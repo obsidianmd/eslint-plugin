@@ -58,6 +58,25 @@ ruleTester.run("no-sample-code", noSampleCode, {
             });`,
         },
         {
+            name: "a click handler that shows its own notice is not the sample",
+            code: `this.registerDomEvent(activeDocument, "click", () => {
+                new Notice("Clicked the ribbon");
+            });`,
+        },
+        {
+            name: "a click handler that shows the sample notice and does its own work is not the sample",
+            code: `this.registerDomEvent(activeDocument, "click", (evt: MouseEvent) => {
+                new Notice("Click");
+                this.handleClick(evt);
+            });`,
+        },
+        {
+            name: "a click listener on another target is not the sample",
+            code: `this.registerDomEvent(this.containerEl, "click", (evt: MouseEvent) => {
+                new Notice("Click");
+            });`,
+        },
+        {
             name: "an interval that logs through the plugin's own logger is not the sample",
             code: "this.registerInterval(window.setInterval(() => this.log('setInterval'), 5 * 60 * 1000));",
         },
@@ -92,6 +111,23 @@ ruleTester.run("no-sample-code", noSampleCode, {
             output: "class MyPlugin extends Plugin { onload() {  this.addCommand(command); } }",
         },
 
+        // The sample plugin's handler since November 2025, and on activeDocument since 2026.
+        {
+            name: "the current sample click handler on activeDocument is forbidden",
+            code: `this.registerDomEvent(activeDocument, 'click', (_evt: MouseEvent) => {
+                new Notice('Click');
+            });`,
+            errors: [{ messageId: "removeSampleDomEvent" }],
+            output: "",
+        },
+        {
+            name: "the sample click handler showing a notice on document is forbidden",
+            code: `this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
+                new Notice("Click");
+            });`,
+            errors: [{ messageId: "removeSampleDomEvent" }],
+            output: "",
+        },
         {
             name: "the sample click handler with another parameter name and a member in the log is the sample",
             code: `this.registerDomEvent(document, "click", (e) => {

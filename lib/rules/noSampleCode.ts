@@ -69,6 +69,24 @@ function isSampleLog(node: TSESTree.Node, label: string): boolean {
 }
 
 /**
+ * Checks if a node is the notice the sample's click handler shows since
+ * November 2025, `new Notice('Click')`.
+ */
+function isSampleNotice(node: TSESTree.Node): boolean {
+    return (
+        node.type === TSESTree.AST_NODE_TYPES.NewExpression &&
+        node.callee.type === TSESTree.AST_NODE_TYPES.Identifier &&
+        node.callee.name === "Notice" &&
+        node.arguments.length === 1 &&
+        node.arguments[0].type === TSESTree.AST_NODE_TYPES.Literal &&
+        node.arguments[0].value === "Click"
+    );
+}
+
+// The documents the sample listens on: `document`, and `activeDocument` since 2026.
+const SAMPLE_DOCUMENTS = new Set(["document", "activeDocument"]);
+
+/**
  * Checks if a node is the sample `registerInterval` call, with any delay:
  * `this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));`
  * Returns the arguments that the sample does not fix (the delay and any after
@@ -116,8 +134,9 @@ function matchSampleIntervalCall(node: TSESTree.CallExpression): TSESTree.CallEx
 
 /**
  * Checks if a node is the sample `registerDomEvent` call, whose handler does
- * nothing but the sample's log:
+ * nothing but the sample's log or notice:
  * `this.registerDomEvent(document, 'click', (evt: MouseEvent) => { console.log('click', evt); });`
+ * `this.registerDomEvent(activeDocument, 'click', (_evt: MouseEvent) => { new Notice('Click'); });`
  * A handler with statements of its own is the plugin's click handler, not the
  * sample. Returns the arguments after the handler, or null when it is not the
  * sample.
@@ -133,15 +152,17 @@ function matchSampleDomEventCall(node: TSESTree.CallExpression): TSESTree.CallEx
         return null;
     }
 
-    // Check for `document` and `'click'` as the first two arguments
+    // Check for `document` (or `activeDocument`) and `'click'` as the first two arguments
+    const target = node.arguments[0];
     if (
-        (node.arguments[0] as TSESTree.Identifier)?.name !== "document" ||
+        target?.type !== TSESTree.AST_NODE_TYPES.Identifier ||
+        !SAMPLE_DOCUMENTS.has(target.name) ||
         (node.arguments[1] as TSESTree.Literal)?.value !== "click"
     ) {
         return null;
     }
 
-    // Check for the specific callback function: its body is the log alone
+    // Check for the specific callback function: its body is the log or the notice alone
     const callback = node.arguments[2];
     if (
         !callback ||
@@ -155,7 +176,7 @@ function matchSampleDomEventCall(node: TSESTree.CallExpression): TSESTree.CallEx
     const statement = callback.body.body[0];
     if (
         statement.type !== TSESTree.AST_NODE_TYPES.ExpressionStatement ||
-        !isSampleLog(statement.expression, "click")
+        !(isSampleLog(statement.expression, "click") || isSampleNotice(statement.expression))
     ) {
         return null;
     }
