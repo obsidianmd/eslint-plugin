@@ -1354,7 +1354,10 @@ describe("files linted by name, only at the root", () => {
 		for (const filename of ["packages/a/package.json", "packages/a/manifest.json", "packages/a/LICENSE", "docs/LICENSE.md"]) {
 			it(`${filename} is not linted by ${configName}`, async () => {
 				const eslint = new ESLint({ overrideConfigFile: true, overrideConfig: plugin.configs[configName] });
-				assert.strictEqual(await eslint.calculateConfigForFile(filename), undefined);
+				// A boolean: on failure, assert would otherwise print the whole
+				// resolved config, every plugin and parser in it, and run out of memory.
+				const linted = (await eslint.calculateConfigForFile(filename)) !== undefined;
+				assert.strictEqual(linted, false, filename);
 			});
 		}
 	}
