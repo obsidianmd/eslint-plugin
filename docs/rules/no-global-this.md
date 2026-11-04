@@ -43,8 +43,7 @@ With type information, these are fixed:
   passed a callback with an untyped parameter that the signatures type differently, as in
   `globalThis.setTimeout((n) => n, 10, 1);`
 - a cast to `any`, `unknown`, `never`, or a type `window` is assignable to
-- an argument to a call whose result is not used, such as `Object.assign(globalThis, helpers)`, and
-  `"name" in globalThis`
+- an argument to a call whose result is not used, such as `Object.assign(globalThis, helpers)`
 
 These get a suggestion:
 
@@ -54,8 +53,14 @@ const globals = globalThis as Record<string, unknown>; // TypeScript rejects thi
 const scope = globalThis; // scope would have window's type
 ```
 
+A probe of the global object for a property that may be missing gets a suggestion, whatever the
+types: `typeof globalThis.crypto`, `"requestIdleCallback" in globalThis`, `!globalThis.crypto`,
+`globalThis.crypto?.randomUUID()` or `globalThis.queueMicrotask ?? fallback`. Such code is written
+to work where the property is missing, as in a web worker or in Node tests, and there
+`window.crypto` throws because there is no `window`.
+
 Without type information, only rewrites that can never change a type are fixed: a cast to `any`,
-`unknown` or `never`, an argument to a call whose result is not used, an `in` check, and the timer
+`unknown` or `never`, an argument to a call whose result is not used, and the timer
 calls that [`prefer-window-timers`](prefer-window-timers.md) fixes. Those are `setTimeout()` or
 `setInterval()` whose result is not used, `clearTimeout()` or `clearInterval()` with a number
 literal, `undefined` or no argument, and `requestAnimationFrame()` and `cancelAnimationFrame()`.

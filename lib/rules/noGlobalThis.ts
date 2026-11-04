@@ -5,6 +5,7 @@ import {
     getTypeInfo,
     isGlobalWindowAt,
     isInWindowCheck,
+    isProbeOfGlobal,
     isResultDiscarded,
     isTimerCallTypeSafe,
     type TypeInfo,
@@ -75,7 +76,13 @@ export default ruleCreator({
                 }
 
                 const data = { name: node.name };
-                const rewrite = classify(node);
+                let rewrite = classify(node);
+                // `typeof globalThis.crypto`, `"x" in globalThis`: written to work
+                // where the property is missing, which as `window.x` throws
+                // where there is no window.
+                if (rewrite === "fix" && isProbeOfGlobal(node)) {
+                    rewrite = "suggest";
+                }
                 if (rewrite === "none") {
                     context.report({ node, messageId: "avoidGlobal", data });
                     return;

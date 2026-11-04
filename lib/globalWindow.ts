@@ -416,6 +416,34 @@ export function isInWindowCheck(node: TSESTree.Node): boolean {
     }
 }
 
+/**
+ * Whether `node`, the global object, is probed for a property that may be
+ * missing: `typeof globalThis.crypto`, `"requestIdleCallback" in globalThis`,
+ * `!globalThis.crypto`, `globalThis.crypto?.randomUUID()`. Such code is
+ * written to work where the property is missing, as in a worker or in Node,
+ * and as `window` it would throw there.
+ */
+export function isProbeOfGlobal(node: TSESTree.Node): boolean {
+    let current = node;
+    for (;;) {
+        const parent = current.parent;
+        if (!parent) {
+            return false;
+        }
+        if (
+            (parent.type === TSESTree.AST_NODE_TYPES.UnaryExpression && parent.operator === "typeof") ||
+            (parent.type === TSESTree.AST_NODE_TYPES.BinaryExpression && parent.operator === "in" && parent.right === current) ||
+            isOnlyTested(current)
+        ) {
+            return true;
+        }
+        if (!isChainLink(parent, current)) {
+            return false;
+        }
+        current = parent;
+    }
+}
+
 // The window or worker name that `node` checks for, if it is a window check.
 function checkedName(node: TSESTree.Node): string | undefined {
     if (node.type === TSESTree.AST_NODE_TYPES.UnaryExpression && node.operator === "typeof") {
