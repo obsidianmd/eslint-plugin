@@ -29,12 +29,24 @@ ruleTester.run("prefer-get-language", preferGetLanguageRule, {
             name: "a dynamic import of the detector is not reported",
             code: "const detector = await import('i18next-browser-languagedetector');",
         },
+        {
+            name: "another storage method, or getItem without a key, is not reported",
+            code: "localStorage.setItem('language', 'en'); localStorage.getItem();",
+        },
+        {
+            name: "another storage on window is not reported",
+            code: "const lang = window.sessionStorage.getItem('language');",
+        },
+        {
+            name: "require() of another module, or without an argument, is not reported",
+            code: "const i18next = require('i18next'); require();",
+        },
     ],
     invalid: [
         {
             name: "localStorage.getItem('language') is forbidden",
             code: "const lang = localStorage.getItem('language');",
-            errors: [{ messageId: "localStorageLanguage" }],
+            errors: [{ messageId: "localStorageLanguage", line: 1, column: 14, endColumn: 46 }],
         },
         {
             name: "window.localStorage.getItem('language') is forbidden",
