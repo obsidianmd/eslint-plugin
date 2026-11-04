@@ -222,7 +222,7 @@ tester.run("ui-sentence-case", rule, {
         },
         {
             name: "a template literal with expressions is not checked",
-            code: "declare const n: number; new Notice(`Saved ${n} Files`);",
+            code: "declare const n: number; new Notice(`Saved ${n} Files`); new Notice(`Open Settings For ${n}`);",
         },
         {
             name: "createDiv, createSpan and createSvg options in sentence case are allowed",
@@ -245,72 +245,112 @@ tester.run("ui-sentence-case", rule, {
             name: "createFragment takes no text",
             code: "createFragment((f) => f.appendText('x'));",
         },
+        {
+            name: "a placeholder example may start with eg., ex. or e. g. in any case",
+            code: "text.setPlaceholder('Eg. My Vault'); text.setPlaceholder('EX. My Vault'); text.setPlaceholder('e. g. My Vault'); text.setPlaceholder('  sk-123  ');",
+        },
+        {
+            name: "an example placeholder attribute is allowed however it is set",
+            code: "el.setAttribute('placeholder', 'e.g. My Vault'); el.placeholder = 'My-Vault'; createEl('input', { attr: { placeholder: 'My-Vault' } });",
+        },
+        {
+            name: "an attribute that holds no text is not checked",
+            code: "el.setAttribute('data-name', 'Open Settings'); el.setAttribute('aria-label'); el.setAttribute(name, 'Open Settings'); createEl('div', { attr: { 'data-title': 'Open Settings' } });",
+        },
+        {
+            name: "a property that holds no text is not checked",
+            code: "el.className = 'Open Settings'; el['textContent'] = 'Open Settings'; label = 'Open Settings';",
+        },
+        {
+            name: "a method that takes no UI text is not checked",
+            code: "el.setValue('Open Settings'); el.addClass('Open Settings'); el['setText']('Open Settings'); setText('Open Settings'); el.setText(...args);",
+        },
+        {
+            name: "an argument that is not a string is not checked",
+            code: "el.setText(label); el.setText(1); el.setText(/Open Settings/); new Notice(message); new Notice(); this.addRibbonIcon('dice'); dropdown.addOption('Daily Note');",
+        },
+        {
+            name: "only a Notice is checked among constructors",
+            code: "new Modal('Open Settings'); new obsidian.Other('Open Settings');",
+        },
+        {
+            name: "a spread or a computed key in createEl options is skipped",
+            code: "createEl('div', { ...base, [key]: 'Open Settings', cls: 'Open Settings' }); createEl('div', ...args);",
+        },
+        {
+            name: "getDisplayText that is not a method body is not checked",
+            code: "class V { getDisplayText = () => 'Open Settings'; other() { return 'Open Settings'; } }",
+        },
+        {
+            name: "a command name that is not a string is not checked",
+            code: "this.addCommand({ id: 'x', name: label }); this.addCommand({ ...base }); this.addCommand(command); this.addCommand();",
+        },
     ],
     invalid: [
         {
             name: "Notice with title case is forbidden",
             code: "new Notice('Enable Auto Reveal');",
-            errors: [{ messageId: "useSentenceCase" }],
+            errors: [{ messageId: "useSentenceCase", data: { suggestion: "Enable auto reveal" } }],
         },
         {
             name: "command name with title case preposition is forbidden",
             code: "this.addCommand({ id: 'x', name: 'Save To Google Drive' });",
-            errors: [{ messageId: "useSentenceCase" }],
+            errors: [{ messageId: "useSentenceCase", data: { suggestion: "Save to Google Drive" } }],
         },
         {
             name: "createEl title with title case is forbidden",
             code: "createEl('div', { title: 'Open Settings' });",
-            errors: [{ messageId: "useSentenceCase" }],
+            errors: [{ messageId: "useSentenceCase", data: { suggestion: "Open settings" } }],
         },
         {
             name: "setTooltip with title case preposition is forbidden",
             code: "btn.setTooltip('Connect To GitHub');",
-            errors: [{ messageId: "useSentenceCase" }],
+            errors: [{ messageId: "useSentenceCase", data: { suggestion: "Connect to GitHub" } }],
         },
         {
             name: "setAttribute placeholder with title case is forbidden",
             code: "el.setAttribute('placeholder', 'Enter Name');",
-            errors: [{ messageId: "useSentenceCase" }],
+            errors: [{ messageId: "useSentenceCase", data: { suggestion: "Enter name" } }],
         },
         {
             name: "Notice in all caps is forbidden",
             code: "new Notice('EXPORT AS PDF');",
-            errors: [{ messageId: "useSentenceCase" }],
+            errors: [{ messageId: "useSentenceCase", data: { suggestion: "Export as PDF" } }],
         },
         {
             name: "getDisplayText with title case is forbidden",
             code: "class V extends ItemView { getDisplayText() { return 'Open Settings'; } }",
-            errors: [{ messageId: "useSentenceCase" }],
+            errors: [{ messageId: "useSentenceCase", data: { suggestion: "Open settings" } }],
         },
         {
             name: "textContent with title case is forbidden",
             code: "el.textContent = 'Open Settings';",
-            errors: [{ messageId: "useSentenceCase" }],
+            errors: [{ messageId: "useSentenceCase", data: { suggestion: "Open settings" } }],
         },
         {
             name: "createEl attr aria-label with title case is forbidden",
             code: "createEl('div', { attr: { 'aria-label': 'Open Settings' } });",
-            errors: [{ messageId: "useSentenceCase" }],
+            errors: [{ messageId: "useSentenceCase", data: { suggestion: "Open settings" } }],
         },
         {
             name: "createEl options behind an angle-bracket type assertion are checked",
             code: "createEl('div', <DomElementInfo>{ title: 'Open Settings' });",
-            errors: [{ messageId: "useSentenceCase" }],
+            errors: [{ messageId: "useSentenceCase", data: { suggestion: "Open settings" } }],
         },
         {
             name: "createEl nested title with title case is forbidden",
             code: "createEl('div', { nested: { title: 'Open Settings' } });",
-            errors: [{ messageId: "useSentenceCase" }],
+            errors: [{ messageId: "useSentenceCase", data: { suggestion: "Open settings" } }],
         },
         {
             name: "placeholder assignment with title case is forbidden",
             code: "el.placeholder = 'Enter Name';",
-            errors: [{ messageId: "useSentenceCase" }],
+            errors: [{ messageId: "useSentenceCase", data: { suggestion: "Enter name" } }],
         },
         {
             name: "getDisplayText with mixed case in branches is forbidden",
             code: "class V extends ItemView { getDisplayText() { if (true) { return 'Open Settings'; } return 'Open settings'; } }",
-            errors: [{ messageId: "useSentenceCase" }],
+            errors: [{ messageId: "useSentenceCase", data: { suggestion: "Open settings" } }],
         },
         {
             name: "auto-fix corrects brand casing",
@@ -357,12 +397,12 @@ tester.run("ui-sentence-case", rule, {
         {
             name: "a prose placeholder is still checked",
             code: "text.setPlaceholder('Enter Your Name');",
-            errors: [{ messageId: "useSentenceCase" }],
+            errors: [{ messageId: "useSentenceCase", data: { suggestion: "Enter your name" } }],
         },
         {
             name: "an e.g. example outside a placeholder is still checked",
             code: "new Setting(el).setDesc('e.g. My Vault');",
-            errors: [{ messageId: "useSentenceCase" }],
+            errors: [{ messageId: "useSentenceCase", data: { suggestion: "E.g. My vault" } }],
         },
         {
             name: "Rest in title case is lowered like any word",
@@ -381,37 +421,37 @@ tester.run("ui-sentence-case", rule, {
         {
             name: "setButtonText is checked",
             code: "button.setButtonText('Save All Files');",
-            errors: [{ messageId: "useSentenceCase" }],
+            errors: [{ messageId: "useSentenceCase", data: { suggestion: "Save all files" } }],
         },
         {
             name: "addRibbonIcon checks its tooltip, the second argument",
             code: "this.addRibbonIcon('dice', 'Open Daily Note', () => {});",
-            errors: [{ messageId: "useSentenceCase" }],
+            errors: [{ messageId: "useSentenceCase", data: { suggestion: "Open daily note" } }],
         },
         {
             name: "addOption checks its label, the second argument",
             code: "dropdown.addOption('daily', 'Daily Note');",
-            errors: [{ messageId: "useSentenceCase" }],
+            errors: [{ messageId: "useSentenceCase", data: { suggestion: "Daily note" } }],
         },
         {
             name: "innerText assignment is checked",
             code: "el.innerText = 'Open Daily Note';",
-            errors: [{ messageId: "useSentenceCase" }],
+            errors: [{ messageId: "useSentenceCase", data: { suggestion: "Open daily note" } }],
         },
         {
             name: "an ariaLabel assignment is checked as aria-label",
             code: "el.ariaLabel = 'Open Daily Note';",
-            errors: [{ messageId: "useSentenceCase" }],
+            errors: [{ messageId: "useSentenceCase", data: { suggestion: "Open daily note" } }],
         },
         {
             name: "setAttribute aria-description is checked",
             code: "el.setAttribute('aria-description', 'Opens The Daily Note');",
-            errors: [{ messageId: "useSentenceCase" }],
+            errors: [{ messageId: "useSentenceCase", data: { suggestion: "Opens the daily note" } }],
         },
         {
             name: "a title assignment is checked",
             code: "el.title = 'Open Daily Note';",
-            errors: [{ messageId: "useSentenceCase" }],
+            errors: [{ messageId: "useSentenceCase", data: { suggestion: "Open daily note" } }],
         },
         {
             name: "createDiv's options are checked like createEl's",
@@ -425,12 +465,12 @@ tester.run("ui-sentence-case", rule, {
         {
             name: "createSpan's options are checked like createEl's",
             code: "createSpan({ text: 'Open Daily Note' }); el.createSpan({ attr: { placeholder: 'Type A Name' } });",
-            errors: [{ messageId: "useSentenceCase" }, { messageId: "useSentenceCase" }],
+            errors: [{ messageId: "useSentenceCase", data: { suggestion: "Open daily note" } }, { messageId: "useSentenceCase", data: { suggestion: "Type a name" } }],
         },
         {
             name: "createSvg's attr values are checked like createEl's",
             code: "el.createSvg('svg', { attr: { 'aria-label': 'Open Daily Note' } });",
-            errors: [{ messageId: "useSentenceCase" }],
+            errors: [{ messageId: "useSentenceCase", data: { suggestion: "Open daily note" } }],
         },
         {
             name: "createDiv's text is fixed when allowAutoFix is on",
@@ -438,6 +478,124 @@ tester.run("ui-sentence-case", rule, {
             options: [{ allowAutoFix: true }],
             output: "el.createDiv({ text: 'Open daily note' });",
             errors: [{ messageId: "useSentenceCase" }],
+        },
+        {
+            name: "setName, setText and setTitle are checked",
+            code: "new Setting(el).setName('Open Daily Note'); button.setText('Open Daily Note'); item.setTitle('Open Daily Note');",
+            errors: [
+                { messageId: "useSentenceCase", data: { suggestion: "Open daily note" }, column: 25 },
+                { messageId: "useSentenceCase", data: { suggestion: "Open daily note" }, column: 60 },
+                { messageId: "useSentenceCase", data: { suggestion: "Open daily note" }, column: 94 },
+            ],
+        },
+        {
+            name: "a string behind as, satisfies or a non-null assertion is checked",
+            code: "new Notice('Open Daily Note' as string); el.setText('Open Daily Note' satisfies string); el.title = 'Open Daily Note'!;",
+            errors: [
+                { messageId: "useSentenceCase", data: { suggestion: "Open daily note" } },
+                { messageId: "useSentenceCase", data: { suggestion: "Open daily note" } },
+                { messageId: "useSentenceCase", data: { suggestion: "Open daily note" } },
+            ],
+        },
+        {
+            name: "a template literal without expressions is checked and fixed to a string",
+            code: "new Notice(`Open Daily Note`);",
+            options: [{ allowAutoFix: true }],
+            output: "new Notice(\"Open daily note\");",
+            errors: [{ messageId: "useSentenceCase", data: { suggestion: "Open daily note" } }],
+        },
+        {
+            name: "a template literal with a double quote is fixed to a valid string",
+            code: 'new Notice(`Say "Open Now" Here`);',
+            options: [{ allowAutoFix: true }],
+            output: 'new Notice("Say \\"open now\\" here");',
+            errors: [{ messageId: "useSentenceCase", data: { suggestion: 'Say "open now" here' } }],
+        },
+        {
+            name: "createEl options behind a non-null assertion are checked",
+            code: "createEl('div', { title: 'Open Daily Note' }!);",
+            errors: [{ messageId: "useSentenceCase", data: { suggestion: "Open daily note" } }],
+        },
+        {
+            name: "an attribute name in snake case is read as kebab case",
+            code: "el.setAttribute('aria_label', 'Open Daily Note'); createEl('div', { attr: { ariaDescription: 'Open Daily Note', title: 'Open Daily Note' } });",
+            errors: [
+                { messageId: "useSentenceCase", data: { suggestion: "Open daily note" } },
+                { messageId: "useSentenceCase", data: { suggestion: "Open daily note" } },
+                { messageId: "useSentenceCase", data: { suggestion: "Open daily note" } },
+            ],
+        },
+        {
+            name: "a command name under a quoted key, or in a bare addCommand call, is checked",
+            code: "this.addCommand({ id: 'x', 'name': 'Open Daily Note' }); addCommand({ name: 'Open Daily Note' });",
+            errors: [
+                { messageId: "useSentenceCase", data: { suggestion: "Open daily note" } },
+                { messageId: "useSentenceCase", data: { suggestion: "Open daily note" } },
+            ],
+        },
+        {
+            name: "createEl options in a bare call are checked",
+            code: "createEl('div', { text: 'Open Daily Note' }); createSvg('svg', { attr: { 'aria-label': 'Open Daily Note' } }); createSpan({ title: 'Open Daily Note' });",
+            errors: [
+                { messageId: "useSentenceCase", data: { suggestion: "Open daily note" } },
+                { messageId: "useSentenceCase", data: { suggestion: "Open daily note" } },
+                { messageId: "useSentenceCase", data: { suggestion: "Open daily note" } },
+            ],
+        },
+        {
+            name: "createEl's text is checked even with a title beside it",
+            code: "createEl('div', { text: 'Open Daily Note', title: 'Open Daily Note' });",
+            errors: [
+                { messageId: "useSentenceCase", column: 25 },
+                { messageId: "useSentenceCase", column: 51 },
+            ],
+        },
+        {
+            name: "getDisplayText returns are found in every kind of statement",
+            code: `class V extends ItemView {
+                getDisplayText() {
+                    switch (mode) { case 1: return 'Open Switch Case'; default: { return 'Open Switch Default'; } }
+                    for (;;) { return 'Open For Loop'; }
+                    for (const x of xs) return 'Open For Of';
+                    while (ok) return 'Open While Loop';
+                    outer: { return 'Open Labeled Block'; }
+                    try { return 'Open Try Block'; } catch { return 'Open Catch Block'; } finally { return 'Open Finally Block'; }
+                    if (a) return 'Open If Branch'; else return 'Open Else Branch';
+                    return;
+                }
+            }`,
+            errors: [
+                { messageId: "useSentenceCase", data: { suggestion: "Open switch case" } },
+                { messageId: "useSentenceCase", data: { suggestion: "Open switch default" } },
+                { messageId: "useSentenceCase", data: { suggestion: "Open for loop" } },
+                { messageId: "useSentenceCase", data: { suggestion: "Open for of" } },
+                { messageId: "useSentenceCase", data: { suggestion: "Open while loop" } },
+                { messageId: "useSentenceCase", data: { suggestion: "Open labeled block" } },
+                { messageId: "useSentenceCase", data: { suggestion: "Open try block" } },
+                { messageId: "useSentenceCase", data: { suggestion: "Open catch block" } },
+                { messageId: "useSentenceCase", data: { suggestion: "Open finally block" } },
+                { messageId: "useSentenceCase", data: { suggestion: "Open if branch" } },
+                { messageId: "useSentenceCase", data: { suggestion: "Open else branch" } },
+            ],
+        },
+        {
+            name: "an assignment reports its value",
+            code: "el.textContent = 'Open Daily Note';",
+            errors: [{ messageId: "useSentenceCase", line: 1, column: 18, endLine: 1, endColumn: 35 }],
+        },
+        {
+            name: "the fix keeps double quotes and escapes what needs escaping",
+            code: String.raw`new Notice("Say \"Open Now\" Here"); new Notice('It\'s Open\\Now\tHere'); new Notice('Open Now\r\nOr\u2028Later\u0001Too\0' + '');`,
+            options: [{ allowAutoFix: true }],
+            output: String.raw`new Notice("Say \"open now\" here"); new Notice('It\'s open\\now\there'); new Notice('Open Now\r\nOr\u2028Later\u0001Too\0' + '');`,
+            errors: [{ messageId: "useSentenceCase" }, { messageId: "useSentenceCase" }],
+        },
+        {
+            name: "the fix writes control characters and line separators as escapes",
+            code: String.raw`new Notice('Open Now\r\nOr\u2028Later\u0001Too\u000b\b\f\0'); new Notice('Open Now\x001\x009'); new Notice("Open Now\v\0");`,
+            options: [{ allowAutoFix: true }],
+            output: String.raw`new Notice('Open now\r\nor\u2028later\x01too\v\b\f\0'); new Notice('Open now\x001\x009'); new Notice("Open now\v\0");`,
+            errors: [{ messageId: "useSentenceCase" }, { messageId: "useSentenceCase" }, { messageId: "useSentenceCase" }],
         },
     ],
 });
