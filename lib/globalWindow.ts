@@ -194,12 +194,12 @@ function decidingConditions(node: TSESTree.Node): TSESTree.Node[] {
                 if (parent.test && parent.test !== child) {
                     conditions.push(parent.test);
                 }
-                conditions.push(...earlierExitTests(parent.consequent, child));
+                conditions.push(...earlierExitTests(parent.consequent, child, parent.test !== child));
                 break;
             case TSESTree.AST_NODE_TYPES.BlockStatement:
             case TSESTree.AST_NODE_TYPES.Program:
             case TSESTree.AST_NODE_TYPES.StaticBlock:
-                conditions.push(...earlierExitTests(parent.body, child));
+                conditions.push(...earlierExitTests(parent.body, child, true));
                 break;
             default:
                 break;
@@ -208,22 +208,25 @@ function decidingConditions(node: TSESTree.Node): TSESTree.Node[] {
     return conditions;
 }
 
-// The tests of the `if`s before `child` in `statements` that leave early.
-function earlierExitTests(statements: readonly TSESTree.Node[], child: TSESTree.Node): TSESTree.Node[] {
-    const tests: TSESTree.Node[] = [];
-    for (const statement of statements) {
-        if (statement === child) {
-            break;
-        }
-        if (
-            statement.type === TSESTree.AST_NODE_TYPES.IfStatement &&
-            (exits(statement.consequent) || (statement.alternate !== null && exits(statement.alternate)))
-        ) {
-            tests.push(statement.test);
-        }
+// The tests of the `if`s before `child` in `statements` that leave early, or
+// of all of them when `child` is not one of the statements (`inList` false).
+// The `if`s of each list are found once: going over the statements before
+// each node was quadratic in a long list of nodes to decide.
+function earlierExitTests(statements: readonly TSESTree.Node[], child: TSESTree.Node, inList: boolean): TSESTree.Node[] {
+    let exitIfs = exitIfsCache.get(statements);
+    if (!exitIfs) {
+        exitIfs = statements.filter(
+            (statement): statement is TSESTree.IfStatement =>
+                statement.type === TSESTree.AST_NODE_TYPES.IfStatement &&
+                (exits(statement.consequent) || (statement.alternate !== null && exits(statement.alternate))),
+        );
+        exitIfsCache.set(statements, exitIfs);
     }
-    return tests;
+    // The statements before `child` are those that end before it starts.
+    return exitIfs.filter((statement) => !inList || statement.range[1] <= child.range[0]).map((statement) => statement.test);
 }
+
+const exitIfsCache = new WeakMap<readonly TSESTree.Node[], TSESTree.IfStatement[]>();
 
 /** The declared type of the global `window`, with type information. */
 export function getGlobalWindowType(types: TypeInfo, node: TSESTree.Node): ts.Type | null {

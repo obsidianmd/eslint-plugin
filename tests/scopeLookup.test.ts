@@ -1,6 +1,8 @@
 import assert from "node:assert";
 import { Linter } from "eslint";
 import type { Rule } from "eslint";
+import noGlobalThis from "../lib/rules/noGlobalThis.js";
+import preferActiveDoc from "../lib/rules/preferActiveDoc.js";
 import preferWindowTimers from "../lib/rules/preferWindowTimers.js";
 
 // Each rule looks up the global it reports (`document`, `globalThis`, a timer
@@ -41,6 +43,16 @@ function ruleTime(name: string, rule: unknown, reference: string): number {
 
 describe("rules that look up a global by name, in a file with many variables", function () {
     this.timeout(60_000);
+
+    it("prefer-active-doc", () => {
+        const ms = ruleTime("prefer-active-doc", preferActiveDoc, `document.title = "x";`);
+        assert.ok(ms < LIMIT_MS, `took ${ms.toFixed(0)} ms`);
+    });
+
+    it("no-global-this", () => {
+        const ms = ruleTime("no-global-this", noGlobalThis, `globalThis.x = 1;`);
+        assert.ok(ms < LIMIT_MS, `took ${ms.toFixed(0)} ms`);
+    });
 
     it("prefer-window-timers", () => {
         const ms = ruleTime("prefer-window-timers", preferWindowTimers, `setTimeout(() => {}, 1);`);
