@@ -67,6 +67,30 @@ ruleTester.run("prefer-update-over-display", preferUpdateOverDisplayRule, {
                 }
             `,
         },
+        {
+            // Renaming the identifier would turn it into this[update]().
+            name: "a computed this[display]() is not reported",
+            options: [{ minAppVersion: "1.13.0" }],
+            code: `
+                ${MOCK_CLASS}
+                const display = "render";
+                class MyTab extends PluginSettingTab {
+                    render(): void {}
+                    refresh() { this[display](); }
+                }
+            `,
+        },
+        {
+            name: "a private #display() is not reported",
+            options: [{ minAppVersion: "1.13.0" }],
+            code: `
+                ${MOCK_CLASS}
+                class MyTab extends PluginSettingTab {
+                    #display(): void {}
+                    refresh() { this.#display(); }
+                }
+            `,
+        },
     ],
     invalid: [
         {
@@ -120,6 +144,44 @@ ruleTester.run("prefer-update-over-display", preferUpdateOverDisplayRule, {
             output: `
                 ${MOCK_CLASS}
                 const MyTab = class extends PluginSettingTab { refresh() { this.update(); } };
+            `,
+        },
+        {
+            name: "this.display() after a class nested in the tab is flagged and fixed",
+            options: [{ minAppVersion: "1.13.0" }],
+            code: `
+                ${MOCK_CLASS}
+                class MyTab extends PluginSettingTab {
+                    refresh() {
+                        const Row = class {};
+                        this.display();
+                    }
+                }
+            `,
+            errors: [{ messageId: "preferUpdate" }],
+            output: `
+                ${MOCK_CLASS}
+                class MyTab extends PluginSettingTab {
+                    refresh() {
+                        const Row = class {};
+                        this.update();
+                    }
+                }
+            `,
+        },
+        {
+            name: "an update() declared through an interface merged into PluginSettingTab is fixed",
+            options: [{ minAppVersion: "1.13.0" }],
+            code: `
+                declare class PluginSettingTab { display(): void; }
+                interface PluginSettingTab { update(): void; }
+                class MyTab extends PluginSettingTab { refresh() { this.display(); } }
+            `,
+            errors: [{ messageId: "preferUpdate" }],
+            output: `
+                declare class PluginSettingTab { display(): void; }
+                interface PluginSettingTab { update(): void; }
+                class MyTab extends PluginSettingTab { refresh() { this.update(); } }
             `,
         },
         {
@@ -248,6 +310,35 @@ ruleTester.run("prefer-update-over-display", preferUpdateOverDisplayRule, {
             ],
         },
         {
+            name: "an anonymous default-exported tab with its own update() gets a suggestion",
+            options: [{ minAppVersion: "1.13.0" }],
+            code: `
+                ${MOCK_CLASS}
+                export default class extends PluginSettingTab {
+                    update(): void {}
+                    refresh() { this.display(); }
+                }
+            `,
+            output: null,
+            errors: [
+                {
+                    messageId: "preferUpdate",
+                    suggestions: [
+                        {
+                            messageId: "replaceWithUpdate",
+                            output: `
+                ${MOCK_CLASS}
+                export default class extends PluginSettingTab {
+                    update(): void {}
+                    refresh() { this.update(); }
+                }
+            `,
+                        },
+                    ],
+                },
+            ],
+        },
+        {
             // kambas: update() { this.display(); } — renaming it would recurse forever.
             name: "this.display() inside the tab's own update() is reported without a fix",
             options: [{ minAppVersion: "1.13.0" }],
@@ -263,6 +354,39 @@ ruleTester.run("prefer-update-over-display", preferUpdateOverDisplayRule, {
             errors: [{ messageId: "preferUpdate", suggestions: [] }],
         },
         {
+            name: "this.display() inside an update() with a quoted name is reported without a fix",
+            options: [{ minAppVersion: "1.13.0" }],
+            code: `
+                ${MOCK_CLASS}
+                class MyTab extends PluginSettingTab {
+                    "update"(): void {
+                        this.display();
+                    }
+                }
+            `,
+            output: null,
+            errors: [{ messageId: "preferUpdate", suggestions: [] }],
+        },
+        {
+            name: "a computed member named by a variable called update is not the tab's update()",
+            options: [{ minAppVersion: "1.13.0" }],
+            code: `
+                ${MOCK_CLASS}
+                const update = "refreshAll";
+                class MyTab extends PluginSettingTab {
+                    [update]() { this.display(); }
+                }
+            `,
+            errors: [{ messageId: "preferUpdate" }],
+            output: `
+                ${MOCK_CLASS}
+                const update = "refreshAll";
+                class MyTab extends PluginSettingTab {
+                    [update]() { this.update(); }
+                }
+            `,
+        },
+        {
             name: "this.display() directly in getSettingDefinitions() is reported without a fix",
             options: [{ minAppVersion: "1.13.0" }],
             code: `
@@ -276,6 +400,34 @@ ruleTester.run("prefer-update-over-display", preferUpdateOverDisplayRule, {
             `,
             output: null,
             errors: [{ messageId: "preferUpdate", suggestions: [] }],
+        },
+        {
+            // A function declared there is, like a callback, run later.
+            name: "this.display() in a function declared in getSettingDefinitions() is fixed",
+            options: [{ minAppVersion: "1.13.0" }],
+            code: `
+                ${MOCK_CLASS}
+                declare function onChange(cb: () => void): void;
+                class MyTab extends PluginSettingTab {
+                    getSettingDefinitions() {
+                        function refresh(this: MyTab) { this.display(); }
+                        onChange(refresh.bind(this));
+                        return [];
+                    }
+                }
+            `,
+            errors: [{ messageId: "preferUpdate" }],
+            output: `
+                ${MOCK_CLASS}
+                declare function onChange(cb: () => void): void;
+                class MyTab extends PluginSettingTab {
+                    getSettingDefinitions() {
+                        function refresh(this: MyTab) { this.update(); }
+                        onChange(refresh.bind(this));
+                        return [];
+                    }
+                }
+            `,
         },
         {
             name: "this.display() with an argument is reported without a fix",
@@ -335,6 +487,74 @@ ruleTester.run("prefer-update-over-display", preferUpdateOverDisplayRule, {
                 class MyTab extends PluginSettingTab {
                     async display(): Promise<void> {}
                     refresh() { void this.update(); }
+                }
+            `,
+        },
+        {
+            name: "a call to an async display() that is a statement of its own is still fixed",
+            options: [{ minAppVersion: "1.13.0" }],
+            code: `
+                ${MOCK_CLASS}
+                class MyTab extends PluginSettingTab {
+                    async display(): Promise<void> {}
+                    refresh() { this.display(); this.display?.(); }
+                }
+            `,
+            errors: [{ messageId: "preferUpdate" }, { messageId: "preferUpdate" }],
+            output: `
+                ${MOCK_CLASS}
+                class MyTab extends PluginSettingTab {
+                    async display(): Promise<void> {}
+                    refresh() { this.update(); this.update?.(); }
+                }
+            `,
+        },
+        {
+            // Only void discards the result: ! reads the promise.
+            name: "an async display() under another unary operator gets a suggestion",
+            options: [{ minAppVersion: "1.13.0" }],
+            code: `
+                ${MOCK_CLASS}
+                class MyTab extends PluginSettingTab {
+                    async display(): Promise<void> {}
+                    refresh() { return !this.display(); }
+                }
+            `,
+            output: null,
+            errors: [
+                {
+                    messageId: "preferUpdate",
+                    suggestions: [
+                        {
+                            messageId: "replaceWithUpdate",
+                            output: `
+                ${MOCK_CLASS}
+                class MyTab extends PluginSettingTab {
+                    async display(): Promise<void> {}
+                    refresh() { return !this.update(); }
+                }
+            `,
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "a used result of a display() that returns undefined is fixed",
+            options: [{ minAppVersion: "1.13.0" }],
+            code: `
+                ${MOCK_CLASS}
+                class MyTab extends PluginSettingTab {
+                    display(): undefined { return undefined; }
+                    refresh() { const shown = this.display(); return shown; }
+                }
+            `,
+            errors: [{ messageId: "preferUpdate" }],
+            output: `
+                ${MOCK_CLASS}
+                class MyTab extends PluginSettingTab {
+                    display(): undefined { return undefined; }
+                    refresh() { const shown = this.update(); return shown; }
                 }
             `,
         },
