@@ -55,6 +55,16 @@ ruleTester.run("prefer-instanceof", preferInstanceofRule, {
             `,
         },
         {
+            name: "instanceof on a generic class that is not a Node is allowed",
+            code: `
+                ${MOCK_DOM}
+                class Box<T> { value?: T }
+                class NamedBox extends Box<string> {}
+                declare const box: NamedBox;
+                if (box instanceof NamedBox) {}
+            `,
+        },
+        {
             name: "instanceof on an any value is not reported",
             code: `
                 ${MOCK_DOM}
@@ -64,6 +74,98 @@ ruleTester.run("prefer-instanceof", preferInstanceofRule, {
         },
     ],
     invalid: [
+        {
+            name: "instanceof on an instance of a generic Node class is fixed",
+            code: `
+                ${MOCK_DOM}
+                class DataEl<T> extends HTMLElement { data?: T }
+                declare const el: DataEl<string>;
+                if (el instanceof HTMLDivElement) {}
+            `,
+            output: `
+                ${MOCK_DOM}
+                class DataEl<T> extends HTMLElement { data?: T }
+                declare const el: DataEl<string>;
+                if (el.instanceOf(HTMLDivElement)) {}
+            `,
+            errors: [{ messageId: "preferInstanceof", data: { className: "HTMLDivElement" } }],
+        },
+        {
+            name: "instanceof on a class whose base class is a generic Node class is fixed",
+            code: `
+                ${MOCK_DOM}
+                class DataEl<T> extends HTMLElement { data?: T }
+                class CountEl extends DataEl<number> {}
+                declare const el: CountEl;
+                if (el instanceof HTMLDivElement) {}
+            `,
+            output: `
+                ${MOCK_DOM}
+                class DataEl<T> extends HTMLElement { data?: T }
+                class CountEl extends DataEl<number> {}
+                declare const el: CountEl;
+                if (el.instanceOf(HTMLDivElement)) {}
+            `,
+            errors: [{ messageId: "preferInstanceof", data: { className: "HTMLDivElement" } }],
+        },
+        {
+            name: "instanceof on an instance of a generic UIEvent class is fixed",
+            code: `
+                ${MOCK_DOM}
+                class PayloadEvent<T> extends UIEvent { payload?: T }
+                declare const evt: PayloadEvent<string>;
+                if (evt instanceof MouseEvent) {}
+            `,
+            output: `
+                ${MOCK_DOM}
+                class PayloadEvent<T> extends UIEvent { payload?: T }
+                declare const evt: PayloadEvent<string>;
+                if (evt.instanceOf(MouseEvent)) {}
+            `,
+            errors: [{ messageId: "preferInstanceof", data: { className: "MouseEvent" } }],
+        },
+        {
+            name: "this inside a generic Node class is fixed",
+            code: `
+                ${MOCK_DOM}
+                class DataEl<T> extends HTMLElement {
+                    data?: T;
+                    isDiv() { return this instanceof HTMLDivElement; }
+                }
+            `,
+            output: `
+                ${MOCK_DOM}
+                class DataEl<T> extends HTMLElement {
+                    data?: T;
+                    isDiv() { return this.instanceOf(HTMLDivElement); }
+                }
+            `,
+            errors: [{ messageId: "preferInstanceof", data: { className: "HTMLDivElement" } }],
+        },
+        {
+            name: "a generic Node class without the instanceOf method gets a suggestion, not a fix",
+            code: `
+                ${MOCK_DOM_NO_INSTANCEOF}
+                class DataEl<T> extends HTMLElement { data?: T }
+                declare const el: DataEl<string>;
+                if (el instanceof HTMLElement) {}
+            `,
+            output: null,
+            errors: [{
+                messageId: "preferInstanceof",
+                data: { className: "HTMLElement" },
+                suggestions: [{
+                    messageId: "preferInstanceofSuggestion",
+                    data: { className: "HTMLElement" },
+                    output: `
+                ${MOCK_DOM_NO_INSTANCEOF}
+                class DataEl<T> extends HTMLElement { data?: T }
+                declare const el: DataEl<string>;
+                if (el.instanceOf(HTMLElement)) {}
+            `,
+                }],
+            }],
+        },
         {
             name: "instanceof on Node is forbidden",
             code: `
