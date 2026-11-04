@@ -4,6 +4,8 @@
 
 ⚠️ This rule _warns_ in the following configs: ✅ `recommended`, 🇬🇧 `recommendedWithLocalesEn`.
 
+💡 This rule is manually fixable by [editor suggestions](https://eslint.org/docs/latest/use/core-concepts#rule-suggestions).
+
 <!-- end auto-generated rule header -->
 
 ## What is reported
@@ -37,8 +39,49 @@ Not reported:
 - `getMarkdownFiles().find()`, which also leaves out every file that is not Markdown;
 - a computed access such as `this.app["vault"]` or `getFiles()[find]`.
 
-There is no fix; use `getFileByPath()` or `getAbstractFileByPath()`.
+## Suggestion
+
+There is no autofix: `getFileByPath()` returns `null`, not `undefined`, when there is no such file.
+A report offers an editor suggestion instead, which you review before applying: `getFiles().find(…)`
+becomes `getFileByPath(…)` with the path the predicate compares with, on the same vault. `?.`, line
+breaks, and parentheses and comments in the path are kept:
+
+```ts
+const file = this.app.vault.getFiles().find((f) => f.path === path);
+// suggests:
+const file = this.app.vault.getFileByPath(path);
+```
+
+`getFiles()` lists files only, so `getFileByPath()` is the one that finds the same file;
+`getAbstractFileByPath()` would also return a folder at that path.
+
+Nothing is offered:
+
+- where the path is not a plain value: anything but variables, properties, literals, template
+  literals and `+` of those, such as `normalizePath(path)` or `this.getPath()`, which `find()` reads
+  once per file and `getFileByPath()` once, or a name of a `function` predicate's own, such as its
+  `this` or `arguments`;
+- with a second argument to `find()`, or a comment that would be lost;
+- where the code relies on `undefined`: it compares the result, or the variable it is kept in, with
+  `undefined` using `===` or `!==`, or with `typeof`; that variable is a `let` set again later; or,
+  without type information, the variable is annotated as `TFile | undefined`;
+- with type information, where the result goes where `undefined` is accepted and `null` is not, such
+  as a `TFile | undefined` variable, return type or parameter; where the path is not a `string`;
+  and where the vault has no `getFileByPath()`, as with `obsidian` typings older than 1.5.7;
+- with a `minAppVersion` below 1.5.7, which has no `getFileByPath()`. Where no version is known (no
+  `manifest.json` with a valid `minAppVersion`, and no `minAppVersion` option), the suggestion is
+  offered and says it needs Obsidian 1.5.7.
 
 ## Further reading
 
 - [Avoid iterating all files to find a file by its path - Plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#Avoid+iterating+all+files+to+find+a+file+by+its+path)
+
+## Options
+
+<!-- begin auto-generated rule options list -->
+
+| Name            | Description                                                                        | Type   |
+| :-------------- | :--------------------------------------------------------------------------------- | :----- |
+| `minAppVersion` | The minimum app version to check against. Defaults to manifest.json minAppVersion. | String |
+
+<!-- end auto-generated rule options list -->
