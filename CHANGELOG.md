@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.5.0] - 2026-11-03
+## [0.5.0] - 2026-11-04
 
 Upgrading from 0.4.x? The breaking changes below each have a fix in
 [Upgrading to 0.5.0](docs/configuration.md#upgrading-to-050). Rules that never ran
