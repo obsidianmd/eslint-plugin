@@ -3,6 +3,22 @@ import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 const BANNED_PROPERTIES = new Set(["userAgent", "platform"]);
 
+// `x.name`, `x["name"]` or `` x[`name`] ``. A computed key such as `x[key]`
+// names none that can be read.
+function getPropertyName(node: TSESTree.MemberExpression): string | undefined {
+    const property = node.property;
+    if (!node.computed) {
+        return property.type === TSESTree.AST_NODE_TYPES.Identifier ? property.name : undefined;
+    }
+    if (property.type === TSESTree.AST_NODE_TYPES.Literal && typeof property.value === "string") {
+        return property.value;
+    }
+    if (property.type === TSESTree.AST_NODE_TYPES.TemplateLiteral && property.expressions.length === 0) {
+        return property.quasis[0].value.cooked ?? undefined;
+    }
+    return undefined;
+}
+
 export default ruleCreator({
     meta: {
         type: "problem" as const,
@@ -20,11 +36,8 @@ export default ruleCreator({
     create(context) {
         return {
             MemberExpression(node: TSESTree.MemberExpression) {
-                const property = node.property;
-                if (
-                    property.type !== TSESTree.AST_NODE_TYPES.Identifier ||
-                    !BANNED_PROPERTIES.has(property.name)
-                ) {
+                const propertyName = getPropertyName(node);
+                if (propertyName === undefined || !BANNED_PROPERTIES.has(propertyName)) {
                     return;
                 }
 
@@ -47,8 +60,7 @@ export default ruleCreator({
                     object.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
                     object.object.type === TSESTree.AST_NODE_TYPES.Identifier &&
                     object.object.name === "window" &&
-                    object.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
-                    object.property.name === "navigator"
+                    getPropertyName(object) === "navigator"
                 ) {
                     context.report({
                         node,
