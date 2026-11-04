@@ -29,4 +29,5 @@ this.registerEvent(
 ```
 
 Not reported: a handler passed by reference (`this.onPaste`), an arrow function with an expression
-body, a handler whose first parameter is destructured, and an event name that is not a string literal.
+body, a handler with no parameters or whose first parameter is destructured, and an event name that
+is not a string literal.

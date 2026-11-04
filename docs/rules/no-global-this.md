@@ -34,10 +34,14 @@ need to change too.
 With type information, these are fixed:
 
 - a property with the same type on `window`: `globalThis.document`, `globalThis.crypto`,
-  `global.process`, or a global the project declares itself
+  `global.process`, or a global the project declares itself. A write to a property that `Window`
+  declares again, such as `globalThis.onerror = null`, gets a suggestion, as `Window` may declare
+  it read-only
 - a call that returns the same type whichever signature it uses, such as
   `globalThis.clearTimeout(timer)` or `globalThis.matchMedia(query)`, and any call whose result is
-  not used, such as `globalThis.setTimeout(save, 100);`
+  not used, such as `globalThis.setTimeout(save, 100);`. Either gets a suggestion instead when it is
+  passed a callback with an untyped parameter that the signatures type differently, as in
+  `globalThis.setTimeout((n) => n, 10, 1);`
 - a cast to `any`, `unknown`, `never`, or a type `window` is assignable to
 - an argument to a call whose result is not used, such as `Object.assign(globalThis, helpers)`, and
   `"name" in globalThis`
@@ -54,8 +58,8 @@ Without type information, only rewrites that can never change a type are fixed: 
 `unknown` or `never`, an argument to a call whose result is not used, an `in` check, and the timer
 calls that [`prefer-window-timers`](prefer-window-timers.md) fixes. Those are `setTimeout()` or
 `setInterval()` whose result is not used, `clearTimeout()` or `clearInterval()` with a number
-literal, and `requestAnimationFrame()` and `cancelAnimationFrame()`. Everything else gets a
-suggestion.
+literal, `undefined` or no argument, and `requestAnimationFrame()` and `cancelAnimationFrame()`.
+Everything else gets a suggestion.
 
 Neither a fix nor a suggestion is offered where `window` would be wrong:
 

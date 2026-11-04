@@ -25,7 +25,8 @@ The words of a plugin name of several words may be separated by any whitespace; 
 otherwise matched as written, punctuation included.
 
 Not reported: a name built from a template literal or a variable, and a command object defined
-elsewhere and passed to `addCommand()` by name.
+elsewhere and passed to `addCommand()` by name. With no plugin name to compare with, because there
+is neither the option nor a `manifest.json`, or with a blank one, nothing is reported.
 
 ## Further reading
 

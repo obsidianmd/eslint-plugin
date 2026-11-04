@@ -48,10 +48,12 @@ export default class MyPlugin extends Plugin {
 }
 ```
 
-Otherwise the method stays, with an empty body `{}`: when the class extends a class of your own,
-whose `onunload()` the method overrides; when a comment is in, above or after the method, as the fix
-removes no comment outside the call; and for an `async`, `static` or decorated `onunload()`, one
-with parameters, or one with overloads. `@typescript-eslint/no-empty-function`, if you enable it,
+Otherwise the method stays, with an empty body `{}`, or with just the comments its body held: when
+the class extends a class of your own, whose `onunload()` the method overrides; when a comment is
+in, above or after the method, as the fix removes no comment outside the call; for an `async`,
+`static` or decorated `onunload()`, one with parameters, or one with overloads; and for one that
+follows a class field with no semicolon after it, unless it is the class's last member, as the next
+member could then continue the field. `@typescript-eslint/no-empty-function`, if you enable it,
 reports the empty method: remove it yourself, or say in a comment why it is empty.
 
 ## Further reading

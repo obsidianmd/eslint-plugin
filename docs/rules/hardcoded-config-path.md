@@ -10,7 +10,8 @@
 
 A string literal or template literal that contains `.obsidian` as a path segment: `".obsidian"`,
 `".obsidian/plugins"`, `"vault/.obsidian/workspace.json"`, `` `${base}/.obsidian/plugins` ``,
-`` `.obsidian/${file}` ``. Users can rename the configuration folder, so use
+`` `.obsidian/${file}` ``. Paths with backslashes count too, and so does text, as in
+`"Your settings are in .obsidian."`. Users can rename the configuration folder, so use
 `this.app.vault.configDir` instead.
 
 Not reported:

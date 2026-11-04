@@ -25,7 +25,8 @@ IDs are identifiers rather than prose, so their words are what separators such a
 inside a longer word, so a plugin with the ID `git` does not get `open-digital-garden` or `legit`
 reported, and its words apart or changed, as in `word-count-tally` or `word-tallies`. Nor are an ID
 built from a template literal or a variable, and a command object defined elsewhere and passed to
-`addCommand()` by name.
+`addCommand()` by name. With no plugin ID to compare with, because there is neither the option nor
+a `manifest.json`, or with one that has no words, such as `-`, nothing is reported.
 
 Changing the ID of a command you already ship resets any hotkey your users assigned to it, so the
 [community scanner](../../configuration.md#community-plugin-scanner-configuration) only checks this
