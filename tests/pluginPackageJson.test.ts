@@ -43,9 +43,17 @@ describe("readPluginPackageJson", () => {
         }
     });
 
-    it("is undefined when no package.json above the module is the plugin's", () => {
-        const url = pathToFileURL(path.join(root, "parent", "other", "lib", "index.js")).href;
-        assert.strictEqual(readPluginPackageJson(url), undefined);
+    it("takes the nearest named package.json when none is the plugin's, as in a fork published under another name", () => {
+        const fork = path.join(root, "parent", "fork");
+        fs.mkdirSync(path.join(fork, "dist", "lib"), { recursive: true });
+        fs.writeFileSync(path.join(fork, "package.json"), JSON.stringify({ name: "@someone/eslint-plugin-obsidianmd", version: "4.5.6" }));
+        fs.writeFileSync(path.join(fork, "dist", "package.json"), JSON.stringify({ type: "module" }));
+        try {
+            const url = pathToFileURL(path.join(fork, "dist", "lib", "index.js")).href;
+            assert.deepStrictEqual(readPluginPackageJson(url), { name: "@someone/eslint-plugin-obsidianmd", version: "4.5.6" });
+        } finally {
+            fs.rmSync(fork, { recursive: true, force: true });
+        }
     });
 
     it("finds this repository's package.json from lib/", () => {

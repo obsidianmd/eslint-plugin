@@ -20,21 +20,28 @@ export interface PluginPackageJson {
  * tells them apart: a fixed number of `..` fits one layout only, and in the
  * other it reaches the directory above the checkout, which may have a
  * package.json of its own.
+ *
+ * A fork published under another name has no package.json with this name, so
+ * then the nearest one with a name and a version is used, which is the fork's.
  */
 export function readPluginPackageJson(moduleUrl: string): PluginPackageJson | undefined {
     let dir = path.dirname(fileURLToPath(moduleUrl));
+    let nearest: PluginPackageJson | undefined;
     for (;;) {
         try {
             const pkg = JSON.parse(fs.readFileSync(path.join(dir, "package.json"), "utf8")) as Partial<PluginPackageJson> | null;
-            if (pkg?.name === PLUGIN_PACKAGE_NAME && typeof pkg.version === "string") {
-                return { name: pkg.name, version: pkg.version };
+            if (typeof pkg?.name === "string" && typeof pkg.version === "string") {
+                if (pkg.name === PLUGIN_PACKAGE_NAME) {
+                    return { name: pkg.name, version: pkg.version };
+                }
+                nearest ??= { name: pkg.name, version: pkg.version };
             }
         } catch {
             // None here, or not JSON: try the next directory up.
         }
         const parent = path.dirname(dir);
         if (parent === dir) {
-            return undefined;
+            return nearest;
         }
         dir = parent;
     }
