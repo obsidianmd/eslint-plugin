@@ -16,7 +16,7 @@ Next, install `eslint-plugin-obsidianmd`:
 npm install eslint-plugin-obsidianmd --save-dev
 ```
 
-The plugin needs Node.js 20.19+, 22.13+ or 24+, ESLint 9.19 or later, and `typescript-eslint` 8.35.1 or later. npm installs `typescript` and `typescript-eslint` alongside the plugin if your project does not already have them. `typescript-eslint` 8.70.1 or later is recommended: it fixes a `no-unnecessary-type-assertion` false positive on an empty object asserted to a `Record` type alias ([typescript-eslint#12856](https://github.com/typescript-eslint/typescript-eslint/issues/12856)). The configuration examples below import `defineConfig` and `globalIgnores` from `eslint/config`, which ESLint added in 9.22. On an older ESLint, write `{ ignores: [...] }` instead of `globalIgnores([...])`, and export the array without `defineConfig`, or, where an example uses `extends`, wrap it in `tseslint.config(...)` instead.
+The plugin needs Node.js 20.19+, 22.13+ or 24+, ESLint 9.19 or later, `typescript-eslint` 8.35.1 or later, and a TypeScript version your `typescript-eslint` supports (4.8.4 or later). npm installs `typescript` and `typescript-eslint` alongside the plugin if your project does not already have them. `typescript-eslint` 8.70.1 or later is recommended: it fixes a `no-unnecessary-type-assertion` false positive on an empty object asserted to a `Record` type alias ([typescript-eslint#12856](https://github.com/typescript-eslint/typescript-eslint/issues/12856)). The configuration examples below import `defineConfig` and `globalIgnores` from `eslint/config`, which ESLint added in 9.22. On an older ESLint, write `{ ignores: [...] }` instead of `globalIgnores([...])`, and export the array without `defineConfig`, or, where an example uses `extends`, wrap it in `tseslint.config(...)` instead.
 
 On ESLint 10, npm prints `ERESOLVE overriding peer dependency` warnings when it installs the plugin, and `npm ls --all` and `npm ls eslint` exit with `invalid: eslint@10…`. Three packages the plugin bundles do not declare ESLint 10 support yet: `@microsoft/eslint-plugin-sdl`, `eslint-plugin-import`, and `eslint-plugin-react`, which `@microsoft/eslint-plugin-sdl` installs. Linting works, so you can ignore the warnings. With npm's `strict-peer-deps` setting on, the install fails instead; turn the setting off or use ESLint 9.
 
@@ -52,6 +52,8 @@ export default defineConfig([
     rules: {
       // example: turn off a rule from the recommended set
       "obsidianmd/sample-names": "off",
+      // Set @typescript-eslint/* rules to "warn" or "error" in a block with
+      // `files: ["**/*.ts"]`; see "Overriding rules" in docs/configuration.md.
     },
   },
 ]);
@@ -70,7 +72,15 @@ The recommended config also lints files that are not source, matching `package.j
 `eslint src` — never visits them, and their checks silently do nothing. See
 [Files linted beyond your source](docs/configuration.md#files-linted-beyond-your-source).
 
-For advanced usage — layering stricter typescript-eslint configs, ignoring files, disabling rules for non-plugin code, and troubleshooting common errors — see the [configuration guide](docs/configuration.md).
+For advanced usage, see the [configuration guide](docs/configuration.md):
+
+- [layering stricter typescript-eslint configs](docs/configuration.md#using-alongside-stricter-typescript-eslint-configs), [ignoring files](docs/configuration.md#ignoring-files) and [disabling rules for non-plugin code](docs/configuration.md#disabling-rules-for-specific-files)
+- how the recommended config handles [test files](docs/configuration.md#test-files) and [web worker files](docs/configuration.md#web-worker-files)
+- [using only obsidianmd rules](docs/configuration.md#using-only-obsidianmd-rules-without-the-recommended-config) through `ruleConfigs`, without the recommended config
+- the [community plugin scanner's configuration](docs/configuration.md#community-plugin-scanner-configuration)
+- [troubleshooting common errors](docs/configuration.md#common-errors)
+
+To give another plugin's rule a message of your own, wrap it with [`obsidianmd.withCustomMessages()`](docs/rules/rule-custom-message.md#wrapping-a-plugins-rule).
 
 ## Configurations
 
@@ -197,7 +207,7 @@ export default defineConfig([
 
 ### Notes
 
-- Hyphenated words: `Auto-Reveal` becomes `auto-reveal`
+- Hyphenated words: mid-sentence, `Auto-Reveal` becomes `auto-reveal`. At the start of a sentence the default `loose` mode keeps `Auto-Reveal`, and `enforceCamelCaseLower` (or `mode: "strict"`) gives `Auto-reveal`
 - Locale file patterns in `recommendedWithLocalesEn`: JSON files named `en.json`, `en-*.json`, `en_*.json` or `en.*.json`, or under an `en/` directory, and modules (`.ts`, `.js`, `.cjs`, `.mjs`) named `en`, `en-*` or `en_*`, or under an `en/` directory
 
 ### Known limitations

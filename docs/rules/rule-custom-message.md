@@ -58,6 +58,12 @@ Setting this rule's options in your own config replaces that object, as for any 
 entries again next to the rules you add. Setting only a severity
 (`"obsidianmd/rule-custom-message": "warn"`) keeps them.
 
+Both are reported as `obsidianmd/rule-custom-message`, so an `eslint-disable` comment naming
+`no-console` or `no-new-func` does not silence them. A comment naming this rule does, but the
+recommended config's `eslint-comments/no-restricted-disable` forbids disabling `obsidianmd/*` rules
+inline and reports the comment as an error in the finding's place. To allow more console methods in
+some files, set this rule's options for those files, as described above.
+
 ## Options
 
 The rule takes a single configuration object where:
@@ -229,4 +235,4 @@ delete the cache file (`.eslintcache` by default) after changing them.
 
 The `obsidianmd/rule-custom-message` rule itself has its own severity level (error/warn/off). All rules wrapped in a single `rule-custom-message` configuration will share this severity level.
 
-If you need different severities for different wrapped rules, create separate configuration blocks targeting different file patterns.
+Separate configuration blocks can set a different severity per file pattern, but within a file every rule wrapped here shares it. To give a wrapped rule a severity of its own, wrap it with [`obsidianmd.withCustomMessages()`](#wrapping-a-plugins-rule) instead: each rule it returns has its own name and severity. That is the way for a plugin's rule, and it accepts a core rule too.

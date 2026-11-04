@@ -138,6 +138,10 @@ export default defineConfig([
       // strictTypeChecked turns this back on; the recommended config runs
       // obsidianmd/no-misused-promises in its place.
       "@typescript-eslint/no-misused-promises": "off",
+      // strictTypeChecked turns this back on too. It reports the
+      // Platform.isDesktop-guarded require() that obsidianmd/no-nodejs-modules
+      // asks for when code needs a Node.js module.
+      "@typescript-eslint/no-require-imports": "off",
       // your overrides
       "@typescript-eslint/no-non-null-assertion": "off",
     },
@@ -162,6 +166,15 @@ time and treats Obsidian's chaining `then` (on `Setting` and every component) as
 Keep the block scoped to your TypeScript files: typescript-eslint's type-aware rules cannot run on
 `package.json`, `manifest.json` or `LICENSE` (see
 [Common errors](#-requires-type-information-on-license-manifestjson-or-packagejson)).
+
+`@typescript-eslint/no-require-imports` is off again for the reason the recommended config turns it
+off: [`no-nodejs-modules`](rules/no-nodejs-modules.md) asks for a dynamic `import()` or a `require()`
+guarded by `Platform.isDesktop` where code needs a Node.js module, and that rule reports every
+`require()`. `strictTypeChecked` also turns `@typescript-eslint/require-await`,
+`@typescript-eslint/ban-ts-comment` and `prefer-const` back on, which the recommended config leaves
+off. The example keeps them, since they contradict nothing this plugin asks for. `require-await`
+does report a view's `async onOpen()` or `onClose()` that never awaits (Obsidian types both to return
+a Promise); turn it off too if you keep those `async`.
 
 ## Overriding rules
 
@@ -656,8 +669,11 @@ export default defineConfig([
         },
       },
       globals: {
-        // Obsidian augments the global scope with these helpers.
-        // Without them, rules like no-undef will report false positives.
+        // Obsidian augments the global scope with these helpers. In this
+        // TS-only block typescript-eslint turns no-undef off (the compiler
+        // reports undefined names), so they matter once you extend the block
+        // to JS files; add globals.browser (from the globals package) there
+        // too, or no-undef reports document, window and the rest.
         activeDocument: "readonly",
         activeWindow: "readonly",
         ajax: "readonly",
@@ -787,7 +803,7 @@ You do not need to replicate this configuration. The recommended config with the
 <details>
 <summary>Full scanner-equivalent configuration</summary>
 
-If you want your local linting to match what the community plugin scanner checks, you can use the following configuration. This disables rules the scanner skips and does not report unused disable comments, matching the scanner's behavior as closely as possible.
+If you want your local linting to match what the community plugin scanner checks, you can use the following configuration. This disables rules the scanner skips and does not report unused disable comments, matching the scanner's behavior as closely as possible. It mirrors the scanner's base layer, which every submission is checked with, and leaves out the stricter layers for newer submissions described under **Rule severity adjustments**.
 
 ```js
 // eslint.config.mjs

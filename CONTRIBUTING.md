@@ -1,6 +1,12 @@
 We're still experimenting with contributions, if you have any questions, please hop onto the [#ESLint plugin thread under #plugin-dev channel](https://discord.com/channels/686053708261228577/1379041736315240518) on our Discord.
 
-You have to agree to the [Contributor License Agreement](https://github.com/obsidianmd/obsidian-releases/blob/master/cla.md) which grants Obsidian the license to use your code.
+You have to agree to the [Contributor License Agreement](https://github.com/obsidianmd/obsidian-releases/blob/master/cla.md) which grants Obsidian the license to use your code. On your first pull request, the CLA Assistant bot comments with a link to it. To sign, reply on the pull request with this exact comment:
+
+```
+I have read the CLA Document and I hereby sign the CLA
+```
+
+The signature is recorded in [cla.json](cla.json), so you sign only once. Comment `recheck` to run the check again.
 
 ### Code standards
 
