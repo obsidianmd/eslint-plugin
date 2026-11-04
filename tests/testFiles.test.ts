@@ -103,6 +103,19 @@ for (const configName of ["recommended", "recommendedWithLocalesEn"] as const) {
 			});
 		}
 
+		// Every other rule, with its options, applies to test files as to the rest
+		// of the plugin; the Obsidian-runtime rules are left out, not set to "off".
+		for (const extension of ["ts", "cts", "mts", "tsx", "js", "cjs", "mjs", "jsx"]) {
+			it(`leaves out exactly the Obsidian-runtime rules for .${extension} test files`, async () => {
+				const { rules: plain = {} } = await eslint.calculateConfigForFile(`src/main.${extension}`);
+				const expected = Object.fromEntries(Object.entries(plain).filter(([rule]) => !(rule in OBSIDIAN_RUNTIME_RULES)));
+				for (const filename of [`src/main.test.${extension}`, `tests/helpers.${extension}`]) {
+					const { rules = {} } = await eslint.calculateConfigForFile(filename);
+					assert.deepStrictEqual(rules, expected, filename);
+				}
+			});
+		}
+
 		it("leaves the Obsidian-runtime rules on for other files", async () => {
 			for (const filename of NOT_TEST_FILES) {
 				const { rules = {} } = await eslint.calculateConfigForFile(filename);
