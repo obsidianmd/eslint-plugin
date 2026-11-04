@@ -2,7 +2,7 @@ import assert from "node:assert";
 import { ESLint, Linter, type Rule } from "eslint";
 import plugin from "../../lib/index.js";
 import { RuleTester } from "@typescript-eslint/rule-tester";
-import parser from "@typescript-eslint/parser";
+import parser, { parse } from "@typescript-eslint/parser";
 import rule from "../../lib/rules/ui/sentenceCaseLocaleModule.js";
 import { typedRuleTesterConfig } from "../mocha-setup.js";
 import type { RuleTesterConfig } from "@typescript-eslint/rule-tester";
@@ -271,6 +271,23 @@ export const third = { c: "Close All Tabs" }, fourth = { d: "Save All Files" };`
                 code: `export default { a: "Enable Auto Reveal" };`,
                 errors: [{ messageId: "useSentenceCase" }],
             },
+            // The CRLF audit's cases (work/aud-win aea8604), fixed in place.
+            {
+                name: "a template literal with an escape is fixed to the same value, its escape kept",
+                filename: "en.ts",
+                code: "export default { a: `Enable Auto Reveal\\nNow` };",
+                output: "export default { a: `Enable auto reveal\\nnow` };",
+                options: [{ allowAutoFix: true }],
+                errors: [{ messageId: "useSentenceCase", data: { suggestion: "Enable auto reveal\nnow" } }],
+            },
+            {
+                name: "a template literal over two lines of a CRLF file keeps its line break, and its value has no \\r",
+                filename: "en.ts",
+                code: "export default {\r\n  a: `Enable Auto\r\nReveal`,\r\n};\r\n",
+                output: "export default {\r\n  a: `Enable auto\r\nreveal`,\r\n};\r\n",
+                options: [{ allowAutoFix: true }],
+                errors: [{ messageId: "useSentenceCase", data: { suggestion: "Enable auto\nreveal" } }],
+            },
             {
                 name: "a template literal is judged and fixed on its value, its escapes kept",
                 filename: "en.ts",
@@ -355,5 +372,21 @@ describe("sentence-case-locale-module in recommendedWithLocalesEn", () => {
     it("does not run on a non-English module", async () => {
         const severity = await severityFor("src/lang/fr.ts");
         assert.ok(severity === undefined || severity === 0);
+    });
+});
+
+describe("ui-sentence-case-locale-module fix of a template literal in a CRLF file", () => {
+    it("holds the suggestion as its value, with no \\r", () => {
+        const { output } = new Linter().verifyAndFix("export default {\r\n  a: `Enable Auto\r\nReveal`,\r\n};\r\n", [{
+            files: ["**/*.ts"],
+            languageOptions: { parser },
+            plugins: { o: { rules: { "sentence-case-locale-module": rule as unknown as Rule.RuleModule } } },
+            rules: { "o/sentence-case-locale-module": ["warn", { allowAutoFix: true }] },
+        }], "en.ts");
+        const statement = parse(output).body[0];
+        assert.ok(statement.type === "ExportDefaultDeclaration" && statement.declaration.type === "ObjectExpression");
+        const property = statement.declaration.properties[0];
+        assert.ok(property.type === "Property" && property.value.type === "TemplateLiteral");
+        assert.strictEqual(property.value.quasis[0].value.cooked, "Enable auto\nreveal");
     });
 });

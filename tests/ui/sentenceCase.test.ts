@@ -1,5 +1,7 @@
+import assert from "node:assert";
+import { Linter, type Rule } from "eslint";
 import { RuleTester } from "@typescript-eslint/rule-tester";
-import parser from "@typescript-eslint/parser";
+import parser, { parse } from "@typescript-eslint/parser";
 import rule from "../../lib/rules/ui/sentenceCase.js";
 import { typedRuleTesterConfig } from "../mocha-setup.js";
 
@@ -674,6 +676,26 @@ tester.run("ui-sentence-case", rule, {
                 { messageId: "useSentenceCase", data: { suggestion: "Open settings" } },
             ],
         },
+        // The CRLF audit's cases (work/aud-win aea8604). That audit expected a
+        // double-quoted string; the fix keeps the template literal as written,
+        // and its value is the same.
+        {
+            name: "a template literal with escapes is fixed to the same value, its escapes kept",
+            code: "new Notice(`Open The Settings\\nNow`); new Notice(`Don\\u2019t Open The Settings`);",
+            options: [{ allowAutoFix: true }],
+            output: "new Notice(`Open the settings\\nnow`); new Notice(`Don\\u2019t open the settings`);",
+            errors: [
+                { messageId: "useSentenceCase", data: { suggestion: "Open the settings\nnow" } },
+                { messageId: "useSentenceCase", data: { suggestion: "Don’t open the settings" } },
+            ],
+        },
+        {
+            name: "a template literal over two lines of a CRLF file keeps its line break, and its value has no \\r",
+            code: "new Notice(`Open The\r\nSettings Now`);\r\n",
+            options: [{ allowAutoFix: true }],
+            output: "new Notice(`Open the\r\nsettings now`);\r\n",
+            errors: [{ messageId: "useSentenceCase", data: { suggestion: "Open the\nsettings now" } }],
+        },
         {
             name: "a template literal keeps its line breaks, escaped quotes and line continuations",
             code: "new Notice(`Open Settings\r\nNow \\' Here \\\r\nToo`);",
@@ -843,3 +865,21 @@ try {
     RuleTester.resetDefaultConfig();
     RuleTester.setDefaultConfig(typedRuleTesterConfig);
 }
+
+// The value the fixed template literal holds, read back from the fixed source:
+// a CRLF line break in a template is read as LF, so the fix gives it no "\r".
+describe("ui-sentence-case fix of a template literal in a CRLF file", () => {
+    it("holds the suggestion as its value", () => {
+        const { output } = new Linter().verifyAndFix("new Notice(`Open The\r\nSettings Now`);\r\n", [{
+            files: ["**/*.ts"],
+            languageOptions: { parser },
+            plugins: { o: { rules: { "sentence-case": rule as unknown as Rule.RuleModule } } },
+            rules: { "o/sentence-case": ["warn", { allowAutoFix: true }] },
+        }], "file.ts");
+        const statement = parse(output).body[0];
+        assert.ok(statement.type === "ExpressionStatement" && statement.expression.type === "NewExpression");
+        const template = statement.expression.arguments[0];
+        assert.ok(template.type === "TemplateLiteral");
+        assert.strictEqual(template.quasis[0].value.cooked, "Open the\nsettings now");
+    });
+});
