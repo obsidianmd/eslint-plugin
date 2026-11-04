@@ -2,7 +2,7 @@ import assert from "node:assert";
 import { ESLint, Linter, type Rule } from "eslint";
 import plugin from "../../lib/index.js";
 import { RuleTester } from "@typescript-eslint/rule-tester";
-import parser from "@typescript-eslint/parser";
+import parser, { parse } from "@typescript-eslint/parser";
 import rule from "../../lib/rules/ui/sentenceCaseLocaleModule.js";
 import { typedRuleTesterConfig } from "../mocha-setup.js";
 import type { RuleTesterConfig } from "@typescript-eslint/rule-tester";
@@ -215,10 +215,10 @@ export const more = <const>{ b: "Open Settings" };`,
                 errors: [{ messageId: "useSentenceCase" }, { messageId: "useSentenceCase" }],
             },
             {
-                name: "a template literal without expressions is checked and fixed to a string",
+                name: "a template literal without expressions is checked and fixed in place",
                 filename: "en.ts",
                 code: "export default { a: `Enable Auto Reveal` };",
-                output: `export default { a: "Enable auto reveal" };`,
+                output: "export default { a: `Enable auto reveal` };",
                 options: [{ allowAutoFix: true }],
                 errors: [{ messageId: "useSentenceCase", data: { suggestion: "Enable auto reveal" } }],
             },
@@ -246,10 +246,10 @@ export const third = { c: "Close All Tabs" }, fourth = { d: "Save All Files" };`
                 ],
             },
             {
-                name: "the fix writes a valid string, quotes included",
+                name: "the fix keeps the quotes of the string",
                 filename: "en.ts",
                 code: `export default { a: 'Say "Open Now" Here' }!;`,
-                output: `export default { a: "Say \\"open now\\" here" }!;`,
+                output: `export default { a: 'Say "open now" here' }!;`,
                 options: [{ allowAutoFix: true }],
                 errors: [{ messageId: "useSentenceCase", data: { suggestion: 'Say "open now" here' } }],
             },
@@ -270,6 +270,58 @@ export const third = { c: "Close All Tabs" }, fourth = { d: "Save All Files" };`
                 filename: "en-US.js",
                 code: `export default { a: "Enable Auto Reveal" };`,
                 errors: [{ messageId: "useSentenceCase" }],
+            },
+            // The CRLF audit's cases (work/aud-win aea8604), fixed in place.
+            {
+                name: "a template literal with an escape is fixed to the same value, its escape kept",
+                filename: "en.ts",
+                code: "export default { a: `Enable Auto Reveal\\nNow` };",
+                output: "export default { a: `Enable auto reveal\\nnow` };",
+                options: [{ allowAutoFix: true }],
+                errors: [{ messageId: "useSentenceCase", data: { suggestion: "Enable auto reveal\nnow" } }],
+            },
+            {
+                name: "a template literal over two lines of a CRLF file keeps its line break, and its value has no \\r",
+                filename: "en.ts",
+                code: "export default {\r\n  a: `Enable Auto\r\nReveal`,\r\n};\r\n",
+                output: "export default {\r\n  a: `Enable auto\r\nreveal`,\r\n};\r\n",
+                options: [{ allowAutoFix: true }],
+                errors: [{ messageId: "useSentenceCase", data: { suggestion: "Enable auto\nreveal" } }],
+            },
+            {
+                name: "a template literal is judged and fixed on its value, its escapes kept",
+                filename: "en.ts",
+                code: "export default { a: `Open Settings\\tNow`, b: `Open\\u0020Settings`, c: `Line One\\nLine Two` };",
+                output: "export default { a: `Open settings\\tnow`, b: `Open\\u0020settings`, c: `Line one\\nline two` };",
+                options: [{ allowAutoFix: true }],
+                errors: [
+                    { messageId: "useSentenceCase", data: { suggestion: "Open settings\tnow" } },
+                    { messageId: "useSentenceCase", data: { suggestion: "Open settings" } },
+                    { messageId: "useSentenceCase", data: { suggestion: "Line one\nline two" } },
+                ],
+            },
+            {
+                name: "a string keeps its quotes and escapes",
+                filename: "en.ts",
+                code: String.raw`export default { a: 'It\'s Open Now', b: "Say \"Open\" Now\n", c: '\u0041pply Settings' };`,
+                output: String.raw`export default { a: 'It\'s open now', b: "Say \"open\" now\n", c: '\u0041pply settings' };`,
+                options: [{ allowAutoFix: true }],
+                errors: [
+                    { messageId: "useSentenceCase", data: { suggestion: "It's open now" } },
+                    { messageId: "useSentenceCase", data: { suggestion: 'Say "open" now\n' } },
+                    { messageId: "useSentenceCase", data: { suggestion: "Apply settings" } },
+                ],
+            },
+            {
+                name: "a letter that has to change but is written as an escape is reported without a fix",
+                filename: "en.ts",
+                code: String.raw`export default { a: 'Open \u0053ettings', b: ` + "`Open \\x53ettings`" + " };",
+                output: null,
+                options: [{ allowAutoFix: true }],
+                errors: [
+                    { messageId: "useSentenceCase", data: { suggestion: "Open settings" } },
+                    { messageId: "useSentenceCase", data: { suggestion: "Open settings" } },
+                ],
             },
             {
                 name: "the string itself is reported",
@@ -320,5 +372,21 @@ describe("sentence-case-locale-module in recommendedWithLocalesEn", () => {
     it("does not run on a non-English module", async () => {
         const severity = await severityFor("src/lang/fr.ts");
         assert.ok(severity === undefined || severity === 0);
+    });
+});
+
+describe("ui-sentence-case-locale-module fix of a template literal in a CRLF file", () => {
+    it("holds the suggestion as its value, with no \\r", () => {
+        const { output } = new Linter().verifyAndFix("export default {\r\n  a: `Enable Auto\r\nReveal`,\r\n};\r\n", [{
+            files: ["**/*.ts"],
+            languageOptions: { parser },
+            plugins: { o: { rules: { "sentence-case-locale-module": rule as unknown as Rule.RuleModule } } },
+            rules: { "o/sentence-case-locale-module": ["warn", { allowAutoFix: true }] },
+        }], "en.ts");
+        const statement = parse(output).body[0];
+        assert.ok(statement.type === "ExportDefaultDeclaration" && statement.declaration.type === "ObjectExpression");
+        const property = statement.declaration.properties[0];
+        assert.ok(property.type === "Property" && property.value.type === "TemplateLiteral");
+        assert.strictEqual(property.value.quasis[0].value.cooked, "Enable auto\nreveal");
     });
 });
