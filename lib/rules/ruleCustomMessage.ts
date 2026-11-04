@@ -5,6 +5,7 @@ import {
     customMessageFor,
     isRecord,
     messageOf,
+    messagesProblem,
     type CustomMessages,
     type WrappedReport,
 } from "../customMessages.js";
@@ -144,7 +145,7 @@ export default ruleCreator<Options, MessageIds>({
                     properties: {
                         messages: {
                             type: "object",
-                            description: "Map of original messages to custom messages",
+                            description: "Object mapping original messages to custom messages",
                             additionalProperties: {
                                 type: "string",
                             },
@@ -179,6 +180,15 @@ export default ruleCreator<Options, MessageIds>({
             }
 
             const messageMap = config.messages;
+            // The schema takes any object, and ESLint's structuredClone keeps a
+            // Map or a Date one, with no entries to match: every report of the
+            // rule would be dropped without a word.
+            const problem = messagesProblem(messageMap);
+            if (problem !== undefined) {
+                throw new TypeError(
+                    `The messages for "${ruleName}" must be an object mapping messages to the messages to show instead, ${problem}.`,
+                );
+            }
             const ruleMessages = rule.meta?.messages;
 
             const forwardSuggestions = (suggest: unknown): TSESLint.SuggestionReportDescriptor<MessageIds>[] => {
