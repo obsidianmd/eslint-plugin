@@ -99,6 +99,58 @@ ruleTester.run("vault-iterate", vaultIterateRule, {
             name: "a predicate that is not the argument of find() is allowed",
             code: "check(f => f.path === path, vault.getFiles().find);",
         },
+        {
+            name: "find() or getFiles() named by a computed key is not checked",
+            code: `
+                const find = "filter";
+                vault.getFiles()[find](f => f.path === path);
+                vault.getFiles()["find"](f => f.path === path);
+                vault[getFiles]().find(f => f.path === path);
+            `,
+        },
+        // Look-alikes of the optional and the destructured forms.
+        {
+            name: "an optional chain to a path that is not the file's is allowed",
+            code: `
+                vault.getFiles().find(f => f?.parent?.path === folder.path);
+                vault.getFiles().find(f => f?.parent.path === folder.path);
+                vault.getFiles().find(f => other?.path === path);
+                vault.getFiles().find(f => f?.path === f?.name);
+                vault.getFiles().find(f => f?.path !== path);
+                vault.getFiles().find(f => f?.["path"] === path);
+            `,
+        },
+        {
+            name: "a destructured property other than the path, or a path compared with the file, is allowed",
+            code: `
+                vault.getFiles().find(({ name }) => name === target);
+                vault.getFiles().find(({ name: path }) => path === target);
+                vault.getFiles().find(({ parent }) => parent.path === folder.path);
+                vault.getFiles().find(({ path, parent }) => path === parent.path);
+                vault.getFiles().find(({ path }) => path === path);
+                vault.getFiles().find(({ path: { length } }) => length === 3);
+                vault.getFiles().find(({ path = fallback }) => path === target);
+                vault.getFiles().find(({ ["path"]: p }) => p === target);
+                vault.getFiles().find(({ [path]: p }) => p === target);
+                vault.getFiles().find(({ ...rest }) => rest.path === target);
+                vault.getFiles().find(([path]) => path === target);
+                vault.getFiles().find(({ path } = file) => path === target);
+            `,
+        },
+        {
+            name: "a destructured path that the comparison does not read is allowed",
+            code: `
+                vault.getFiles().find(({ path }) => { const path2 = path; return path2 === target; });
+                vault.getFiles().find(({ path }) => other.path === target);
+            `,
+        },
+        {
+            name: "an async optional or destructured predicate is allowed",
+            code: `
+                vault.getFiles().find(async (f) => f?.path === path);
+                vault.getFiles().find(async ({ path }) => path === target);
+            `,
+        },
     ],
     invalid: [
         {
@@ -141,6 +193,36 @@ ruleTester.run("vault-iterate", vaultIterateRule, {
                 app.vault.getFiles().find((f) => { return other.path == f.path; });
             `,
             errors: [{ messageId: "iterate", line: 2 }, { messageId: "iterate", line: 3 }],
+        },
+        {
+            name: "the path read through an optional chain is forbidden",
+            code: `
+                vault.getFiles().find(f => f?.path === p);
+                this.app.vault.getFiles().find((file) => p == file?.path);
+                vault.getFiles().find(function (f) { return f?.path === p; });
+            `,
+            errors: [
+                { messageId: "iterate", line: 2 },
+                { messageId: "iterate", line: 3 },
+                { messageId: "iterate", line: 4 },
+            ],
+        },
+        {
+            name: "a destructured path is forbidden",
+            code: `
+                vault.getFiles().find(({ path }) => path === p);
+                this.app.vault.getFiles().find(({ path }: TFile) => normalizePath(target) == path);
+                vault.getFiles().find(({ path: filePath }) => filePath === p);
+                vault.getFiles().find(({ path, name }) => { return path === other.path; });
+                vault.getFiles().find(function ({ path }) { return p === path; });
+            `,
+            errors: [
+                { messageId: "iterate", line: 2 },
+                { messageId: "iterate", line: 3 },
+                { messageId: "iterate", line: 4 },
+                { messageId: "iterate", line: 5 },
+                { messageId: "iterate", line: 6 },
+            ],
         },
         {
             name: "a function expression that only returns the comparison is forbidden",
