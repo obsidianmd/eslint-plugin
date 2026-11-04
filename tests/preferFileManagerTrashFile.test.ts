@@ -38,6 +38,13 @@ ruleTester.run("prefer-file-manager-trash-file", preferFileManagerTrashRule, {
             `,
         },
         {
+            name: "a function named trash or delete is not a Vault method",
+            code: `
+                declare function trash(file: unknown): void;
+                trash(someFile);
+            `,
+        },
+        {
             name: "delete on a nullable non-Vault object is allowed",
             code: `
                 declare const cache: Map<string, number> | null;
@@ -59,7 +66,25 @@ ruleTester.run("prefer-file-manager-trash-file", preferFileManagerTrashRule, {
                 {
                     messageId: "preferTrashFile",
                     data: { methodName: "trash" },
+                    // The method name, not the call.
+                    line: 4,
+                    column: 23,
+                    endColumn: 28,
                 },
+            ],
+        },
+        {
+            name: "Obsidian's own Vault.trash and Vault.delete are forbidden",
+            code: `
+                import { TFile, Vault } from "obsidian";
+                declare const vault: Vault;
+                declare const file: TFile;
+                void vault.trash(file, true);
+                void vault.delete(file);
+            `,
+            errors: [
+                { messageId: "preferTrashFile", data: { methodName: "trash" }, line: 5 },
+                { messageId: "preferTrashFile", data: { methodName: "delete" }, line: 6 },
             ],
         },
         {
