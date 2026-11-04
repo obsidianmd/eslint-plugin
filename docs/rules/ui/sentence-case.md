@@ -22,7 +22,12 @@ literals without `${…}`, used as:
   `setAttribute()`. A string in place of the options is a CSS class and is not checked.
 - assignments to `textContent`, `innerText`, `title`, `placeholder`, `ariaLabel` and
   `ariaDescription`, but not to a property of `dataset` (`el.dataset.title = …` sets a data
-  attribute), and not text appended with `+=`
+  attribute), and not text appended with `+=`. Other objects have a `title` or `placeholder` too,
+  such as a note's frontmatter, so with type information those two are checked only on an element
+  (an `Element` subtype such as `HTMLElement`), on the document, or on a value whose type is
+  `any`, `unknown` or unresolved: `frontmatter.title = "Untitled Note"` with
+  `frontmatter: { title: string }` is not checked. Without type information every such assignment
+  is checked.
 - strings returned from a `getDisplayText()` method
 
 A template literal is judged on its value, with its escapes decoded: `` `Open\tSettings` `` is
@@ -40,10 +45,16 @@ Which words take a capital:
   and after an abbreviation such as "e.g.", "i.e.", "etc.", "vs.", "approx." or "no.", the next
   word may take either case: "Choose a folder, e.g. notes" and "Choose a folder, e.g. Notes" both
   pass.
-- a first word in quotes keeps the case it is written in: `"Open" settings` passes.
+- a first word after punctuation, a bullet, an arrow, quotes or a list number keeps the case it is
+  written in: "- Item", "- item", "• Bullet", "→ Next", `"Open" settings` and "1) Open settings"
+  all pass. So do the first word of a label in brackets or parentheses and the first word after
+  it: "[Beta] Feature", "[beta] feature" and "(Beta) Sync" pass. The words after that are later
+  words, so "- Open Settings" is reported, expecting "- Open settings". A word right after "(" is
+  the first word, as before, so "(open settings)" and "(beta) sync" are reported.
 - a number before the first word takes its place, so the word after the number is not capitalized:
   "2 files selected" passes, and "2 Files selected" is reported. A word that starts with a number,
-  such as "1st", "3D" or "10x", keeps its letters as written.
+  such as "1st", "3D", "4K" or "10x", keeps its letters as written, wherever it is: "Open 3D view"
+  passes.
 - emoji before the first word are not text, so "✅ Open settings" and "⚠️ Open settings" pass.
 
 Some text keeps its casing, because it is data rather than prose:
@@ -59,7 +70,9 @@ Some text keeps its casing, because it is data rather than prose:
   Windows" is reported, expecting "Close all Windows". Any other casing, such as "WINDOWS", is
   corrected to the brand's. This holds for these names in your own `brands` too.
 - URLs, such as `https://obsidian.md/help`, and date and time formats, such as `YYYY-MM-DD`,
-  `HH:mm` or `hh:mm A`. A lone "A" is a word, so "Create A new note" is reported.
+  `HH:mm`, `hh:mm A`, `MMM D, YYYY`, `DD MMM YYYY` or `dddd, MMMM Do`. Tokens joined by spaces or
+  commas are a format only when one of them is never a word, such as `MMM`, `YYYY` or `DD`, so "Do
+  A barrel roll" is text. A lone "A" is a word, so "Create A new note" is reported.
 - "REST" written in capitals. It is also an ordinary word, so both "Use the REST API" and "Take a
   rest" pass.
 - a placeholder that shows an example value: a single token with no spaces (`sk-123…`,

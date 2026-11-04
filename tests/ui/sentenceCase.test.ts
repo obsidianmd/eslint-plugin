@@ -1,5 +1,7 @@
 import { RuleTester } from "@typescript-eslint/rule-tester";
+import parser from "@typescript-eslint/parser";
 import rule from "../../lib/rules/ui/sentenceCase.js";
+import { typedRuleTesterConfig } from "../mocha-setup.js";
 
 const tester = new RuleTester();
 
@@ -328,6 +330,22 @@ tester.run("ui-sentence-case", rule, {
         {
             name: "text appended with += is not checked",
             code: "el.textContent += ' done'; el.title += ' And More';",
+        },
+        {
+            name: "the first word after a bullet, punctuation or a label keeps its case",
+            code: "new Notice('[Beta] Feature'); new Notice('[beta] feature'); new Notice('- Item'); new Notice('- open settings'); new Notice('• Bullet'); new Notice('→ Next'); new Notice('(Beta) Sync');",
+        },
+        {
+            name: "a word that starts with a number keeps its letters mid-sentence",
+            code: "new Notice('Open 3D view'); new Notice('Export in 4K');",
+        },
+        {
+            name: "a date format with spaces keeps its casing",
+            code: "new Setting(el).setDesc('Format: MMM D, YYYY'); new Notice('Use DD MMM YYYY or dddd, MMMM Do');",
+        },
+        {
+            name: "with type information, title and placeholder on an object that is not an element are not checked",
+            code: "declare const frontmatter: { title: string }; frontmatter.title = 'Untitled Note'; declare const opts: { placeholder?: string }; opts.placeholder = 'Enter Name'; class Note { title = ''; rename() { this.title = 'Untitled Note'; } } function rename<T extends { title: string }>(note: T) { note.title = 'Untitled Note'; } declare const either: { title: string } | null; either!.title = 'Untitled Note';",
         },
         {
             name: "a file name or a path is still skipped",
@@ -748,6 +766,47 @@ settings'); new Notice('It\'s \u{1F600} open');`,
             ],
         },
         {
+            name: "a later word after a bullet or a label is still checked",
+            code: "new Notice('- Open Settings'); new Notice('[Beta] Feature Flags'); new Notice('Get 10x Faster');",
+            errors: [
+                { messageId: "useSentenceCase", data: { suggestion: "- Open settings" } },
+                { messageId: "useSentenceCase", data: { suggestion: "[Beta] Feature flags" } },
+                { messageId: "useSentenceCase", data: { suggestion: "Get 10x faster" } },
+            ],
+        },
+        {
+            name: "with type information, title and placeholder are checked on an element, the document, and a type that says nothing",
+            code: [
+                "declare const div: HTMLDivElement; div.title = 'Open Daily Note';",
+                "declare const input: HTMLInputElement; input.placeholder = 'Enter Name';",
+                "declare const svg: SVGSVGElement; (svg as unknown as { title: string }).title = 'x'; svg.dataset.x = 'x';",
+                "declare const node: Element; node.title = 'Open Daily Note';",
+                "document.title = 'Open Daily Note';",
+                "declare const maybe: HTMLElement | undefined; maybe!.title = 'Open Daily Note';",
+                "function set<T extends HTMLElement>(e: T) { e.title = 'Open Daily Note'; }",
+                "declare const both: HTMLElement & { extra: true }; both.title = 'Open Daily Note';",
+                "declare const fm: any; fm.title = 'Untitled Note';",
+                "declare const u: unknown; u.title = 'Untitled Note';",
+                "undeclared.title = 'Untitled Note';",
+                "class MyView extends HTMLElement { init() { this.title = 'Open Daily Note'; } }",
+                "function any<T>(e: T) { (e as T & { title: string }).title = 'Open Daily Note'; }",
+            ].join("\n"),
+            errors: [
+                { messageId: "useSentenceCase", line: 1 },
+                { messageId: "useSentenceCase", line: 2 },
+                { messageId: "useSentenceCase", line: 4 },
+                { messageId: "useSentenceCase", line: 5 },
+                { messageId: "useSentenceCase", line: 6 },
+                { messageId: "useSentenceCase", line: 7 },
+                { messageId: "useSentenceCase", line: 8 },
+                { messageId: "useSentenceCase", line: 9 },
+                { messageId: "useSentenceCase", line: 10 },
+                { messageId: "useSentenceCase", line: 11 },
+                { messageId: "useSentenceCase", line: 12 },
+                { messageId: "useSentenceCase", line: 13 },
+            ],
+        },
+        {
             name: "a DOM text property is still checked",
             code: "el.title = 'Open Daily Note'; el.ariaLabel = 'Open Daily Note'; el.ariaDescription = 'Open Daily Note'; el.innerText = 'Open Daily Note'; document.title = 'Open Daily Note'; el.dataset = 'Open Daily Note' as never; el.title ||= 'Open Daily Note';",
             errors: [
@@ -761,3 +820,26 @@ settings'); new Notice('It\'s \u{1F600} open');`,
         },
     ],
 });
+
+// Without type information the rule cannot tell an element from another
+// object, so every title and placeholder assignment is checked. The default
+// config has a project, so it is reset for this tester.
+RuleTester.resetDefaultConfig();
+try {
+    new RuleTester({ languageOptions: { parser } }).run("ui-sentence-case without type information", rule, {
+        valid: [],
+        invalid: [
+            {
+                name: "title and placeholder on any object are checked",
+                code: "declare const frontmatter: { title: string }; frontmatter.title = 'Untitled Note'; declare const opts: { placeholder?: string }; opts.placeholder = 'Enter Name';",
+                errors: [
+                    { messageId: "useSentenceCase", data: { suggestion: "Untitled note" } },
+                    { messageId: "useSentenceCase", data: { suggestion: "Enter name" } },
+                ],
+            },
+        ],
+    });
+} finally {
+    RuleTester.resetDefaultConfig();
+    RuleTester.setDefaultConfig(typedRuleTesterConfig);
+}

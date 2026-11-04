@@ -90,8 +90,44 @@ const cases: Record<string, Case[]> = {
         ["🇬🇧 Open settings", null],
         ["1️⃣ Open settings", null],
         ["#️⃣ Open settings", null],
-        // "#" and "*" are skipped, as before.
+        // After punctuation, a bullet, an arrow or quotes, the first word keeps
+        // the case it is written in; the words after it are later words.
         ["* Required field", null],
+        ["* required field", null],
+        ["#tags found", null],
+        ["#Tags found", null],
+        ["- Item", null],
+        ["- open settings", null],
+        ["- Open Settings", "- Open settings"],
+        ["• Bullet point", null],
+        ["→ Next", null],
+        ["→ next step", null],
+        ["...Loading", null],
+        ["...loading", null],
+        ["1) Open settings", null],
+        ["(1) Open settings", null],
+        ["– Item One", "– Item one"],
+        // A label in brackets: its first word and the first word after it keep their case.
+        ["[Beta] Feature", null],
+        ["[beta] feature", null],
+        ["[Beta] feature", null],
+        ["[BETA] Feature", null],
+        ["[Beta] Feature Flags", "[Beta] Feature flags"],
+        ["[1] Open settings", null],
+        ["✅ [Beta] Feature", null],
+        ["- [Beta] Feature", null],
+        ["[Work In Progress] Feature", "[Work in progress] Feature"],
+        ["[Beta] api keys", "[Beta] API keys"],
+        ["[Beta] github sync", "[Beta] GitHub sync"],
+        ["(Beta) Sync", null],
+        ["(Beta) sync", null],
+        // A word right after "(" is still the first word, as before.
+        ["(beta) sync", "(Beta) sync"],
+        ["(Optional) Value", null],
+        // A bracket that closes the text is not a label.
+        ["[open settings]", null],
+        // Other letters before the first word still make it a later word.
+        ["Über Settings", "Über settings"],
         // A first word in quotes keeps the case it is written in.
         ['"Open" settings', null],
         ['"open" settings', null],
@@ -100,6 +136,18 @@ const cases: Record<string, Case[]> = {
         ["(“Open”) settings", null],
         ['"Open" Settings', '"Open" settings'],
         ['"Open Settings" now', '"Open settings" now'],
+    ],
+    "a word that starts with a number keeps its letters anywhere": [
+        ["Open 3D view", null],
+        ["Open 3d view", null],
+        ["Use 4K images", null],
+        ["Finish 1st", null],
+        ["Get 10x Faster", "Get 10x faster"],
+        ["Use 2-Factor Sign-In", "Use 2-Factor sign-in"],
+        // An acronym is still an acronym.
+        ["Enable 2fa", "Enable 2FA"],
+        // A word that only contains a number is a word.
+        ["Use V2 Sync", "Use v2 sync"],
     ],
     "acronyms are upper case wherever they are": [
         ["Export as pdf", "Export as PDF"],
@@ -231,6 +279,20 @@ const cases: Record<string, Case[]> = {
         ["Create A new note", "Create a new note"],
         ["Note: Create A New Note", "Note: Create a new note"],
         ["Use DD/MM/YYYY A Format", "Use DD/MM/YYYY a format"],
+        // Tokens joined by spaces or commas, with one that is never a word.
+        ["Use MMM D, YYYY here", null],
+        ["Use DD MMM YYYY here", null],
+        ["Use YYYY-MM-DD HH:mm here", null],
+        ["Use dddd, MMMM Do here", null],
+        ["Use MMM D, YYYY h:mm A here", null],
+        ["Format: MMM D, YYYY", null],
+        ["MMM D, YYYY is the default", null],
+        ["Use DD MMM YYYY Format", "Use DD MMM YYYY format"],
+        // Tokens that are also words are words when nothing else joins them.
+        ["Create A New Note", "Create a new note"],
+        ["Do A Barrel Roll", "Do a barrel roll"],
+        ["Use D M H", "Use d m h"],
+        ["Pick A D Grade", "Pick a d grade"],
     ],
     "a version number or a brand with a dot is checked": [
         ["Version 1.2 Released", "Version 1.2 released"],

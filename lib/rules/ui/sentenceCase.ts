@@ -1,4 +1,5 @@
 import { TSESTree, TSESLint } from "@typescript-eslint/utils";
+import ts from "typescript";
 import { docsUrl, ruleCreator } from "../../ruleCreator.js";
 import {
     createSentenceCaseReporter,
@@ -74,6 +75,29 @@ const ATTR_TEXT_KEYS = new Set(["aria-label", "aria-description", "title", "plac
 
 // Element properties that hold user-facing text, as set by an assignment
 const TEXT_PROPERTIES = new Set(["textContent", "innerText", "title", "placeholder", "ariaLabel", "ariaDescription"]);
+
+// Properties that other objects often have too, such as a note's
+// frontmatter.title, so with type information they are checked only on an
+// element or the document
+const ELEMENT_ONLY_TEXT_PROPERTIES = new Set(["title", "placeholder"]);
+
+// Whether a value of this type may be an element or the document: an Element
+// subtype such as HTMLElement or SVGElement, Document, or a type that says
+// nothing (any, unknown, an error type or an unconstrained type parameter).
+// A union or an intersection may be one if any of its members may.
+function mayBeElement(type: ts.Type, checker: ts.TypeChecker, seen: Set<ts.Type> = new Set()): boolean {
+    if (seen.has(type)) return false;
+    seen.add(type);
+    if (type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) return true;
+    if (type.isUnionOrIntersection()) return type.types.some((member) => mayBeElement(member, checker, seen));
+    if (type.flags & ts.TypeFlags.TypeParameter) {
+        const constraint = checker.getBaseConstraintOfType(type);
+        return !constraint || mayBeElement(constraint, checker, seen);
+    }
+    const name = type.getSymbol()?.name;
+    if (name === "Element" || name === "Document") return true;
+    return (type.getBaseTypes() ?? []).some((base) => mayBeElement(base, checker, seen));
+}
 
 // Whether placeholder text shows an example value rather than prose: a single
 // token with no whitespace ("sk-123…", "YYYY-MM-DD", "my-vault"), or text
@@ -236,6 +260,19 @@ export default ruleCreator({
             messageId: "useSentenceCase",
         });
 
+        // Type information when the file has it
+        const services = context.sourceCode.parserServices;
+        const program = services?.program ?? null;
+        const nodeMap = services?.esTreeNodeToTSNodeMap ?? null;
+
+        // Whether `object` may be an element. True without type information,
+        // where the rule cannot tell.
+        function mayBeElementObject(object: TSESTree.Expression): boolean {
+            if (!program || !nodeMap) return true;
+            const checker = program.getTypeChecker();
+            return mayBeElement(checker.getTypeAtLocation(nodeMap.get(object)), checker);
+        }
+
         // Checks the options object of createEl, createDiv, createSpan and
         // createSvg for text properties
         function checkCreateOptions(node: TSESTree.CallExpression, name: string) {
@@ -340,6 +377,8 @@ export default ruleCreator({
                         ? object.property.name
                         : null;
                 if (objectName === "dataset") return;
+                // frontmatter.title is a note's data, not an element's title
+                if (ELEMENT_ONLY_TEXT_PROPERTIES.has(prop) && !mayBeElementObject(object)) return;
                 const str = getStringFromNode(node.right);
                 if (str == null) return;
                 if (prop === "placeholder" && isPlaceholderExample(str)) return;

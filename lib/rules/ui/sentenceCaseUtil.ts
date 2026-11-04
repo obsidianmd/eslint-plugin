@@ -442,6 +442,15 @@ function writeToken(chars: string[], start: number, replacement: string, length:
 
 // Moment-style date and time format tokens, as in "YYYY-MM-DD" or "HH:mm".
 const DATE_FORMAT_TOKEN = "(?:YYYY|YY|MMMM|MMM|MM|M|Do|DD|D|dddd|ddd|HH|H|hh|h|mm|ss|SSS|A|a)";
+// The tokens a format joined by spaces or commas may hold, as in "MMM D, YYYY".
+// "A" and "a" are left out: only a time format before them makes them a token.
+const SPACED_DATE_FORMAT_TOKEN = "(?:YYYY|YY|MMMM|MMM|MM|M|Do|DD|D|dddd|ddd|HH|H|hh|h|mm|ss|SSS)";
+// The tokens that are never an English word, one of which such a format needs,
+// so that "Do D" is text and "Do MMM" a format
+const STRONG_DATE_FORMAT_TOKEN = "(?:YYYY|YY|MMMM|MMM|MM|DD|dddd|ddd|HH|hh|mm|ss|SSS)";
+// What joins the tokens of a format: a dash, slash, dot, colon or underscore,
+// or a space after an optional comma
+const DATE_FORMAT_SEPARATOR = "(?:[-/.:_]|,?\\s)";
 
 // Text whose casing is data, not prose, so it is never re-cased: URLs, and two
 // or more date format tokens joined by separators. Each pattern is global.
@@ -459,6 +468,14 @@ const PROTECTED_PATTERNS: readonly RegExp[] = [
     // Examples: "hh:mm A", "h:mm a", "HH:mm:ss A"
     new RegExp(
         `(?<![A-Za-z0-9])(?:HH|H|hh|h)(?:[:.]${DATE_FORMAT_TOKEN})+ ?[Aa](?![A-Za-z0-9])`,
+        "g",
+    ),
+    // Tokens joined by spaces or commas, one of them a token that is never a word
+    // Examples: "MMM D, YYYY", "DD MMM YYYY", "dddd, MMMM Do", "YYYY-MM-DD HH:mm"
+    new RegExp(
+        `(?<![A-Za-z0-9])(?:(?:${SPACED_DATE_FORMAT_TOKEN}${DATE_FORMAT_SEPARATOR})+${STRONG_DATE_FORMAT_TOKEN}` +
+            `|${STRONG_DATE_FORMAT_TOKEN}(?=${DATE_FORMAT_SEPARATOR}${SPACED_DATE_FORMAT_TOKEN}))` +
+            `(?:${DATE_FORMAT_SEPARATOR}${SPACED_DATE_FORMAT_TOKEN})*(?![A-Za-z0-9])`,
         "g",
     ),
 ];
@@ -497,8 +514,19 @@ function caseHyphenPart(part: string, opts: ReturnType<typeof normalizeOptions>)
 // number before the first word is text, as in "2 files selected".
 const EMOJI_RE = /[0-9#*]\uFE0F?\u20E3|[\p{Extended_Pictographic}\p{Emoji_Modifier}\p{Regional_Indicator}\u200D\uFE0F]/gu;
 
-// Opening quotation marks: a first word after them keeps the case it is written in
-const OPENING_QUOTES_RE = /^["'\u2018\u201A\u201B\u201C\u201E\u201F\u00AB\u2039\u300C\u300E]+$/;
+// What may come before a first word that keeps the case it is written in:
+// punctuation, a bullet, an arrow or quotes ("- ", "• ", "→ ", "[", "\"", "..."),
+// with no letter or digit, or a list number ("1)")
+const LEADING_MARKER_RE = /^(?:[^\p{L}\p{N}]+|\d{1,3}[.)])$/u;
+
+// The end of a label in brackets or parentheses that opens the text, as in
+// "[Beta] Feature" or "(Beta) Sync": the index of the word after it, which
+// keeps the case it is written in, or -1. A bracket that closes the text, as
+// in "(Open settings)", is not a label.
+function leadingLabelEnd(sentence: string): number {
+    const m = /^[^\p{L}\p{N}]*?[[(][^[\]()]*[A-Za-z0-9][^[\]()]*[\])]\s+(?=[A-Za-z0-9])/u.exec(sentence);
+    return m ? m[0].length : -1;
+}
 
 // Applies sentence case transformation to a single sentence. With
 // `firstWordAnyCase`, the first word keeps the case it is written in, as after
@@ -510,6 +538,7 @@ function transformSentence(sentence: string, opts: ReturnType<typeof normalizeOp
     const brandMatches = collectBrandMatches(sentence, opts.brands, opts.ambiguousBrands)
         .filter((match) => !rangeOverlaps(protectedRanges, match.start, match.end));
     const brandRanges = mergeRanges(brandMatches.map((match) => [match.start, match.end]));
+    const labelEnd = leadingLabelEnd(sentence);
 
     const chars = sentence.split("");
 
@@ -544,10 +573,10 @@ function transformSentence(sentence: string, opts: ReturnType<typeof normalizeOp
 
         const firstToken = sentence.slice(tokenStart, tokenEnd);
         const upperToken = firstToken.toUpperCase();
-        // Emoji, "(", "#" and "*" before the first word are not text
+        // Emoji and "(" before the first word are not text
         const leadingContent = sentence.slice(0, firstAlpha)
             .replace(EMOJI_RE, '')
-            .replace(/[(#*]/g, '')
+            .replaceAll('(', '')
             .trim();
         const firstPart = firstToken.split("-")[0];
         const firstPartUpper = firstPart.toUpperCase();
@@ -570,8 +599,9 @@ function transformSentence(sentence: string, opts: ReturnType<typeof normalizeOp
         } else if (/^[0-9]/.test(firstToken)) {
             // "1st", "3D", "10x": a word that starts with a number has no
             // first letter to capitalize, so its letters stay as written
-        } else if (OPENING_QUOTES_RE.test(leadingContent)) {
-            // A first word in quotes, as in "\"Open\" settings", keeps its case
+        } else if (tokenStart === labelEnd || LEADING_MARKER_RE.test(leadingContent)) {
+            // A first word after a label, punctuation, a bullet or quotes, as in
+            // "[Beta] Feature", "- Item" or "\"Open\" settings", keeps its case
         } else if (leadingContent) {
             // Text before the first word, such as a number in "2 files
             // selected" or the "50%" of "50% complete", makes it a later word
@@ -610,6 +640,10 @@ function transformSentence(sentence: string, opts: ReturnType<typeof normalizeOp
         }
         // An acronym that is also a word keeps all caps when written that way
         if (opts.caseAgnosticAcronyms.has(upperToken) && token === upperToken) continue;
+        // "3D", "4K", "1st": a word that starts with a number keeps its letters
+        if (/^[0-9]/.test(token)) continue;
+        // The first word after a label, as in "[Beta] Feature", keeps its case
+        if (start === labelEnd) continue;
 
         const dottedMatch = token.match(/^([A-Za-z](?:\.[A-Za-z])+)(\.)?$/);
         if (dottedMatch) {
