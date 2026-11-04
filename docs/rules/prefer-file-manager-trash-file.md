@@ -9,9 +9,10 @@
 ## What is reported
 
 A call to `trash()` or `delete()` on Obsidian's `Vault`, recognised by type, so `this.app.vault`, a
-variable holding the vault and a `Vault` parameter are all found. `Vault.delete()` removes a file for
-good, and `Vault.trash()` picks the trash itself, both ignoring the user's "Deleted files" setting.
-`FileManager.trashFile()` follows that setting:
+variable holding the vault and a `Vault` parameter are all found, also when they may be null or
+undefined, as in `vault?.delete(file)` with `vault: Vault | null`, or `plugin?.app.vault.trash(file)`.
+`Vault.delete()` removes a file for good, and `Vault.trash()` picks the trash itself, both ignoring
+the user's "Deleted files" setting. `FileManager.trashFile()` follows that setting:
 
 ```ts
 await this.app.vault.delete(file); // reported
