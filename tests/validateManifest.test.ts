@@ -346,6 +346,117 @@ ruleTester.run("validate-manifest", manifestRule as unknown as Rule.RuleModule, 
                 }`,
             options: [{ allowedWords: { description: ["plugin"] } }],
         },
+        {
+            // The scanner reports a description shorter than 10 characters, not one of 10.
+            name: "a description of exactly 10 characters is accepted",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Word tally",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Counts it.",
+                    "isDesktopOnly": false
+                }`,
+        },
+        {
+            name: "a description of exactly 250 characters is accepted",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Word tally",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Counts words. Counts words. Counts words. Counts words. Counts words. Counts words. Counts words. Counts words. Counts words. Counts words. Counts words. Counts words. Counts words. Counts words. Counts words. Counts words. Counts words. Counts word.",
+                    "isDesktopOnly": false
+                }`,
+        },
+        {
+            // The scanner trims the description before it looks at its last character.
+            name: "a description ending with punctuation and then whitespace is accepted",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Word tally",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Counts words in the active note.  ",
+                    "isDesktopOnly": false
+                }`,
+        },
+        {
+            // Only a leading "ob" counts as a part of "Obsidian".
+            name: "a name containing 'ob' after its start is accepted",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Global search",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Counts words in the active note.",
+                    "isDesktopOnly": false
+                }`,
+        },
+        {
+            name: "allowedWords 'plugin' on the name accepts the word",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Plugin manager",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Counts words in the active note.",
+                    "isDesktopOnly": false
+                }`,
+            options: [{ allowedWords: { name: ["plugin"] } }],
+        },
+        {
+            name: "allowedWords 'obsidian' on the description accepts the word",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Word tally",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Counts words in Obsidian notes.",
+                    "isDesktopOnly": false
+                }`,
+            options: [{ allowedWords: { description: ["obsidian"] } }],
+        },
+        {
+            // "a plugin to" inside "Agenda plugin to" is not a self-reference.
+            name: "a self-reference must start a word",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Word tally",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Syncs the Agenda plugin to your calendar.",
+                    "isDesktopOnly": false
+                }`,
+        },
+        {
+            // Every description starts with an empty name; that is not reported.
+            name: "an empty name is not a prefix of the description",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Counts words in the active note.",
+                    "isDesktopOnly": false
+                }`,
+        },
     ],
     invalid: [
         {
@@ -1025,13 +1136,323 @@ ruleTester.run("validate-manifest", manifestRule as unknown as Rule.RuleModule, 
                 },
             ],
         },
-        // A newline or tab is a control character (Cc). The directory shows
-        // the description on one line, so neither belongs in it.
-        // JSON can escape half of a surrogate pair on its own. The result is
-        // not a character at all (Cs), and renders as a replacement glyph.
-        // Neither a flag nor a keycap contains an Extended_Pictographic code
-        // point: a flag is two regional indicators, a keycap is a digit, U+FE0F
-        // and U+20E3.
+        {
+            name: "a name containing 'obsi' after its start is reported",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Snobsi notes",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Counts words in the active note.",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                { messageId: "nameObsidianFragment" },
+            ],
+        },
+        {
+            name: "a description saying 'this tool' is reported",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Word tally",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "This tool counts words.",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                { messageId: "descriptionSelfReference" },
+            ],
+        },
+        {
+            name: "a description saying 'this add-on' is reported",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Word tally",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "This add-on counts words.",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                { messageId: "descriptionSelfReference" },
+            ],
+        },
+        {
+            name: "a description saying 'this Obsidian plugin' is reported",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Word tally",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "This Obsidian plugin counts words.",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                { messageId: "descriptionObsidian" },
+                { messageId: "descriptionSelfReference" },
+            ],
+        },
+        {
+            name: "a description saying 'a plugin for' is reported",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Word tally",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "A plugin for counting words.",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                { messageId: "descriptionSelfReference" },
+            ],
+        },
+        {
+            name: "a description saying 'an Obsidian plugin to' is reported",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Word tally",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "An Obsidian plugin to count words.",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                { messageId: "descriptionObsidian" },
+                { messageId: "descriptionSelfReference" },
+            ],
+        },
+        {
+            name: "a description of 9 characters is reported",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Word tally",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Count it.",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                { messageId: "descriptionTooShort" },
+            ],
+        },
+        {
+            name: "a description that is short once trimmed is reported",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Word tally",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "   Counts.    ",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                { messageId: "descriptionTooShort" },
+            ],
+        },
+        {
+            // The scanner measures the description untrimmed.
+            name: "trailing whitespace counts towards the 250 character limit",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Word tally",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Counts words. Counts words. Counts words. Counts words. Counts words. Counts words. Counts words. Counts words. Counts words. Counts words. Counts words. Counts words. Counts words. Counts words. Counts words. Counts words. Counts words. Counts word. ",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                { messageId: "descriptionTooLong", data: { length: "251" } },
+            ],
+        },
+        {
+            name: "a description with punctuation only before its end is reported",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Word tally",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Counts words. Then more",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                { messageId: "descriptionPunctuation" },
+            ],
+        },
+        {
+            name: "the name and the description are compared trimmed and in any case",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Counts words fast ",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "  counts WORDS fast.",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                { messageId: "descriptionStartsWithName" },
+            ],
+        },
+        {
+            name: "a description equal to the name, ignoring case and whitespace, is reported",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": " Counts words fast. ",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "counts WORDS fast.  ",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                { messageId: "descriptionSameAsName" },
+            ],
+        },
+        {
+            name: "a non-string name leaves the description unchecked against it",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": 42,
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "42 counts words.",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                { messageId: "invalidType", data: { key: "name", expectedType: "string", actualType: "number" } },
+            ],
+        },
+        {
+            name: "a string isDesktopOnly is reported",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Word tally",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Counts words in the active note.",
+                    "isDesktopOnly": "false"
+                }`,
+            errors: [
+                { messageId: "invalidType", data: { key: "isDesktopOnly", expectedType: "boolean", actualType: "string" } },
+            ],
+        },
+        {
+            name: "a non-string id is reported, without the word checks",
+            filename: "manifest.json",
+            code: `{
+                    "id": 12345,
+                    "name": "Word tally",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Counts words in the active note.",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                { messageId: "invalidType", data: { key: "id", expectedType: "string", actualType: "number" } },
+            ],
+        },
+        {
+            // The first name would be reported for "Obsidian"; JSON.parse keeps
+            // the last one, and so does the rule.
+            name: "the word checks use the last of duplicate keys",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Obsidian tally",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Counts words fast.",
+                    "isDesktopOnly": false,
+                    "name": "Word tally"
+                }`,
+            errors: [
+                { messageId: "duplicateKey", data: { key: "name" }, line: 9, column: 21, endLine: 9, endColumn: 27 },
+            ],
+        },
+        {
+            // The description starts with the first name, but not with the last.
+            name: "the description checks use the last of duplicate names",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Counts words",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Counts words fast.",
+                    "isDesktopOnly": false,
+                    "name": "Word tally"
+                }`,
+            errors: [
+                { messageId: "duplicateKey", data: { key: "name" }, line: 9, column: 21 },
+            ],
+        },
+        {
+            // A word or type problem is the value's, an unknown key the key's.
+            name: "each problem is reported on the key or value it is about",
+            filename: "manifest.json",
+            code: `{
+                    "id": "obsidian-tally",
+                    "name": "Word tally",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Counts words in the active note.",
+                    "isDesktopOnly": "no",
+                    "fundingUrl": { "patreon": 1 },
+                    "eslintIgnore": true
+                }`,
+            errors: [
+                { messageId: "idObsidian", line: 2, column: 27, endLine: 2, endColumn: 43 },
+                { messageId: "invalidType", line: 8, column: 38, endLine: 8, endColumn: 42 },
+                { messageId: "invalidFundingUrl", line: 9, column: 48, endLine: 9, endColumn: 49 },
+                { messageId: "disallowedKey", line: 10, column: 21, endLine: 10, endColumn: 35 },
+            ],
+        },
+        {
+            name: "a missing key is reported on the root object",
+            filename: "manifest.json",
+            code: `
+                {}`,
+            errors: [
+                { messageId: "missingKey", data: { key: "author" }, line: 2, column: 17 },
+                { messageId: "missingKey" },
+                { messageId: "missingKey" },
+                { messageId: "missingKey" },
+                { messageId: "missingKey" },
+                { messageId: "missingKey" },
+                { messageId: "missingKey" },
+            ],
+        },
     ],
 });
 
@@ -1098,6 +1519,26 @@ json5RuleTester.run("validate-manifest (json5)", manifestRule as unknown as Rule
                 {
                     messageId: "duplicateKey",
                     data: { key: "id" },
+                },
+            ],
+        },
+        {
+            // JSON5 has NaN and Infinity, which have no JSON type to name.
+            name: "a NaN value is reported as of unknown type",
+            filename: "manifest.json",
+            code: `{
+                    id: "foo-bar",
+                    name: "Foo bar",
+                    author: "Me",
+                    version: "1.0.0",
+                    minAppVersion: "1.0.0",
+                    description: "A way to foo bar your life.",
+                    isDesktopOnly: NaN,
+                }`,
+            errors: [
+                {
+                    messageId: "invalidType",
+                    data: { key: "isDesktopOnly", expectedType: "boolean", actualType: "unknown" },
                 },
             ],
         },
