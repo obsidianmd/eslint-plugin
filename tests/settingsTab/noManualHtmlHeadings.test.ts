@@ -1275,7 +1275,15 @@ describe("no-manual-html-headings suggestion descriptions", () => {
             files: ["**/*.ts"],
             languageOptions: {
                 parser: tseslint.parser,
-                ...(typed && { parserOptions: { project: "./tsconfig.json", tsconfigRootDir: process.cwd() } }),
+                // With CI=true, typescript-eslint would otherwise build the program
+                // once from file.ts on disk, and type-check that instead of `body`.
+                ...(typed && {
+                    parserOptions: {
+                        project: "./tsconfig.json",
+                        tsconfigRootDir: process.cwd(),
+                        disallowAutomaticSingleRunInference: true,
+                    },
+                }),
             },
             plugins: { obsidianmd: { rules: { "no-manual-html-headings": noManualHeadingsRule as never } } },
             rules: { "obsidianmd/no-manual-html-headings": "error" },
