@@ -75,7 +75,6 @@ type MessageIds =
     | "disallowedKey"
     | "duplicateKey"
     | "invalidFundingUrl"
-    | "emptyFundingUrlObject"
     | "mustBeRootObject"
     | "idObsidian"
     | "idEndsWithPlugin"
@@ -255,7 +254,6 @@ const rule: ValidateManifestRuleDefinition = {
                 "The '{{key}}' property is defined multiple times in the manifest.",
             invalidFundingUrl:
                 "The 'fundingUrl' object must only contain string values.",
-            emptyFundingUrlObject: "The 'fundingUrl' cannot be empty.",
             mustBeRootObject: "The manifest must be a single JSON object.",
             idObsidian: "The plugin id must not contain \"obsidian\".",
             idEndsWithPlugin: "The plugin id must not end with \"plugin\".",
@@ -398,70 +396,31 @@ const rule: ValidateManifestRuleDefinition = {
                             }
                         }
 
-                        if (key === "fundingUrl") {
-                            if (
-                                actualType === "object" &&
-                                valueNode.type === "Object"
-                            ) {
-                                if (valueNode.members.length > 0) {
-                                    // Check for duplicate keys in fundingUrl
-                                    const fundingKeys = new Set<string>();
-                                    for (const fundingMember of valueNode.members) {
-                                        const propKey =
-                                            getMemberKey(fundingMember);
+                        // An empty fundingUrl string or object, and an empty
+                        // entry, are accepted: the review checks only the URLs
+                        // that are there, and an empty one gives no results.
+                        if (key === "fundingUrl" && valueNode.type === "Object") {
+                            const fundingKeys = new Set<string>();
+                            for (const fundingMember of valueNode.members) {
+                                const propKey = getMemberKey(fundingMember);
 
-                                        if (fundingKeys.has(propKey)) {
-                                            context.report({
-                                                node: fundingMember.name,
-                                                messageId: "duplicateKey",
-                                                data: { key: propKey },
-                                            });
-                                        }
-
-                                        fundingKeys.add(propKey);
-
-                                        // Check if each property in fundingUrl is a string
-                                        if (
-                                            getAstNodeType(
-                                                fundingMember.value,
-                                            ) !== "string"
-                                        ) {
-                                            context.report({
-                                                node: fundingMember.value,
-                                                messageId: "invalidFundingUrl",
-                                            });
-                                        }
-
-                                        // Check for empty string values
-                                        if (
-                                            fundingMember.value.type ===
-                                            "String" &&
-                                            fundingMember.value.value.length ===
-                                            0
-                                        ) {
-                                            context.report({
-                                                node: fundingMember.value,
-                                                messageId:
-                                                    "emptyFundingUrlObject",
-                                            });
-                                        }
-                                    }
-                                } else {
-                                    // Check for empty fundingUrl object
+                                if (fundingKeys.has(propKey)) {
                                     context.report({
-                                        node: valueNode,
-                                        messageId: "emptyFundingUrlObject",
+                                        node: fundingMember.name,
+                                        messageId: "duplicateKey",
+                                        data: { key: propKey },
                                     });
                                 }
-                            } else if (
-                                actualType === "string" &&
-                                valueNode.type === "String" &&
-                                valueNode.value.length === 0
-                            ) {
-                                context.report({
-                                    node: valueNode,
-                                    messageId: "emptyFundingUrlObject",
-                                });
+
+                                fundingKeys.add(propKey);
+
+                                // Each labelled entry must be a string
+                                if (getAstNodeType(fundingMember.value) !== "string") {
+                                    context.report({
+                                        node: fundingMember.value,
+                                        messageId: "invalidFundingUrl",
+                                    });
+                                }
                             }
                         }
                     } else {
