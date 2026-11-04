@@ -1,0 +1,12 @@
+{
+	"compilerOptions": {
+		"target": "es2022",
+		"module": "nodenext",
+		"lib": ["es2022", "dom"],
+		"jsx": "preserve",
+		"skipLibCheck": true,
+		"noEmit": true,
+		"types": []
+	},
+	"include": ["file.tsx", "file.mts", "file.cts"]
+}

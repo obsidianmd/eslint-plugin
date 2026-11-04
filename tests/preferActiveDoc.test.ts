@@ -368,14 +368,11 @@ typedJsRuleTester.run("prefer-active-doc in a JavaScript file with type informat
 });
 
 // The recommended config runs prefer-create-el on .tsx, .mts and .cts files as
-// well as on .ts ones.
+// well as on .ts ones. The files are stubs in a fixture project: a project
+// service with allowDefaultProject would be shared with the rest of the run.
 const otherExtensionsRuleTester = new RuleTester({
     languageOptions: {
-        parserOptions: {
-            project: null,
-            projectService: { allowDefaultProject: ["*.tsx", "*.mts", "*.cts"] },
-            tsconfigRootDir: process.cwd(),
-        },
+        parserOptions: { project: "./tsconfig.json", tsconfigRootDir: `${process.cwd()}/tests/fixtures/ts-extensions` },
     },
 });
 
