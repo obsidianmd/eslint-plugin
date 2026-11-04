@@ -1,4 +1,5 @@
 import type { Linter } from "eslint";
+import path from "node:path";
 import globals from "globals";
 
 // The globals.browser names that a dedicated worker has as well, although the
@@ -41,3 +42,13 @@ export const browserOnlyGlobalsOff: Linter.Globals = Object.fromEntries(
         .filter((name) => !Object.hasOwn(globals.worker, name) && !BROWSER_GLOBALS_ALSO_IN_WORKERS.has(name))
         .map((name) => [name, "off"]),
 );
+
+// The paths the recommended config treats as web worker code, as its
+// WORKER_FILES globs match them: a `*.worker.<ext>` file, or any file under a
+// `workers` directory. Kept in step with WORKER_FILES in index.ts.
+const WORKER_FILE = /(?:^|\/)(?:[^/.][^/]*\.worker|workers\/(?:[^/]+\/)*[^/.][^/]*)\.(?:ts|cts|mts|tsx|js|cjs|mjs|jsx)$/;
+
+/** Whether `filename`, relative to `cwd`, is a web worker file by its path. */
+export function isWorkerFile(filename: string, cwd: string): boolean {
+    return WORKER_FILE.test(path.relative(cwd, filename).split(path.sep).join("/"));
+}

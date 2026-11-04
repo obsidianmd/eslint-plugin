@@ -1,9 +1,11 @@
 import assert from "node:assert";
 import fs from "node:fs";
+import path from "node:path";
 import { createRequire } from "node:module";
 import { ESLint, type Linter } from "eslint";
 import globals from "globals";
 import plugin from "../lib/index.js";
+import { isWorkerFile } from "../lib/workerGlobals.js";
 
 // Web worker code runs without a window, so the recommended config switches off
 // the rules whose fix needs one (#171). Their autofixes rewrote `globalThis` to
@@ -306,4 +308,26 @@ describe("worker code under another name, with the docs' override", () => {
 			],
 		);
 	});
+});
+
+// prefer-active-doc offers no suggestion in a worker file even where it is
+// enabled there by hand, and tells one by its path as the config does.
+describe("isWorkerFile", () => {
+	const cwd = process.cwd();
+	for (const filename of WORKER_FILES) {
+		it(`is true for ${filename}`, () => {
+			assert.strictEqual(isWorkerFile(path.join(cwd, filename), cwd), true);
+		});
+	}
+	for (const extension of EXTENSIONS) {
+		it(`is true for .${extension} worker files`, () => {
+			assert.strictEqual(isWorkerFile(path.join(cwd, `src/indexer.worker.${extension}`), cwd), true);
+			assert.strictEqual(isWorkerFile(path.join(cwd, `workers/helper.${extension}`), cwd), true);
+		});
+	}
+	for (const filename of NOT_WORKER_FILES) {
+		it(`is false for ${filename}`, () => {
+			assert.strictEqual(isWorkerFile(path.join(cwd, filename), cwd), false);
+		});
+	}
 });

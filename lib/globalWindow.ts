@@ -72,6 +72,32 @@ export function mayLackWindowAt(context: Context, node: TSESTree.Node): boolean 
     );
 }
 
+/**
+ * Whether code at `node` may run where there is no `activeDocument` or
+ * `activeWindow`, as far as the file shows. Those are Obsidian's: a browser
+ * or a DOM emulation such as jsdom has a `document` and a `window` without
+ * them. Code written to run there checks where it is:
+ *
+ * - a window check before it in the same function, or one that decides
+ *   whether it runs, whatever the check finds: `typeof document`,
+ *   `"window" in globalThis`, a worker check;
+ * - the same for a check of Obsidian's own globals: `typeof activeDocument`,
+ *   `"activeWindow" in window`, `window.activeDocument ?? …`, or a bare
+ *   `activeDocument` that is only tested;
+ * - it runs where a `try` that reads the window has failed, or mayLackWindowAt
+ *   holds.
+ *
+ * A rule offers no rewrite to `activeDocument` or `activeWindow` there.
+ */
+export function mayRunOutsideObsidianAt(context: Context, node: TSESTree.Node): boolean {
+    const facts = getWindowFacts(context.sourceCode);
+    return (
+        followsWindowCheck(context.sourceCode, node, true) ||
+        followsCheck(facts.obsidianChecks, node, true) ||
+        mayLackWindowAt(context, node)
+    );
+}
+
 // A name that says which environment the code runs in: isBrowser, inBrowser,
 // IS_BROWSER, isNode, isNodeJs, isNodeEnv, isWorker, inWorker, isWebWorker,
 // isServer, isSSR, isElectron, hasWindow, hasDom, hasDocument, canUseDOM.
@@ -266,6 +292,9 @@ interface WindowCheck {
 
 interface WindowFacts {
     checks: WindowCheck[];
+    // Checks of Obsidian's `activeDocument` or `activeWindow`, which tell
+    // nothing about the window itself.
+    obsidianChecks: WindowCheck[];
     // Each `try` whose block reads the window, so throws without one.
     windowTries: TSESTree.TryStatement[];
     // The reads and calls that hold a check whose meaning is known:
@@ -285,18 +314,25 @@ const windowFactsCache = new WeakMap<TSESTree.Program, WindowFacts>();
 // decide it, such as `const browser = typeof window !== "undefined"`, still
 // counts in the same function, but not in the functions nested in it; there,
 // each read of `browser` is a check of its own.
-function followsWindowCheck(sourceCode: Context["sourceCode"], node: TSESTree.Node): boolean {
+// With `anyCheck`, a check that decides whether `node` runs counts whatever it
+// finds: one that proves the window is there does not prove Obsidian is.
+function followsWindowCheck(sourceCode: Context["sourceCode"], node: TSESTree.Node, anyCheck = false): boolean {
     const facts = getWindowFacts(sourceCode);
     return (
-        facts.checks.some(({ condition, presentWhenTrue }) => {
-            const scope = enclosingFunction(condition);
-            if (condition.range[1] > node.range[0] || !contains(scope, node)) {
-                return false;
-            }
-            const value = presentWhenTrue === undefined ? undefined : conditionValueAt(condition, node);
-            return value === undefined ? enclosingFunction(node) === scope : value !== presentWhenTrue;
-        }) || facts.windowTries.some((statement) => runsWhenTryFails(statement, node))
+        followsCheck(facts.checks, node, anyCheck) ||
+        facts.windowTries.some((statement) => runsWhenTryFails(statement, node))
     );
+}
+
+function followsCheck(checks: WindowCheck[], node: TSESTree.Node, anyCheck: boolean): boolean {
+    return checks.some(({ condition, presentWhenTrue }) => {
+        const scope = enclosingFunction(condition);
+        if (condition.range[1] > node.range[0] || !contains(scope, node)) {
+            return false;
+        }
+        const value = presentWhenTrue === undefined && !anyCheck ? undefined : conditionValueAt(condition, node);
+        return value === undefined ? enclosingFunction(node) === scope : anyCheck || value !== presentWhenTrue;
+    });
 }
 
 // Whether `node` runs when the block of `statement` throws: in its `catch` or
@@ -506,13 +542,17 @@ function getWindowFacts(sourceCode: Context["sourceCode"]): WindowFacts {
     if (cached) {
         return cached;
     }
-    const facts: WindowFacts = { checks: [], windowTries: [], knownChecks: new Set() };
+    const facts: WindowFacts = { checks: [], obsidianChecks: [], windowTries: [], knownChecks: new Set() };
     const followed = new Set<TSESTree.Node>();
     // Whether `node` or anything in it reads the window.
     const visit = (node: TSESTree.Node): boolean => {
         const name = checkedName(node);
         if (name !== undefined) {
-            addWindowCheck(sourceCode, facts, toWindowCheck(node, name), followed);
+            addWindowCheck(sourceCode, facts, facts.checks, toWindowCheck(node, name), followed);
+        }
+        const obsidianName = checkedObsidianName(node);
+        if (obsidianName !== undefined) {
+            addWindowCheck(sourceCode, facts, facts.obsidianChecks, toWindowCheck(node, obsidianName), followed);
         }
         let reads = readsWindow(node);
         for (const key of sourceCode.visitorKeys[node.type] ?? []) {
@@ -548,10 +588,11 @@ function isNode(value: unknown): value is TSESTree.Node {
 function addWindowCheck(
     sourceCode: Context["sourceCode"],
     facts: WindowFacts,
+    checks: WindowCheck[],
     check: WindowCheck,
     followed: Set<TSESTree.Node>,
 ): void {
-    facts.checks.push(check);
+    checks.push(check);
     // `!` keeps what the value says; `&&` and `||` lose it.
     let value: TSESTree.Node = check.condition;
     let presentWhenTrue = check.presentWhenTrue;
@@ -585,7 +626,7 @@ function addWindowCheck(
         if (held !== undefined) {
             facts.knownChecks.add(condition);
         }
-        addWindowCheck(sourceCode, facts, { condition, presentWhenTrue: held }, followed);
+        addWindowCheck(sourceCode, facts, checks, { condition, presentWhenTrue: held }, followed);
     }
 }
 
@@ -713,6 +754,58 @@ function checkedName(node: TSESTree.Node): string | undefined {
         return key === undefined ? undefined : environmentName(key);
     }
     return isOnlyTested(node) ? chainedName(node, GLOBAL_OBJECTS) : undefined;
+}
+
+// Obsidian's globals, which a browser or jsdom does not have, and the objects
+// they are read from when the code expects them to be missing.
+const OBSIDIAN_WINDOW_NAMES = new Set(["activeDocument", "activeWindow"]);
+const OBSIDIAN_GLOBAL_OBJECTS = new Set([...GLOBAL_OBJECTS, "window"]);
+
+// The Obsidian global that `node` checks for: `typeof activeDocument`,
+// `typeof window.activeWindow`, `"activeDocument" in window`, a chain on the
+// global object or `window` that is only tested (`window.activeDocument ?? …`),
+// or a bare `activeDocument` that is only tested.
+function checkedObsidianName(node: TSESTree.Node): string | undefined {
+    const nameOf = (name: string | undefined) => (name !== undefined && OBSIDIAN_WINDOW_NAMES.has(name) ? name : undefined);
+    if (node.type === TSESTree.AST_NODE_TYPES.UnaryExpression && node.operator === "typeof") {
+        const arg = skipChainAndCasts(node.argument);
+        return nameOf(arg.type === TSESTree.AST_NODE_TYPES.Identifier ? arg.name : chainedKey(arg, OBSIDIAN_WINDOW_NAMES));
+    }
+    if (node.type === TSESTree.AST_NODE_TYPES.BinaryExpression && node.operator === "in") {
+        return nameOf(node.left.type === TSESTree.AST_NODE_TYPES.PrivateIdentifier ? undefined : staticString(node.left));
+    }
+    if (!isOnlyTested(node)) {
+        return undefined;
+    }
+    if (node.type === TSESTree.AST_NODE_TYPES.Identifier) {
+        return nameOf(node.name);
+    }
+    const root = chainRoot(node);
+    return root.type === TSESTree.AST_NODE_TYPES.Identifier && OBSIDIAN_GLOBAL_OBJECTS.has(root.name)
+        ? chainedKey(node, OBSIDIAN_WINDOW_NAMES)
+        : undefined;
+}
+
+// The first key of `names` in the member chain `node`, from its end.
+function chainedKey(node: TSESTree.Node, names: Set<string>): string | undefined {
+    let current = skipChainAndCasts(node);
+    while (current.type === TSESTree.AST_NODE_TYPES.MemberExpression) {
+        const key = staticKey(current);
+        if (key !== undefined && names.has(key)) {
+            return key;
+        }
+        current = skipChainAndCasts(current.object);
+    }
+    return undefined;
+}
+
+// The object the member chain `node` starts from.
+function chainRoot(node: TSESTree.Node): TSESTree.Node {
+    let current = skipChainAndCasts(node);
+    while (current.type === TSESTree.AST_NODE_TYPES.MemberExpression) {
+        current = skipChainAndCasts(current.object);
+    }
+    return current;
 }
 
 function environmentName(name: string): string | undefined {

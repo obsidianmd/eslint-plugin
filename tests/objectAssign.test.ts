@@ -70,7 +70,8 @@ ruleTester.run("object-assign", objectAssignRule, {
         {
             name: "Object.assign with two args mutating first is forbidden",
             code: "Object.assign(defaultConfig, config);",
-            errors: [{ messageId: "twoArgumentsDefault" }],
+            // The result is thrown away: the code relies on the target being changed.
+            errors: [{ messageId: "twoArgumentsDefault", suggestions: [] }],
         },
         {
             name: "Object.assign mutating DEFAULT_SETTINGS is forbidden",
@@ -83,42 +84,131 @@ ruleTester.run("object-assign", objectAssignRule, {
                     }
                 }
             `,
-            errors: [{ messageId: "twoArgumentsDefault" }],
+            errors: [{
+                messageId: "twoArgumentsDefault",
+                suggestions: [{
+                    messageId: "copyIntoNewObject",
+                    data: { target: "DEFAULT_SETTINGS" },
+                    output: `
+                class MyPlugin {
+                    settings: unknown;
+
+                    async loadSettings() {
+                        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+                    }
+                }
+            `,
+                }],
+            }],
         },
         {
             name: "the defaults name is matched in any case",
             code: "Object.assign(myDefaults, data);",
-            errors: [{ messageId: "twoArgumentsDefault" }],
+            // The result is thrown away: the code relies on the target being changed.
+            errors: [{ messageId: "twoArgumentsDefault", suggestions: [] }],
         },
         {
             name: "a property of this named defaults is reported",
             code: "this.settings = Object.assign(this.defaults, await this.loadData());",
-            errors: [{ messageId: "twoArgumentsDefault" }],
+            errors: [{
+                messageId: "twoArgumentsDefault",
+                suggestions: [{ messageId: "copyIntoNewObject", data: { target: "this.defaults" }, output: "this.settings = Object.assign({}, this.defaults, await this.loadData());" }],
+            }],
         },
         {
             name: "a property of another object named DEFAULT_SETTINGS is reported",
             code: "this.settings = Object.assign(Constants.DEFAULT_SETTINGS, data);",
-            errors: [{ messageId: "twoArgumentsDefault" }],
+            errors: [{
+                messageId: "twoArgumentsDefault",
+                suggestions: [{ messageId: "copyIntoNewObject", data: { target: "Constants.DEFAULT_SETTINGS" }, output: "this.settings = Object.assign({}, Constants.DEFAULT_SETTINGS, data);" }],
+            }],
         },
         {
             name: "a camel-case defaults property is reported",
             code: "Object.assign(this.defaultSettings, data);",
-            errors: [{ messageId: "twoArgumentsDefault" }],
+            // The result is thrown away: the code relies on the target being changed.
+            errors: [{ messageId: "twoArgumentsDefault", suggestions: [] }],
         },
         {
             name: "a nested property is matched by its last name",
             code: "Object.assign(this.plugin.DEFAULT_SETTINGS, data);",
-            errors: [{ messageId: "twoArgumentsDefault" }],
+            // The result is thrown away: the code relies on the target being changed.
+            errors: [{ messageId: "twoArgumentsDefault", suggestions: [] }],
         },
         {
             name: "a computed property with a string key is reported",
             code: "Object.assign(this[\"defaults\"], data);",
-            errors: [{ messageId: "twoArgumentsDefault" }],
+            // The result is thrown away: the code relies on the target being changed.
+            errors: [{ messageId: "twoArgumentsDefault", suggestions: [] }],
         },
         {
             name: "a private field is reported",
             code: "class Store { #defaults = {}; load(data: object) { return Object.assign(this.#defaults, data); } }",
-            errors: [{ messageId: "twoArgumentsDefault" }],
+            errors: [{
+                messageId: "twoArgumentsDefault",
+                suggestions: [{ messageId: "copyIntoNewObject", data: { target: "this.#defaults" }, output: "class Store { #defaults = {}; load(data: object) { return Object.assign({}, this.#defaults, data); } }" }],
+            }],
+        },
+    ],
+});
+
+const copied = (target: string, output: string) => [{ messageId: "copyIntoNewObject" as const, data: { target }, output }];
+
+ruleTester.run("object-assign suggestions", objectAssignRule, {
+    valid: [],
+    invalid: [
+        {
+            name: "?. is kept",
+            code: "export const s = Object.assign?.(DEFAULT_SETTINGS, data);",
+            errors: [{ messageId: "twoArgumentsDefault", suggestions: copied("DEFAULT_SETTINGS", "export const s = Object.assign?.({}, DEFAULT_SETTINGS, data);") }],
+        },
+        {
+            name: "parentheses and comments are kept",
+            code: "export const s = (Object.assign)(/* base */ (DEFAULT_SETTINGS), data);",
+            errors: [{ messageId: "twoArgumentsDefault", suggestions: copied("DEFAULT_SETTINGS", "export const s = (Object.assign)(/* base */ {}, (DEFAULT_SETTINGS), data);") }],
+        },
+        {
+            name: "a call over several lines, with CRLF and a trailing comma",
+            code: "export async function load(p: { loadData(): Promise<object> }) {\r\n    return Object.assign(\r\n        DEFAULT_SETTINGS,\r\n        await p.loadData(),\r\n    );\r\n}\r\n",
+            errors: [{
+                messageId: "twoArgumentsDefault",
+                suggestions: copied("DEFAULT_SETTINGS", "export async function load(p: { loadData(): Promise<object> }) {\r\n    return Object.assign(\r\n        {}, DEFAULT_SETTINGS,\r\n        await p.loadData(),\r\n    );\r\n}\r\n"),
+            }],
+        },
+        {
+            name: "a spread source is kept",
+            code: "export const s = Object.assign(defaults, ...sources);",
+            errors: [{ messageId: "twoArgumentsDefault", suggestions: copied("defaults", "export const s = Object.assign({}, defaults, ...sources);") }],
+        },
+        // Nothing is offered:
+        {
+            name: "where the result is thrown away with void, or by a chain",
+            code: "void Object.assign(DEFAULT_SETTINGS, data); Object.assign?.(DEFAULT_SETTINGS, data);",
+            errors: [
+                { messageId: "twoArgumentsDefault", suggestions: [] },
+                { messageId: "twoArgumentsDefault", suggestions: [] },
+            ],
+        },
+        {
+            name: "with type arguments, which are for two arguments",
+            code: "interface Settings { a: number } export const s = Object.assign<Settings, Partial<Settings>>(DEFAULT_SETTINGS, data);",
+            errors: [{ messageId: "twoArgumentsDefault", suggestions: [] }],
+        },
+    ],
+});
+
+const untypedRuleTester = new RuleTester({
+    languageOptions: { parserOptions: { project: null, projectService: false } },
+});
+
+untypedRuleTester.run("object-assign in a JavaScript file", objectAssignRule, {
+    valid: [],
+    invalid: [
+        {
+            name: "the suggestion is offered",
+            filename: "main.js",
+            code: "module.exports.load = (data) => Object.assign(DEFAULT_SETTINGS, data);\n",
+            errors: [{ messageId: "twoArgumentsDefault", suggestions: copied("DEFAULT_SETTINGS", "module.exports.load = (data) => Object.assign({}, DEFAULT_SETTINGS, data);\n") }],
         },
     ],
 });
