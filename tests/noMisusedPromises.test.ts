@@ -231,6 +231,60 @@ ruleTester.run("no-misused-promises", noMisusedPromisesRule, {
             options: [{ checksConditionals: { flagUnions: "all" } }],
             errors: [{ messageId: "conditional" }],
         },
+        // Only `then` is changed: other members declared in obsidian.d.ts keep
+        // their types, so an async callback is still checked against them.
+        {
+            name: "an async callback passed where an obsidian API expects a void-returning one",
+            code: `
+                import { App, TFile } from "obsidian";
+                declare const app: App;
+                declare const file: TFile;
+                void app.fileManager.processFrontMatter(file, async (frontmatter) => {
+                    frontmatter.updated = await Promise.resolve(Date.now());
+                });
+            `,
+            errors: [{ messageId: "voidReturnArgument" }],
+        },
+        {
+            name: "an async override of a void-returning obsidian method",
+            code: `
+                import { Component } from "obsidian";
+                export class Panel extends Component {
+                    async onunload(): Promise<void> {
+                        await Promise.resolve();
+                    }
+                }
+            `,
+            errors: [{ messageId: "voidReturnInheritedMethod" }],
+        },
+        {
+            name: "an async function in a void-returning property of an obsidian type",
+            code: `
+                import type { SettingDefinitionAction } from "obsidian";
+                const definition: SettingDefinitionAction = {
+                    name: "Export",
+                    action: async () => { await Promise.resolve(); },
+                };
+            `,
+            errors: [{ messageId: "voidReturnProperty" }],
+        },
+        {
+            name: "a then without declarations, from a mapped type, is a thenable",
+            code: `
+                declare const lazy: Record<"then", (onFulfilled: (value: number) => void) => void>;
+                if (lazy) {}
+            `,
+            errors: [{ messageId: "conditional" }],
+        },
+        {
+            name: "a then declared in a project's own obsidian.d.ts is a thenable",
+            code: `
+                import type { Deferred } from "./tests/fixtures/types/obsidian.js";
+                declare const deferred: Deferred;
+                if (deferred) {}
+            `,
+            errors: [{ messageId: "conditional" }],
+        },
         {
             name: "an intersection of a Setting and a Promise",
             code: `
