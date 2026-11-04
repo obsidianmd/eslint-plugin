@@ -285,6 +285,54 @@ tester.run("ui-sentence-case", rule, {
             name: "a command name that is not a string is not checked",
             code: "this.addCommand({ id: 'x', name: label }); this.addCommand({ ...base }); this.addCommand(command); this.addCommand();",
         },
+        {
+            name: "a template literal is judged on its value, not on its escapes",
+            code: "new Notice(`Open\\u0020settings`); new Notice(`Open settings\\x2E`); new Notice(`Line one\\nline two`);",
+        },
+        {
+            name: "a number before the first word makes it a later word",
+            code: "new Notice('2 files selected'); new Notice('1st place'); new Notice('3D view');",
+        },
+        {
+            name: "the word after e.g., i.e., etc. or vs. may take either case",
+            code: "new Setting(el).setDesc('Choose a folder, e.g. notes'); new Notice('Choose a folder, e.g. Notes'); new Notice('Compare local vs. remote');",
+        },
+        {
+            name: "a first word in quotes keeps its capital",
+            code: "new Notice('\"Open\" settings'); new Notice(\"'Open' settings\"); new Notice('\"open\" settings');",
+        },
+        {
+            name: "an AM/PM token after a time format keeps its casing",
+            code: "new Setting(el).setDesc('Format: hh:mm A');",
+        },
+        {
+            name: "a mixed-case acronym keeps its listed casing",
+            code: "new Notice('Sign in with OAuth');",
+        },
+        {
+            name: "a brand that is also an ordinary word may be written as the word",
+            code: "new Notice('Close all windows'); new Notice('Move the cursor'); new Notice('Leave some slack'); new Notice('The notion of time'); new Notice('Press x to close'); new Notice('Views react to changes');",
+        },
+        {
+            name: "a data attribute set through dataset is not UI text",
+            code: "el.dataset.title = 'Open Daily Note'; el.dataset.placeholder = 'Enter Name'; this.containerEl.dataset.ariaLabel = 'Open Daily Note';",
+        },
+        {
+            name: "a property in snake case is not a DOM text property",
+            code: "item.aria_label = 'Open Daily Note';",
+        },
+        {
+            name: "a computed property named by a variable is not checked",
+            code: "declare const title: string; el[title] = 'Open Daily Note';",
+        },
+        {
+            name: "text appended with += is not checked",
+            code: "el.textContent += ' done'; el.title += ' And More';",
+        },
+        {
+            name: "a file name or a path is still skipped",
+            code: "new Notice('Open config.json'); new Notice('See docs/readme.md'); new Notice('Saved to Notes/Daily.md'); new Notice('https://x.com/a.b'); new Notice('Open .obsidian/plugins Folder');",
+        },
     ],
     invalid: [
         {
@@ -498,17 +546,17 @@ tester.run("ui-sentence-case", rule, {
             ],
         },
         {
-            name: "a template literal without expressions is checked and fixed to a string",
+            name: "a template literal without expressions is checked and fixed in place",
             code: "new Notice(`Open Daily Note`);",
             options: [{ allowAutoFix: true }],
-            output: "new Notice(\"Open daily note\");",
+            output: "new Notice(`Open daily note`);",
             errors: [{ messageId: "useSentenceCase", data: { suggestion: "Open daily note" } }],
         },
         {
-            name: "a template literal with a double quote is fixed to a valid string",
+            name: "a template literal with a double quote keeps its backticks",
             code: 'new Notice(`Say "Open Now" Here`);',
             options: [{ allowAutoFix: true }],
-            output: 'new Notice("Say \\"open now\\" here");',
+            output: 'new Notice(`Say "open now" here`);',
             errors: [{ messageId: "useSentenceCase", data: { suggestion: 'Say "open now" here' } }],
         },
         {
@@ -591,11 +639,125 @@ tester.run("ui-sentence-case", rule, {
             errors: [{ messageId: "useSentenceCase" }, { messageId: "useSentenceCase" }],
         },
         {
-            name: "the fix writes control characters and line separators as escapes",
+            name: "the fix keeps every escape as written",
             code: String.raw`new Notice('Open Now\r\nOr\u2028Later\u0001Too\u000b\b\f\0'); new Notice('Open Now\x001\x009'); new Notice("Open Now\v\0");`,
             options: [{ allowAutoFix: true }],
-            output: String.raw`new Notice('Open now\r\nor\u2028later\x01too\v\b\f\0'); new Notice('Open now\x001\x009'); new Notice("Open now\v\0");`,
+            output: String.raw`new Notice('Open now\r\nor\u2028later\u0001too\u000b\b\f\0'); new Notice('Open now\x001\x009'); new Notice("Open now\v\0");`,
             errors: [{ messageId: "useSentenceCase" }, { messageId: "useSentenceCase" }, { messageId: "useSentenceCase" }],
+        },
+        {
+            name: "a template literal is judged and fixed on its value, its escapes kept",
+            code: "new Notice(`Open Settings\\tNow`); new Notice(`Line One\\nLine Two`); new Notice(`Open\\u0020Settings`);",
+            options: [{ allowAutoFix: true }],
+            output: "new Notice(`Open settings\\tnow`); new Notice(`Line one\\nline two`); new Notice(`Open\\u0020settings`);",
+            errors: [
+                { messageId: "useSentenceCase", data: { suggestion: "Open settings\tnow" } },
+                { messageId: "useSentenceCase", data: { suggestion: "Line one\nline two" } },
+                { messageId: "useSentenceCase", data: { suggestion: "Open settings" } },
+            ],
+        },
+        {
+            name: "a template literal keeps its line breaks, escaped quotes and line continuations",
+            code: "new Notice(`Open Settings\r\nNow \\' Here \\\r\nToo`);",
+            options: [{ allowAutoFix: true }],
+            output: "new Notice(`Open settings\r\nnow \\' here \\\r\ntoo`);",
+            errors: [{ messageId: "useSentenceCase", data: { suggestion: "Open settings\nnow ' here too" } }],
+        },
+        {
+            name: "a string keeps its escapes, an escaped letter included",
+            code: String.raw`new Notice('\u0041pply Settings'); new Notice("Say \"Open\" Now"); new Notice('Open \
+Settings'); new Notice('It\'s \u{1F600} Open');`,
+            options: [{ allowAutoFix: true }],
+            output: String.raw`new Notice('\u0041pply settings'); new Notice("Say \"open\" now"); new Notice('Open \
+settings'); new Notice('It\'s \u{1F600} open');`,
+            errors: [
+                { messageId: "useSentenceCase", data: { suggestion: "Apply settings" } },
+                { messageId: "useSentenceCase", data: { suggestion: 'Say "open" now' } },
+                { messageId: "useSentenceCase", data: { suggestion: "Open settings" } },
+                { messageId: "useSentenceCase", data: { suggestion: "It's \u{1F600} open" } },
+            ],
+        },
+        {
+            name: "a letter that has to change but is written as an escape is reported without a fix",
+            code: String.raw`new Notice('Open \u0053ettings'); new Notice(` + "`Open \\x53ettings`" + String.raw`); new Notice('Open \u{53}ettings');`,
+            options: [{ allowAutoFix: true }],
+            output: null,
+            errors: [
+                { messageId: "useSentenceCase", data: { suggestion: "Open settings" } },
+                { messageId: "useSentenceCase", data: { suggestion: "Open settings" } },
+                { messageId: "useSentenceCase", data: { suggestion: "Open settings" } },
+            ],
+        },
+        {
+            name: "the fix changes only the string behind as, satisfies or a non-null assertion",
+            code: "new Notice('Open Daily Note' as string); createEl('div', { text: 'Open Daily Note' as const }); el.setText(`Open Daily Note` satisfies string); el.title = 'Open Daily Note'!;",
+            options: [{ allowAutoFix: true }],
+            output: "new Notice('Open daily note' as string); createEl('div', { text: 'Open daily note' as const }); el.setText(`Open daily note` satisfies string); el.title = 'Open daily note'!;",
+            errors: [
+                { messageId: "useSentenceCase" },
+                { messageId: "useSentenceCase" },
+                { messageId: "useSentenceCase" },
+                { messageId: "useSentenceCase" },
+            ],
+        },
+        {
+            name: "a word after a number is a later word",
+            code: "new Notice('2 Files selected'); new Notice('10x Faster');",
+            options: [{ allowAutoFix: true }],
+            output: "new Notice('2 files selected'); new Notice('10x faster');",
+            errors: [
+                { messageId: "useSentenceCase", data: { suggestion: "2 files selected" } },
+                { messageId: "useSentenceCase", data: { suggestion: "10x faster" } },
+            ],
+        },
+        {
+            name: "a mixed-case acronym in another case is fixed to its listed casing",
+            code: "new Notice('Sign in with oauth'); new Notice('Sign in with OAUTH');",
+            options: [{ allowAutoFix: true }],
+            output: "new Notice('Sign in with OAuth'); new Notice('Sign in with OAuth');",
+            errors: [
+                { messageId: "useSentenceCase", data: { suggestion: "Sign in with OAuth" } },
+                { messageId: "useSentenceCase", data: { suggestion: "Sign in with OAuth" } },
+            ],
+        },
+        {
+            name: "a brand that is also an ordinary word is not rewritten from one casing to the other",
+            code: "new Notice('Close All windows'); new Notice('Close All Windows'); new Notice('Import From NOTION');",
+            options: [{ allowAutoFix: true }],
+            output: "new Notice('Close all windows'); new Notice('Close all Windows'); new Notice('Import from Notion');",
+            errors: [
+                { messageId: "useSentenceCase", data: { suggestion: "Close all windows" } },
+                { messageId: "useSentenceCase", data: { suggestion: "Close all Windows" } },
+                { messageId: "useSentenceCase", data: { suggestion: "Import from Notion" } },
+            ],
+        },
+        {
+            name: "an A that is not part of a time format is still lowercased",
+            code: "new Notice('Create A new note'); new Setting(el).setDesc('Format: Create A New Note');",
+            errors: [
+                { messageId: "useSentenceCase", data: { suggestion: "Create a new note" } },
+                { messageId: "useSentenceCase", data: { suggestion: "Format: Create a new note" } },
+            ],
+        },
+        {
+            name: "a version number or a brand with a dot does not make the text a path",
+            code: "new Notice('Version 1.2 Released'); new Notice('Install Node.js First');",
+            errors: [
+                { messageId: "useSentenceCase", data: { suggestion: "Version 1.2 released" } },
+                { messageId: "useSentenceCase", data: { suggestion: "Install Node.js first" } },
+            ],
+        },
+        {
+            name: "a DOM text property is still checked",
+            code: "el.title = 'Open Daily Note'; el.ariaLabel = 'Open Daily Note'; el.ariaDescription = 'Open Daily Note'; el.innerText = 'Open Daily Note'; document.title = 'Open Daily Note'; el.dataset = 'Open Daily Note' as never; el.title ||= 'Open Daily Note';",
+            errors: [
+                { messageId: "useSentenceCase" },
+                { messageId: "useSentenceCase" },
+                { messageId: "useSentenceCase" },
+                { messageId: "useSentenceCase" },
+                { messageId: "useSentenceCase" },
+                { messageId: "useSentenceCase" },
+            ],
         },
     ],
 });

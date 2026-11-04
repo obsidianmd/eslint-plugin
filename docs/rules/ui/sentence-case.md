@@ -21,26 +21,55 @@ literals without `${…}`, used as:
   `createSvg()`, including nested option objects, and the same attributes set with
   `setAttribute()`. A string in place of the options is a CSS class and is not checked.
 - assignments to `textContent`, `innerText`, `title`, `placeholder`, `ariaLabel` and
-  `ariaDescription`
+  `ariaDescription`, but not to a property of `dataset` (`el.dataset.title = …` sets a data
+  attribute), and not text appended with `+=`
 - strings returned from a `getDisplayText()` method
 
-The message gives the expected text. There is no fix unless you set `allowAutoFix: true`; `--fix`
-then rewrites the string and keeps its quotes (a template literal becomes a double-quoted string).
+A template literal is judged on its value, with its escapes decoded: `` `Open\tSettings` `` is
+"Open", a tab and "Settings".
+
+The message gives the expected text. There is no fix unless you set `allowAutoFix: true`. `--fix`
+then changes the case of the letters that need it and nothing else: the quotes or backticks, every
+escape (`\t`, `\"`, `\u00e9`) and an `as`, `satisfies` or `!` after the string stay as written.
+Where a letter that has to change is written as an escape, as in `'Open \u0053ettings'`, the text
+is reported without a fix.
+
+Which words take a capital:
+
+- the first word of each sentence, after `.`, `!` or `?` and a space. After a colon or a semicolon,
+  and after an abbreviation such as "e.g.", "i.e.", "etc.", "vs.", "approx." or "no.", the next
+  word may take either case: "Choose a folder, e.g. notes" and "Choose a folder, e.g. Notes" both
+  pass.
+- a first word in quotes keeps the case it is written in: `"Open" settings` passes.
+- a number before the first word takes its place, so the word after the number is not capitalized:
+  "2 files selected" passes, and "2 Files selected" is reported. A word that starts with a number,
+  such as "1st", "3D" or "10x", keeps its letters as written.
+- emoji before the first word are not text, so "✅ Open settings" and "⚠️ Open settings" pass.
 
 Some text keeps its casing, because it is data rather than prose:
 
 - brand names and acronyms, such as "GitHub" or "PDF", which are held to that casing ("github" is
-  reported, expecting "GitHub"); in the default `loose` mode a camelCase or PascalCase word too,
-  unless `enforceCamelCaseLower` is set
-- URLs, such as `https://obsidian.md/help`, and date and time formats, such as `YYYY-MM-DD` or `HH:mm`
+  reported, expecting "GitHub"). An acronym listed in mixed case, such as "OAuth", keeps that
+  casing; any other is written in capitals. In the default `loose` mode a camelCase or PascalCase
+  word keeps its casing too, unless `enforceCamelCaseLower` is set.
+- a brand whose name is also an ordinary word: "Windows", "Cursor", "Slack", "X", "Notion" and
+  "React". In lower case it is that word and is left alone ("Close all windows", "Move the cursor",
+  "Views react to changes"); written as the brand it keeps that casing ("Install on Windows").
+  Neither is rewritten into the other, so title-case text keeps the capital it has: "Close All
+  Windows" is reported, expecting "Close all Windows". Any other casing, such as "WINDOWS", is
+  corrected to the brand's. This holds for these names in your own `brands` too.
+- URLs, such as `https://obsidian.md/help`, and date and time formats, such as `YYYY-MM-DD`,
+  `HH:mm` or `hh:mm A`. A lone "A" is a word, so "Create A new note" is reported.
 - "REST" written in capitals. It is also an ordinary word, so both "Use the REST API" and "Take a
   rest" pass.
 - a placeholder that shows an example value: a single token with no spaces (`sk-123…`,
   `YYYY-MM-DD`), or text starting with "e.g." or "ex." (`e.g. My Vault`)
 
 Not checked at all: text with inline code (`` `npm install` ``) or HTML tags, text with placeholders
-(`{count}`, `%s`), file paths, keyboard shortcuts (`Ctrl+S`), version numbers and all-caps
-identifiers (`API_KEY`).
+(`{count}`, `%s`), file paths and file names (`config.json`, `docs/readme.md`, `.obsidian/plugins`,
+`https://x.com/a.b`), keyboard shortcuts (`Ctrl+S`), a version number on its own (`v1.2.3`) and
+all-caps identifiers (`API_KEY`). A number such as "1.2", or a brand with a dot such as "Node.js",
+does not make text a file name, so "Version 1.2 Released" and "Install Node.js First" are checked.
 
 The rule is off in `recommended` and `recommendedWithLocalesEn`, because it reports too much
 ordinary text to be on by default. 0.3.0 meant to turn it off, but it stayed on through 0.4.2. To use

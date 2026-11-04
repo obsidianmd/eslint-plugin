@@ -1,5 +1,5 @@
 import { TSESLint, TSESTree } from "@typescript-eslint/utils";
-import { DEFAULT_BRANDS } from "./brands.js";
+import { DEFAULT_AMBIGUOUS_BRANDS, DEFAULT_BRANDS } from "./brands.js";
 import { DEFAULT_ACRONYMS, DEFAULT_CASE_AGNOSTIC_ACRONYMS } from "./acronyms.js";
 
 export type Mode = "loose" | "strict";
@@ -32,7 +32,6 @@ export interface SentenceCaseReporterParams<MessageId extends string> {
     evaluatorOptions: EvaluatorOptions;
     allowAutoFix: boolean;
     messageId: MessageId;
-    formatReplacement?: (node: TSESTree.Node, suggestion: string) => string | null;
 }
 
 // Function type for reporting sentence case violations
@@ -75,7 +74,9 @@ export function createSentenceCaseEvaluator(
     };
 }
 
-// Creates a reporter function for sentence case violations with caching and auto-fix support
+// Creates a reporter function for sentence case violations with caching and
+// auto-fix support. `node` is the string, or a string behind `as`,
+// `satisfies` or `!`; the fix rewrites only the string, in place.
 export function createSentenceCaseReporter<MessageId extends string>(
     params: SentenceCaseReporterParams<MessageId>,
 ): SentenceCaseReport {
@@ -87,16 +88,10 @@ export function createSentenceCaseReporter<MessageId extends string>(
             return;
         }
 
-        if (!params.allowAutoFix) {
-            params.context.report({
-                node,
-                messageId: params.messageId,
-                data: {
-                    suggestion
-                },
-            });
-            return;
-        }
+        const stringNode = params.allowAutoFix ? unwrapExpression(node) : null;
+        const replacement = stringNode && getStaticStringValue(stringNode) === value
+            ? recaseStringSource(params.context.sourceCode.getText(stringNode), value, suggestion)
+            : null;
 
         params.context.report({
             node,
@@ -104,13 +99,116 @@ export function createSentenceCaseReporter<MessageId extends string>(
             data: {
                 suggestion,
             },
-            fix(fixer: TSESLint.RuleFixer) {
-                const customReplacement = params.formatReplacement?.(node, suggestion);
-                const replacement = customReplacement ?? JSON.stringify(suggestion);
-                return fixer.replaceText(node, replacement);
-            },
+            ...(stringNode && replacement !== null
+                ? { fix: (fixer: TSESLint.RuleFixer) => fixer.replaceText(stringNode, replacement) }
+                : {}),
         });
     };
+}
+
+// The text a string literal, or a template literal without `${…}`, evaluates
+// to: its value, with every escape decoded, not its source
+export function getStaticStringValue(node: TSESTree.Node): string | null {
+    if (node.type === TSESTree.AST_NODE_TYPES.Literal) {
+        return typeof node.value === "string" ? node.value : null;
+    }
+    if (node.type === TSESTree.AST_NODE_TYPES.TemplateLiteral && node.expressions.length === 0) {
+        return node.quasis[0]?.value.cooked ?? null;
+    }
+    return null;
+}
+
+// The escapes that stand for a control character, such as "\n" for a line
+// feed. Any other escaped character, as in "\'", stands for itself.
+const CONTROL_ESCAPES: Readonly<Record<string, string>> = {
+    b: "\b", f: "\f", n: "\n", r: "\r", t: "\t", v: "\v",
+};
+
+// Decodes the body of a JavaScript string or template literal, or of a JSON
+// string, and maps each UTF-16 unit of its value to the index in the body of
+// the character that is written as itself, or to -1 for a unit that an escape
+// or a template line break stands for. Returns null for an escape it does not
+// decode, such as a legacy octal one.
+function mapStringBody(body: string, template: boolean): { value: string; sourceIndex: number[] } | null {
+    let value = "";
+    const sourceIndex: number[] = [];
+    const push = (text: string, index: number) => {
+        value += text;
+        for (let k = 0; k < text.length; k++) sourceIndex.push(index);
+    };
+    let i = 0;
+    while (i < body.length) {
+        const ch = body[i];
+        if (template && ch === "\r") {
+            // A template reads a CR LF or CR line break as LF
+            push("\n", -1);
+            i += body[i + 1] === "\n" ? 2 : 1;
+            continue;
+        }
+        if (ch !== "\\") {
+            push(ch, i);
+            i++;
+            continue;
+        }
+        const next = body[i + 1];
+        if (next === undefined) return null;
+        if (next === "\r") {
+            // A line continuation adds nothing
+            i += body[i + 2] === "\n" ? 3 : 2;
+            continue;
+        }
+        if (next === "\n" || next === "\u2028" || next === "\u2029") {
+            i += 2;
+            continue;
+        }
+        if (next === "x" || next === "u") {
+            const braced = next === "u" && body[i + 2] === "{";
+            const start = braced ? i + 3 : i + 2;
+            const end = braced ? body.indexOf("}", start) : start + (next === "x" ? 2 : 4);
+            const hex = end < 0 ? "" : body.slice(start, end);
+            if (!/^[0-9a-fA-F]+$/.test(hex) || (!braced && hex.length !== end - start)) return null;
+            const codePoint = parseInt(hex, 16);
+            if (codePoint > 0x10ffff) return null;
+            push(String.fromCodePoint(codePoint), -1);
+            i = braced ? end + 1 : end;
+            continue;
+        }
+        if (/[0-9]/.test(next)) {
+            // Only "\0" not followed by a digit; legacy octal escapes are left alone
+            if (next !== "0" || /[0-9]/.test(body[i + 2] ?? "")) return null;
+            push("\0", -1);
+            i += 2;
+            continue;
+        }
+        const codePoint = body.codePointAt(i + 1) ?? 0;
+        const escaped = String.fromCodePoint(codePoint);
+        push(CONTROL_ESCAPES[escaped] ?? escaped, -1);
+        i += 1 + escaped.length;
+    }
+    return { value, sourceIndex };
+}
+
+// Rewrites the source of a string, a template literal without `${…}` or a JSON
+// string, quotes included, so that it holds `suggestion` instead of `value`.
+// Only letters written as themselves change case; the quotes, every escape
+// and every line break stay as written. Returns null when that cannot be
+// done: a letter to change is written as an escape (`\u0053`), the source
+// does not decode to `value`, or the suggestion is not a change of case.
+export function recaseStringSource(source: string, value: string, suggestion: string): string | null {
+    const quote = source[0];
+    if (source.length < 2 || source[source.length - 1] !== quote || !["'", "\"", "`"].includes(quote)) return null;
+    if (suggestion.length !== value.length) return null;
+    const body = source.slice(1, -1);
+    const mapped = mapStringBody(body, quote === "`");
+    if (!mapped || mapped.value !== value) return null;
+    const chars = body.split("");
+    for (let k = 0; k < value.length; k++) {
+        if (suggestion[k] === value[k]) continue;
+        const index = mapped.sourceIndex[k];
+        if (index < 0 || suggestion[k].toLowerCase() !== value[k].toLowerCase()) return null;
+        chars[index] = suggestion[k];
+    }
+    return quote + chars.join("") + quote;
 }
 
 // Type guard to check if an object has a physicalFilename property
@@ -199,19 +297,31 @@ function isAlpha(ch: string): boolean {
     return /[A-Za-z]/.test(ch);
 }
 
-// Detects if text appears to be a file path
-function looksLikePath(text: string): boolean {
+// Detects if text appears to be a file path. A brand such as "Node.js" and a
+// number such as "1.2" are not file names.
+function looksLikePath(text: string, brands: readonly string[]): boolean {
     // Check for relative paths starting with ./ or ../
     // Examples: "./config.json", "../src/main.ts"
     if (/^\.{1,2}\//.test(text)) return true;
-    // Check for paths with slashes and file extensions
-    // Examples: "src/main.ts", "C:\\Users\\file.txt", "/home/user/doc.pdf", "file.txt"
-    if (/\.[a-z0-9]{1,4}(['"\s]|$)/i.test(text)) return true;
+    // Check for a folder whose name starts with a dot
+    // Examples: ".obsidian/plugins", "Edit the .git/config file"
+    if (/(?:^|[\s'"(])\.[\w-]+\//.test(text)) return true;
+    // Check for words ending in a file extension
+    // Examples: "src/main.ts", "C:\\Users\\file.txt", "/home/user/doc.pdf", "file.txt", "obsidian.md"
+    for (const m of text.matchAll(/\.([a-z0-9]{1,4})(?=['"\s]|$)/gi)) {
+        const dot = m.index;
+        // "1.2", "v2.0.1", "$1.99": digits on both sides of the dot
+        if (/^[0-9]+$/.test(m[1]) && /[0-9]/.test(text[dot - 1] ?? "")) continue;
+        const wordStart = Math.max(...[" ", "\t", "\n", "'", "\"", "("].map((c) => text.lastIndexOf(c, dot))) + 1;
+        const word = text.slice(wordStart, dot + m[0].length).toLowerCase();
+        if (brands.some((brand) => brand.toLowerCase() === word)) continue;
+        return true;
+    }
     return false;
 }
 
 // Determines if a string should be skipped from sentence case validation
-export function isSkippableString(text: string): boolean {
+export function isSkippableString(text: string, brands: readonly string[] = DEFAULT_BRANDS): boolean {
     if (!text) return true;
     // Inline code or HTML tags
     // Examples: "Use `npm install`", "<b>Bold text</b>", "</div>"
@@ -220,7 +330,7 @@ export function isSkippableString(text: string): boolean {
     // Examples: "Hello ${name}", "Welcome {user}", "File %s saved", "%1$s items"
     if (/(\$\{[^}]+\}|\{[^}]+\}|%\d*\$?s|%s)/.test(text)) return true;
     // File paths
-    if (looksLikePath(text)) return true;
+    if (looksLikePath(text, brands)) return true;
     // Keyboard shortcuts
     // Examples: "Ctrl+S", "Cmd + A", "Alt+Tab", "⌘+C", "Shift + Enter"
     if (/(Ctrl|Cmd|Alt|Shift|Option|⌘|⌥|⌃|⇧)\s*\+\s*[A-Za-z]/.test(text)) return true;
@@ -233,16 +343,24 @@ export function isSkippableString(text: string): boolean {
     return false;
 }
 
+// The casing an acronym is written in: as listed for one in mixed case, such
+// as "OAuth", and all caps otherwise
+function acronymCasing(acronym: string): string {
+    return /[a-z]/.test(acronym) && /[A-Z]/.test(acronym) ? acronym : acronym.toUpperCase();
+}
+
 // Normalizes and prepares options with defaults for sentence case evaluation
 function normalizeOptions(options?: EvaluatorOptions) {
     const brands = (options?.brands ?? DEFAULT_BRANDS).slice().sort((a, b) => b.length - a.length);
-    const acronyms = new Set((options?.acronyms ?? DEFAULT_ACRONYMS).map((s) => s.toUpperCase()));
+    const ambiguousBrands = new Set(DEFAULT_AMBIGUOUS_BRANDS);
+    // Acronyms in upper case, mapped to the casing they are written in
+    const acronyms = new Map((options?.acronyms ?? DEFAULT_ACRONYMS).map((s) => [s.toUpperCase(), acronymCasing(s)]));
     const caseAgnosticAcronyms = new Set(DEFAULT_CASE_AGNOSTIC_ACRONYMS);
     const ignoreWords = new Set((options?.ignoreWords ?? []).map((s) => s));
     const ignoreRegex = (options?.ignoreRegex ?? []).map((p) => new RegExp(p));
     const mode: Mode = options?.mode ?? "loose";
     const enforceCamelCaseLower = options?.enforceCamelCaseLower === true;
-    return { brands, acronyms, caseAgnosticAcronyms, ignoreWords, ignoreRegex, mode, enforceCamelCaseLower } as const;
+    return { brands, ambiguousBrands, acronyms, caseAgnosticAcronyms, ignoreWords, ignoreRegex, mode, enforceCamelCaseLower } as const;
 }
 
 // Tests if text matches any of the ignore regex patterns
@@ -264,13 +382,16 @@ interface BrandMatch {
     canonical: string;
 }
 
-// Finds all occurrences of a brand name (case-insensitive) and records their ranges and canonical casing
-function collectBrandMatches(sentence: string, brands: readonly string[]): BrandMatch[] {
+// Finds all occurrences of a brand name (case-insensitive) and records their
+// ranges and canonical casing. A brand that is also an ordinary word, such as
+// "Windows", is not one where it is written as that word, in lower case.
+function collectBrandMatches(sentence: string, brands: readonly string[], ambiguousBrands: ReadonlySet<string>): BrandMatch[] {
     const matches: BrandMatch[] = [];
     for (const brand of brands) {
         const pattern = new RegExp(`(^|[^A-Za-z0-9])(${escapeRegExp(brand)})(?=$|[^A-Za-z0-9])`, "gi");
         let m: RegExpExecArray | null;
         while ((m = pattern.exec(sentence))) {
+            if (ambiguousBrands.has(brand) && m[2] === brand.toLowerCase()) continue;
             const start = m.index + m[1].length;
             const end = start + brand.length;
             if (matches.some((existing) => !(end <= existing.start || start >= existing.end))) {
@@ -334,6 +455,12 @@ const PROTECTED_PATTERNS: readonly RegExp[] = [
         `(?<![A-Za-z0-9])${DATE_FORMAT_TOKEN}(?:[-/.:_]${DATE_FORMAT_TOKEN})+(?![A-Za-z0-9])`,
         "g",
     ),
+    // A time format with an AM/PM token after a space, which a lone "A" is not
+    // Examples: "hh:mm A", "h:mm a", "HH:mm:ss A"
+    new RegExp(
+        `(?<![A-Za-z0-9])(?:HH|H|hh|h)(?:[:.]${DATE_FORMAT_TOKEN})+ ?[Aa](?![A-Za-z0-9])`,
+        "g",
+    ),
 ];
 
 // Finds the character ranges of text that must keep its casing
@@ -358,21 +485,31 @@ function rangeOverlaps(ranges: number[][], start: number, end: number): boolean 
 // acronyms and brands as written, anything else lower
 function caseHyphenPart(part: string, opts: ReturnType<typeof normalizeOptions>): string {
     const partUpper = part.toUpperCase();
-    if (opts.acronyms.has(partUpper)) return partUpper;
+    const acronym = opts.acronyms.get(partUpper);
+    if (acronym !== undefined) return acronym;
     if (opts.caseAgnosticAcronyms.has(partUpper) && part === partUpper) return part;
     if (opts.brands.includes(part)) return part;
     return part.toLowerCase();
 }
 
-// Applies sentence case transformation to a single sentence
-function transformSentence(sentence: string, opts: ReturnType<typeof normalizeOptions>, prefixPunctuation: string): string {
+// Emoji, with the skin tones, joiners, variation selectors and keycaps that
+// build them, and flags. Unlike \p{Emoji}, it leaves out the digits, so a
+// number before the first word is text, as in "2 files selected".
+const EMOJI_RE = /[0-9#*]\uFE0F?\u20E3|[\p{Extended_Pictographic}\p{Emoji_Modifier}\p{Regional_Indicator}\u200D\uFE0F]/gu;
+
+// Opening quotation marks: a first word after them keeps the case it is written in
+const OPENING_QUOTES_RE = /^["'\u2018\u201A\u201B\u201C\u201E\u201F\u00AB\u2039\u300C\u300E]+$/;
+
+// Applies sentence case transformation to a single sentence. With
+// `firstWordAnyCase`, the first word keeps the case it is written in, as after
+// a colon.
+function transformSentence(sentence: string, opts: ReturnType<typeof normalizeOptions>, firstWordAnyCase: boolean): string {
     // URLs and format strings keep their casing, brand names inside them included
     const protectedRanges = collectProtectedRanges(sentence);
     // Find all brand occurrences to preserve their casing
-    const brandMatches = collectBrandMatches(sentence, opts.brands)
+    const brandMatches = collectBrandMatches(sentence, opts.brands, opts.ambiguousBrands)
         .filter((match) => !rangeOverlaps(protectedRanges, match.start, match.end));
     const brandRanges = mergeRanges(brandMatches.map((match) => [match.start, match.end]));
-    const anyCasePunctuations = new Set([':', ';']);
 
     const chars = sentence.split("");
 
@@ -388,7 +525,7 @@ function transformSentence(sentence: string, opts: ReturnType<typeof normalizeOp
         firstAlpha >= 0 &&
         !rangeContains(brandRanges, firstAlpha) &&
         !rangeContains(protectedRanges, firstAlpha) &&
-        !anyCasePunctuations.has(prefixPunctuation)
+        !firstWordAnyCase
     ) {
         // Find the token containing firstAlpha
         const tokenRe = /[A-Za-z0-9][A-Za-z0-9.\-]*/g;
@@ -407,14 +544,16 @@ function transformSentence(sentence: string, opts: ReturnType<typeof normalizeOp
 
         const firstToken = sentence.slice(tokenStart, tokenEnd);
         const upperToken = firstToken.toUpperCase();
+        // Emoji, "(", "#" and "*" before the first word are not text
         const leadingContent = sentence.slice(0, firstAlpha)
-            .replace(/\p{Emoji}/gu, '')
-            .replaceAll('(', '')
+            .replace(EMOJI_RE, '')
+            .replace(/[(#*]/g, '')
             .trim();
         const firstPart = firstToken.split("-")[0];
         const firstPartUpper = firstPart.toUpperCase();
-        if (opts.acronyms.has(upperToken)) {
-            writeToken(chars, tokenStart, upperToken, firstToken.length);
+        const acronym = opts.acronyms.get(upperToken);
+        if (acronym !== undefined) {
+            writeToken(chars, tokenStart, acronym, firstToken.length);
         } else if (
             firstToken.includes("-") &&
             (opts.acronyms.has(firstPartUpper) ||
@@ -428,7 +567,14 @@ function transformSentence(sentence: string, opts: ReturnType<typeof normalizeOp
             // An all-caps "REST" opening the sentence stays as written
         } else if (!opts.enforceCamelCaseLower && opts.mode === "loose" && isCamelOrPascal(firstToken)) {
             // Preserve camelCase/PascalCase tokens when loose mode allows it
+        } else if (/^[0-9]/.test(firstToken)) {
+            // "1st", "3D", "10x": a word that starts with a number has no
+            // first letter to capitalize, so its letters stay as written
+        } else if (OPENING_QUOTES_RE.test(leadingContent)) {
+            // A first word in quotes, as in "\"Open\" settings", keeps its case
         } else if (leadingContent) {
+            // Text before the first word, such as a number in "2 files
+            // selected" or the "50%" of "50% complete", makes it a later word
             for (let j = tokenStart; j < tokenEnd; j++) {
                 chars[j] = firstToken[j - tokenStart].toLowerCase();
             }
@@ -457,8 +603,9 @@ function transformSentence(sentence: string, opts: ReturnType<typeof normalizeOp
         if (firstAlpha >= 0 && start <= firstAlpha && firstAlpha < end) continue;
 
         const upperToken = token.toUpperCase();
-        if (opts.acronyms.has(upperToken)) {
-            writeToken(chars, start, upperToken, token.length);
+        const acronym = opts.acronyms.get(upperToken);
+        if (acronym !== undefined) {
+            writeToken(chars, start, acronym, token.length);
             continue;
         }
         // An acronym that is also a word keeps all caps when written that way
@@ -514,6 +661,10 @@ function transformSentence(sentence: string, opts: ReturnType<typeof normalizeOp
     return chars.join("");
 }
 
+// Text that ends in an abbreviation whose dot does not end the sentence, as
+// "Choose a folder, e.g" does in "Choose a folder, e.g. notes"
+const ABBREVIATION_RE = /(?:^|[^A-Za-z0-9.])(?:e\.g|eg|i\.e|ie|etc|vs|cf|approx|incl|esp|viz|a\.k\.a|aka|w\.r\.t|resp|no)$/i;
+
 // Generates a sentence case suggestion for text using normalized options
 function sentenceCaseSuggestionWithOptions(
     text: string,
@@ -551,8 +702,15 @@ function sentenceCaseSuggestionWithOptions(
 
     const transformed = segments
         .map(({ core, punct, whitespace }, index) => {
-            const prefixPunctuation = segments[index - 1]?.punct ?? "";
-            const out = transformSentence(core, opts, prefixPunctuation);
+            const previous = segments[index - 1];
+            // After a colon or a semicolon, or the dot of an abbreviation
+            // such as "e.g.", the next word may take either case
+            const firstWordAnyCase = previous !== undefined && (
+                previous.punct === ":" ||
+                previous.punct === ";" ||
+                (previous.punct === "." && ABBREVIATION_RE.test(previous.core))
+            );
+            const out = transformSentence(core, opts, firstWordAnyCase);
             return out + punct + whitespace;
         })
         .join("");
@@ -568,8 +726,8 @@ export function sentenceCaseSuggestion(text: string, options?: EvaluatorOptions)
 
 // Evaluates if text follows sentence case rules and provides a suggestion if not
 export function evaluateSentenceCase(text: string, options?: EvaluatorOptions): EvaluationResult {
-    if (isSkippableString(text)) return { ok: true };
     const opts = normalizeOptions(options);
+    if (isSkippableString(text, opts.brands)) return { ok: true };
     if (shouldIgnoreByRegex(text, opts.ignoreRegex)) return { ok: true };
     const suggestion = sentenceCaseSuggestionWithOptions(text, opts);
     return { ok: suggestion === text, suggestion: suggestion === text ? undefined : suggestion };

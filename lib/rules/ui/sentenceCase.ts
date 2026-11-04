@@ -2,6 +2,7 @@ import { TSESTree, TSESLint } from "@typescript-eslint/utils";
 import { docsUrl, ruleCreator } from "../../ruleCreator.js";
 import {
     createSentenceCaseReporter,
+    getStaticStringValue,
     resolveSentenceCaseConfig,
     SentenceCaseRuleOptions,
     unwrapExpression,
@@ -13,7 +14,8 @@ type MessageId = "useSentenceCase";
 // Default configuration with no custom options specified
 const defaultOptions: SentenceCaseRuleOptions = [{}] as const;
 
-// Extracts string value from AST nodes, unwrapping TypeScript type assertions
+// Extracts string value from AST nodes, unwrapping TypeScript type assertions.
+// A template literal gives its value, with its escapes decoded.
 function getStringFromNode(node: TSESTree.Node): string | null {
     if (
         node.type === TSESTree.AST_NODE_TYPES.TSAsExpression ||
@@ -22,11 +24,7 @@ function getStringFromNode(node: TSESTree.Node): string | null {
     ) {
         return getStringFromNode(node.expression);
     }
-    if (node.type === TSESTree.AST_NODE_TYPES.Literal && typeof node.value === "string") return node.value;
-    if (node.type === TSESTree.AST_NODE_TYPES.TemplateLiteral && node.expressions.length === 0) {
-        return node.quasis[0]?.value.raw ?? null;
-    }
-    return null;
+    return getStaticStringValue(node);
 }
 
 // Checks if an object property has a specific key name
@@ -48,60 +46,6 @@ function normalizeAttributeName(name: string): string {
     return name.replace(/_/g, "-").replace(/[A-Z]/g, (ch) => `-${ch.toLowerCase()}`).toLowerCase();
 }
 
-// Encodes a JavaScript string literal with proper escape sequences and quote handling
-function encodeStringLiteral(value: string, quote: "'" | "\""): string {
-    let result = quote;
-    for (let i = 0; i < value.length; i++) {
-        const ch = value[i];
-        switch (ch) {
-            case quote:
-                result += `\\${quote}`;
-                break;
-            case "\\":
-                result += "\\\\";
-                break;
-            case "\n":
-                result += "\\n";
-                break;
-            case "\r":
-                result += "\\r";
-                break;
-            case "\t":
-                result += "\\t";
-                break;
-            case "\b":
-                result += "\\b";
-                break;
-            case "\f":
-                result += "\\f";
-                break;
-            case "\v":
-                result += "\\v";
-                break;
-            case "\0": {
-                const next = value.charCodeAt(i + 1);
-                if (Number.isFinite(next) && next >= 48 && next <= 57) {
-                    result += "\\x00";
-                } else {
-                    result += "\\0";
-                }
-                break;
-            }
-            default: {
-                const code = ch.charCodeAt(0);
-                if (code === 0x2028 || code === 0x2029) {
-                    result += `\\u${code.toString(16).padStart(4, "0")}`;
-                } else if (code < 0x20) {
-                    result += `\\x${code.toString(16).padStart(2, "0")}`;
-                } else {
-                    result += ch;
-                }
-            }
-        }
-    }
-    result += quote;
-    return result;
-}
 // Maps method names to the position of their text argument
 const METHOD_STRING_ARG_POS: Record<string, number> = {
     setName: 0,
@@ -127,6 +71,9 @@ const CREATE_OPTIONS_ARG_POS = new Map<string, number>([
 
 // HTML attributes that contain user-facing text
 const ATTR_TEXT_KEYS = new Set(["aria-label", "aria-description", "title", "placeholder"]);
+
+// Element properties that hold user-facing text, as set by an assignment
+const TEXT_PROPERTIES = new Set(["textContent", "innerText", "title", "placeholder", "ariaLabel", "ariaDescription"]);
 
 // Whether placeholder text shows an example value rather than prose: a single
 // token with no whitespace ("sk-123…", "YYYY-MM-DD", "my-vault"), or text
@@ -287,15 +234,6 @@ export default ruleCreator({
             evaluatorOptions,
             allowAutoFix,
             messageId: "useSentenceCase",
-            formatReplacement: (node, suggestion) => {
-                if (node.type === TSESTree.AST_NODE_TYPES.Literal && typeof node.value === "string" && typeof node.raw === "string") {
-                    const quoteChar = node.raw[0];
-                    if (quoteChar === "'" || quoteChar === '"') {
-                        return encodeStringLiteral(suggestion, quoteChar);
-                    }
-                }
-                return null;
-            },
         });
 
         // Checks the options object of createEl, createDiv, createSpan and
@@ -386,21 +324,25 @@ export default ruleCreator({
             },
             // Method calls like setName(), setText(), etc.
             CallExpression: checkMethodCall,
-            // Direct property assignments: textContent, innerText, title
+            // Direct property assignments: textContent, innerText, title,
+            // placeholder, ariaLabel and ariaDescription
             AssignmentExpression(node: TSESTree.AssignmentExpression) {
-                if (node.left.type !== TSESTree.AST_NODE_TYPES.MemberExpression || node.left.property.type !== TSESTree.AST_NODE_TYPES.Identifier) return;
+                if (node.left.type !== TSESTree.AST_NODE_TYPES.MemberExpression || node.left.computed || node.left.property.type !== TSESTree.AST_NODE_TYPES.Identifier) return;
+                // `+=` appends to the text, so its value is not the whole text
+                if (node.operator === "+=") return;
                 const prop = node.left.property.name;
-                const normalized = normalizeAttributeName(prop);
-                if (
-                    prop !== "textContent" &&
-                    prop !== "innerText" &&
-                    !ATTR_TEXT_KEYS.has(normalized)
-                ) {
-                    return;
-                }
+                if (!TEXT_PROPERTIES.has(prop)) return;
+                // el.dataset.title sets a data-title attribute, which is data, not text
+                const object = node.left.object;
+                const objectName = object.type === TSESTree.AST_NODE_TYPES.Identifier
+                    ? object.name
+                    : object.type === TSESTree.AST_NODE_TYPES.MemberExpression && !object.computed && object.property.type === TSESTree.AST_NODE_TYPES.Identifier
+                        ? object.property.name
+                        : null;
+                if (objectName === "dataset") return;
                 const str = getStringFromNode(node.right);
                 if (str == null) return;
-                if (normalized === "placeholder" && isPlaceholderExample(str)) return;
+                if (prop === "placeholder" && isPlaceholderExample(str)) return;
                 reportIfNeeded(node.right, str);
             },
             MethodDefinition: checkGetDisplayTextReturns,
