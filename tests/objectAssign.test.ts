@@ -57,6 +57,14 @@ ruleTester.run("object-assign", objectAssignRule, {
             name: "three or more arguments are not reported",
             code: "Object.assign(DEFAULT_SETTINGS, a, b);",
         },
+        {
+            name: "assign on another object, or another Object method, is not reported",
+            code: "Settings.assign(DEFAULT_SETTINGS, data); Object.defineProperties(DEFAULT_SETTINGS, descriptors);",
+        },
+        {
+            name: "a target that is a call or a numeric index has no name to match",
+            code: "Object.assign(getDefaults(), data); Object.assign(this[0], data);",
+        },
     ],
     invalid: [
         {
