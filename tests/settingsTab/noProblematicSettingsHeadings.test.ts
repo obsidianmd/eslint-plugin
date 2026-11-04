@@ -1,4 +1,6 @@
+import assert from "node:assert";
 import { RuleTester } from "@typescript-eslint/rule-tester";
+import { Linter } from "eslint";
 import rule from "../../lib/rules/settingsTab/noProblematicSettingsHeadings.js";
 
 const MOCK_CLASS = `
@@ -260,12 +262,12 @@ ruleTester.run("no-problematic-settings-headings", rule, {
             errors: [{ messageId: "pluginName", suggestions: [] }],
         },
         {
-            name: "removing a heading with a description is a suggestion",
+            name: "removing a heading with a description is a suggestion that says the description goes too",
             code: tab(`new Setting(this.containerEl).setName("General").setDesc("Applies everywhere.").setHeading();`),
             output: null,
             errors: [{
                 messageId: "general",
-                suggestions: [{ messageId: "removeHeading", output: tab(`;`) }],
+                suggestions: [{ messageId: "removeHeading", data: { including: ", including `setDesc()`" }, output: tab(`;`) }],
             }],
         },
         {
@@ -274,7 +276,7 @@ ruleTester.run("no-problematic-settings-headings", rule, {
             output: null,
             errors: [{
                 messageId: "general",
-                suggestions: [{ messageId: "removeHeading", output: tab(`;`) }],
+                suggestions: [{ messageId: "removeHeading", data: { including: "" }, output: tab(`;`) }],
             }],
         },
         {
@@ -294,13 +296,13 @@ ruleTester.run("no-problematic-settings-headings", rule, {
             errors: [
                 {
                     messageId: "general",
-                    suggestions: [{ messageId: "removeHeading", output: tab(`
+                    suggestions: [{ messageId: "removeHeading", data: { including: ", including `setTooltip()`" }, output: tab(`
                 ;
                 new Setting(this.containerEl).setName("General").setDisabled(true).setHeading();`) }],
                 },
                 {
                     messageId: "general",
-                    suggestions: [{ messageId: "removeHeading", output: tab(`
+                    suggestions: [{ messageId: "removeHeading", data: { including: ", including `setDisabled()`" }, output: tab(`
                 new Setting(this.containerEl).setName("General").setTooltip("Applies everywhere.").setHeading();
                 ;`) }],
                 },
@@ -472,3 +474,25 @@ function tab(body: string): string {
         }
     `;
 }
+
+// The removal takes the whole statement, the description and tooltip with it,
+// so the suggestion's description says so.
+describe("no-problematic-settings-headings suggestion description", () => {
+    it("says the whole heading setting goes, naming the calls that go with it", () => {
+        const messages = new Linter().verify(`
+            class MyTab extends PluginSettingTab {
+                display() {
+                    new Setting(this.containerEl).setName("General").setDesc("Applies everywhere.").setTooltip("All").setDesc("Everywhere").setHeading()
+                    new Setting(this.containerEl.createDiv()).setName("General").setHeading()
+                }
+            }
+        `, [{
+            plugins: { obsidianmd: { rules: { "no-problematic-settings-headings": rule as never } } },
+            rules: { "obsidianmd/no-problematic-settings-headings": "error" },
+        }]);
+        assert.deepStrictEqual(messages.map((message) => message.suggestions?.map((suggestion) => suggestion.desc)), [
+            ["Remove the whole heading setting: the `new Setting(…)` statement and every call in it, including `setDesc()` and `setTooltip()`."],
+            ["Remove the whole heading setting: the `new Setting(…)` statement and every call in it."],
+        ]);
+    });
+});
