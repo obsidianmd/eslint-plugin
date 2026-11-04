@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { gt, lt, valid } from "semver";
 import ts from "typescript";
 import { getManifest } from "../manifest.js";
+import { toVersion } from "../minAppVersion.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 import { OVERLOAD_HISTORY } from "./obsidianOverloadHistory.js";
 import { getLiteralParameters, getOverloadKey, getSinceTag } from "./obsidianOverloads.js";
@@ -532,19 +533,6 @@ export default ruleCreator<Options, "apiNotAvailable">({
         }
     }
 });
-
-// A version semver can compare: as written when valid, a bare "x" or "x.y" with
-// the missing parts read as 0 ("0.15" is 0.15.0), else undefined. Nothing looser:
-// semver's coerce would read "x99.0.0" as 99.0.0, and a manifest could then
-// switch the rule off with a minAppVersion Obsidian does not read that way.
-function toVersion(raw: string): Version | undefined {
-    const version = valid(raw);
-    if (version) {
-        return version;
-    }
-    const partial = /^(\d+)(?:\.(\d+))?$/.exec(raw.trim());
-    return partial ? `${Number(partial[1])}.${Number(partial[2] ?? 0)}.0` : undefined;
-}
 
 // Whether an argument's type depends on the parameter it is passed to: a
 // function with a parameter left untyped, also as a property, an element or a

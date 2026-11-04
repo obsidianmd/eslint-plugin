@@ -1,6 +1,10 @@
-import { TSESTree } from "@typescript-eslint/utils";
+import { type TSESLint, TSESTree } from "@typescript-eslint/utils";
+import ts from "typescript";
 import { disableDirectives, isDisabled, problemStart } from "../disableDirectives.js";
+import { getTypeInfo, hasLocalBinding, mayRunOutsideObsidianAt } from "../globalWindow.js";
+import { type MinAppVersionOptions, minAppVersionSchema, supportsVersion } from "../minAppVersion.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
+import { isWorkerFile } from "../workerGlobals.js";
 import { isReportedOnGlobalDocument } from "./preferCreateEl.js";
 
 // `window` is left alone: timers belong on the main window rather than on
@@ -13,7 +17,20 @@ const REPLACEMENTS: Record<string, string> = {
 // information: its `**/*.{ts,cts,mts,tsx}` block.
 const TYPESCRIPT_FILE = /\.(?:ts|cts|mts|tsx)$/;
 
-export default ruleCreator({
+// The Obsidian version that added popout windows, and `activeDocument` with them.
+const ACTIVE_DOCUMENT_SINCE = "0.15.0";
+
+// The objects a property set on lives as long as the plugin: the global
+// object, and a CommonJS module's exports.
+const GLOBAL_OBJECTS = new Set(["window", "globalThis", "global", "self", "activeWindow", "module", "exports"]);
+const EQUALITY_OPERATORS = new Set(["===", "!==", "==", "!="]);
+// The scopes whose variables live as long as the plugin: the module, the
+// script, and a `namespace`.
+const MODULE_SCOPES = new Set<string>(["module", "global", "tsModule"]);
+
+type MessageIds = "preferActive" | "useActiveDocument" | "useActiveDocumentSince";
+
+export default ruleCreator<MinAppVersionOptions, MessageIds>({
     meta: {
         type: "suggestion" as const,
         docs: {
@@ -21,15 +38,28 @@ export default ruleCreator({
                 "Prefer `activeDocument` over `document` for popout window compatibility.",
             url: docsUrl("prefer-active-doc"),
         },
-        schema: [],
+        schema: minAppVersionSchema,
         fixable: undefined,
+        hasSuggestions: true,
         messages: {
             preferActive:
                 "Use '{{replacement}}' instead of '{{original}}' for popout window compatibility.",
+            useActiveDocument: "Replace with `activeDocument`, the document of the window that has focus.",
+            useActiveDocumentSince:
+                "Replace with `activeDocument`, the document of the window that has focus (needs Obsidian {{since}} or later).",
         },
     },
-    defaultOptions: [],
+    defaultOptions: [{}],
     create(context) {
+        const supported = supportsVersion(context.options[0]?.minAppVersion, ACTIVE_DOCUMENT_SINCE);
+        // A worker has no `activeDocument`, and the recommended config turns
+        // the global off there; so may a config of the plugin's own.
+        const offerable =
+            supported !== false &&
+            !isWorkerFile(context.filename, context.cwd) &&
+            context.languageOptions.globals?.activeDocument !== "off";
+        const types = getTypeInfo(context);
+
         // prefer-create-el needs type information, and the recommended config
         // runs it on TypeScript files only.
         const createElRuns =
@@ -160,9 +190,161 @@ export default ruleCreator({
                         original: node.name,
                         replacement,
                     },
+                    suggest: offerable && canSuggestAt(node) ? [suggestion(node)] : [],
                 });
             },
         };
+
+        function suggestion(node: TSESTree.Identifier): TSESLint.SuggestionReportDescriptor<MessageIds> {
+            // `{ document }` keeps its key.
+            const text =
+                node.parent.type === TSESTree.AST_NODE_TYPES.Property && node.parent.shorthand
+                    ? "document: activeDocument"
+                    : "activeDocument";
+            const fix = (fixer: TSESLint.RuleFixer) => fixer.replaceText(node, text);
+            return supported === undefined
+                ? { messageId: "useActiveDocumentSince", data: { since: ACTIVE_DOCUMENT_SINCE }, fix }
+                : { messageId: "useActiveDocument", fix };
+        }
+
+        // Whether `activeDocument` written in place of the global `document` at
+        // `node` is that global, and does what the code meant.
+        function canSuggestAt(node: TSESTree.Identifier): boolean {
+            const scope = context.sourceCode.getScope(node);
+            // A parameter or a variable of that name, or no such global in the
+            // plugin's typings.
+            if (hasLocalBinding(scope, "activeDocument")) {
+                return false;
+            }
+            if (types && !types.checker.resolveName("activeDocument", types.toTs(node), ts.SymbolFlags.Value, false)) {
+                return false;
+            }
+            // `document = …`, `({ document } = …)`, `export { document }`.
+            const reference = findReference(scope, node);
+            if (!reference?.isReadOnly() || node.parent.type === TSESTree.AST_NODE_TYPES.ExportSpecifier) {
+                return false;
+            }
+            // Code that also runs in a browser, or under jsdom, has a
+            // `document` but no `activeDocument`.
+            if (mayRunOutsideObsidianAt(context, node)) {
+                return false;
+            }
+            return !isComparedOrStored(node);
+        }
+
+        // The reference `node` makes, from the scope it is in.
+        function findReference(
+            scope: ReturnType<typeof context.sourceCode.getScope>,
+            node: TSESTree.Identifier,
+        ): TSESLint.Scope.Reference | undefined {
+            return scope.references.find((ref) => ref.identifier === node);
+        }
+
+        // Whether the document itself is compared, as in `target === document`,
+        // or kept where later code reads it whatever window has focus then: a
+        // variable of the module, a property of the global object, a default
+        // export or a static field. `activeDocument` there would compare with,
+        // or keep, whichever document had focus.
+        function isComparedOrStored(node: TSESTree.Identifier): boolean {
+            let value: TSESTree.Node = node;
+            for (let parent = value.parent; parent; parent = value.parent) {
+                switch (parent.type) {
+                    case TSESTree.AST_NODE_TYPES.TSAsExpression:
+                    case TSESTree.AST_NODE_TYPES.TSNonNullExpression:
+                    case TSESTree.AST_NODE_TYPES.TSSatisfiesExpression:
+                    case TSESTree.AST_NODE_TYPES.TSTypeAssertion:
+                    case TSESTree.AST_NODE_TYPES.LogicalExpression:
+                    case TSESTree.AST_NODE_TYPES.ArrayExpression:
+                    case TSESTree.AST_NODE_TYPES.ObjectExpression:
+                        break;
+                    case TSESTree.AST_NODE_TYPES.ConditionalExpression:
+                        if (parent.test === value) {
+                            return false;
+                        }
+                        break;
+                    case TSESTree.AST_NODE_TYPES.SequenceExpression:
+                        if (parent.expressions.at(-1) !== value) {
+                            return false;
+                        }
+                        break;
+                    case TSESTree.AST_NODE_TYPES.Property:
+                        if (parent.value !== value || parent.parent.type !== TSESTree.AST_NODE_TYPES.ObjectExpression) {
+                            return false;
+                        }
+                        break;
+                    case TSESTree.AST_NODE_TYPES.BinaryExpression:
+                        // Only the document itself: `document.body === el` compares an element.
+                        return isCast(node, value) && EQUALITY_OPERATORS.has(parent.operator);
+                    case TSESTree.AST_NODE_TYPES.SwitchCase:
+                        return parent.test === value && isCast(node, value);
+                    case TSESTree.AST_NODE_TYPES.SwitchStatement:
+                        return parent.discriminant === value && isCast(node, value);
+                    case TSESTree.AST_NODE_TYPES.VariableDeclarator:
+                        return parent.init === value && isModuleLevel(parent);
+                    case TSESTree.AST_NODE_TYPES.AssignmentExpression:
+                        return parent.right === value && isGlobalTarget(parent.left);
+                    case TSESTree.AST_NODE_TYPES.ExportDefaultDeclaration:
+                        return true;
+                    case TSESTree.AST_NODE_TYPES.PropertyDefinition:
+                        return parent.value === value && parent.static;
+                    default:
+                        return false;
+                }
+                value = parent;
+            }
+            return false;
+        }
+
+        // Whether `outer` is `node`, or `node` under casts only, as in
+        // `(document as any)`.
+        function isCast(node: TSESTree.Node, outer: TSESTree.Node): boolean {
+            let current: TSESTree.Node = node;
+            while (current !== outer) {
+                const parent: TSESTree.Node | undefined = current.parent;
+                if (
+                    parent?.type !== TSESTree.AST_NODE_TYPES.TSAsExpression &&
+                    parent?.type !== TSESTree.AST_NODE_TYPES.TSNonNullExpression &&
+                    parent?.type !== TSESTree.AST_NODE_TYPES.TSSatisfiesExpression &&
+                    parent?.type !== TSESTree.AST_NODE_TYPES.TSTypeAssertion
+                ) {
+                    return false;
+                }
+                current = parent;
+            }
+            return true;
+        }
+
+        // Whether `declarator` declares a variable of the module or the script.
+        function isModuleLevel(declarator: TSESTree.VariableDeclarator): boolean {
+            return context.sourceCode
+                .getDeclaredVariables(declarator)
+                .some((variable) => MODULE_SCOPES.has(variable.scope.type));
+        }
+
+        // Whether `target` is a variable of the module or the script, an
+        // undeclared global, or a property of the global object or of
+        // `module.exports`.
+        function isGlobalTarget(target: TSESTree.Node): boolean {
+            if (target.type === TSESTree.AST_NODE_TYPES.Identifier) {
+                const reference = findReference(context.sourceCode.getScope(target), target);
+                const scopeType = reference?.resolved?.scope.type;
+                return scopeType === undefined || MODULE_SCOPES.has(scopeType);
+            }
+            let object: TSESTree.Node = target;
+            while (
+                object.type === TSESTree.AST_NODE_TYPES.MemberExpression ||
+                object.type === TSESTree.AST_NODE_TYPES.TSAsExpression ||
+                object.type === TSESTree.AST_NODE_TYPES.TSNonNullExpression
+            ) {
+                object = object.type === TSESTree.AST_NODE_TYPES.MemberExpression ? object.object : object.expression;
+            }
+            return (
+                object !== target &&
+                object.type === TSESTree.AST_NODE_TYPES.Identifier &&
+                GLOBAL_OBJECTS.has(object.name) &&
+                !hasLocalBinding(context.sourceCode.getScope(object), object.name)
+            );
+        }
 
         function findVariable(scope: ReturnType<typeof context.sourceCode.getScope>, name: string): { defs: unknown[] } | null {
             let current: typeof scope | null = scope;
