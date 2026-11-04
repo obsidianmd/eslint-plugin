@@ -110,6 +110,7 @@ export default ruleCreator<Options, "apiNotAvailable">({
         }
         const sinceMap = buildSinceMap(dtsPath);
         const reported = new WeakSet<TSESTree.Node>();
+        const earlyExits = new WeakMap<TSESTree.Node, EarlyExit[]>();
 
         return {
             MemberExpression(node: TSESTree.MemberExpression) {
@@ -503,8 +504,8 @@ export default ruleCreator<Options, "apiNotAvailable">({
                     }
                 } else if (
                     !isHoistedFunction(prevChild) &&
-                    getEarlierStatements(current, prevChild).some((statement) =>
-                        covers(versionAfterEarlyExit(statement)),
+                    getEarlyExits(current).some(
+                        (exit) => exit.end <= prevChild.range[0] && covers(exit.version),
                     )
                 ) {
                     return true;
@@ -513,6 +514,25 @@ export default ruleCreator<Options, "apiNotAvailable">({
                 current = current.parent;
             }
             return false;
+        }
+
+        // The early exits of a statement list, with the version each proves
+        // for the statements after it. Read once per list: going over the
+        // statements before each reported node is quadratic in a long list
+        // that reports many.
+        function getEarlyExits(container: TSESTree.Node): EarlyExit[] {
+            let exits = earlyExits.get(container);
+            if (!exits) {
+                exits = [];
+                for (const statement of getStatements(container)) {
+                    const version = versionAfterEarlyExit(statement);
+                    if (version !== undefined) {
+                        exits.push({ end: statement.range[1], version });
+                    }
+                }
+                earlyExits.set(container, exits);
+            }
+            return exits;
         }
 
         // The version proven for the statements after `if (test) <exit>`, which
@@ -619,23 +639,27 @@ function isHoistedFunction(node: TSESTree.Node): boolean {
     return node.type === AST_NODE_TYPES.FunctionDeclaration;
 }
 
-// The statements that run before `child` in a statement list it belongs to.
-function getEarlierStatements(container: TSESTree.Node, child: TSESTree.Node): TSESTree.Statement[] {
-    let statements: TSESTree.Node[];
+// An `if` that returns or throws, in a statement list: the statements after
+// it, those that start at or after `end`, run only with `version` proven.
+interface EarlyExit {
+    end: number;
+    version: Version;
+}
+
+// The statements of a statement list, in order. Those that run before a child
+// of the list are those that end before the child starts.
+function getStatements(container: TSESTree.Node): TSESTree.Statement[] {
     switch (container.type) {
         case AST_NODE_TYPES.BlockStatement:
         case AST_NODE_TYPES.StaticBlock:
+            return container.body;
         case AST_NODE_TYPES.Program:
-            statements = container.body;
-            break;
+            return container.body as TSESTree.Statement[];
         case AST_NODE_TYPES.SwitchCase:
-            statements = container.consequent;
-            break;
+            return container.consequent;
         default:
             return [];
     }
-    const index = statements.indexOf(child);
-    return index > 0 ? (statements.slice(0, index) as TSESTree.Statement[]) : [];
 }
 
 // Whether running `statement` always leaves the statement list it sits in:
@@ -800,14 +824,24 @@ function buildSinceMap(dtsPath: string): SinceMap {
     }
 }
 
+// Looked up once per program rather than once per file: a program can hold
+// thousands of source files.
+const dtsPaths = new WeakMap<ts.Program, string | undefined>();
+
 function findObsidianDtsPath(program: ts.Program): string | undefined {
+    if (dtsPaths.has(program)) {
+        return dtsPaths.get(program);
+    }
+    let found: string | undefined;
     for (const sourceFile of program.getSourceFiles()) {
         const normalized = sourceFile.fileName.replace(/\\/g, "/");
         if (normalized.includes("/obsidian/obsidian.d.ts")) {
-            return sourceFile.fileName;
+            found = sourceFile.fileName;
+            break;
         }
     }
-    return undefined;
+    dtsPaths.set(program, found);
+    return found;
 }
 
 function getCachePath(dtsPath: string): string {
