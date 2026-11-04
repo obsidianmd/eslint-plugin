@@ -3,6 +3,7 @@ import path from "node:path";
 import { RuleTester } from "@typescript-eslint/rule-tester";
 import { type ESLint, Linter } from "eslint";
 import { describe, it } from "mocha";
+import globals from "globals";
 import tseslint from "typescript-eslint";
 import preferActiveDocRule from "../lib/rules/preferActiveDoc.js";
 import preferCreateElRule from "../lib/rules/preferCreateEl.js";
@@ -31,37 +32,39 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
             name: "typeof document check is allowed",
             code: "if (typeof document !== 'undefined') {}",
         },
+        // Object.prototype's members are not replacements. A class member key
+        // is skipped as a key, so each test also has a bare reference.
         {
             name: "constructor is not replaced",
-            code: "class A { constructor() {} }",
+            code: "class A { constructor() {} } constructor;",
         },
         {
             name: "hasOwnProperty is not replaced",
-            code: "class A { hasOwnProperty() {} }",
+            code: "class A { hasOwnProperty() {} } hasOwnProperty;",
         },
         {
             name: "isPrototypeOf is not replaced",
-            code: "class A { isPrototypeOf() {} }",
+            code: "class A { isPrototypeOf() {} } isPrototypeOf;",
         },
         {
             name: "propertyIsEnumerable is not replaced",
-            code: "class A { propertyIsEnumerable() {} }",
+            code: "class A { propertyIsEnumerable() {} } propertyIsEnumerable;",
         },
         {
             name: "toLocaleString is not replaced",
-            code: "class A { toLocaleString() {} }",
+            code: "class A { toLocaleString() {} } toLocaleString;",
         },
         {
             name: "toString is not replaced",
-            code: "class A { toString() {} }",
+            code: "class A { toString() {} } toString;",
         },
         {
             name: "valueOf is not replaced",
-            code: "class A { valueOf() {} }",
+            code: "class A { valueOf() {} } valueOf;",
         },
         {
             name: "__proto__ is not replaced",
-            code: "class A { __proto__() {} }",
+            code: "class A { __proto__() {} } __proto__;",
         },
         {
             name: "window.setTimeout is allowed",
@@ -136,6 +139,10 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
             code: "document: while(true) { break document; }",
         },
         {
+            name: "continue to a label named document is allowed",
+            code: "document: for (;;) { continue document; }",
+        },
+        {
             name: "typeof in type position is allowed",
             code: "type T = typeof document;",
         },
@@ -148,6 +155,14 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
             code: "declare global { interface Window { doc: typeof document } }",
         },
         {
+            name: "document in an ambient module is allowed",
+            code: "declare module 'shim' { export default document; }",
+        },
+        {
+            name: "typeof document in a type assertion is allowed",
+            code: "const doc = getDoc() as typeof document;",
+        },
+        {
             name: "abstract class property named document is allowed",
             code: "abstract class Foo { abstract document: string; }",
         },
@@ -158,6 +173,10 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
         {
             name: "class accessor named document is allowed",
             code: "class Foo { accessor document = ''; }",
+        },
+        {
+            name: "abstract class accessor named document is allowed",
+            code: "abstract class Foo { abstract accessor document: string; }",
         },
         {
             name: "renamed destructured document is allowed",
@@ -236,6 +255,11 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
         {
             name: "document as an argument to createElement is still flagged",
             code: "el.createElement(document);",
+            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+        },
+        {
+            name: "a document member as an argument to createElement is still flagged",
+            code: "el.createElement(document.title);",
             errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
         },
         {
@@ -338,6 +362,68 @@ typedJsRuleTester.run("prefer-active-doc in a JavaScript file with type informat
             name: "document.createElement() is flagged",
             filename: "main.js",
             code: "document.createElement('div');",
+            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+        },
+    ],
+});
+
+// The recommended config runs prefer-create-el on .tsx, .mts and .cts files as
+// well as on .ts ones.
+const otherExtensionsRuleTester = new RuleTester({
+    languageOptions: {
+        parserOptions: {
+            project: null,
+            projectService: { allowDefaultProject: ["*.tsx", "*.mts", "*.cts"] },
+            tsconfigRootDir: process.cwd(),
+        },
+    },
+});
+
+otherExtensionsRuleTester.run("prefer-active-doc in .tsx, .mts and .cts files", preferActiveDocRule, {
+    valid: [
+        {
+            name: "document.createElement() is left to prefer-create-el in a .tsx file",
+            filename: "file.tsx",
+            code: "document.createElement('div');",
+        },
+        {
+            name: "document.createElement() is left to prefer-create-el in a .mts file",
+            filename: "file.mts",
+            code: "document.createElement('div');",
+        },
+        {
+            name: "document.createElement() is left to prefer-create-el in a .cts file",
+            filename: "file.cts",
+            code: "document.createElement('div');",
+        },
+    ],
+    invalid: [
+        {
+            name: "document.body is still flagged in a .tsx file",
+            filename: "file.tsx",
+            code: "document.body;",
+            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+        },
+    ],
+});
+
+// The recommended config declares the browser's and Obsidian's globals. They
+// are variables without a declaration in the file: still the globals.
+const globalsRuleTester = new RuleTester({
+    languageOptions: { globals: { ...globals.browser, activeDocument: "readonly" } },
+});
+
+globalsRuleTester.run("prefer-active-doc with the recommended config's globals", preferActiveDocRule, {
+    valid: [
+        {
+            name: "document.createElement() is left to prefer-create-el",
+            code: "document.createElement('div');",
+        },
+    ],
+    invalid: [
+        {
+            name: "document.body is forbidden",
+            code: "document.body;",
             errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
         },
     ],
