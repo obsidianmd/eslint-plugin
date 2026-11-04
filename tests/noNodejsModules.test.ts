@@ -6,6 +6,18 @@ const ruleTester = new RuleTester();
 ruleTester.run("no-nodejs-modules", noNodejsModules, {
     valid: [
         {
+            name: "the else branch of if (!Platform.isDesktop) is guarded",
+            code: 'import { Notice, Platform } from "obsidian"; if (!Platform.isDesktop) { new Notice("Desktop only"); } else { const fs = require("fs"); }',
+        },
+        {
+            name: "the alternate of a !Platform.isDesktop ternary is guarded",
+            code: 'import { Platform } from "obsidian"; const fs = !Platform.isDesktop ? null : require("fs");',
+        },
+        {
+            name: "the right side of !Platform.isDesktop || is guarded",
+            code: 'import { Platform } from "obsidian"; !Platform.isDesktop || window.require("child_process");',
+        },
+        {
             name: "importing obsidian is allowed",
             code: "import { Plugin } from 'obsidian';",
         },
@@ -191,8 +203,52 @@ ruleTester.run("no-nodejs-modules", noNodejsModules, {
             name: "a type query of a built-in module is allowed",
             code: "type Fs = typeof import('fs');",
         },
+        // --- require() through the global object ---
+        {
+            name: "window.require() inside if (Platform.isDesktop) is allowed",
+            code: "if (Platform.isDesktop) { const fs = window.require('fs'); }",
+        },
+        {
+            name: "window.require() after an early-return guard is allowed",
+            code: `
+                function readConfig() {
+                    if (!Platform.isDesktop) return;
+                    const { readFileSync } = (window as any).require('node:fs');
+                }
+            `,
+        },
+        {
+            name: "window.require() with Platform.isDesktop && short-circuit is allowed",
+            code: "Platform.isDesktop && activeWindow.require('os');",
+        },
+        {
+            name: "window.require() is allowed when isDesktopOnly is set",
+            code: "const fs = window.require('fs');",
+            options: [{ isDesktopOnly: true }],
+        },
+        {
+            name: "window.require() of a module that is not built into Node.js is allowed",
+            code: "const { remote } = window.require('electron'); const obsidian = globalThis.require('obsidian');",
+        },
+        {
+            name: "window.require() with a non-literal module name is not checked",
+            code: "const module = window.require(moduleName);",
+        },
+        {
+            name: "require() on another object is not checked",
+            code: "electron.remote.require('fs'); remote.require('child_process'); loader.require('path');",
+        },
+        {
+            name: "a local binding named window is not the global window",
+            code: "function run(window: { require(id: string): unknown }) { window.require('fs'); }",
+        },
     ],
     invalid: [
+        {
+            name: "the branch where !Platform.isDesktop holds is not guarded",
+            code: 'import { Platform } from "obsidian"; if (!Platform.isDesktop) { require("fs"); }',
+            errors: [{ messageId: "noNodejs" }],
+        },
         {
             name: "static import of node:path is forbidden",
             code: "import path from 'node:path';",
@@ -342,6 +398,45 @@ ruleTester.run("no-nodejs-modules", noNodejsModules, {
             name: "explicitly setting isDesktopOnly false still reports",
             code: "import fs from 'node:fs';",
             options: [{ isDesktopOnly: false }],
+            errors: [{ messageId: "noNodejs" }],
+        },
+        // --- require() through the global object: only bare require() was checked ---
+        {
+            name: "window.require() of a built-in module is forbidden",
+            code: "const fs = window.require('fs');",
+            errors: [{ messageId: "noNodejs", data: { module: "fs" } }],
+        },
+        {
+            name: "window.require() through a type assertion is forbidden",
+            code: "const { exec } = (window as any).require('child_process'); const path = (<any>window).require('path');",
+            errors: [
+                { messageId: "noNodejs", data: { module: "child_process" } },
+                { messageId: "noNodejs", data: { module: "path" } },
+            ],
+        },
+        {
+            name: "globalThis.require(), activeWindow.require(), self.require() and global.require() are forbidden",
+            code: "globalThis.require('node:path'); activeWindow.require('os'); self.require('crypto'); global.require('fs/promises');",
+            errors: [
+                { messageId: "noNodejs", data: { module: "node:path" } },
+                { messageId: "noNodejs", data: { module: "os" } },
+                { messageId: "noNodejs", data: { module: "crypto" } },
+                { messageId: "noNodejs", data: { module: "fs/promises" } },
+            ],
+        },
+        {
+            name: "window['require'](), an optional call and a non-null assertion are forbidden",
+            code: "window['require']('fs'); window?.require('fs'); window.require?.('fs'); window!.require('fs');",
+            errors: [
+                { messageId: "noNodejs" },
+                { messageId: "noNodejs" },
+                { messageId: "noNodejs" },
+                { messageId: "noNodejs" },
+            ],
+        },
+        {
+            name: "window.require() inside if (!Platform.isDesktop) is forbidden",
+            code: "if (!Platform.isDesktop) { window.require('fs'); }",
             errors: [{ messageId: "noNodejs" }],
         },
         {

@@ -134,7 +134,11 @@ export function getContextFilename<MessageId extends string>(
     return typeof filename === "string" ? filename : null;
 }
 
-// Checks if a file path matches the pattern for English locale files
+// Checks if a file path matches the pattern for English locale files: a file
+// or directory named "en" in any case, alone or followed by ".", "-" or "_"
+// and more (en-US, en_GB, en.messages), with one of `extensions`. The
+// recommendedWithLocalesEn globs in lib/index.ts select the same files; the
+// extension is matched in its case, as ESLint matches those globs.
 export function isEnglishLocalePath(
     filePath: string,
     extensions: readonly string[],
@@ -143,8 +147,7 @@ export function isEnglishLocalePath(
     const normalizedExtensions = extensions.map((ext) => ext.replace(/^\./, ""));
     const extensionPattern = normalizedExtensions.map(escapeRegExp).join("|");
     const regex = new RegExp(
-        `(?:^|/)en(?:[._-][^/]+)?(?:/.*)?\\.(?:${extensionPattern})$`,
-        "i",
+        `(?:^|/)[eE][nN](?:[._-][^/]+)?(?:/.*)?\\.(?:${extensionPattern})$`,
     );
     return regex.test(normalized);
 }
@@ -164,7 +167,9 @@ export function isExpressionNode(node: TSESTree.Node | null | undefined): node i
     }
 }
 
-// Unwraps TypeScript type assertions and non-null assertions to get the underlying expression
+// Unwraps TypeScript type assertions (`x as T`, `<T>x`), `satisfies` and
+// non-null assertions to get the underlying expression. Parentheses leave no
+// node in the AST, so they need no unwrapping.
 export function unwrapExpression(
     node: TSESTree.Node | null | undefined,
 ): TSESTree.Expression | null {
@@ -172,6 +177,7 @@ export function unwrapExpression(
     while (current) {
         if (
             current.type === TSESTree.AST_NODE_TYPES.TSAsExpression ||
+            current.type === TSESTree.AST_NODE_TYPES.TSTypeAssertion ||
             current.type === TSESTree.AST_NODE_TYPES.TSSatisfiesExpression ||
             current.type === TSESTree.AST_NODE_TYPES.TSNonNullExpression
         ) {

@@ -84,6 +84,41 @@ ruleTester.run("no-unsupported-api", rule, {
             options: [{ minAppVersion: "1.4.10" }],
         },
         {
+            name: "a class expression extending AbstractInputSuggest is allowed at 1.4.10",
+            code: `
+                import { AbstractInputSuggest } from 'obsidian';
+                const Suggest = class extends AbstractInputSuggest<string> {
+                    getSuggestions(): string[] { return []; }
+                    renderSuggestion(): void {}
+                    selectSuggestion(): void {}
+                };
+            `,
+            options: [{ minAppVersion: "1.4.10" }],
+        },
+        {
+            name: "a class expression extending AbstractInputSuggest is allowed where requireApiVersion guards it",
+            code: `
+                import { AbstractInputSuggest, requireApiVersion } from 'obsidian';
+                const Suggest = requireApiVersion("1.4.10")
+                    ? class extends AbstractInputSuggest<string> {
+                        getSuggestions(): string[] { return []; }
+                        renderSuggestion(): void {}
+                        selectSuggestion(): void {}
+                    }
+                    : null;
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "a class expression extending a class without @since is allowed",
+            code: `
+                import { Modal } from 'obsidian';
+                const Prompt = class extends Modal {};
+                const Plain = class {};
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
             name: "Function setTooltip available at minAppVersion 1.4.4",
             code: `
                 import { setTooltip } from 'obsidian';
@@ -603,6 +638,43 @@ ruleTester.run("no-unsupported-api", rule, {
                         super.setValue(value);
                     }
                 }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "apiNotAvailable" }, { messageId: "apiNotAvailable" }],
+        },
+        // Only class declarations were checked.
+        {
+            name: "a class expression extending AbstractInputSuggest requires 1.4.10",
+            code: `
+                import { AbstractInputSuggest } from 'obsidian';
+                const Suggest = class extends AbstractInputSuggest<string> {
+                    getSuggestions(): string[] { return []; }
+                    renderSuggestion(): void {}
+                    selectSuggestion(): void {}
+                };
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [
+                {
+                    messageId: "apiNotAvailable",
+                    data: { qualifiedName: "AbstractInputSuggest", sinceVersion: "1.4.10", minAppVersion: "1.0.0" },
+                    line: 3,
+                },
+            ],
+        },
+        {
+            name: "a named class expression passed as an argument and its super call are reported",
+            code: `
+                import { AbstractInputSuggest } from 'obsidian';
+                declare function register(ctor: unknown): void;
+                register(class MySuggest extends AbstractInputSuggest<string> {
+                    getSuggestions(): string[] { return []; }
+                    renderSuggestion(): void {}
+                    selectSuggestion(): void {}
+                    setValue(value: string): void {
+                        super.setValue(value);
+                    }
+                });
             `,
             options: [{ minAppVersion: "1.0.0" }],
             errors: [{ messageId: "apiNotAvailable" }, { messageId: "apiNotAvailable" }],

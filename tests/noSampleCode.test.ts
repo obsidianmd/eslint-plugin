@@ -28,6 +28,66 @@ ruleTester.run("no-sample-code", noSampleCode, {
             name: "registerInterval callback calling an immediately invoked function is allowed",
             code: "this.registerInterval(window.setInterval(() => (() => console.log('setInterval'))(), 1000));",
         },
+
+        // --- A handler that does more than the sample's logging is the plugin's own code ---
+        // The fix deleted the whole call, doRealWork() included.
+        {
+            name: "a click handler that logs and then does its own work is not the sample",
+            code: `this.registerDomEvent(document, "click", (evt) => {
+                console.log("click", evt);
+                this.doRealWork(evt);
+            });`,
+        },
+        {
+            name: "a click handler whose own work comes before the log is not the sample",
+            code: `this.registerDomEvent(document, "click", (evt: MouseEvent) => {
+                this.doRealWork(evt);
+                console.log("click", evt);
+            });`,
+        },
+        {
+            name: "a click handler that does its work inside the log call is not the sample",
+            code: `this.registerDomEvent(document, "click", (evt: MouseEvent) => {
+                console.log("click", this.handleClick(evt));
+            });`,
+        },
+        {
+            name: "a click handler that logs through the plugin's own logger is not the sample",
+            code: `this.registerDomEvent(document, "click", (evt: MouseEvent) => {
+                this.logger.log("click", evt);
+            });`,
+        },
+        {
+            name: "a click handler that shows its own notice is not the sample",
+            code: `this.registerDomEvent(activeDocument, "click", () => {
+                new Notice("Clicked the ribbon");
+            });`,
+        },
+        {
+            name: "a click handler that shows the sample notice and does its own work is not the sample",
+            code: `this.registerDomEvent(activeDocument, "click", (evt: MouseEvent) => {
+                new Notice("Click");
+                this.handleClick(evt);
+            });`,
+        },
+        {
+            name: "a click listener on another target is not the sample",
+            code: `this.registerDomEvent(this.containerEl, "click", (evt: MouseEvent) => {
+                new Notice("Click");
+            });`,
+        },
+        {
+            name: "an interval that logs through the plugin's own logger is not the sample",
+            code: "this.registerInterval(window.setInterval(() => this.log('setInterval'), 5 * 60 * 1000));",
+        },
+        {
+            name: "an interval whose log call does work is not the sample",
+            code: "this.registerInterval(window.setInterval(() => console.log('setInterval', this.sync()), 5 * 60 * 1000));",
+        },
+        {
+            name: "an interval with a block body that does its own work is not the sample",
+            code: "this.registerInterval(window.setInterval(() => { console.log('setInterval'); this.sync(); }, 5 * 60 * 1000));",
+        },
     ],
     invalid: [
         {
@@ -49,6 +109,54 @@ ruleTester.run("no-sample-code", noSampleCode, {
             code: "class MyPlugin extends Plugin { onload() { this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000)); this.addCommand(command); } }",
             errors: [{ messageId: "removeSampleInterval" }],
             output: "class MyPlugin extends Plugin { onload() {  this.addCommand(command); } }",
+        },
+
+        // The sample plugin's handler since November 2025, and on activeDocument since 2026.
+        {
+            name: "the current sample click handler on activeDocument is forbidden",
+            code: `this.registerDomEvent(activeDocument, 'click', (_evt: MouseEvent) => {
+                new Notice('Click');
+            });`,
+            errors: [{ messageId: "removeSampleDomEvent" }],
+            output: "",
+        },
+        {
+            name: "the sample click handler showing a notice on document is forbidden",
+            code: `this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
+                new Notice("Click");
+            });`,
+            errors: [{ messageId: "removeSampleDomEvent" }],
+            output: "",
+        },
+        {
+            name: "the sample click handler with another parameter name and a member in the log is the sample",
+            code: `this.registerDomEvent(document, "click", (e) => {
+                console.log("click", e.target);
+            });`,
+            errors: [{ messageId: "removeSampleDomEvent" }],
+            output: "",
+        },
+        {
+            name: "the sample interval with another delay is the sample",
+            code: "this.registerInterval(window.setInterval(() => console.log('setInterval'), this.settings.minutes * 60 * 1000));",
+            errors: [{ messageId: "removeSampleInterval" }],
+            output: "",
+        },
+
+        // --- Deleting the call would drop a call made in its arguments: no fix ---
+        {
+            name: "a sample interval whose delay is computed by a call is reported without a fix",
+            code: "this.registerInterval(window.setInterval(() => console.log('setInterval'), this.getDelay()));",
+            errors: [{ messageId: "removeSampleInterval" }],
+            output: null,
+        },
+        {
+            name: "a sample click handler with options built by a call is reported without a fix",
+            code: `this.registerDomEvent(document, "click", (evt: MouseEvent) => {
+                console.log("click", evt);
+            }, this.listenerOptions());`,
+            errors: [{ messageId: "removeSampleDomEvent" }],
+            output: null,
         },
 
         // --- The call's value is used, or the call is not a statement of its own: no fix ---

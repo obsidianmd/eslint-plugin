@@ -1,6 +1,7 @@
 import { type TSESLint, TSESTree } from "@typescript-eslint/utils";
 import { getManifest } from "../../manifest.js";
 import { docsUrl, ruleCreator } from "../../ruleCreator.js";
+import { isPluginSettingTab } from "./shared.js";
 
 type Options = [{ pluginName?: string }?];
 
@@ -50,25 +51,28 @@ export default ruleCreator<Options, "settings" | "general" | "pluginName" | "rem
     create(context) {
         const options = context.options[0] || {};
         const pluginName = options.pluginName ?? getManifest()?.name;
-        let insidePluginSettingTab = false;
+        // For each enclosing class, whether it is a settings tab. The nearest one
+        // decides: a class nested in a tab is checked on its own terms, and the
+        // tab is checked again after it. Functions do not count, so a callback or
+        // a nested function in the tab is in the tab.
+        const classStack: boolean[] = [];
+        const enterClass = (node: TSESTree.ClassDeclaration | TSESTree.ClassExpression) => {
+            classStack.push(isPluginSettingTab(node));
+        };
+        const exitClass = () => {
+            classStack.pop();
+        };
 
         return {
-            ClassDeclaration(node: TSESTree.ClassDeclaration) {
-                if (
-                    node.superClass?.type === TSESTree.AST_NODE_TYPES.Identifier &&
-                    node.superClass.name === "PluginSettingTab"
-                ) {
-                    insidePluginSettingTab = true;
-                }
-            },
-            "ClassDeclaration:exit"() {
-                insidePluginSettingTab = false;
-            },
+            ClassDeclaration: enterClass,
+            "ClassDeclaration:exit": exitClass,
+            ClassExpression: enterClass,
+            "ClassExpression:exit": exitClass,
             // Find `new Setting(...).setName("...").setHeading()`
             "CallExpression[callee.property.name='setHeading']"(
                 node: TSESTree.CallExpression,
             ) {
-                if (!insidePluginSettingTab) return;
+                if (!classStack.at(-1)) return;
 
                 // The whole chain the heading is part of, from `new Setting(…)` to
                 // its last call, which may come after setHeading().
@@ -76,9 +80,9 @@ export default ruleCreator<Options, "settings" | "general" | "pluginName" | "rem
                 const chain = chainCalls(top);
                 if (!chain) return;
                 const { calls, settingConstructor } = chain;
-                // The setName() nearest to the constructor, below setHeading().
-                const below = calls.slice(calls.findIndex((call) => call.node === node));
-                const setNameCall = below.reverse().find((call) => call.name === "setName")?.node;
+                // The heading's name: each setName() replaces the one before, so it
+                // is the last one in the chain, before or after setHeading().
+                const setNameCall = calls.find((call) => call.name === "setName")?.node;
 
                 if (!setNameCall || !settingConstructor) return;
 

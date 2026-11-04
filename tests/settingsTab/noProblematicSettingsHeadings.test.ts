@@ -54,6 +54,51 @@ ruleTester.run("no-problematic-settings-headings", rule, {
                 }
             `,
         },
+        // The nearest enclosing class decides whether a heading is in a settings tab.
+        {
+            name: "a heading in a class nested in a settings tab is not checked",
+            code: tab(`
+                class Section {
+                    render(el: HTMLElement) {
+                        new Setting(el).setName("General").setHeading();
+                    }
+                }
+                const View = class {
+                    render(el: HTMLElement) {
+                        new Setting(el).setName("General").setHeading();
+                    }
+                };`),
+        },
+        {
+            name: "a heading after a settings tab nested in another class is not checked",
+            code: `
+                ${MOCK_CLASS}
+                class Plugin {
+                    load(el: HTMLElement) {
+                        class MyTab extends PluginSettingTab {}
+                        new Setting(el).setName("General").setHeading();
+                    }
+                }
+            `,
+        },
+        // The heading's name is the last setName() in the chain, wherever setHeading() is.
+        {
+            name: "a setting that is not a heading is not checked, whatever its name",
+            code: tab(`new Setting(this.containerEl).setName("General").setDesc("Applies everywhere.");`),
+        },
+        {
+            name: "a name replaced by a later setName() is not checked",
+            code: tab(`
+                new Setting(this.containerEl).setName("General").setHeading().setName("Appearance");
+                new Setting(this.containerEl).setName("General").setName("Appearance").setHeading();`),
+        },
+        {
+            name: "a name replaced by a later setName() that is not a string literal is not checked",
+            code: `
+                declare const label: string;
+                ${tab(`new Setting(this.containerEl).setName("General").setHeading().setName(label);`)}
+            `,
+        },
     ],
     invalid: [
         {
@@ -218,6 +263,99 @@ ruleTester.run("no-problematic-settings-headings", rule, {
             code: tab(`
                 const generalHeading = new Setting(this.containerEl).setName("General").setHeading();
                 generalHeading.setClass("x");`),
+            output: null,
+            errors: [{ messageId: "general", suggestions: [] }],
+        },
+        // A class nested in the tab used to end the check for the rest of the tab.
+        {
+            name: "a heading after a class nested in the tab is reported",
+            code: tab(`
+                class Inner {}
+                new Setting(this.containerEl).setName("General").setHeading();`),
+            output: tab(`
+                class Inner {}
+                ;`),
+            errors: [{ messageId: "general" }],
+        },
+        {
+            name: "a heading in a callback or a nested function of the tab is reported",
+            code: tab(`
+                class Inner {}
+                [1].forEach(() => { new Setting(this.containerEl).setName("General").setHeading(); });
+                function renderSection(el: HTMLElement) { new Setting(el).setName("Display options").setHeading(); }`),
+            output: tab(`
+                class Inner {}
+                [1].forEach(() => { ; });
+                function renderSection(el: HTMLElement) { new Setting(el).setName("Display options").setHeading(); }`),
+            errors: [{ messageId: "general" }, { messageId: "settings" }],
+        },
+        {
+            name: "a settings tab written as a class expression is checked",
+            code: `
+                ${MOCK_CLASS}
+                export const MyTab = class extends PluginSettingTab {
+                    display() {
+                        new Setting(this.containerEl).setName("General").setHeading();
+                    }
+                };
+            `,
+            output: `
+                ${MOCK_CLASS}
+                export const MyTab = class extends PluginSettingTab {
+                    display() {
+                        ;
+                    }
+                };
+            `,
+            errors: [{ messageId: "general" }],
+        },
+        {
+            name: "a settings tab nested in another class is checked",
+            code: `
+                ${MOCK_CLASS}
+                class Plugin {
+                    makeTab() {
+                        return class extends PluginSettingTab {
+                            display() {
+                                new Setting(this.containerEl).setName("Plugin settings").setHeading();
+                            }
+                        };
+                    }
+                }
+            `,
+            errors: [{ messageId: "settings" }],
+        },
+        // setName() after setHeading() names the heading as well.
+        {
+            name: "a heading named after setHeading() is reported and removed",
+            code: tab(`
+                new Setting(this.containerEl).setHeading().setName("General");
+                new Setting(this.containerEl).setHeading().setName("Sample Plugin").setClass("x");`),
+            output: tab(`
+                ;
+                ;`),
+            errors: [{ messageId: "general" }, { messageId: "pluginName" }],
+        },
+        {
+            name: "a heading named after setHeading() with 'settings' is reported without a fix",
+            code: tab(`new Setting(this.containerEl).setHeading().setName("Advanced settings");`),
+            errors: [{ messageId: "settings" }],
+        },
+        {
+            name: "the last setName() names the heading",
+            code: tab(`new Setting(this.containerEl).setName("Appearance").setHeading().setName("General");`),
+            output: tab(`;`),
+            errors: [{ messageId: "general" }],
+        },
+        {
+            name: "a heading named after setHeading() with a control is not removed",
+            code: tab(`new Setting(this.containerEl).setHeading().setName("General").addButton((btn) => btn.setIcon("x"));`),
+            output: null,
+            errors: [{ messageId: "general", suggestions: [] }],
+        },
+        {
+            name: "a heading named after setHeading() whose value is used is not removed",
+            code: tab(`const heading = new Setting(this.containerEl).setHeading().setName("General");`),
             output: null,
             errors: [{ messageId: "general", suggestions: [] }],
         },

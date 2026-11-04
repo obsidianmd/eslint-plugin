@@ -10,9 +10,10 @@
 
 ## What is reported
 
-Checks the string values of an English locale JSON file — `en.json`, `en-US.json`, `en_GB.json`, or
-any `.json` under an `en/` directory — and reports those not in sentence case. Keys are not checked,
-and neither are array elements. Values in nested objects are.
+Checks the string values of an English locale JSON file — `en.json`, `en-US.json`, `en_GB.json`,
+`en.messages.json`, or any `.json` under a directory named so, such as `en/` or `en-US/`, with `en`
+in any case — and reports those not in sentence case. Keys are not checked, and neither are array
+elements. Values in nested objects are.
 
 ```json
 {
@@ -30,10 +31,11 @@ placeholders (`{{count}}`) is not checked. The options work as in
 [`ui/sentence-case`](sentence-case.md#options).
 
 Not reported: keys, array elements, non-string values, and files that are not English locale files,
-such as `fr.json` or `entries.json`, which only starts with "en".
+such as `fr.json`, or `entries.json` and `english.json`, which only start with "en".
 
 The rule reads the file with the `json/json` language from `@eslint/json`, which
-`recommendedWithLocalesEn` sets up for these files. To enable it without that config, do the same:
+`recommendedWithLocalesEn` sets up for these files, the same files the rule takes for English locale
+files. To enable it without that config, do the same:
 
 ```js
 import json from "@eslint/json";
@@ -41,7 +43,12 @@ import obsidianmd from "eslint-plugin-obsidianmd";
 
 export default [
   {
-    files: ["**/en.json", "**/en*.json", "**/en/**/*.json"],
+    files: [
+      "**/[eE][nN].json",
+      "**/[eE][nN][._-]?*.json",
+      "**/[eE][nN]/**/*.json",
+      "**/[eE][nN][._-]?*/**/*.json",
+    ],
     language: "json/json",
     plugins: { json, obsidianmd },
     rules: { "obsidianmd/ui/sentence-case-json": "warn" },

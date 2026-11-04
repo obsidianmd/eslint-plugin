@@ -23,9 +23,13 @@ onChange(async (value) => {
 ```
 
 Not reported: `display()` called on anything other than `this`, a call outside a settings tab, and
-any call while `minAppVersion` is below 1.13.0. Below 1.13.0 the recommended config also keeps
-typescript-eslint's `no-deprecated` from reporting `display()`, which `obsidian` typings from 1.13
-mark deprecated; from 1.13.0 it reports every `display()` call, on `this` or not.
+any call while `minAppVersion` is below 1.13.0.
+
+The recommended config also runs typescript-eslint's `no-deprecated`, and `obsidian` typings from
+1.13 mark `display()` deprecated. The config has `no-deprecated` allow `display()` while the
+`minAppVersion` in `manifest.json` is below 1.13.0, or there is no valid one; from 1.13.0
+`no-deprecated` reports every `display()` call, on `this` or not. That allowance follows
+`manifest.json` only; this rule's `minAppVersion` option does not change it.
 
 `--fix` renames the call to `this.update()` only when type information shows that it is safe: the
 installed `obsidian` typings are 1.13.0 or later and give the tab Obsidian's own `update()`, and

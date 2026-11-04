@@ -33,8 +33,9 @@ export default ruleCreator({
                     return;
                 }
 
-                const body = getFunctionBody(callback);
-                if (!body) {
+                // An arrow function with an expression body is not checked.
+                const body = callback.body;
+                if (body.type !== TSESTree.AST_NODE_TYPES.BlockStatement) {
                     return;
                 }
 
@@ -43,9 +44,9 @@ export default ruleCreator({
                     return;
                 }
 
-                const evtName = evtParam.name;
+                const { readsDefaultPrevented, callsPreventDefault } = findEventUses(callback, evtParam, body);
 
-                if (!hasDefaultPreventedCheck(body, evtName)) {
+                if (!readsDefaultPrevented) {
                     context.report({
                         node: callback,
                         messageId: "missingDefaultPrevented",
@@ -53,7 +54,7 @@ export default ruleCreator({
                     });
                 }
 
-                if (!hasPreventDefaultCall(body, evtName)) {
+                if (!callsPreventDefault) {
                     context.report({
                         node: callback,
                         messageId: "missingPreventDefault",
@@ -95,33 +96,96 @@ export default ruleCreator({
             );
         }
 
-        function getFunctionBody(node: TSESTree.ArrowFunctionExpression | TSESTree.FunctionExpression): TSESTree.Statement[] | null {
-            if (node.body.type === TSESTree.AST_NODE_TYPES.BlockStatement) {
-                return node.body.body;
-            }
-            return null;
-        }
-
-        function hasDefaultPreventedCheck(statements: TSESTree.Statement[], evtName: string): boolean {
-            const source = context.sourceCode;
-            for (const stmt of statements) {
-                const text = source.getText(stmt);
-                if (text.includes(`${evtName}.defaultPrevented`)) {
-                    return true;
+        // Whether the handler's body reads `<evt>.defaultPrevented` and calls
+        // `<evt>.preventDefault()`, where <evt> is the handler's first
+        // parameter. Its references come from scope analysis, so a variable of
+        // the same name declared inside the handler does not count, and
+        // neither do strings, comments or another object's property.
+        function findEventUses(
+            callback: TSESTree.ArrowFunctionExpression | TSESTree.FunctionExpression,
+            evtParam: TSESTree.Identifier,
+            body: TSESTree.BlockStatement,
+        ): { readsDefaultPrevented: boolean; callsPreventDefault: boolean } {
+            let readsDefaultPrevented = false;
+            let callsPreventDefault = false;
+            const variable = context.sourceCode
+                .getDeclaredVariables(callback)
+                .find((v) => v.identifiers.includes(evtParam));
+            for (const reference of variable?.references ?? []) {
+                const identifier = reference.identifier;
+                // Only the body, not a default value of a later parameter.
+                if (identifier.range[0] < body.range[0] || identifier.range[1] > body.range[1]) {
+                    continue;
+                }
+                // `evt!`, `evt as ClipboardEvent` and `<ClipboardEvent>evt` are the event too.
+                const target = skipTypeAssertions(identifier);
+                const parent = target.parent;
+                if (!parent) {
+                    continue;
+                }
+                if (parent.type === TSESTree.AST_NODE_TYPES.MemberExpression && parent.object === target) {
+                    const property = memberPropertyName(parent);
+                    if (property === "defaultPrevented") {
+                        readsDefaultPrevented = true;
+                    } else if (
+                        property === "preventDefault" &&
+                        parent.parent.type === TSESTree.AST_NODE_TYPES.CallExpression &&
+                        parent.parent.callee === parent
+                    ) {
+                        callsPreventDefault = true;
+                    }
+                } else if (destructuresDefaultPrevented(parent, target)) {
+                    readsDefaultPrevented = true;
                 }
             }
-            return false;
+            return { readsDefaultPrevented, callsPreventDefault };
         }
 
-        function hasPreventDefaultCall(statements: TSESTree.Statement[], evtName: string): boolean {
-            const source = context.sourceCode;
-            for (const stmt of statements) {
-                const text = source.getText(stmt);
-                if (text.includes(`${evtName}.preventDefault()`)) {
-                    return true;
-                }
+        function skipTypeAssertions(node: TSESTree.Node): TSESTree.Node {
+            let current = node;
+            while (
+                current.parent &&
+                (current.parent.type === TSESTree.AST_NODE_TYPES.TSNonNullExpression ||
+                    current.parent.type === TSESTree.AST_NODE_TYPES.TSAsExpression ||
+                    current.parent.type === TSESTree.AST_NODE_TYPES.TSSatisfiesExpression ||
+                    current.parent.type === TSESTree.AST_NODE_TYPES.TSTypeAssertion) &&
+                current.parent.expression === current
+            ) {
+                current = current.parent;
             }
-            return false;
+            return current;
+        }
+
+        // The name in `evt.name` and `evt["name"]`.
+        function memberPropertyName(node: TSESTree.MemberExpression): string | null {
+            if (!node.computed) {
+                return node.property.type === TSESTree.AST_NODE_TYPES.Identifier ? node.property.name : null;
+            }
+            return node.property.type === TSESTree.AST_NODE_TYPES.Literal && typeof node.property.value === "string"
+                ? node.property.value
+                : null;
+        }
+
+        // `const { defaultPrevented } = evt` and `({ defaultPrevented } = evt)`.
+        function destructuresDefaultPrevented(parent: TSESTree.Node, target: TSESTree.Node): boolean {
+            let pattern: TSESTree.Node | null = null;
+            if (parent.type === TSESTree.AST_NODE_TYPES.VariableDeclarator && parent.init === target) {
+                pattern = parent.id;
+            } else if (parent.type === TSESTree.AST_NODE_TYPES.AssignmentExpression && parent.right === target) {
+                pattern = parent.left;
+            }
+            if (pattern?.type !== TSESTree.AST_NODE_TYPES.ObjectPattern) {
+                return false;
+            }
+            return pattern.properties.some((property) => {
+                if (property.type !== TSESTree.AST_NODE_TYPES.Property) {
+                    return false;
+                }
+                const key = property.key;
+                return key.type === TSESTree.AST_NODE_TYPES.Literal
+                    ? key.value === "defaultPrevented"
+                    : !property.computed && key.type === TSESTree.AST_NODE_TYPES.Identifier && key.name === "defaultPrevented";
+            });
         }
     },
 });

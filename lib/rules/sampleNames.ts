@@ -25,22 +25,38 @@ export default ruleCreator({
     },
     defaultOptions: [],
     create(context) {
+        function reportSampleName(id: TSESTree.Identifier | null | undefined) {
+            if (id && sampleTypeNames.includes(id.name)) {
+                context.report({
+                    node: id,
+                    messageId: "rename",
+                });
+            }
+        }
+
         return {
             TSInterfaceDeclaration(node: TSESTree.TSInterfaceDeclaration) {
-                if (sampleTypeNames.includes(node.id.name)) {
-                    context.report({
-                        node: node.id,
-                        messageId: "rename",
-                    });
-                }
+                reportSampleName(node.id);
+            },
+            // `type MyPluginSettings = { … }`, the interface written as a type.
+            TSTypeAliasDeclaration(node: TSESTree.TSTypeAliasDeclaration) {
+                reportSampleName(node.id);
             },
             ClassDeclaration(node: TSESTree.ClassDeclaration) {
-                if (node.id && sampleTypeNames.includes(node.id.name)) {
-                    context.report({
-                        node: node.id,
-                        messageId: "rename",
-                    });
+                reportSampleName(node.id);
+            },
+            // `const MyPlugin = class extends Plugin {}`: the variable names
+            // the class, as may the class itself (`class MyPlugin {}`).
+            ClassExpression(node: TSESTree.ClassExpression) {
+                const parent = node.parent;
+                if (
+                    parent.type === TSESTree.AST_NODE_TYPES.VariableDeclarator &&
+                    parent.init === node &&
+                    parent.id.type === TSESTree.AST_NODE_TYPES.Identifier
+                ) {
+                    reportSampleName(parent.id);
                 }
+                reportSampleName(node.id);
             },
             // A property of an interface or object type, such as the sample's
             // `interface MyPluginSettings { mySetting: string }`.

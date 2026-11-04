@@ -1,6 +1,7 @@
 import { AST_NODE_TYPES } from "@typescript-eslint/utils";
 import type { TSESTree } from "@typescript-eslint/utils";
 import { isBuiltin } from "node:module";
+import { hasLocalBinding } from "../globalWindow.js";
 import { isManifestDesktopOnly } from "../manifest.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
@@ -130,11 +131,11 @@ export default ruleCreator<[NoNodejsModulesOptions?], "noNodejs">({
                 });
             },
 
-            // require() calls — allowed when guarded by Platform.isDesktop
+            // require() calls, also through the global object
+            // (`window.require()`) — allowed when guarded by Platform.isDesktop
             CallExpression(node: TSESTree.CallExpression) {
                 if (
-                    node.callee.type !== AST_NODE_TYPES.Identifier ||
-                    node.callee.name !== "require" ||
+                    !isRequireCallee(node.callee) ||
                     node.arguments.length === 0 ||
                     node.arguments[0].type !== AST_NODE_TYPES.Literal ||
                     typeof (node.arguments[0] as TSESTree.Literal).value !== "string"
@@ -155,8 +156,58 @@ export default ruleCreator<[NoNodejsModulesOptions?], "noNodejs">({
                 });
             },
         };
+
+        // `require`, or `require` read from the global object: on desktop,
+        // Electron's renderer puts Node's require() on `window`, so
+        // `window.require("fs")` and `(window as any).require("fs")` load the
+        // module just as a bare `require("fs")` does, and fail on mobile. Only
+        // the global object counts, and only where no local binding of that
+        // name shadows it: `x.require()` on anything else, such as Electron's
+        // `remote.require()` or a module loader of a library, is not Node's
+        // require() of this window.
+        function isRequireCallee(callee: TSESTree.Expression): boolean {
+            if (callee.type === AST_NODE_TYPES.Identifier) {
+                return callee.name === "require";
+            }
+            if (callee.type !== AST_NODE_TYPES.MemberExpression || getPropertyName(callee) !== "require") {
+                return false;
+            }
+            const object = skipTypeWrappers(callee.object);
+            return (
+                object.type === AST_NODE_TYPES.Identifier &&
+                GLOBAL_OBJECT_NAMES.has(object.name) &&
+                !hasLocalBinding(context.sourceCode.getScope(object), object.name)
+            );
+        }
     },
 });
+
+// The names of the global object in Obsidian's desktop renderer, where they are
+// all the same window: activeWindow is the focused one, a popout's own.
+const GLOBAL_OBJECT_NAMES = new Set(["window", "globalThis", "self", "global", "activeWindow"]);
+
+function getPropertyName(node: TSESTree.MemberExpression): string | undefined {
+    if (!node.computed) {
+        return node.property.type === AST_NODE_TYPES.Identifier ? node.property.name : undefined;
+    }
+    return node.property.type === AST_NODE_TYPES.Literal && typeof node.property.value === "string"
+        ? node.property.value
+        : undefined;
+}
+
+// `(window as any)`, `(<any>window)`, `window!`, `window satisfies …`
+function skipTypeWrappers(node: TSESTree.Expression): TSESTree.Expression {
+    let current = node;
+    while (
+        current.type === AST_NODE_TYPES.TSAsExpression ||
+        current.type === AST_NODE_TYPES.TSTypeAssertion ||
+        current.type === AST_NODE_TYPES.TSNonNullExpression ||
+        current.type === AST_NODE_TYPES.TSSatisfiesExpression
+    ) {
+        current = current.expression;
+    }
+    return current;
+}
 
 function isPlatformIsDesktop(expr: TSESTree.Expression): boolean {
     // Platform.isDesktop
@@ -166,6 +217,15 @@ function isPlatformIsDesktop(expr: TSESTree.Expression): boolean {
         expr.object.name === "Platform" &&
         expr.property.type === AST_NODE_TYPES.Identifier &&
         expr.property.name === "isDesktop"
+    );
+}
+
+// !Platform.isDesktop: what follows when it is false runs on desktop only.
+function isNotPlatformIsDesktop(expr: TSESTree.Expression): boolean {
+    return (
+        expr.type === AST_NODE_TYPES.UnaryExpression &&
+        expr.operator === "!" &&
+        isPlatformIsDesktop(expr.argument)
     );
 }
 
@@ -195,6 +255,10 @@ function isGuardedByPlatformIsDesktop(node: TSESTree.Node): boolean {
                     return true;
                 }
             }
+            // if (!Platform.isDesktop) { ... } else { require(...) }
+            if (prevChild === current.alternate && isNotPlatformIsDesktop(current.test)) {
+                return true;
+            }
         } else if (current.type === AST_NODE_TYPES.ConditionalExpression) {
             if (prevChild !== current.test && prevChild !== current.alternate) {
                 if (extractsPlatformIsDesktop(current.test)) {
@@ -207,6 +271,10 @@ function isGuardedByPlatformIsDesktop(node: TSESTree.Node): boolean {
                     return true;
                 }
             }
+            // !Platform.isDesktop ? ... : import(...)
+            if (prevChild === current.alternate && isNotPlatformIsDesktop(current.test)) {
+                return true;
+            }
         } else if (
             current.type === AST_NODE_TYPES.LogicalExpression &&
             current.operator === "&&" &&
@@ -215,6 +283,14 @@ function isGuardedByPlatformIsDesktop(node: TSESTree.Node): boolean {
             if (extractsPlatformIsDesktop(current.left)) {
                 return true;
             }
+        } else if (
+            // !Platform.isDesktop || require(...)
+            current.type === AST_NODE_TYPES.LogicalExpression &&
+            current.operator === "||" &&
+            prevChild === current.right &&
+            isNotPlatformIsDesktop(current.left)
+        ) {
+            return true;
         } else if (
             current.type === AST_NODE_TYPES.FunctionDeclaration ||
             current.type === AST_NODE_TYPES.FunctionExpression ||

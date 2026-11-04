@@ -1,5 +1,6 @@
 import { TSESTree } from "@typescript-eslint/utils";
 import { docsUrl, ruleCreator } from "../../ruleCreator.js";
+import { isCommandProperty } from "./property.js";
 
 export default ruleCreator({
     meta: {
@@ -30,9 +31,7 @@ export default ruleCreator({
                 const commandObject = node.arguments[0];
                 for (const property of commandObject.properties) {
                     if (
-                        property.type === TSESTree.AST_NODE_TYPES.Property &&
-                        property.key.type === TSESTree.AST_NODE_TYPES.Identifier &&
-                        property.key.name === "hotkeys"
+                        isCommandProperty(property, "hotkeys")
                     ) {
                         context.report({
                             node: property,

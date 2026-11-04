@@ -30,6 +30,14 @@ ruleTester.run("no-command-in-command-name", noCommandInNameRule, {
             name: "name from a template literal is not checked",
             code: "this.addCommand({ name: `Run command` });",
         },
+        {
+            name: "a computed key that is a variable is not the name",
+            code: "this.addCommand({ [name]: 'Run command' });",
+        },
+        {
+            name: "another quoted key is not the name",
+            code: "this.addCommand({ 'id': 'run-command', 'name': 'Run', 'names': 'Run command' });",
+        },
     ],
     invalid: [
         {
@@ -46,6 +54,11 @@ ruleTester.run("no-command-in-command-name", noCommandInNameRule, {
             name: "'command' next to punctuation is forbidden",
             code: "this.addCommand({ name: 'Run (command)' }); this.addCommand({ name: 'Open-command' });",
             errors: [{ messageId: "commandInName" }, { messageId: "commandInName" }],
+        },
+        {
+            name: "a quoted name key is checked",
+            code: "this.addCommand({ \"id\": \"run\", \"name\": \"Run command\" }); this.addCommand({ 'name': 'Command: run' }); this.addCommand({ ['name']: 'Run command' });",
+            errors: [{ messageId: "commandInName" }, { messageId: "commandInName" }, { messageId: "commandInName" }],
         },
     ],
 });

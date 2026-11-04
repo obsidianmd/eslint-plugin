@@ -4,6 +4,8 @@
 
 💼 This rule is enabled in the following configs: ✅ `recommended`, 🇬🇧 `recommendedWithLocalesEn`.
 
+💭 This rule requires [type information](https://typescript-eslint.io/linting/typed-linting).
+
 <!-- end auto-generated rule header -->
 
 ## What is reported
@@ -15,7 +17,8 @@ The uses checked are:
 
 - reading a property or calling a method, such as `this.app.renderContext`
 - calling a function or creating an instance, such as `displayTooltip()` or `new SecretComponent(app, el)`
-- extending a class, such as `class MySuggest extends AbstractInputSuggest`, and calling methods
+- extending a class, such as `class MySuggest extends AbstractInputSuggest`, also in a class
+  expression such as `const MySuggest = class extends AbstractInputSuggest {}`, and calling methods
   inherited from it through `super`
 - a newer method on an older class, such as `setDisabled()` on a `BaseComponent`, and Obsidian's
   additions to built-ins, such as `Array.prototype.findLastIndex`
@@ -121,3 +124,13 @@ Use **`obsidian` 1.10.0 or later** for meaningful results. This is independent o
 your plugin's `minAppVersion`: the typings supply the "when was this added" data,
 while `minAppVersion` from `manifest.json` is the floor being checked against, so
 keeping the typings current does not raise the minimum app version you support.
+
+### Cache
+
+Reading the `@since` tags means parsing all of `obsidian.d.ts`, so the rule caches the result in
+`.cache/eslint-plugin-obsidianmd/since-map.json` in the `node_modules` directory that holds
+`obsidian`, normally `node_modules/.cache/eslint-plugin-obsidianmd/since-map.json`. The cache records
+the `obsidian` version it was built from and the version of this plugin that built it, and the rule
+rebuilds it when either differs, so upgrading `obsidian` or this plugin refreshes it; deleting the
+file forces a rebuild. Where the file
+cannot be written, the rule parses the typings on every ESLint run instead.

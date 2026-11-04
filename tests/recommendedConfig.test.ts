@@ -409,7 +409,6 @@ describe("scanner-aligned severities", () => {
 	it("security rules should be at error", () => {
 		const securityRules = [
 			"no-eval",
-			"no-implied-eval",
 			"no-unsanitized/method",
 			"no-unsanitized/property",
 		];
@@ -420,6 +419,13 @@ describe("scanner-aligned severities", () => {
 				`security rule ${rule} should be 'error'`
 			);
 		}
+	});
+
+	// typescript-eslint's rule replaces the core one in TypeScript files (see
+	// impliedEval.test.ts).
+	it("implied eval should be at error", () => {
+		assert.strictEqual(getSeverity(tsRules["@typescript-eslint/no-implied-eval"]), "error");
+		assert.strictEqual(getSeverity(jsRules["no-implied-eval"]), "error");
 	});
 
 	it("scanner-escalated obsidianmd rules should be at error", () => {
@@ -565,6 +571,16 @@ describe("type-checked rule guard", () => {
 				`${rule} requires type info but is missing from TS config — add it to recommendedPluginRulesConfigTypeChecked`
 			);
 		}
+	});
+
+	// eslint-doc-generator reads meta.docs.requiresTypeChecking to mark a rule as
+	// needing type information in the README and the rule's doc.
+	it("type-requiring rules, and only those, set meta.docs.requiresTypeChecking", () => {
+		const marked = Object.entries(plugin.rules)
+			.filter(([, rule]) => (rule.meta?.docs as { requiresTypeChecking?: boolean } | undefined)?.requiresTypeChecking === true)
+			.map(([name]) => `obsidianmd/${name}`)
+			.sort();
+		assert.deepStrictEqual(marked, [...TYPE_CHECKED_RULES].sort());
 	});
 });
 

@@ -163,6 +163,18 @@ ruleTester.run("prefer-create-el", preferCreateEl, {
             code: `${MOCK_OBSIDIAN_DOM}\ndeclare global { interface Document { win: typeof globalThis } }\ndeclare const iframe: HTMLIFrameElement;\n(iframe.contentDocument as Document).createElementNS('http://www.w3.org/2000/svg', 'path');`,
         },
         {
+            name: "a nullable const holding iframe.contentDocument is not flagged with ?.",
+            code: `${MOCK_OBSIDIAN_DOM}\ndeclare global { interface Document { win: typeof globalThis } }\ndeclare const iframe: HTMLIFrameElement;\nconst doc = iframe.contentDocument;\ndoc?.createElement('style');`,
+        },
+        {
+            name: "a nullable object that is not a document is not flagged",
+            code: "declare const notDoc: { createElement(tag: string): unknown } | null;\nnotDoc?.createElement('p');",
+        },
+        {
+            name: "a nullable union of a document and another object is not flagged",
+            code: "declare const maybeDoc: Document | { createElement(tag: string): HTMLElement } | null;\nmaybeDoc?.createElement('p');",
+        },
+        {
             name: "an iframe document is not flagged without Obsidian types",
             code: `declare global { interface Document { win: typeof globalThis } }\ndeclare const iframe: HTMLIFrameElement;\niframe.contentDocument!.createElement('div');`,
         },
@@ -642,6 +654,86 @@ ruleTester.run("prefer-create-el", preferCreateEl, {
             errors: [{ messageId: "preferCreateEl" }],
         },
 
+        // --- A document that may be null or undefined ---
+        // A union with null has no `defaultView` of its own, so these were
+        // never reported.
+        {
+            name: "a nullable document's doc?.createElement(tag) → doc?.win.createEl(tag)",
+            code: `${MOCK_OBSIDIAN_DOM}\ndeclare const doc: (Document & { win: typeof globalThis }) | null;\nconst el = doc?.createElement('p');`,
+            output: `${MOCK_OBSIDIAN_DOM}\ndeclare const doc: (Document & { win: typeof globalThis }) | null;\nconst el = doc?.win.createEl('p');`,
+            errors: [{ messageId: "preferCreateEl", data: { replacement: "doc?.win.createEl('p')", original: "doc?.createElement('p')" } }],
+        },
+        {
+            name: "an optional document parameter's doc?.createElement('div') → doc?.win.createDiv()",
+            code: `${MOCK_OBSIDIAN_DOM}\nfunction make(doc?: Document & { win: typeof globalThis }) { return doc?.createElement('div'); }`,
+            output: `${MOCK_OBSIDIAN_DOM}\nfunction make(doc?: Document & { win: typeof globalThis }) { return doc?.win.createDiv(); }`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        {
+            name: "a document that may be undefined: doc?.createElementNS(SVG_NS, tag) → doc?.win.createSvg(tag)",
+            code: `${MOCK_OBSIDIAN_DOM}\ndeclare const doc: (Document & { win: typeof globalThis }) | undefined;\ndoc?.createElementNS('http://www.w3.org/2000/svg', 'path');`,
+            output: `${MOCK_OBSIDIAN_DOM}\ndeclare const doc: (Document & { win: typeof globalThis }) | undefined;\ndoc?.win.createSvg('path');`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        {
+            name: "a nullable document's doc?.createDocumentFragment() → doc?.win.createFragment()",
+            code: `${MOCK_OBSIDIAN_DOM}\ndeclare const doc: (Document & { win: typeof globalThis }) | null | undefined;\ndoc?.createDocumentFragment();`,
+            output: `${MOCK_OBSIDIAN_DOM}\ndeclare const doc: (Document & { win: typeof globalThis }) | null | undefined;\ndoc?.win.createFragment();`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        {
+            name: "a document reached through an optional chain keeps the chain",
+            code: `${MOCK_OBSIDIAN_DOM}\ndeclare const view: { doc: Document & { win: typeof globalThis } } | undefined;\nconst el = view?.doc.createElement('p');`,
+            output: `${MOCK_OBSIDIAN_DOM}\ndeclare const view: { doc: Document & { win: typeof globalThis } } | undefined;\nconst el = view?.doc.win.createEl('p');`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        // TypeScript reports `doc.createElement()` on a nullable document
+        // (TS18047); `doc.win` reads the same value and gets the same error.
+        {
+            name: "a nullable document without ?. is fixed with the same receiver",
+            code: `${MOCK_OBSIDIAN_DOM}\ndeclare const doc: (Document & { win: typeof globalThis }) | null;\ndoc.createElement('p');`,
+            output: `${MOCK_OBSIDIAN_DOM}\ndeclare const doc: (Document & { win: typeof globalThis }) | null;\ndoc.win.createEl('p');`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        {
+            name: "a nullable document without Obsidian types gets a suggestion that keeps ?.",
+            code: `declare const doc: Document | null;\ndoc?.createElement('p');`,
+            output: null,
+            errors: [
+                {
+                    messageId: "preferCreateEl",
+                    suggestions: [
+                        {
+                            messageId: "preferCreateElSuggestion",
+                            output: `declare const doc: Document | null;\ndoc?.win.createEl('p');`,
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "a node's ownerDocument, which may be null, gets a suggestion with Obsidian's types",
+            code: `import "obsidian";\ndeclare const node: Node;\nnode.ownerDocument?.createElement('p');`,
+            output: null,
+            errors: [
+                {
+                    messageId: "preferCreateEl",
+                    suggestions: [
+                        {
+                            messageId: "preferCreateElSuggestion",
+                            output: `import "obsidian";\ndeclare const node: Node;\nnode.ownerDocument?.win.createEl('p');`,
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "a string tag on a nullable document gets neither a fix nor a suggestion",
+            code: `${MOCK_OBSIDIAN_DOM}\ndeclare const doc: (Document & { win: typeof globalThis }) | null;\ndeclare const tag: string;\ndoc?.createElement(tag);`,
+            output: null,
+            errors: [{ messageId: "preferCreateEl", suggestions: [] }],
+        },
+
         // --- The global document declares createEl but no global helper does ---
         {
             name: "document.createElement('div') without a global createDiv offers a suggestion",
@@ -710,6 +802,22 @@ ruleTester.run("prefer-create-el: createEl() shorthands", preferCreateEl, {
             name: "this.el?.createEl('div', opts) as a statement keeps the optional chain",
             code: `${OBSIDIAN}class View { el: HTMLElement | null = null; render() { this.el?.createEl('div', { cls: 'empty', text: 'None' }); } }`,
             output: `${OBSIDIAN}class View { el: HTMLElement | null = null; render() { this.el?.createDiv({ cls: 'empty', text: 'None' }); } }`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        // `view?.el` is typed `HTMLElement | undefined` inside the chain, which
+        // has no createDiv() of its own: reported with no fix before.
+        {
+            name: "an element reached through an optional chain is fixed and keeps the chain",
+            code: `${OBSIDIAN}declare const view: { contentEl: HTMLElement } | undefined;\nview?.contentEl.createEl('div', { cls: 'empty' });`,
+            output: `${OBSIDIAN}declare const view: { contentEl: HTMLElement } | undefined;\nview?.contentEl.createDiv({ cls: 'empty' });`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        // TypeScript reports `el.createEl()` on a nullable element (TS18047);
+        // `el.createDiv()` reads the same value and gets the same error.
+        {
+            name: "a nullable element without ?. is fixed with the same receiver",
+            code: `${OBSIDIAN}declare const el: HTMLElement | null;\nel.createEl('span');`,
+            output: `${OBSIDIAN}declare const el: HTMLElement | null;\nel.createSpan();`,
             errors: [{ messageId: "preferCreateEl" }],
         },
         {

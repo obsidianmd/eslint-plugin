@@ -6,6 +6,8 @@
 
 🔧💡 This rule is automatically fixable by the [`--fix` CLI option](https://eslint.org/docs/latest/user-guide/command-line-interface#--fix) and manually fixable by [editor suggestions](https://eslint.org/docs/latest/use/core-concepts#rule-suggestions).
 
+💭 This rule requires [type information](https://typescript-eslint.io/linting/typed-linting).
+
 <!-- end auto-generated rule header -->
 
 ## What is reported
@@ -26,9 +28,12 @@ A value that is not a name, a property access, a call, a non-null assertion or `
 parentheses, so `(await getEl()) instanceof HTMLElement` becomes
 `(await getEl()).instanceOf(HTMLElement)`.
 
-Not reported: `instanceof` on any other type, such as a `TFile` or your own classes, on an `any`
-value, and with `strictNullChecks` on a value whose type includes `null` or `undefined`, such as
-`el.parentElement`.
+A value that may be null or undefined, such as `el.parentElement`, is reported too, with a
+suggestion; see [Values that may be null or undefined](#values-that-may-be-null-or-undefined).
+
+Not reported: `instanceof` on any other type, such as a `TFile` or your own classes, on an `any` or
+`unknown` value, and on a union of more than one type besides `null` and `undefined`, such as
+`Node | string` or `HTMLElement | SVGElement`.
 
 The rule needs type information, so the recommended config runs it on TypeScript files only. It
 switches the rule off for worker and test files, which have no popout windows and no `instanceOf()`;
@@ -45,10 +50,12 @@ may be null or undefined, the rewrite is offered as a suggestion that keeps the 
 if (list[0] instanceof HTMLElement) {} // suggestion: list[0]?.instanceOf(HTMLElement)
 ```
 
-With `strictNullChecks`, a value whose type includes `null` or `undefined` is not reported at all
-(see above), but a value read through an index signature, such as `list[0]` or `record.key`, counts
-as possibly undefined: unless `noUncheckedIndexedAccess` is on, it is typed as present even past the
-end of the list.
+With `strictNullChecks`, the type tells: a value whose type includes `null` or `undefined`, such as
+`el.parentElement`, a `Node | undefined`, an optional chain or a type parameter constrained to
+`HTMLElement | null`, gets that suggestion. So does a value read through an index signature, such as
+`list[0]` or `record.key`: unless `noUncheckedIndexedAccess` is on, it is typed as present even past
+the end of the list. A value narrowed by a check, such as `parent && parent instanceof HTMLElement`,
+or asserted with `!`, is fixed.
 
 Without `strictNullChecks` no type includes `null`, so the value's declaration tells instead: a
 property or call declared as `null` or `undefined` (`el.parentElement`, `el.querySelector()`,

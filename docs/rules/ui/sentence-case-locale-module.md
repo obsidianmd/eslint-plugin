@@ -10,15 +10,18 @@
 
 ## What is reported
 
-Checks the strings of an English locale module, such as `en.ts`, `en-GB.ts` or a module under an `en/`
-directory, and reports those not in sentence case. The strings checked are those of an exported
-object, including nested objects and arrays:
+Checks the strings of an English locale module, such as `en.ts`, `en-GB.ts`, `en.messages.ts` or a
+module under an `en/` or `en-GB/` directory, and reports those not in sentence case. The strings
+checked are those of an exported object, including nested objects and arrays:
 
 ```ts
 export default { autoReveal: "Enable Auto Reveal" }; // reported
 const strings = { openNote: "Open note" };
 export { strings }; // checked as well, as are `export default strings` and `export const x = { … }`
 ```
+
+The object may carry `as const`, `satisfies …` or another type assertion, as in
+`export default { … } as const satisfies Record<string, string>`.
 
 The message gives the expected text, and with `allowAutoFix: true`, `--fix` rewrites the string as
 a double-quoted string. Values are judged as in [`ui/sentence-case`](sentence-case.md): URLs, date
@@ -29,8 +32,9 @@ Not reported: keys, an object that is not exported, an object assigned to `modul
 in functions, template literals with `${…}`, and modules that are not English locale files, such as
 `fr.ts`.
 
-`recommendedWithLocalesEn` runs this rule on `.ts`, `.js`, `.cjs` and `.mjs` files named `en`,
-`en-*` or `en_*`, and on those under an `en/` directory.
+`recommendedWithLocalesEn` runs this rule on the same files the rule takes for English locale
+modules: `.ts`, `.js`, `.cjs` and `.mjs` files named `en`, `en-*`, `en_*` or `en.*`, with `en` in
+any case, and those under a directory named so.
 
 ## Options
 

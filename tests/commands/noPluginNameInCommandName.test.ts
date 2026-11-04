@@ -42,6 +42,16 @@ ruleTester.run("no-plugin-name-in-command-name", noPluginNameRule, {
             options: [{ pluginName: "a.b" }],
         },
         {
+            name: "a computed key that is a variable is not the name",
+            code: "this.addCommand({ [name]: 'My Awesome Plugin: Open a new note' });",
+            options: [{ pluginName: "My Awesome Plugin" }],
+        },
+        {
+            name: "another quoted key is not the name",
+            code: "this.addCommand({ 'id': 'my-awesome-plugin', 'name': 'Open a new note', 'title': 'My Awesome Plugin' });",
+            options: [{ pluginName: "My Awesome Plugin" }],
+        },
+        {
             name: "an empty plugin name matches nothing",
             code: "this.addCommand({ name: 'Open: a note' });",
             options: [{ pluginName: " " }],
@@ -95,6 +105,12 @@ ruleTester.run("no-plugin-name-in-command-name", noPluginNameRule, {
             code: "this.addCommand({ name: 'My  Awesome\tPlugin: open' });",
             options: [{ pluginName: "My Awesome Plugin" }],
             errors: [{ messageId: "pluginName" }],
+        },
+        {
+            name: "a quoted name key is checked",
+            code: "this.addCommand({ \"id\": \"open\", \"name\": \"My Awesome Plugin: Open\" }); this.addCommand({ 'name': 'Open (My Awesome Plugin)' }); this.addCommand({ ['name']: 'My Awesome Plugin: Close' });",
+            options: [{ pluginName: "My Awesome Plugin" }],
+            errors: [{ messageId: "pluginName" }, { messageId: "pluginName" }, { messageId: "pluginName" }],
         },
         {
             // This repository's own manifest.json has "name": "Sample Plugin".

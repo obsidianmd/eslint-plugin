@@ -14,11 +14,17 @@ without the `node:` prefix and including subpaths such as `fs/promises`, loaded 
 - a static `import`, including a side-effect `import "fs"` and TypeScript's
   `import fs = require("fs")`, or a re-export (`export … from "fs"`), since these load the module
   wherever the file runs and cannot be guarded;
-- a dynamic `import()` or a `require()` that `Platform.isDesktop` does not guard.
+- a dynamic `import()` or a `require()` that `Platform.isDesktop` does not guard, including
+  `require()` read from the global object: `window.require()`, `globalThis.require()`,
+  `self.require()`, `global.require()` and `activeWindow.require()`, also through a type assertion
+  or `!`, such as `(window as any).require("fs")`. On desktop, Electron puts Node's `require()` on
+  the window, so these load the module just as a bare `require()` does.
 
 A dynamic `import()` or `require()` counts as guarded inside `if (Platform.isDesktop)` (or
 `if (Platform.isDesktop && …)`), in the first branch of `Platform.isDesktop ? … : …`, to the right of
-`Platform.isDesktop && …`, and anywhere in a function whose first statement is
+`Platform.isDesktop && …`, in the `else` of `if (!Platform.isDesktop)`, the second branch of
+`!Platform.isDesktop ? … : …` and to the right of `!Platform.isDesktop || …`, and anywhere in a
+function whose first statement is
 `if (!Platform.isDesktop) return;` or `throw`, without an `else`:
 
 ```ts
@@ -27,8 +33,10 @@ if (Platform.isDesktop) {
 }
 ```
 
-Not reported: modules that are not built into Node.js; a dynamic `import()` or `require()` whose
-module name is not a string literal; and imports and re-exports that TypeScript erases when
+Not reported: modules that are not built into Node.js, such as `window.require("electron")`; a
+dynamic `import()` or `require()` whose module name is not a string literal; `require()` on any
+other object, such as Electron's `remote.require()` or a library's module loader, and on a local
+variable or parameter named `window`; and imports and re-exports that TypeScript erases when
 compiling, so they never load the module:
 
 ```ts

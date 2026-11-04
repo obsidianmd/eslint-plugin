@@ -38,6 +38,7 @@ export default ruleCreator({
             description:
                 "Disallow storing references to custom views directly in the plugin, which can cause memory leaks.",
             url: docsUrl("no-view-references-in-plugin"),
+            requiresTypeChecking: true,
         },
         schema: [],
         messages: {

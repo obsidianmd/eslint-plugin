@@ -224,6 +224,27 @@ tester.run("ui-sentence-case", rule, {
             name: "a template literal with expressions is not checked",
             code: "declare const n: number; new Notice(`Saved ${n} Files`);",
         },
+        {
+            name: "createDiv, createSpan and createSvg options in sentence case are allowed",
+            code: "createDiv({ text: 'Open settings' }); el.createSpan({ title: 'Open settings' }); el.createSvg('svg', { attr: { 'aria-label': 'Open settings' } });",
+        },
+        {
+            // A string in place of the options is the class.
+            name: "a class given as a string is not checked",
+            code: "createDiv('Setting Item'); el.createSpan('Setting Item'); el.createSvg('svg', 'Setting Item'); el.createEl('div', 'Setting Item');",
+        },
+        {
+            name: "other options of createDiv, createSpan and createSvg are not checked",
+            code: "el.createDiv({ cls: 'Setting Item' }); createSpan({ attr: { 'data-name': 'Open Settings' } }); el.createSvg('svg', { attr: { viewBox: '0 0 24 24' }, cls: 'Big Icon' });",
+        },
+        {
+            name: "the tag of createSvg is not checked",
+            code: "el.createSvg('Open Settings' as never);",
+        },
+        {
+            name: "createFragment takes no text",
+            code: "createFragment((f) => f.appendText('x'));",
+        },
     ],
     invalid: [
         {
@@ -269,6 +290,11 @@ tester.run("ui-sentence-case", rule, {
         {
             name: "createEl attr aria-label with title case is forbidden",
             code: "createEl('div', { attr: { 'aria-label': 'Open Settings' } });",
+            errors: [{ messageId: "useSentenceCase" }],
+        },
+        {
+            name: "createEl options behind an angle-bracket type assertion are checked",
+            code: "createEl('div', <DomElementInfo>{ title: 'Open Settings' });",
             errors: [{ messageId: "useSentenceCase" }],
         },
         {
@@ -385,6 +411,32 @@ tester.run("ui-sentence-case", rule, {
         {
             name: "a title assignment is checked",
             code: "el.title = 'Open Daily Note';",
+            errors: [{ messageId: "useSentenceCase" }],
+        },
+        {
+            name: "createDiv's options are checked like createEl's",
+            code: "createDiv({ text: 'Open Daily Note' }); el.createDiv({ title: 'Open Daily Note', attr: { 'aria-label': 'Open Daily Note' } }, (div) => {});",
+            errors: [
+                { messageId: "useSentenceCase", column: 19 },
+                { messageId: "useSentenceCase", column: 63 },
+                { messageId: "useSentenceCase", column: 104 },
+            ],
+        },
+        {
+            name: "createSpan's options are checked like createEl's",
+            code: "createSpan({ text: 'Open Daily Note' }); el.createSpan({ attr: { placeholder: 'Type A Name' } });",
+            errors: [{ messageId: "useSentenceCase" }, { messageId: "useSentenceCase" }],
+        },
+        {
+            name: "createSvg's attr values are checked like createEl's",
+            code: "el.createSvg('svg', { attr: { 'aria-label': 'Open Daily Note' } });",
+            errors: [{ messageId: "useSentenceCase" }],
+        },
+        {
+            name: "createDiv's text is fixed when allowAutoFix is on",
+            code: "el.createDiv({ text: 'Open Daily Note' });",
+            options: [{ allowAutoFix: true }],
+            output: "el.createDiv({ text: 'Open daily note' });",
             errors: [{ messageId: "useSentenceCase" }],
         },
     ],

@@ -9,8 +9,9 @@
 ## What is reported
 
 The `id` of a command passed to `addCommand()` as an object literal, when it is a string literal that
-contains the words of the plugin ID, together and in order, in any case. The plugin ID is the
-`pluginId` option, or else the `id` in the `manifest.json` of the directory ESLint runs from:
+contains the words of the plugin ID, together and in order, in any case; the key may be quoted
+(`"id": …`). The plugin ID is the `pluginId` option, or else the `id` in the `manifest.json` of the
+directory ESLint runs from:
 
 ```ts
 // manifest.json: { "id": "word-tally", ... }

@@ -53,6 +53,22 @@ ruleTester.run("no-static-styles-assignment", noInlineStylesRule, {
             name: "setCssStyles with a variable is allowed",
             code: "el.setCssStyles(styles);",
         },
+        {
+            name: "setCssProps with only CSS variables, quoted or computed, is allowed",
+            code: "el.setCssProps({ '--a': 'red', \"--b\": width, [`--c`]: '1px', [`--${name}`]: value, [key]: value, [color]: 'red' });",
+        },
+        {
+            name: "setCssStyles with a spread is allowed",
+            code: "el.setCssStyles({ ...styles });",
+        },
+        {
+            name: "a style from a template literal with an expression is allowed",
+            code: "el.style.color = `${color}`; el.style.setProperty('color', `${color}`); el.setAttribute('style', `color: ${color}`);",
+        },
+        {
+            name: "setAttribute with a static template literal for another attribute is allowed",
+            code: "el.setAttribute(`data-id`, `123`);",
+        },
     ],
     invalid: [
         {
@@ -129,6 +145,86 @@ ruleTester.run("no-static-styles-assignment", noInlineStylesRule, {
                     data: { property: "el.setCssStyles" },
                 }
             ]
-        }
+        },
+
+        // --- A computed string key names the property like a dotted one ---
+        // The message read "element.style.undefined".
+        {
+            name: "style[\"color\"] with literal is forbidden and named by its key",
+            code: "el.style[\"color\"] = 'red';",
+            errors: [{ messageId: "avoidStyleAssignment", data: { property: "element.style.color" } }],
+        },
+        {
+            name: "a computed key that is not an identifier is named in brackets",
+            code: "el.style['--my-var'] = 'red'; el.style[`background-color`] = 'red';",
+            errors: [
+                { messageId: "avoidStyleAssignment", data: { property: 'element.style["--my-var"]' } },
+                { messageId: "avoidStyleAssignment", data: { property: 'element.style["background-color"]' } },
+            ],
+        },
+        {
+            name: "a dynamic computed key is named by its source",
+            code: "el.style[prop] = 'red'; el.style[getProp()] = 'red';",
+            errors: [
+                { messageId: "avoidStyleAssignment", data: { property: "element.style[prop]" } },
+                { messageId: "avoidStyleAssignment", data: { property: "element.style[getProp()]" } },
+            ],
+        },
+
+        // --- Unquoted keys are CSS properties like quoted ones ---
+        {
+            name: "setCssStyles with an unquoted property is forbidden",
+            code: "el.setCssStyles({ color: 'red' });",
+            errors: [{ messageId: "avoidStyleAssignment", data: { property: "el.setCssStyles" } }],
+        },
+        {
+            name: "setCssProps with an unquoted property is forbidden",
+            code: "el.setCssProps({ display: 'none' });",
+            errors: [{ messageId: "avoidStyleAssignment", data: { property: "el.setCssProps" } }],
+        },
+        {
+            name: "an unquoted property is forbidden whatever its value, as a quoted one is",
+            code: "el.setCssStyles({ top: `${y}px` }); el.setCssStyles({ 'top': `${y}px` }); el.setCssProps({ width });",
+            errors: [
+                { messageId: "avoidStyleAssignment", data: { property: "el.setCssStyles" } },
+                { messageId: "avoidStyleAssignment", data: { property: "el.setCssStyles" } },
+                { messageId: "avoidStyleAssignment", data: { property: "el.setCssProps" } },
+            ],
+        },
+        {
+            name: "a CSS property next to CSS variables is forbidden, once per call",
+            code: "el.setCssProps({ '--a': 'red', color: 'red', display: 'none' });",
+            errors: [{ messageId: "avoidStyleAssignment", data: { property: "el.setCssProps" } }],
+        },
+        {
+            name: "a computed static template key is forbidden like a quoted one",
+            code: "el.setCssProps({ [`color`]: 'red' });",
+            errors: [{ messageId: "avoidStyleAssignment", data: { property: "el.setCssProps" } }],
+        },
+
+        // --- A template literal without expressions is a literal value ---
+        {
+            name: "style.color with a static template literal is forbidden",
+            code: "el.style.color = `red`;",
+            errors: [{ messageId: "avoidStyleAssignment", data: { property: "element.style.color" } }],
+        },
+        {
+            name: "a multi-line static cssText template literal is forbidden",
+            code: "el.style.cssText = `\n  color: red;\n  display: none;\n`;",
+            errors: [{ messageId: "avoidStyleAssignment", data: { property: "element.style.cssText" } }],
+        },
+        {
+            name: "setProperty with a static template literal value is forbidden",
+            code: "el.style.setProperty('color', `red`);",
+            errors: [{ messageId: "avoidStyleAssignment", data: { property: "element.style.setProperty" } }],
+        },
+        {
+            name: "setAttribute('style') with static template literals is forbidden",
+            code: "el.setAttribute('style', `color: red;`); el.setAttribute(`style`, 'color: red;');",
+            errors: [
+                { messageId: "avoidStyleAssignment", data: { property: "element.setAttribute" } },
+                { messageId: "avoidStyleAssignment", data: { property: "element.setAttribute" } },
+            ],
+        },
     ],
 });

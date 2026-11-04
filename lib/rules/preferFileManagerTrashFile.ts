@@ -11,6 +11,7 @@ export default ruleCreator({
             description:
                 "Prefer FileManager.trashFile() over Vault.trash() or Vault.delete() to respect user settings.",
             url: docsUrl("prefer-file-manager-trash-file"),
+            requiresTypeChecking: true,
         },
         schema: [],
         messages: {
@@ -21,6 +22,7 @@ export default ruleCreator({
     defaultOptions: [],
     create(context) {
         const services = getParserServices(context);
+        const checker = services.program.getTypeChecker();
 
         return {
             CallExpression(node: TSESTree.CallExpression) {
@@ -37,8 +39,12 @@ export default ruleCreator({
                     return;
                 }
 
-                // Now, check the type of the object (`vault` in `vault.trash()`)
-                const objectType = services.getTypeAtLocation(callee.object);
+                // Now, check the type of the object (`vault` in `vault.trash()`),
+                // without null and undefined: `Vault | null`, an optional
+                // `vault?: Vault` and `plugin?.app.vault` (typed
+                // `Vault | undefined` inside the chain) are unions, which have
+                // no symbol of their own.
+                const objectType = checker.getNonNullableType(services.getTypeAtLocation(callee.object));
                 const symbol = objectType.getSymbol();
 
                 // Check if the symbol's name is 'Vault'. This is robust and

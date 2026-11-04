@@ -16,9 +16,10 @@ literals without `${…}`, used as:
 - the first argument of `setName`, `setDesc`, `setButtonText`, `setTooltip`, `setPlaceholder`,
   `setText` and `setTitle`, the tooltip of `addRibbonIcon` and the label of `addOption`
 - the message of `new Notice(…)` and a command's `name` in `addCommand({ … })`
-- `createEl()`'s `text` and `title` options and its `attr` values for `aria-label`,
-  `aria-description`, `title` and `placeholder`, including nested option objects, and the same
-  attributes set with `setAttribute()`
+- the `text` and `title` options of `createEl()`, `createDiv()` and `createSpan()`, and the `attr`
+  values for `aria-label`, `aria-description`, `title` and `placeholder` of those and of
+  `createSvg()`, including nested option objects, and the same attributes set with
+  `setAttribute()`. A string in place of the options is a CSS class and is not checked.
 - assignments to `textContent`, `innerText`, `title`, `placeholder`, `ariaLabel` and
   `ariaDescription`
 - strings returned from a `getDisplayText()` method

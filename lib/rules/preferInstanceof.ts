@@ -5,11 +5,25 @@ import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 const INSTANCEABLE_BASE_TYPES = new Set(["Node", "UIEvent"]);
 
+const NULLISH_FLAGS = ts.TypeFlags.Null | ts.TypeFlags.Undefined | ts.TypeFlags.Void;
+
+// `T | null` and `T | undefined` as `T`: with strictNullChecks a value that may
+// be null or undefined has a union type, which has no symbol or base types of
+// its own. A union of anything else, such as `Node | string`, stays a union.
+function withoutNullish(type: ts.Type): ts.Type {
+    if (!type.isUnion()) {
+        return type;
+    }
+    const rest = type.types.filter((part) => (part.flags & NULLISH_FLAGS) === 0);
+    return rest.length === 1 ? rest[0] : type;
+}
+
 function isInstanceableType(type: ts.Type, services: ParserServices): boolean {
+    type = withoutNullish(type);
     const constraint = type.getConstraint();
 
     if (constraint) {
-        type = constraint;
+        type = withoutNullish(constraint);
     }
 
     const symbol = type.getSymbol();
@@ -55,6 +69,7 @@ export default ruleCreator({
             description:
                 "Prefer `.instanceOf(T)` over `instanceof T` for cross-window safe type checks on DOM Nodes and UIEvents.",
             url: docsUrl("prefer-instanceof"),
+            requiresTypeChecking: true,
         },
         schema: [],
         fixable: "code" as const,
@@ -138,10 +153,16 @@ export default ruleCreator({
             if (isIndexSignatureAccess(node)) {
                 return true;
             }
+            // Only with strictNullChecks can a type include null or undefined.
+            // This comes before the test below, which a union that already
+            // includes null passes as if strictNullChecks were off.
+            if (typeIncludesNullish(type)) {
+                return true;
+            }
             // Without strictNullChecks TypeScript leaves null and undefined out of
             // every type, so getNullableType() returns the type unchanged.
             if (checker.getNullableType(type, ts.TypeFlags.Null) !== type) {
-                return typeIncludesNullish(type);
+                return false;
             }
             // The types cannot tell then, so read the declarations instead:
             // `const child = el.firstElementChild` is declared `Element | null`.
@@ -151,8 +172,7 @@ export default ruleCreator({
         function typeIncludesNullish(type: ts.Type): boolean {
             const constraint = type.getConstraint() ?? type;
             const parts = constraint.isUnion() ? constraint.types : [constraint];
-            const nullish = ts.TypeFlags.Null | ts.TypeFlags.Undefined | ts.TypeFlags.Void;
-            return parts.some((part) => (part.flags & nullish) !== 0);
+            return parts.some((part) => (part.flags & NULLISH_FLAGS) !== 0);
         }
 
         function isIndexSignatureAccess(node: ts.Node): boolean {

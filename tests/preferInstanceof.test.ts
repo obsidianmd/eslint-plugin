@@ -463,6 +463,226 @@ const OBSIDIAN_INSTANCEOF = `
     export {};
 `;
 
+// With strictNullChecks a value that may be null or undefined has a union type,
+// which has no symbol or base types of its own: these were never reported.
+ruleTester.run("prefer-instanceof with strictNullChecks", preferInstanceofRule, {
+    valid: [
+        {
+            name: "a nullable value of another class is not reported",
+            code: `
+                class TFile {}
+                declare const file: TFile | null;
+                if (file instanceof TFile) {}
+            `,
+        },
+        {
+            name: "a value that may be a Node or a string is not reported",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare const value: Node | string | undefined;
+                if (value instanceof HTMLElement) {}
+            `,
+        },
+        {
+            name: "a nullable unknown value is not reported",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare const value: unknown;
+                if (value instanceof HTMLElement) {}
+            `,
+        },
+        {
+            name: "a type parameter constrained to a nullable object is not reported",
+            code: `${OBSIDIAN_INSTANCEOF}
+                function isEl<T extends object | null>(value: T) { return value instanceof HTMLElement; }
+            `,
+        },
+    ],
+    invalid: [
+        {
+            name: "a nullable property gets a suggestion with ?.",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare const el: HTMLElement;
+                if (el.parentElement instanceof HTMLDivElement) {}
+            `,
+            output: null,
+            errors: [
+                {
+                    messageId: "preferInstanceof",
+                    data: { className: "HTMLDivElement" },
+                    suggestions: [
+                        {
+                            messageId: "preferInstanceofOptionalSuggestion",
+                            data: { className: "HTMLDivElement" },
+                            output: `${OBSIDIAN_INSTANCEOF}
+                declare const el: HTMLElement;
+                if (el.parentElement?.instanceOf(HTMLDivElement)) {}
+            `,
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "a Node that may be undefined gets a suggestion with ?.",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare const node: Node | undefined;
+                if (node instanceof HTMLElement) {}
+            `,
+            output: null,
+            errors: [
+                {
+                    messageId: "preferInstanceof",
+                    suggestions: [
+                        {
+                            messageId: "preferInstanceofOptionalSuggestion",
+                            output: `${OBSIDIAN_INSTANCEOF}
+                declare const node: Node | undefined;
+                if (node?.instanceOf(HTMLElement)) {}
+            `,
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "an event that may be null gets a suggestion with ?.",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare const evt: UIEvent | null;
+                if (evt instanceof MouseEvent) {}
+            `,
+            output: null,
+            errors: [
+                {
+                    messageId: "preferInstanceof",
+                    suggestions: [
+                        {
+                            messageId: "preferInstanceofOptionalSuggestion",
+                            output: `${OBSIDIAN_INSTANCEOF}
+                declare const evt: UIEvent | null;
+                if (evt?.instanceOf(MouseEvent)) {}
+            `,
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "a type parameter constrained to a nullable element gets a suggestion with ?.",
+            code: `${OBSIDIAN_INSTANCEOF}
+                function isDiv<T extends HTMLElement | null>(el: T) { return el instanceof HTMLDivElement; }
+            `,
+            output: null,
+            errors: [
+                {
+                    messageId: "preferInstanceof",
+                    suggestions: [
+                        {
+                            messageId: "preferInstanceofOptionalSuggestion",
+                            output: `${OBSIDIAN_INSTANCEOF}
+                function isDiv<T extends HTMLElement | null>(el: T) { return el?.instanceOf(HTMLDivElement); }
+            `,
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "a type parameter that may be null gets a suggestion with ?.",
+            code: `${OBSIDIAN_INSTANCEOF}
+                function isDiv<T extends HTMLElement>(el: T | null) { return el instanceof HTMLDivElement; }
+            `,
+            output: null,
+            errors: [
+                {
+                    messageId: "preferInstanceof",
+                    suggestions: [
+                        {
+                            messageId: "preferInstanceofOptionalSuggestion",
+                            output: `${OBSIDIAN_INSTANCEOF}
+                function isDiv<T extends HTMLElement>(el: T | null) { return el?.instanceOf(HTMLDivElement); }
+            `,
+                        },
+                    ],
+                },
+            ],
+        },
+        // Nothing in the declarations says null: only the type does.
+        {
+            name: "a value inferred as nullable gets a suggestion with ?.",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare const el: HTMLElement; declare const cond: boolean;
+                const target = cond ? el : null;
+                if (target instanceof HTMLDivElement) {}
+            `,
+            output: null,
+            errors: [
+                {
+                    messageId: "preferInstanceof",
+                    suggestions: [
+                        {
+                            messageId: "preferInstanceofOptionalSuggestion",
+                            output: `${OBSIDIAN_INSTANCEOF}
+                declare const el: HTMLElement; declare const cond: boolean;
+                const target = cond ? el : null;
+                if (target?.instanceOf(HTMLDivElement)) {}
+            `,
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "an optional chain gets a suggestion that continues it",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare const view: { containerEl: HTMLElement } | undefined;
+                if (view?.containerEl instanceof HTMLDivElement) {}
+            `,
+            output: null,
+            errors: [
+                {
+                    messageId: "preferInstanceof",
+                    suggestions: [
+                        {
+                            messageId: "preferInstanceofOptionalSuggestion",
+                            output: `${OBSIDIAN_INSTANCEOF}
+                declare const view: { containerEl: HTMLElement } | undefined;
+                if (view?.containerEl?.instanceOf(HTMLDivElement)) {}
+            `,
+                        },
+                    ],
+                },
+            ],
+        },
+
+        // --- Narrowed or asserted to a non-null value: still fixed ---
+        {
+            name: "a nullable property narrowed by a check is fixed",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare const el: HTMLElement;
+                const parent = el.parentElement;
+                if (parent && parent instanceof HTMLDivElement) {}
+            `,
+            output: `${OBSIDIAN_INSTANCEOF}
+                declare const el: HTMLElement;
+                const parent = el.parentElement;
+                if (parent && parent.instanceOf(HTMLDivElement)) {}
+            `,
+            errors: [{ messageId: "preferInstanceof", data: { className: "HTMLDivElement" } }],
+        },
+        {
+            name: "a non-null assertion on a nullable value is fixed",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare const el: HTMLElement;
+                if (el.parentElement! instanceof HTMLDivElement) {}
+            `,
+            output: `${OBSIDIAN_INSTANCEOF}
+                declare const el: HTMLElement;
+                if (el.parentElement!.instanceOf(HTMLDivElement)) {}
+            `,
+            errors: [{ messageId: "preferInstanceof", data: { className: "HTMLDivElement" } }],
+        },
+    ],
+});
+
 // Without strictNullChecks no type includes null, so `Element | null` reads as
 // `Element`. Whether a value may be null comes from its declaration then.
 const nonStrictRuleTester = new RuleTester({

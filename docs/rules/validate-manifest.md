@@ -24,16 +24,18 @@ check only to newer submissions, this rule applies the current policy.
 - **`description`:** must be 10 to 250 characters and end with `.`, `!` or `?`. It must
   not include "Obsidian", refer to itself ("this plugin", "a plugin that", "the plugin
   …"), or repeat or start with the name.
-- **`fundingUrl`:** a non-empty string, or a non-empty object whose values are non-empty
-  strings, its keys not repeated. Whether they are valid URLs is not checked.
+- **`fundingUrl`:** a string, or an object whose values are strings, its keys not repeated.
+  An empty string, an empty object and an empty entry are accepted, as the review accepts
+  them. Whether the values are valid URLs is not checked.
 
 Not reported: "plugin" elsewhere in an `id` or a description ("Automatically reload
 plugins in development."), a description starting with a lowercase letter, and emoji or
 other characters in a description. Whether an `id` or `name` is already taken needs the
 community directory, so only the review checks it. The review's other checks are not made
 here either: the `version` format, a placeholder, email address or URL in `author`, the
-`name`'s length and capitals, and whether `authorUrl` and `fundingUrl` are reachable HTTPS
-links.
+`name`'s length and capitals, and whether `authorUrl` and `fundingUrl` are valid, reachable
+HTTPS links that use no raw IP address and do not point to the Obsidian website (nor, for
+`authorUrl`, to a GitHub repository).
 
 There is no fix. The recommended config runs this rule on `manifest.json` next to your ESLint config,
 read with the JSON language; see

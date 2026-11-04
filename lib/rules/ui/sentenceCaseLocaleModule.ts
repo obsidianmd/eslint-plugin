@@ -151,11 +151,13 @@ export default ruleCreator({
                 }
             },
             ExportDefaultDeclaration(node: TSESTree.ExportDefaultDeclaration) {
-                if (!node.declaration) return;
-                if (node.declaration.type === TSESTree.AST_NODE_TYPES.ObjectExpression) {
-                    collectStringLiterals(node.declaration, (n, v) => reportIfNeeded(n, v));
-                } else if (node.declaration.type === TSESTree.AST_NODE_TYPES.Identifier) {
-                    const obj = varObjects.get(node.declaration.name);
+                // `export default { … } as const`, `… satisfies T` and `<T>{ … }` too.
+                const declaration = unwrapExpression(node.declaration);
+                if (!declaration) return;
+                if (declaration.type === TSESTree.AST_NODE_TYPES.ObjectExpression) {
+                    collectStringLiterals(declaration, (n, v) => reportIfNeeded(n, v));
+                } else if (declaration.type === TSESTree.AST_NODE_TYPES.Identifier) {
+                    const obj = varObjects.get(declaration.name);
                     if (obj) collectStringLiterals(obj, (n, v) => reportIfNeeded(n, v));
                 }
             },

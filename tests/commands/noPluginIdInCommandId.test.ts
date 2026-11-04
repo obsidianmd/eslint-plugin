@@ -40,6 +40,16 @@ ruleTester.run("no-plugin-id-in-command-id", noPluginIdRule, {
             code: "const command = { id: 'my-plugin-open-note' }; this.addCommand(command);",
             options: [{ pluginId: "my-plugin" }],
         },
+        {
+            name: "a computed key that is a variable is not the id",
+            code: "this.addCommand({ [id]: 'my-plugin-open-note' });",
+            options: [{ pluginId: "my-plugin" }],
+        },
+        {
+            name: "another quoted key is not the id",
+            code: "this.addCommand({ 'id': 'open-note', 'name': 'my-plugin', 'pluginId': 'my-plugin' });",
+            options: [{ pluginId: "my-plugin" }],
+        },
     ],
     invalid: [
         {
@@ -77,6 +87,12 @@ ruleTester.run("no-plugin-id-in-command-id", noPluginIdRule, {
             code: "this.addCommand({ id: 'git-commit' }); this.addCommand({ id: 'pullFromGit' });",
             options: [{ pluginId: "git" }],
             errors: [{ messageId: "pluginId" }, { messageId: "pluginId" }],
+        },
+        {
+            name: "a quoted id key is checked",
+            code: "this.addCommand({ \"id\": \"my-plugin-open\", \"name\": \"Open\" }); this.addCommand({ 'id': 'myPluginOpen' }); this.addCommand({ ['id']: 'open-my-plugin' });",
+            options: [{ pluginId: "my-plugin" }],
+            errors: [{ messageId: "pluginId" }, { messageId: "pluginId" }, { messageId: "pluginId" }],
         },
         {
             // This repository's own manifest.json has "id": "sample-plugin".

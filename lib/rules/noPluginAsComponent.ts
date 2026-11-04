@@ -38,6 +38,7 @@ export default ruleCreator({
             description:
                 "Disallow anti-patterns when passing a component to MarkdownRenderer.render to prevent memory leaks.",
             url: docsUrl("no-plugin-as-component"),
+            requiresTypeChecking: true,
         },
         schema: [],
         messages: {

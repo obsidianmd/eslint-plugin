@@ -241,6 +241,11 @@ const recommendedTypeCheckedGeneralRules: RulesConfig = {
     // declared in a `declare global` block or a .d.ts, so typescript-eslint
     // advises turning it off for TypeScript. JavaScript files keep it.
     "no-undef": "off",
+    // @typescript-eslint/no-implied-eval (from recommendedTypeChecked) reports
+    // every call the core rule does, and also strings it knows only by type;
+    // with both on, each implied eval was reported twice. typescript-eslint's
+    // configs turn the core rule off where theirs runs. JavaScript files keep it.
+    "no-implied-eval": "off",
 };
 
 // Combined rules for TypeScript files
@@ -353,9 +358,10 @@ const flatRecommendedGeneralRules: RulesConfig = {
     "no-alert": "warn",
     "no-undef": "warn",
     "@typescript-eslint/ban-ts-comment": "off",
-    // obsidianmd/no-nodejs-modules checks require() calls itself, and its fix
-    // for a Node module is a Platform.isDesktop-guarded require(), which this
-    // blanket ban would report in turn.
+    // obsidianmd/no-nodejs-modules checks require() calls itself, and its
+    // message tells the developer to load a Node module with a dynamic import()
+    // or a require() guarded by Platform.isDesktop; this blanket ban would
+    // report that require() in turn.
     "@typescript-eslint/no-require-imports": "off",
     "@typescript-eslint/no-unused-vars": ["warn", ...noUnusedVarsOptions],
     "@typescript-eslint/no-unused-expressions": ["warn", ...noUnusedExpressionsOptions],
@@ -561,40 +567,28 @@ const recommendedWithLocalesEn: Config[] = defineConfig([
     {
         plugins: { json, obsidianmd: plugin },
         language: "json/json",
+        // The files the rule's own path check (isEnglishLocalePath) accepts:
+        // named "en" in any case, alone or followed by ".", "-" or "_" and
+        // more (en-US, en_GB, en.messages), or anywhere under a directory
+        // named so. Not english.json, entries.json or env.json.
         files: [
-            "**/en.json",
-            "**/en*.json",
-            "**/en/*.json",
-            "**/en/**/*.json",
+            "**/[eE][nN].json",
+            "**/[eE][nN][._-]?*.json",
+            "**/[eE][nN]/**/*.json",
+            "**/[eE][nN][._-]?*/**/*.json",
         ],
         rules: {
             "obsidianmd/ui/sentence-case-json": "warn",
         },
     },
-    // TS/JS English locale modules
+    // TS/JS English locale modules, named as the JSON files above
     {
         plugins: { obsidianmd: plugin },
         files: [
-            "**/en.ts",
-            "**/en.js",
-            "**/en.cjs",
-            "**/en.mjs",
-            "**/en-*.ts",
-            "**/en-*.js",
-            "**/en-*.cjs",
-            "**/en-*.mjs",
-            "**/en_*.ts",
-            "**/en_*.js",
-            "**/en_*.cjs",
-            "**/en_*.mjs",
-            "**/en/*.ts",
-            "**/en/*.js",
-            "**/en/*.cjs",
-            "**/en/*.mjs",
-            "**/en/**/*.ts",
-            "**/en/**/*.js",
-            "**/en/**/*.cjs",
-            "**/en/**/*.mjs",
+            "**/[eE][nN].{ts,js,cjs,mjs}",
+            "**/[eE][nN][._-]?*.{ts,js,cjs,mjs}",
+            "**/[eE][nN]/**/*.{ts,js,cjs,mjs}",
+            "**/[eE][nN][._-]?*/**/*.{ts,js,cjs,mjs}",
         ],
         rules: {
             "obsidianmd/ui/sentence-case-locale-module": "warn",

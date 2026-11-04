@@ -9,7 +9,7 @@
 ## What is reported
 
 The `id` of a command passed to `addCommand()` as an object literal, when it is a string literal that
-has "command", in any case, as one of its words:
+has "command", in any case, as one of its words. The key may be quoted (`"id": …`):
 
 ```ts
 this.addCommand({ id: "open-note-command", name: "Open note", callback }); // reported

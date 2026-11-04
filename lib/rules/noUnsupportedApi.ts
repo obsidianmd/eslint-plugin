@@ -2,6 +2,7 @@ import { AST_NODE_TYPES, ASTUtils, ESLintUtils, TSESLint } from "@typescript-esl
 import type { TSESTree } from "@typescript-eslint/utils";
 import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { gt, lt, valid } from "semver";
 import ts from "typescript";
 import { getManifest } from "../manifest.js";
@@ -16,7 +17,29 @@ type SinceMap = Map<QualifiedName, SinceVersion>;
 
 interface SinceMapCache {
     obsidianPackageVersion: Version;
+    // The version of this plugin that wrote the cache, so a release that builds
+    // the map differently does not reuse a map an older one wrote.
+    pluginVersion?: string;
     entries: [QualifiedName, SinceVersion][];
+}
+
+const PLUGIN_VERSION = readPluginVersion();
+
+// This plugin's own package.json: two levels up from lib/rules/ in the source,
+// three from dist/lib/rules/ in the build.
+function readPluginVersion(): string | undefined {
+    const here = dirname(fileURLToPath(import.meta.url));
+    for (const candidate of [join(here, "../../package.json"), join(here, "../../../package.json")]) {
+        try {
+            const pkg = JSON.parse(readFileSync(candidate, "utf8")) as { name?: string; version?: string };
+            if (pkg.name === "eslint-plugin-obsidianmd") {
+                return pkg.version;
+            }
+        } catch {
+            // Not there: try the next location.
+        }
+    }
+    return undefined;
 }
 
 let cachedSinceMap: SinceMap | undefined;
@@ -29,6 +52,7 @@ export default ruleCreator<Options, "apiNotAvailable">({
             description:
                 "Disallow usage of Obsidian APIs not available in the plugin's minimum app version",
             url: docsUrl("no-unsupported-api"),
+            requiresTypeChecking: true,
         },
         schema: [
             {
@@ -97,17 +121,9 @@ export default ruleCreator<Options, "apiNotAvailable">({
                 checkSymbol(node, symbol);
             },
 
-            ClassDeclaration(node: TSESTree.ClassDeclaration) {
-                if (!node.superClass) {
-                    return;
-                }
-                if (node.superClass.type !== AST_NODE_TYPES.Identifier) {
-                    return;
-                }
-                const tsNode = services.esTreeNodeToTSNodeMap.get(node.superClass);
-                const symbol = checker.getSymbolAtLocation(tsNode);
-                checkSymbol(node.superClass, symbol);
-            },
+            ClassDeclaration: checkSuperClass,
+            // `const Suggest = class extends AbstractInputSuggest<string> {}`
+            ClassExpression: checkSuperClass,
 
             CallExpression(node: TSESTree.CallExpression) {
                 if (node.callee.type !== AST_NODE_TYPES.Identifier) {
@@ -118,6 +134,21 @@ export default ruleCreator<Options, "apiNotAvailable">({
                 checkSymbol(node.callee, symbol);
             },
         };
+
+        // A superclass named by an identifier. One named by a property access,
+        // such as `obsidian.AbstractInputSuggest`, is a MemberExpression,
+        // checked above.
+        function checkSuperClass(node: TSESTree.ClassDeclaration | TSESTree.ClassExpression): void {
+            if (!node.superClass) {
+                return;
+            }
+            if (node.superClass.type !== AST_NODE_TYPES.Identifier) {
+                return;
+            }
+            const tsNode = services.esTreeNodeToTSNodeMap.get(node.superClass);
+            const symbol = checker.getSymbolAtLocation(tsNode);
+            checkSymbol(node.superClass, symbol);
+        }
 
         function resolveSymbol(symbol: ts.Symbol): ts.Symbol {
             if (symbol.flags & ts.SymbolFlags.Alias) {
@@ -721,7 +752,7 @@ function loadCachedSinceMap(dtsPath: string, obsidianVersion: string): SinceMap 
         const cachePath = getCachePath(dtsPath);
         const raw = readFileSync(cachePath, "utf8");
         const cache = JSON.parse(raw) as SinceMapCache;
-        if (cache.obsidianPackageVersion === obsidianVersion) {
+        if (cache.obsidianPackageVersion === obsidianVersion && cache.pluginVersion === PLUGIN_VERSION) {
             return new Map(cache.entries);
         }
 
@@ -737,6 +768,7 @@ function saveSinceMapCache(dtsPath: string, obsidianVersion: string, sinceMap: S
         mkdirSync(dirname(cachePath), { recursive: true });
         const cache: SinceMapCache = {
             obsidianPackageVersion: obsidianVersion,
+            pluginVersion: PLUGIN_VERSION,
             entries: [...sinceMap.entries()],
         };
         writeFileSync(cachePath, JSON.stringify(cache), "utf8");

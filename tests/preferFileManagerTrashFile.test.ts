@@ -37,6 +37,15 @@ ruleTester.run("prefer-file-manager-trash-file", preferFileManagerTrashRule, {
                 vault.adapter.remove('file.md');
             `,
         },
+        {
+            name: "delete on a nullable non-Vault object is allowed",
+            code: `
+                declare const cache: Map<string, number> | null;
+                declare const seen: Set<string> | undefined;
+                cache?.delete('file.md');
+                seen?.delete('file.md');
+            `,
+        },
     ],
     invalid: [
         {
@@ -104,6 +113,35 @@ ruleTester.run("prefer-file-manager-trash-file", preferFileManagerTrashRule, {
                 async function remove(v: Vault, file: unknown) {
                     await v.delete(file);
                 }
+            `,
+            errors: [{ messageId: "preferTrashFile", data: { methodName: "delete" } }],
+        },
+        // A union with null or undefined has no symbol of its own, so these
+        // were never reported.
+        {
+            name: "a vault that may be null is found by type",
+            code: `
+                declare class Vault { delete(file: unknown): Promise<void>; }
+                declare const mv: Vault | null;
+                mv?.delete(someFile);
+            `,
+            errors: [{ messageId: "preferTrashFile", data: { methodName: "delete" } }],
+        },
+        {
+            name: "an optional vault property is found by type",
+            code: `
+                declare class Vault { trash(file: unknown, system: boolean): Promise<void>; }
+                declare const app: { vault?: Vault };
+                app.vault?.trash(someFile, true);
+            `,
+            errors: [{ messageId: "preferTrashFile", data: { methodName: "trash" } }],
+        },
+        {
+            name: "a vault read through an optional chain is found by type",
+            code: `
+                declare class Vault { delete(file: unknown): Promise<void>; }
+                declare const plugin: { app: { vault: Vault } } | undefined;
+                plugin?.app.vault.delete(someFile);
             `,
             errors: [{ messageId: "preferTrashFile", data: { methodName: "delete" } }],
         },

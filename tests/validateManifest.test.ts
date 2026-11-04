@@ -57,6 +57,53 @@ ruleTester.run("validate-manifest", manifestRule as unknown as Rule.RuleModule, 
                     }
                 }`,
         },
+        // The review checks only the funding URLs that are there, and an empty
+        // URL gives no results, so none of these fail it.
+        {
+            name: "empty fundingUrl string is accepted",
+            filename: "manifest.json",
+            code: `{
+                    "id": "test-id",
+                    "name": "Test name",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "A great test.",
+                    "isDesktopOnly": false,
+                    "fundingUrl": ""
+                }`,
+        },
+        {
+            name: "empty fundingUrl object is accepted",
+            filename: "manifest.json",
+            code: `{
+                    "id": "test-id",
+                    "name": "Test name",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "A great test.",
+                    "isDesktopOnly": false,
+                    "fundingUrl": {}
+                }`,
+        },
+        {
+            name: "empty fundingUrl entry is accepted",
+            filename: "manifest.json",
+            code: `{
+                    "id": "test-id",
+                    "name": "Test name",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "A great test.",
+                    "isDesktopOnly": false,
+                    "fundingUrl": {
+                        "patreon": "https://patreon.com/test",
+                        "ko-fi": ""
+                    }
+                }`,
+        },
         {
             name: "valid description is accepted",
             filename: "manifest.json",
@@ -866,7 +913,7 @@ ruleTester.run("validate-manifest", manifestRule as unknown as Rule.RuleModule, 
             ],
         },
         {
-            name: "empty fundingUrl object is forbidden",
+            name: "fundingUrl array is forbidden",
             filename: "manifest.json",
             code: `{
                     "id": "test-id",
@@ -876,30 +923,16 @@ ruleTester.run("validate-manifest", manifestRule as unknown as Rule.RuleModule, 
                     "minAppVersion": "1.0.0",
                     "description": "A great test.",
                     "isDesktopOnly": false,
-                    "fundingUrl": {}
+                    "fundingUrl": ["https://patreon.com/test"]
                 }`,
             errors: [
                 {
-                    messageId: "emptyFundingUrlObject",
-                },
-            ],
-        },
-        {
-            name: "empty fundingUrl string is forbidden",
-            filename: "manifest.json",
-            code: `{
-                    "id": "test-id",
-                    "name": "Test name",
-                    "author": "Me",
-                    "version": "1.0.0",
-                    "minAppVersion": "1.0.0",
-                    "description": "A great test.",
-                    "isDesktopOnly": false,
-                    "fundingUrl": ""
-                }`,
-            errors: [
-                {
-                    messageId: "emptyFundingUrlObject",
+                    messageId: "invalidType",
+                    data: {
+                        key: "fundingUrl",
+                        expectedType: "string or object",
+                        actualType: "array",
+                    },
                 },
             ],
         },
@@ -922,28 +955,6 @@ ruleTester.run("validate-manifest", manifestRule as unknown as Rule.RuleModule, 
             errors: [
                 {
                     messageId: "invalidFundingUrl",
-                },
-            ],
-        },
-        {
-            name: "empty fundingUrl entry alongside valid entry is forbidden",
-            filename: "manifest.json",
-            code: `{
-                    "id": "test-id",
-                    "name": "Test name",
-                    "author": "Me",
-                    "version": "1.0.0",
-                    "minAppVersion": "1.0.0",
-                    "description": "A great test.",
-                    "isDesktopOnly": false,
-                    "fundingUrl": {
-                        "patreon": "https://patreon.com/test",
-                        "ko-fi": ""
-                    }
-                }`,
-            errors: [
-                {
-                    messageId: "emptyFundingUrlObject",
                 },
             ],
         },

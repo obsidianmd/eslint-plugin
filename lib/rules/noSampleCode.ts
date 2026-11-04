@@ -2,24 +2,97 @@ import { TSESTree } from "@typescript-eslint/utils";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 /**
- * Checks if a node is a `.log(label, ...)` call, as in `console.log('click', evt)`.
- * The callee can be anything (`tick()`, `this.update()`), so check it before reading it.
+ * Whether evaluating `node` only reads values: no call, `new`, assignment,
+ * `++`/`--`, `delete`, `await` or spread, so deleting it with the sample call
+ * leaves out nothing the plugin does.
  */
-function isLogCall(node: TSESTree.Node, label: string): boolean {
+function isSideEffectFree(node: TSESTree.Node): boolean {
+    switch (node.type) {
+        case TSESTree.AST_NODE_TYPES.Literal:
+        case TSESTree.AST_NODE_TYPES.Identifier:
+        case TSESTree.AST_NODE_TYPES.ThisExpression:
+            return true;
+        case TSESTree.AST_NODE_TYPES.TemplateLiteral:
+            return node.expressions.every(isSideEffectFree);
+        case TSESTree.AST_NODE_TYPES.MemberExpression:
+            return isSideEffectFree(node.object) && (!node.computed || isSideEffectFree(node.property));
+        case TSESTree.AST_NODE_TYPES.BinaryExpression:
+        case TSESTree.AST_NODE_TYPES.LogicalExpression:
+            return isSideEffectFree(node.left) && isSideEffectFree(node.right);
+        case TSESTree.AST_NODE_TYPES.ConditionalExpression:
+            return isSideEffectFree(node.test) && isSideEffectFree(node.consequent) && isSideEffectFree(node.alternate);
+        case TSESTree.AST_NODE_TYPES.UnaryExpression:
+            return node.operator !== "delete" && isSideEffectFree(node.argument);
+        case TSESTree.AST_NODE_TYPES.ObjectExpression:
+            // Listener options, such as `{ capture: true }`
+            return node.properties.every(
+                (property) =>
+                    property.type === TSESTree.AST_NODE_TYPES.Property &&
+                    property.kind === "init" &&
+                    (!property.computed || isSideEffectFree(property.key)) &&
+                    isSideEffectFree(property.value),
+            );
+        case TSESTree.AST_NODE_TYPES.TSAsExpression:
+        case TSESTree.AST_NODE_TYPES.TSNonNullExpression:
+        case TSESTree.AST_NODE_TYPES.TSSatisfiesExpression:
+        case TSESTree.AST_NODE_TYPES.TSTypeAssertion:
+            return isSideEffectFree(node.expression);
+        default:
+            return false;
+    }
+}
+
+/**
+ * Checks if a node is the sample's log call, `console.log(label, ...)` as in
+ * `console.log('click', evt)`: after the label, it only reads values. A call
+ * to another `log()`, such as the plugin's own logger, or one that computes what
+ * it logs with a call, is the plugin's own code.
+ */
+function isSampleLog(node: TSESTree.Node, label: string): boolean {
+    if (
+        node.type !== TSESTree.AST_NODE_TYPES.CallExpression ||
+        node.callee.type !== TSESTree.AST_NODE_TYPES.MemberExpression ||
+        node.callee.computed ||
+        node.callee.object.type !== TSESTree.AST_NODE_TYPES.Identifier ||
+        node.callee.object.name !== "console" ||
+        node.callee.property.type !== TSESTree.AST_NODE_TYPES.Identifier ||
+        node.callee.property.name !== "log"
+    ) {
+        return false;
+    }
+    const [first, ...rest] = node.arguments;
     return (
-        node.type === TSESTree.AST_NODE_TYPES.CallExpression &&
-        node.callee.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
-        node.callee.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
-        node.callee.property.name === "log" &&
-        (node.arguments[0] as TSESTree.Literal | undefined)?.value === label
+        first?.type === TSESTree.AST_NODE_TYPES.Literal &&
+        first.value === label &&
+        rest.every(isSideEffectFree)
     );
 }
 
 /**
- * Checks if a node is the sample `registerInterval` call.
- * `this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));`
+ * Checks if a node is the notice the sample's click handler shows since
+ * November 2025, `new Notice('Click')`.
  */
-function isSampleIntervalCall(node: TSESTree.CallExpression): boolean {
+function isSampleNotice(node: TSESTree.Node): boolean {
+    return (
+        node.type === TSESTree.AST_NODE_TYPES.NewExpression &&
+        node.callee.type === TSESTree.AST_NODE_TYPES.Identifier &&
+        node.callee.name === "Notice" &&
+        node.arguments.length === 1 &&
+        node.arguments[0].type === TSESTree.AST_NODE_TYPES.Literal &&
+        node.arguments[0].value === "Click"
+    );
+}
+
+// The documents the sample listens on: `document`, and `activeDocument` since 2026.
+const SAMPLE_DOCUMENTS = new Set(["document", "activeDocument"]);
+
+/**
+ * Checks if a node is the sample `registerInterval` call, with any delay:
+ * `this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));`
+ * Returns the arguments that the sample does not fix (the delay and any after
+ * it), or null when it is not the sample.
+ */
+function matchSampleIntervalCall(node: TSESTree.CallExpression): TSESTree.CallExpressionArgument[] | null {
     // Check for `this.registerInterval(...)`
     if (
         node.callee.type !== TSESTree.AST_NODE_TYPES.MemberExpression ||
@@ -27,7 +100,7 @@ function isSampleIntervalCall(node: TSESTree.CallExpression): boolean {
         node.callee.property.type !== TSESTree.AST_NODE_TYPES.Identifier ||
         node.callee.property.name !== "registerInterval"
     ) {
-        return false;
+        return null;
     }
 
     // Check for `window.setInterval(...)` as the first argument
@@ -41,27 +114,34 @@ function isSampleIntervalCall(node: TSESTree.CallExpression): boolean {
         (setIntervalCall.callee.property as TSESTree.Identifier)?.name !==
         "setInterval"
     ) {
-        return false;
+        return null;
     }
 
-    // Check for `() => console.log('setInterval')` as the first argument to setInterval
+    // Check for `() => console.log('setInterval')` as the first argument to setInterval.
+    // A block body, as in `() => { console.log('setInterval'); this.sync(); }`, is
+    // not the sample's.
     const callback = setIntervalCall.arguments[0];
     if (
         !callback ||
         callback.type !== TSESTree.AST_NODE_TYPES.ArrowFunctionExpression ||
-        !isLogCall(callback.body, "setInterval")
+        !isSampleLog(callback.body, "setInterval")
     ) {
-        return false;
+        return null;
     }
 
-    return true;
+    return [...setIntervalCall.arguments.slice(1), ...node.arguments.slice(1)];
 }
 
 /**
- * Checks if a node is the sample `registerDomEvent` call.
+ * Checks if a node is the sample `registerDomEvent` call, whose handler does
+ * nothing but the sample's log or notice:
  * `this.registerDomEvent(document, 'click', (evt: MouseEvent) => { console.log('click', evt); });`
+ * `this.registerDomEvent(activeDocument, 'click', (_evt: MouseEvent) => { new Notice('Click'); });`
+ * A handler with statements of its own is the plugin's click handler, not the
+ * sample. Returns the arguments after the handler, or null when it is not the
+ * sample.
  */
-function isSampleDomEventCall(node: TSESTree.CallExpression): boolean {
+function matchSampleDomEventCall(node: TSESTree.CallExpression): TSESTree.CallExpressionArgument[] | null {
     // Check for `this.registerDomEvent(...)`
     if (
         node.callee.type !== TSESTree.AST_NODE_TYPES.MemberExpression ||
@@ -69,37 +149,39 @@ function isSampleDomEventCall(node: TSESTree.CallExpression): boolean {
         node.callee.property.type !== TSESTree.AST_NODE_TYPES.Identifier ||
         node.callee.property.name !== "registerDomEvent"
     ) {
-        return false;
+        return null;
     }
 
-    // Check for `document` and `'click'` as the first two arguments
+    // Check for `document` (or `activeDocument`) and `'click'` as the first two arguments
+    const target = node.arguments[0];
     if (
-        (node.arguments[0] as TSESTree.Identifier)?.name !== "document" ||
+        target?.type !== TSESTree.AST_NODE_TYPES.Identifier ||
+        !SAMPLE_DOCUMENTS.has(target.name) ||
         (node.arguments[1] as TSESTree.Literal)?.value !== "click"
     ) {
-        return false;
+        return null;
     }
 
-    // Check for the specific callback function
+    // Check for the specific callback function: its body is the log or the notice alone
     const callback = node.arguments[2];
     if (
         !callback ||
         callback.type !== TSESTree.AST_NODE_TYPES.ArrowFunctionExpression ||
-        callback.body.type !== TSESTree.AST_NODE_TYPES.BlockStatement
+        callback.body.type !== TSESTree.AST_NODE_TYPES.BlockStatement ||
+        callback.body.body.length !== 1
     ) {
-        return false;
+        return null;
     }
 
-    const firstStatement = callback.body.body[0];
+    const statement = callback.body.body[0];
     if (
-        !firstStatement ||
-        firstStatement.type !== TSESTree.AST_NODE_TYPES.ExpressionStatement ||
-        !isLogCall(firstStatement.expression, "click")
+        statement.type !== TSESTree.AST_NODE_TYPES.ExpressionStatement ||
+        !(isSampleLog(statement.expression, "click") || isSampleNotice(statement.expression))
     ) {
-        return false;
+        return null;
     }
 
-    return true;
+    return node.arguments.slice(3);
 }
 
 /**
@@ -144,8 +226,15 @@ export default ruleCreator({
     },
     defaultOptions: [],
     create(context) {
-        function report(node: TSESTree.CallExpression, messageId: "removeSampleInterval" | "removeSampleDomEvent"): void {
-            const statement = getRemovableStatement(node);
+        function report(
+            node: TSESTree.CallExpression,
+            messageId: "removeSampleInterval" | "removeSampleDomEvent",
+            otherArguments: TSESTree.CallExpressionArgument[],
+        ): void {
+            // An argument the sample does not fix, such as the delay, is deleted
+            // with the call, so it must not do anything: `this.getDelay()` would
+            // no longer be called.
+            const statement = otherArguments.every(isSideEffectFree) ? getRemovableStatement(node) : null;
             context.report({
                 node,
                 messageId,
@@ -155,10 +244,14 @@ export default ruleCreator({
 
         return {
             CallExpression(node: TSESTree.CallExpression) {
-                if (isSampleIntervalCall(node)) {
-                    report(node, "removeSampleInterval");
-                } else if (isSampleDomEventCall(node)) {
-                    report(node, "removeSampleDomEvent");
+                const intervalArguments = matchSampleIntervalCall(node);
+                if (intervalArguments) {
+                    report(node, "removeSampleInterval", intervalArguments);
+                    return;
+                }
+                const domEventArguments = matchSampleDomEventCall(node);
+                if (domEventArguments) {
+                    report(node, "removeSampleDomEvent", domEventArguments);
                 }
             },
         };
