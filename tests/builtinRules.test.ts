@@ -1,8 +1,15 @@
-import { RuleTester } from "eslint";
+import { Linter, RuleTester } from "eslint";
 import { builtinRules } from "eslint/use-at-your-own-risk";
 import type { Rule } from "eslint";
 import globals from "globals";
 import { restrictedGlobalsOptions } from "../lib/ruleOptions.js";
+
+// ESLint 10 gave some core rules suggestions that ESLint 9's lack, and
+// RuleTester wants them listed exactly when a rule gives them.
+const ESLINT_MAJOR = Number(Linter.version.split(".")[0]);
+function suggestionsSinceEslint10(suggestions: RuleTester.SuggestionOutput[]): { suggestions?: RuleTester.SuggestionOutput[] } {
+    return ESLINT_MAJOR >= 10 ? { suggestions } : {};
+}
 
 const ruleTester = new RuleTester();
 const scriptRuleTester = new RuleTester({
@@ -128,7 +135,13 @@ function testJsConfigsRecommendedRules(): void {
             {
                 name: "comparing with -0 is forbidden",
                 code: "if (x === -0) {}",
-                errors: [{ messageId: "unexpected" }],
+                errors: [{
+                    messageId: "unexpected",
+                    ...suggestionsSinceEslint10([
+                        { messageId: "suggestRemoveMinus", output: "if (x === 0) {}" },
+                        { messageId: "suggestObjectIs", output: "if (Object.is(x, -0)) {}" },
+                    ]),
+                }],
             },
         ],
     });
@@ -851,7 +864,12 @@ function testJsConfigsRecommendedRules(): void {
             {
                 name: "unused private field is forbidden",
                 code: "class A { #x = 1; }",
-                errors: [{ messageId: "unusedPrivateClassMember" }],
+                errors: [{
+                    messageId: "unusedPrivateClassMember",
+                    ...suggestionsSinceEslint10([
+                        { messageId: "removeUnusedPrivateClassMember", output: "class A { }" },
+                    ]),
+                }],
             },
         ],
     });
