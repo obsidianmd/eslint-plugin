@@ -8,17 +8,17 @@
 
 ## What is reported
 
-`getFiles().find()` with a predicate that compares a file's `path` with `===` or `==`, on `vault`
-or on any property access ending in `.vault`: `this.app.vault`, `app.vault`, `plugin.app.vault`,
-`this.vault`.
+`getFiles().find()` with an arrow function predicate whose body compares a file's `path` with `===`
+or `==`, the path on the left (`(f) => f.path === path`), on `vault` or on any property access
+ending in `.vault`: `this.app.vault`, `app.vault`, `plugin.app.vault`, `this.vault`.
 
 ```ts
 const file = this.app.vault.getFiles().find((f) => f.path === path); // reported
 const file = this.app.vault.getFileByPath(path); // use this instead
 ```
 
-Not reported: a predicate that does not compare `path`, and a computed access such as
-`this.app["vault"]`. There is no fix; use `getFileByPath()` or `getAbstractFileByPath()`.
+Not reported: a predicate that does not compare `path`, `getMarkdownFiles().find()`, and a
+computed access such as `this.app["vault"]`. There is no fix; use `getFileByPath()` or `getAbstractFileByPath()`.
 
 ## Further reading
 

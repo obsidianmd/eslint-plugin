@@ -19,16 +19,18 @@ literals without `${…}`, used as:
 - `createEl()`'s `text` and `title` options and its `attr` values for `aria-label`,
   `aria-description`, `title` and `placeholder`, including nested option objects, and the same
   attributes set with `setAttribute()`
-- assignments to `textContent`, `innerText`, `title`, `placeholder` and `ariaLabel`
+- assignments to `textContent`, `innerText`, `title`, `placeholder`, `ariaLabel` and
+  `ariaDescription`
 - strings returned from a `getDisplayText()` method
 
 The message gives the expected text. There is no fix unless you set `allowAutoFix: true`; `--fix`
-then rewrites the string and keeps its quotes.
+then rewrites the string and keeps its quotes (a template literal becomes a double-quoted string).
 
 Some text keeps its casing, because it is data rather than prose:
 
-- brand names and acronyms, such as "GitHub" or "PDF"; in the default `loose` mode a camelCase or
-  PascalCase word too, unless `enforceCamelCaseLower` is set
+- brand names and acronyms, such as "GitHub" or "PDF", which are held to that casing ("github" is
+  reported, expecting "GitHub"); in the default `loose` mode a camelCase or PascalCase word too,
+  unless `enforceCamelCaseLower` is set
 - URLs, such as `https://obsidian.md/help`, and date and time formats, such as `YYYY-MM-DD` or `HH:mm`
 - "REST" written in capitals. It is also an ordinary word, so both "Use the REST API" and "Take a
   rest" pass.
@@ -52,6 +54,12 @@ it, turn it on yourself:
 ```
 
 ## Options
+
+`brands` and `acronyms` replace the built-in lists ([brands](../../../lib/rules/ui/brands.ts),
+[acronyms](../../../lib/rules/ui/acronyms.ts)) rather than add to them, so list the built-in names
+you still want. `ignoreWords` keeps the casing of a word written exactly as listed, except the
+first word of a sentence. `ignoreRegex` skips a whole string that one of its patterns matches.
+`mode: "strict"` lowercases camelCase and PascalCase words, as `enforceCamelCaseLower` does.
 
 <!-- begin auto-generated rule options list -->
 

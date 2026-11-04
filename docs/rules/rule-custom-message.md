@@ -44,6 +44,20 @@ Limitations:
 - A wrapped rule that throws while starting, for example on an option it does not accept, logs the
   error and is skipped.
 
+## In the recommended config
+
+The recommended configs turn the core `no-console` and `no-new-func` rules off and run them through
+this rule instead, at `error`, on JavaScript and TypeScript files:
+
+- `no-console`, with `allow: ["warn", "error", "debug"]`: any other console method is reported as
+  `[no-console] Avoid unnecessary logging to console. See https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#Avoid+unnecessary+logging+to+console`.
+- `no-new-func`: `new Function(…)` and `Function(…)` are reported as
+  ``[no-new-func] Using the `Function` constructor is dangerous because it executes arbitrary code, similar to `eval()` ``.
+
+Setting this rule's options in your own config replaces that object, as for any rule, so list both
+entries again next to the rules you add. Setting only a severity
+(`"obsidianmd/rule-custom-message": "warn"`) keeps them.
+
 ## Options
 
 The rule takes a single configuration object where:

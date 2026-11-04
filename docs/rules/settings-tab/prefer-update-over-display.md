@@ -32,10 +32,11 @@ installed `obsidian` typings are 1.13.0 or later and give the tab Obsidian's own
 the call's result is unused or `display()` returns `void`. Otherwise the rename is offered as an
 editor suggestion, which you review before applying:
 
-- without type information (JavaScript files, or no `parserOptions.projectService`);
+- without type information (JavaScript files, or no `parserOptions.projectService` or `project`);
 - with `obsidian` typings older than 1.13, which have no `update()`: upgrade the `obsidian` package
   along with it;
 - when the tab declares an `update` of its own;
+- in a `function` callback whose `this` is not typed as the tab;
 - when the promise of an `async display()` is awaited or returned, since `update()` returns `void`.
 
 A call that passes arguments, or one in the tab's own `update()` or directly in
@@ -44,7 +45,8 @@ and it calls `getSettingDefinitions()`, so the renamed call would end up calling
 
 Only a class that extends `PluginSettingTab` by that name is checked, declared, `abstract` or as a
 class expression; a superclass written as a property access (`obsidian.PluginSettingTab`) is not. The version comes from the `minAppVersion` option, or else from `manifest.json` in the directory
-ESLint runs from. When neither gives a valid `x.y.z` version, the rule does nothing.
+ESLint runs from. When that version is not a valid `x.y.z` version, the rule does nothing; an
+invalid option, such as `"1.13"`, is not replaced by the manifest's version.
 
 ## Further reading
 

@@ -25,8 +25,9 @@ and neither are array elements. Values in nested objects are.
 Here `"Open Settings"` is reported; `"Open settings"` would pass. The message gives the expected
 text, and with `allowAutoFix: true`, `--fix` rewrites the value as a valid JSON string. Values are
 judged as in [`ui/sentence-case`](sentence-case.md): URLs, date formats such as `YYYY-MM-DD`, brand
-names and "REST" written in capitals keep their casing, and text with inline code or HTML is not
-checked.
+names and "REST" written in capitals keep their casing, and text with inline code, HTML or
+placeholders (`{{count}}`) is not checked. The options work as in
+[`ui/sentence-case`](sentence-case.md#options).
 
 Not reported: keys, array elements, non-string values, and files that are not English locale files,
 such as `fr.json` or `entries.json`, which only starts with "en".

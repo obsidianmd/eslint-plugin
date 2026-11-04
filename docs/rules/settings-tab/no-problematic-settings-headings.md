@@ -19,14 +19,15 @@ class declaration that extends `PluginSettingTab`, whose name contains (ignoring
 - the plugin's name, from the `pluginName` option or else the `name` in `manifest.json`: the tab
   already carries it. The fix removes the heading.
 
-Not reported: headings outside a settings tab, and a name that is not a string literal.
+Not reported: headings outside a settings tab, a name that is not a string literal (a template
+literal included), and a `setName()` called after `setHeading()`.
 
 ## Fixes and suggestions
 
 The fix replaces the heading's whole statement with an empty one (`;`), which stays valid as the body
 of an `if` and keeps the statements around it apart. It is applied only where the statement is just
-the heading: `new Setting(…)`, `setName()`, `setHeading()` and `setClass()`, in any order, with
-literals, variables and property reads as arguments.
+the heading: `new Setting(…)`, `setName()`, `setHeading()` and `setClass()`, the last anywhere in
+the chain, with literals, variables and property reads as arguments.
 
 ```ts
 new Setting(containerEl).setName("General").setHeading().setClass("my-heading"); // fixed to ;

@@ -12,7 +12,9 @@ This rule catches the sample plugin's `LICENSE` left unedited. Its copyright lin
 `Copyright (C) 2020-2025 by Dynalist Inc.`.
 
 - A copyright line whose holder is `Dynalist Inc.` is reported: change the holder to your name.
-- While the holder is still `Dynalist Inc.`, a year before the current year is reported too.
+- While the holder is still `Dynalist Inc.`, a year (the last of a range) before the current year
+  is reported too, unless `disableUnchangedYear` is set. `currentYear` sets the year to compare
+  against; it defaults to the current year.
 
 Not reported: a copyright line with any other holder, whatever its year.
 
