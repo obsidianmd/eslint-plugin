@@ -29,6 +29,10 @@ interface ChildResult {
         ts: boolean;
         js: boolean;
     };
+    nodeNamespace: {
+        ts: boolean;
+        js: boolean;
+    };
     noDeprecated: {
         tsEntry: [number, { allow: { name: string }[] }];
     };
@@ -123,6 +127,12 @@ describe("manifest fallback in the linted repo's working directory", () => {
 
         it("are not added when there is no manifest", () => {
             assert.deepStrictEqual(noManifest.result.nodeGlobals, { ts: false, js: false });
+        });
+
+        it("include the NodeJS namespace when the manifest is desktop-only", () => {
+            assert.deepStrictEqual(desktopOnly.result.nodeNamespace, { ts: true, js: true });
+            assert.deepStrictEqual(stringFalse.result.nodeNamespace, { ts: false, js: false });
+            assert.deepStrictEqual(noManifest.result.nodeNamespace, { ts: false, js: false });
         });
     });
 
