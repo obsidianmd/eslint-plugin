@@ -483,6 +483,15 @@ ruleTester.run("prefer-instanceof with strictNullChecks", preferInstanceofRule, 
             `,
         },
         {
+            name: "a value that may be a Node or another class is not reported",
+            code: `${OBSIDIAN_INSTANCEOF}
+                class Widget {}
+                declare const value: Node | Widget | undefined;
+                declare const other: Node | Widget;
+                if (value instanceof HTMLElement || other instanceof HTMLElement) {}
+            `,
+        },
+        {
             name: "a nullable unknown value is not reported",
             code: `${OBSIDIAN_INSTANCEOF}
                 declare const value: unknown;
@@ -536,6 +545,28 @@ ruleTester.run("prefer-instanceof with strictNullChecks", preferInstanceofRule, 
                             messageId: "preferInstanceofOptionalSuggestion",
                             output: `${OBSIDIAN_INSTANCEOF}
                 declare const node: Node | undefined;
+                if (node?.instanceOf(HTMLElement)) {}
+            `,
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "a Node that may be void gets a suggestion with ?.",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare const node: Node | void;
+                if (node instanceof HTMLElement) {}
+            `,
+            output: null,
+            errors: [
+                {
+                    messageId: "preferInstanceof",
+                    suggestions: [
+                        {
+                            messageId: "preferInstanceofOptionalSuggestion",
+                            output: `${OBSIDIAN_INSTANCEOF}
+                declare const node: Node | void;
                 if (node?.instanceOf(HTMLElement)) {}
             `,
                         },
@@ -832,7 +863,330 @@ nonStrictRuleTester.run("prefer-instanceof without strictNullChecks", preferInst
             ],
         },
 
+        {
+            name: "a nullable property read through parentheses or satisfies gets a suggestion with ?.",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare const el: HTMLElement;
+                const a = (el.parentElement);
+                const b = el.parentElement satisfies Element | null;
+                if (a instanceof HTMLDivElement || b instanceof HTMLDivElement) {}
+            `,
+            output: null,
+            errors: [
+                {
+                    messageId: "preferInstanceof",
+                    suggestions: [
+                        {
+                            messageId: "preferInstanceofOptionalSuggestion",
+                            output: `${OBSIDIAN_INSTANCEOF}
+                declare const el: HTMLElement;
+                const a = (el.parentElement);
+                const b = el.parentElement satisfies Element | null;
+                if (a?.instanceOf(HTMLDivElement) || b instanceof HTMLDivElement) {}
+            `,
+                        },
+                    ],
+                },
+                {
+                    messageId: "preferInstanceof",
+                    suggestions: [
+                        {
+                            messageId: "preferInstanceofOptionalSuggestion",
+                            output: `${OBSIDIAN_INSTANCEOF}
+                declare const el: HTMLElement;
+                const a = (el.parentElement);
+                const b = el.parentElement satisfies Element | null;
+                if (a instanceof HTMLDivElement || b?.instanceOf(HTMLDivElement)) {}
+            `,
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "a value cast to a nullable type gets a suggestion with ?.",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare const el: HTMLElement;
+                const child = el.firstChild as Element | null;
+                if (child instanceof HTMLElement) {}
+            `,
+            output: null,
+            errors: [
+                {
+                    messageId: "preferInstanceof",
+                    suggestions: [
+                        {
+                            messageId: "preferInstanceofOptionalSuggestion",
+                            output: `${OBSIDIAN_INSTANCEOF}
+                declare const el: HTMLElement;
+                const child = el.firstChild as Element | null;
+                if (child?.instanceOf(HTMLElement)) {}
+            `,
+                        },
+                    ],
+                },
+            ],
+        },
+        // Without noUncheckedIndexedAccess, an index signature hands out
+        // undefined past the end, which the element type does not say.
+        {
+            name: "a const holding an index signature's entry gets a suggestion with ?.",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare const list: Node[]; declare const els: Record<string, Node>;
+                const first = list[0];
+                const main = els.main;
+                if (first instanceof HTMLElement || main instanceof HTMLElement) {}
+            `,
+            output: null,
+            errors: [
+                {
+                    messageId: "preferInstanceof",
+                    suggestions: [
+                        {
+                            messageId: "preferInstanceofOptionalSuggestion",
+                            output: `${OBSIDIAN_INSTANCEOF}
+                declare const list: Node[]; declare const els: Record<string, Node>;
+                const first = list[0];
+                const main = els.main;
+                if (first?.instanceOf(HTMLElement) || main instanceof HTMLElement) {}
+            `,
+                        },
+                    ],
+                },
+                {
+                    messageId: "preferInstanceof",
+                    suggestions: [
+                        {
+                            messageId: "preferInstanceofOptionalSuggestion",
+                            output: `${OBSIDIAN_INSTANCEOF}
+                declare const list: Node[]; declare const els: Record<string, Node>;
+                const first = list[0];
+                const main = els.main;
+                if (first instanceof HTMLElement || main?.instanceOf(HTMLElement)) {}
+            `,
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "a const holding a nullable property read with brackets gets a suggestion with ?.",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare const view: { parentEl: Node | null };
+                const parent = view["parentEl"];
+                if (parent instanceof HTMLElement) {}
+            `,
+            output: null,
+            errors: [
+                {
+                    messageId: "preferInstanceof",
+                    suggestions: [
+                        {
+                            messageId: "preferInstanceofOptionalSuggestion",
+                            output: `${OBSIDIAN_INSTANCEOF}
+                declare const view: { parentEl: Node | null };
+                const parent = view["parentEl"];
+                if (parent?.instanceOf(HTMLElement)) {}
+            `,
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "a conditional with a nullable branch gets a suggestion with ?.",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare const el: HTMLElement; declare const cond: boolean;
+                const a = cond ? el.parentElement : el;
+                const b = cond ? el : el.parentElement;
+                if (a instanceof HTMLDivElement || b instanceof HTMLDivElement) {}
+            `,
+            output: null,
+            errors: [
+                {
+                    messageId: "preferInstanceof",
+                    suggestions: [
+                        {
+                            messageId: "preferInstanceofOptionalSuggestion",
+                            output: `${OBSIDIAN_INSTANCEOF}
+                declare const el: HTMLElement; declare const cond: boolean;
+                const a = cond ? el.parentElement : el;
+                const b = cond ? el : el.parentElement;
+                if (a?.instanceOf(HTMLDivElement) || b instanceof HTMLDivElement) {}
+            `,
+                        },
+                    ],
+                },
+                {
+                    messageId: "preferInstanceof",
+                    suggestions: [
+                        {
+                            messageId: "preferInstanceofOptionalSuggestion",
+                            output: `${OBSIDIAN_INSTANCEOF}
+                declare const el: HTMLElement; declare const cond: boolean;
+                const a = cond ? el.parentElement : el;
+                const b = cond ? el : el.parentElement;
+                if (a instanceof HTMLDivElement || b?.instanceOf(HTMLDivElement)) {}
+            `,
+                        },
+                    ],
+                },
+            ],
+        },
+        // `a && b` is `a` when `a` is falsy; `a || b`, `a ?? b`, `(a, b)` and
+        // `(a = b)` can be `b`.
+        ...[
+            ["&& with a nullable left", "el.parentElement && el"],
+            ["|| with a nullable right", "fallback || el.parentElement"],
+            ["?? with a nullable right", "fallback ?? el.parentElement"],
+            ["a comma with a nullable right", "(0, el.parentElement)"],
+            ["an assignment of a nullable value", "(other = el.parentElement)"],
+        ].map(([form, init]) => {
+            const code = (check: string) => `${OBSIDIAN_INSTANCEOF}
+                declare const el: HTMLElement; declare const fallback: HTMLElement; let other: HTMLElement;
+                const value = ${init};
+                if (${check}) {}
+            `;
+            return {
+                name: `a const holding ${form} gets a suggestion with ?.`,
+                code: code("value instanceof HTMLDivElement"),
+                output: null,
+                errors: [
+                    {
+                        messageId: "preferInstanceof" as const,
+                        suggestions: [
+                            {
+                                messageId: "preferInstanceofOptionalSuggestion" as const,
+                                output: code("value?.instanceOf(HTMLDivElement)"),
+                            },
+                        ],
+                    },
+                ],
+            };
+        }),
+        {
+            name: "a parameter declared nullable gets a suggestion with ?.",
+            code: `${OBSIDIAN_INSTANCEOF}
+                function isDiv(el: Node | null) { return el instanceof HTMLDivElement; }
+            `,
+            output: null,
+            errors: [
+                {
+                    messageId: "preferInstanceof",
+                    suggestions: [
+                        {
+                            messageId: "preferInstanceofOptionalSuggestion",
+                            output: `${OBSIDIAN_INSTANCEOF}
+                function isDiv(el: Node | null) { return el?.instanceOf(HTMLDivElement); }
+            `,
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "a value typed with a parenthesized nullable type gets a suggestion with ?.",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare const node: (Node | null);
+                if (node instanceof HTMLElement) {}
+            `,
+            output: null,
+            errors: [
+                {
+                    messageId: "preferInstanceof",
+                    suggestions: [
+                        {
+                            messageId: "preferInstanceofOptionalSuggestion",
+                            output: `${OBSIDIAN_INSTANCEOF}
+                declare const node: (Node | null);
+                if (node?.instanceOf(HTMLElement)) {}
+            `,
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "an imported value or type declared nullable in another module gets a suggestion with ?.",
+            code: `import { maybeNode, type MaybeNode } from "./tests/fixtures/nullableNode.js";
+                ${OBSIDIAN_INSTANCEOF}
+                declare const node: MaybeNode;
+                if (maybeNode instanceof HTMLElement || node instanceof HTMLElement) {}
+            `,
+            output: null,
+            errors: [
+                {
+                    messageId: "preferInstanceof",
+                    suggestions: [
+                        {
+                            messageId: "preferInstanceofOptionalSuggestion",
+                            output: `import { maybeNode, type MaybeNode } from "./tests/fixtures/nullableNode.js";
+                ${OBSIDIAN_INSTANCEOF}
+                declare const node: MaybeNode;
+                if (maybeNode?.instanceOf(HTMLElement) || node instanceof HTMLElement) {}
+            `,
+                        },
+                    ],
+                },
+                {
+                    messageId: "preferInstanceof",
+                    suggestions: [
+                        {
+                            messageId: "preferInstanceofOptionalSuggestion",
+                            output: `import { maybeNode, type MaybeNode } from "./tests/fixtures/nullableNode.js";
+                ${OBSIDIAN_INSTANCEOF}
+                declare const node: MaybeNode;
+                if (maybeNode instanceof HTMLElement || node?.instanceOf(HTMLElement)) {}
+            `,
+                        },
+                    ],
+                },
+            ],
+        },
+        // An optional property, a class field, a parameter property and a getter.
+        ...[
+            ["an optional property", "declare const view: { el?: Node };", "view.el"],
+            ["a nullable class field", "declare class View { el: Node | null; }\ndeclare const view: View;", "view.el"],
+            ["a nullable parameter property", "class View { constructor(public el: Node | null) {} }\ndeclare const view: View;", "view.el"],
+            ["a nullable getter", "declare class View { get el(): Node | null; }\ndeclare const view: View;", "view.el"],
+        ].map(([form, declarations, left]) => {
+            const code = (check: string) => `${OBSIDIAN_INSTANCEOF}
+                ${declarations}
+                if (${check}) {}
+            `;
+            return {
+                name: `${form} gets a suggestion with ?.`,
+                code: code(`${left} instanceof HTMLElement`),
+                output: null,
+                errors: [
+                    {
+                        messageId: "preferInstanceof" as const,
+                        suggestions: [
+                            {
+                                messageId: "preferInstanceofOptionalSuggestion" as const,
+                                output: code(`${left}?.instanceOf(HTMLElement)`),
+                            },
+                        ],
+                    },
+                ],
+            };
+        }),
+
         // --- Declared without null or undefined: still fixed ---
+        {
+            name: "a value cast to a type without null is fixed",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare const el: HTMLElement;
+                const child = el.firstElementChild as Element;
+                if (child instanceof HTMLElement) {}
+            `,
+            output: `${OBSIDIAN_INSTANCEOF}
+                declare const el: HTMLElement;
+                const child = el.firstElementChild as Element;
+                if (child.instanceOf(HTMLElement)) {}
+            `,
+            errors: [{ messageId: "preferInstanceof", data: { className: "HTMLElement" } }],
+        },
         {
             name: "a value declared as a Node is fixed",
             code: `${OBSIDIAN_INSTANCEOF}
