@@ -91,10 +91,25 @@ Code in the `try` itself gets a suggestion instead of a fix when the `catch` dro
 parameter, or does not read it, and does nothing but return), as in `try { setTimeout(fn, 0); } catch {}`,
 where `window.setTimeout()` failing would go unseen.
 
-Not recognised: a check in another file (`import { isBrowser } from "./env"`), and one held in a class
-member or an object property (`this.isBrowser`). There, code that runs without a window can still be
-fixed, so keep it in a web worker or test file, where the recommended config switches this rule off,
-or disable the rule for it.
+A check in another file (`import { isBrowser } from "./env"`), or one held in a class member or an
+object property (`this.isBrowser`, `env.isNode`), cannot be followed. So where a condition that decides
+whether the code runs reads a name that says which environment it is in, the code gets a suggestion
+instead of a fix, whichever way the condition goes. That condition is the test of an `if`, `?:`, loop
+or `switch` around the code, the left of an `&&`, `||` or `??`, or an `if` before the code that
+returns, throws, breaks or continues. The names are `isBrowser`, `inBrowser`, `IS_BROWSER`, `isNode`,
+`isNodeJs`, `isNodeEnv`, `isWorker`, `inWorker`, `isWebWorker`, `isServer`, `isSSR`, `isElectron`,
+`hasWindow`, `hasDom`, `hasDocument` and `canUseDOM`, in any case and with or without `_`, as a
+variable, a call or a property, and `typeof process` and `process.versions`:
+
+```ts
+if (!env.isNode) { setTimeout(fn, 0); } // suggestion
+if (settings.enabled) { setTimeout(fn, 0); } // fixed
+```
+
+A `const` in the same file set to one check, as in `const isBrowser = typeof window !== "undefined";`,
+is followed instead. Code that still runs without
+a window where none of this shows can be fixed, so keep it in a web worker or test file, where the
+recommended config switches this rule off, or disable the rule for it.
 
 ## Web workers and tests
 

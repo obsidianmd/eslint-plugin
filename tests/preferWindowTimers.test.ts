@@ -311,8 +311,8 @@ ruleTester.run("prefer-window-timers", preferWindowTimersRule, {
         },
         {
             name: "a typeof check of another global does not stop the fix",
-            code: `export const hasWindow = typeof window; export function stop(n: number) { if (typeof process === "undefined") { clearTimeout(n); } }`,
-            output: `export const hasWindow = typeof window; export function stop(n: number) { if (typeof process === "undefined") { window.clearTimeout(n); } }`,
+            code: `export const hasWindow = typeof window; export function stop(n: number) { if (typeof structuredClone === "undefined") { clearTimeout(n); } }`,
+            output: `export const hasWindow = typeof window; export function stop(n: number) { if (typeof structuredClone === "undefined") { window.clearTimeout(n); } }`,
             errors: [{ messageId: "preferWindowTimer", data: { name: "clearTimeout" } }],
         },
 
@@ -409,6 +409,73 @@ ruleTester.run("prefer-window-timers", preferWindowTimersRule, {
             output: null,
             errors: [{ messageId: "preferWindowTimer", data: { name: "setTimeout" }, suggestions: [] }],
         },
+
+        // --- A condition that names the environment ---
+        // A check that cannot be followed here, imported or held in a member,
+        // may say there is no window: a suggestion, not a fix.
+        ...[
+            ...[
+                "isBrowser", "inBrowser", "hasWindow", "hasDom", "hasDOM", "canUseDOM", "isNode", "isNodeEnv",
+                "isWorker", "inWorker", "isServer", "isSSR", "IS_BROWSER", "isElectron",
+            ].map((flag) => [`${flag} declared elsewhere`, `declare const ${flag}: boolean; export function later(fn: () => void) { if (${flag}) { setTimeout(fn, 0); } }`]),
+            ["an imported flag", `import { isBrowser } from "./env"; export function later(fn: () => void) { if (!isBrowser) { setTimeout(fn, 0); } }`],
+            ["a class member", `export class Timer { isBrowser = true; start(fn: () => void) { if (this.isBrowser) { setTimeout(fn, 0); } } }`],
+            ["an object property", `declare const env: { isNode: boolean }; export function later(fn: () => void) { if (!env.isNode) { setTimeout(fn, 0); } }`],
+            ["a property with a string key", `declare const env: Record<string, boolean>; export function later(fn: () => void) { if (env["isServer"]) { setTimeout(fn, 0); } }`],
+            ["an early return", `declare const canUseDOM: boolean; export function later(fn: () => void) { if (!canUseDOM) return; setTimeout(fn, 0); }`],
+            ["a call", `declare function isSSR(): boolean; export function later(fn: () => void) { if (!isSSR()) { setTimeout(fn, 0); } }`],
+            ["typeof process", `export function later(fn: () => void) { if (typeof process !== "undefined") { setTimeout(fn, 0); } }`],
+            ["process.versions", `export function later(fn: () => void) { if (process.versions?.electron) { setTimeout(fn, 0); } }`],
+            ["a switch", `declare const env: { isWorker: boolean }; export function later(fn: () => void) { switch (env.isWorker) { case false: setTimeout(fn, 0); break; } }`],
+            ["a flag next to a check that proves the window", `const hasWindow = typeof window !== "undefined"; declare const isNode: boolean; export function later(fn: () => void) { if (hasWindow && !isNode) { setTimeout(fn, 0); } }`],
+            ["a flag around a callback", `declare const isBrowser: boolean; declare const el: any; export function later(fn: () => void) { if (isBrowser) { el.on("x", () => { setTimeout(fn, 0); }); } }`],
+        ].map(([form, code]) => ({
+            name: `a timer decided by ${form} gets a suggestion`,
+            code,
+            output: null,
+            errors: [{
+                messageId: "preferWindowTimer" as const,
+                data: { name: "setTimeout" },
+                suggestions: [{ messageId: "useWindowTimer" as const, data: { name: "setTimeout" }, output: code.replace("setTimeout(fn", "window.setTimeout(fn") }],
+            }],
+        })),
+        {
+            name: "a clearTimeout on the right of || after an environment flag gets a suggestion",
+            code: `declare const env: { isNode: boolean }; export function stop(id: number) { env.isNode || clearTimeout(id); }`,
+            output: null,
+            errors: [{
+                messageId: "preferWindowTimer",
+                data: { name: "clearTimeout" },
+                suggestions: [{ messageId: "useWindowTimer", data: { name: "clearTimeout" }, output: `declare const env: { isNode: boolean }; export function stop(id: number) { env.isNode || window.clearTimeout(id); }` }],
+            }],
+        },
+        {
+            name: "activeWindow decided by an environment flag gets a suggestion",
+            code: `declare const isBrowser: boolean; export function later(fn: () => void) { if (isBrowser) { activeWindow.setTimeout(fn, 0); } }`,
+            output: null,
+            errors: [{
+                messageId: "noActiveWindowTimer",
+                data: { name: "setTimeout" },
+                suggestions: [{ messageId: "useWindowTimer", data: { name: "setTimeout" }, output: `declare const isBrowser: boolean; export function later(fn: () => void) { if (isBrowser) { window.setTimeout(fn, 0); } }` }],
+            }],
+        },
+        // Ordinary names keep their fixes, and so does a flag this file follows.
+        ...[
+            ["a property named node", `declare const node: { parentElement: unknown }; export function later(fn: () => void) { if (node.parentElement) { setTimeout(fn, 0); } }`],
+            ["a variable named doc", `declare const doc: unknown; export function later(fn: () => void) { if (doc) { setTimeout(fn, 0); } }`],
+            ["a setting", `declare const settings: { enabled: boolean }; export function later(fn: () => void) { if (settings.enabled) { setTimeout(fn, 0); } }`],
+            ["names that only start like one", `declare const isNodeSelected: boolean; declare const isBrowsing: boolean; declare const tree: { hasNode(id: string): boolean }; export function later(fn: () => void) { if (isNodeSelected && isBrowsing && tree.hasNode("a")) { setTimeout(fn, 0); } }`],
+            ["Obsidian's Platform", `declare const Platform: { isDesktop: boolean; isMobile: boolean }; export function later(fn: () => void) { if (Platform.isDesktop || Platform.isMobile) { setTimeout(fn, 0); } }`],
+            ["process.platform", `export function later(fn: () => void) { if (process.platform === "darwin") { setTimeout(fn, 0); } }`],
+            ["a flag this file sets from a check", `const isBrowser = typeof window !== "undefined"; export function later(fn: () => void) { if (isBrowser) { setTimeout(fn, 0); } }`],
+            ["a flag in a callback in the condition", `declare const items: { isNode: boolean }[]; export function later(fn: () => void) { if (items.some((item) => item.isNode)) { setTimeout(fn, 0); } }`],
+            ["a flag in an if before it that does not leave", `declare const isBrowser: boolean; declare function log(): void; export function later(fn: () => void) { if (isBrowser) { log(); } setTimeout(fn, 0); }`],
+        ].map(([form, code]) => ({
+            name: `a timer decided by ${form} is fixed`,
+            code,
+            output: code.replace("setTimeout(fn", "window.setTimeout(fn"),
+            errors: [{ messageId: "preferWindowTimer" as const, data: { name: "setTimeout" } }],
+        })),
 
         // --- try/catch ---
         // A try that reads the window throws without one: its catch and finally,

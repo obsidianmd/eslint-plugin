@@ -630,6 +630,30 @@ ruleTester.run("no-global-this in try and catch", noGlobalThisRule, {
     ],
 });
 
+// A condition that names the environment, from a check that cannot be
+// followed here, may say there is no window: a suggestion, not a fix.
+ruleTester.run("no-global-this under an environment flag", noGlobalThisRule, {
+    valid: [],
+    invalid: [
+        {
+            name: "globalThis decided by an environment flag gets a suggestion",
+            code: "declare const isBrowser: boolean; export function id() { return isBrowser ? globalThis.crypto.randomUUID() : ''; }",
+            output: null,
+            errors: [{
+                messageId: "avoidGlobal",
+                data: { name: "globalThis" },
+                suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "declare const isBrowser: boolean; export function id() { return isBrowser ? window.crypto.randomUUID() : ''; }" }],
+            }],
+        },
+        {
+            name: "globalThis decided by an ordinary setting is fixed",
+            code: "declare const settings: { enabled: boolean }; export function id() { return settings.enabled ? globalThis.crypto.randomUUID() : ''; }",
+            output: "declare const settings: { enabled: boolean }; export function id() { return settings.enabled ? window.crypto.randomUUID() : ''; }",
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" } }],
+        },
+    ],
+});
+
 // Look-alikes of a window check that are not one: still fixed.
 ruleTester.run("no-global-this next to window checks", noGlobalThisRule, {
     valid: [],

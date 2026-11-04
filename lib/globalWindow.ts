@@ -52,12 +52,151 @@ export function isGlobalWindowAt(context: Context, node: TSESTree.Node): boolean
 
 /**
  * Whether code at `node`, where isGlobalWindowAt holds, may still run without
- * a window as far as the file shows: it is in a `try` whose `catch` drops the
- * error, as in `try { setTimeout(fn, 0); } catch {}`, where `window` failing
- * would go unseen. A rule offers its rewrite there as a suggestion, not a fix.
+ * a window as far as the file shows:
+ *
+ * - a condition that decides whether it runs reads a name that says which
+ *   environment the code is in, such as `isBrowser`, `env.isNode`, `canUseDOM`
+ *   or `typeof process`, from a check that cannot be followed here;
+ * - it is in a `try` whose `catch` drops the error, as in
+ *   `try { setTimeout(fn, 0); } catch {}`, where `window` failing would go
+ *   unseen.
+ *
+ * A rule offers its rewrite there as a suggestion, not a fix.
  */
 export function mayLackWindowAt(context: Context, node: TSESTree.Node): boolean {
-    return isInSilentTry(context.sourceCode, node);
+    const sourceCode = context.sourceCode;
+    const { knownChecks } = getWindowFacts(sourceCode);
+    return (
+        decidingConditions(node).some((condition) => readsEnvironmentName(sourceCode, condition, knownChecks)) ||
+        isInSilentTry(sourceCode, node)
+    );
+}
+
+// A name that says which environment the code runs in: isBrowser, inBrowser,
+// IS_BROWSER, isNode, isNodeJs, isNodeEnv, isWorker, inWorker, isWebWorker,
+// isServer, isSSR, isElectron, hasWindow, hasDom, hasDocument, canUseDOM.
+const ENVIRONMENT_NAME =
+    /^(?:(?:is|in)_?(?:browser|node(?:_?js)?(?:_?env)?|(?:web_?)?worker|server|ssr|electron)|has_?(?:window|dom|document)|can_?(?:use_?)?dom)$/i;
+
+// Whether `condition` reads an environment name, `typeof process` or
+// `process.versions`, outside the functions in it and the checks this file
+// follows exactly (`const hasWindow = typeof window !== "undefined"`).
+function readsEnvironmentName(
+    sourceCode: Context["sourceCode"],
+    condition: TSESTree.Node,
+    knownChecks: Set<TSESTree.Node>,
+): boolean {
+    const visit = (node: TSESTree.Node): boolean => {
+        if (isFunction(node) || knownChecks.has(node)) {
+            return false;
+        }
+        if (isEnvironmentRead(node)) {
+            return true;
+        }
+        return (sourceCode.visitorKeys[node.type] ?? []).some((key) => {
+            const child: unknown = (node as unknown as Record<string, unknown>)[key];
+            return Array.isArray(child) ? child.some((item) => isNode(item) && visit(item)) : isNode(child) && visit(child);
+        });
+    };
+    return visit(condition);
+}
+
+function isEnvironmentRead(node: TSESTree.Node): boolean {
+    switch (node.type) {
+        case TSESTree.AST_NODE_TYPES.Identifier:
+            // isBrowser, env.isNode
+            return ENVIRONMENT_NAME.test(node.name);
+        case TSESTree.AST_NODE_TYPES.MemberExpression: {
+            // env["isNode"], process.versions
+            const key = staticKey(node);
+            const object = skipChainAndCasts(node.object);
+            return (
+                key !== undefined &&
+                ((node.computed && ENVIRONMENT_NAME.test(key)) ||
+                    (key === "versions" &&
+                        object.type === TSESTree.AST_NODE_TYPES.Identifier &&
+                        object.name === "process"))
+            );
+        }
+        case TSESTree.AST_NODE_TYPES.UnaryExpression: {
+            // typeof process
+            const arg = skipChainAndCasts(node.argument);
+            return (
+                node.operator === "typeof" &&
+                arg.type === TSESTree.AST_NODE_TYPES.Identifier &&
+                arg.name === "process"
+            );
+        }
+        default:
+            return false;
+    }
+}
+
+// The conditions that decide whether `node` runs: the test of each `if`, `?:`,
+// loop or `switch` it is in a branch of, the left of each `&&`, `||` or `??`
+// it is on the right of, and the test of each `if` before it that returns,
+// throws, breaks or continues.
+function decidingConditions(node: TSESTree.Node): TSESTree.Node[] {
+    const conditions: TSESTree.Node[] = [];
+    let child: TSESTree.Node = node;
+    for (let parent = node.parent; parent; child = parent, parent = parent.parent) {
+        switch (parent.type) {
+            case TSESTree.AST_NODE_TYPES.IfStatement:
+            case TSESTree.AST_NODE_TYPES.ConditionalExpression:
+                if (parent.test !== child) {
+                    conditions.push(parent.test);
+                }
+                break;
+            case TSESTree.AST_NODE_TYPES.WhileStatement:
+            case TSESTree.AST_NODE_TYPES.DoWhileStatement:
+            case TSESTree.AST_NODE_TYPES.ForStatement:
+                if (parent.test && parent.test !== child) {
+                    conditions.push(parent.test);
+                }
+                break;
+            case TSESTree.AST_NODE_TYPES.LogicalExpression:
+                if (parent.right === child) {
+                    conditions.push(parent.left);
+                }
+                break;
+            case TSESTree.AST_NODE_TYPES.SwitchStatement:
+                if (parent.discriminant !== child) {
+                    conditions.push(parent.discriminant);
+                }
+                break;
+            case TSESTree.AST_NODE_TYPES.SwitchCase:
+                if (parent.test && parent.test !== child) {
+                    conditions.push(parent.test);
+                }
+                conditions.push(...earlierExitTests(parent.consequent, child));
+                break;
+            case TSESTree.AST_NODE_TYPES.BlockStatement:
+            case TSESTree.AST_NODE_TYPES.Program:
+            case TSESTree.AST_NODE_TYPES.StaticBlock:
+                conditions.push(...earlierExitTests(parent.body, child));
+                break;
+            default:
+                break;
+        }
+    }
+    return conditions;
+}
+
+// The tests of the `if`s before `child` in `statements` that leave early.
+function earlierExitTests(statements: readonly TSESTree.Node[], child: TSESTree.Node): TSESTree.Node[] {
+    const tests: TSESTree.Node[] = [];
+    for (const statement of statements) {
+        if (statement === child) {
+            break;
+        }
+        if (
+            statement.type === TSESTree.AST_NODE_TYPES.IfStatement &&
+            (exits(statement.consequent) || (statement.alternate !== null && exits(statement.alternate)))
+        ) {
+            tests.push(statement.test);
+        }
+    }
+    return tests;
 }
 
 /** The declared type of the global `window`, with type information. */
@@ -129,6 +268,9 @@ interface WindowFacts {
     checks: WindowCheck[];
     // Each `try` whose block reads the window, so throws without one.
     windowTries: TSESTree.TryStatement[];
+    // The reads and calls that hold a check whose meaning is known:
+    // `hasWindow` after `const hasWindow = typeof window !== "undefined"`.
+    knownChecks: Set<TSESTree.Node>;
 }
 
 const windowFactsCache = new WeakMap<TSESTree.Program, WindowFacts>();
@@ -364,13 +506,13 @@ function getWindowFacts(sourceCode: Context["sourceCode"]): WindowFacts {
     if (cached) {
         return cached;
     }
-    const facts: WindowFacts = { checks: [], windowTries: [] };
+    const facts: WindowFacts = { checks: [], windowTries: [], knownChecks: new Set() };
     const followed = new Set<TSESTree.Node>();
     // Whether `node` or anything in it reads the window.
     const visit = (node: TSESTree.Node): boolean => {
         const name = checkedName(node);
         if (name !== undefined) {
-            addWindowCheck(sourceCode, facts.checks, toWindowCheck(node, name), followed);
+            addWindowCheck(sourceCode, facts, toWindowCheck(node, name), followed);
         }
         let reads = readsWindow(node);
         for (const key of sourceCode.visitorKeys[node.type] ?? []) {
@@ -405,11 +547,11 @@ function isNode(value: unknown): value is TSESTree.Node {
 // makes each `hasWindow()` one.
 function addWindowCheck(
     sourceCode: Context["sourceCode"],
-    checks: WindowCheck[],
+    facts: WindowFacts,
     check: WindowCheck,
     followed: Set<TSESTree.Node>,
 ): void {
-    checks.push(check);
+    facts.checks.push(check);
     // `!` keeps what the value says; `&&` and `||` lose it.
     let value: TSESTree.Node = check.condition;
     let presentWhenTrue = check.presentWhenTrue;
@@ -436,11 +578,14 @@ function addWindowCheck(
         if (!reference.isRead() || read.type !== TSESTree.AST_NODE_TYPES.Identifier) {
             continue;
         }
-        if (!holder.isFunction) {
-            addWindowCheck(sourceCode, checks, { condition: read, presentWhenTrue: held }, followed);
-        } else if (read.parent.type === TSESTree.AST_NODE_TYPES.CallExpression && read.parent.callee === read) {
-            addWindowCheck(sourceCode, checks, { condition: read.parent, presentWhenTrue: held }, followed);
+        const condition = holder.isFunction ? read.parent : read;
+        if (holder.isFunction && !(condition.type === TSESTree.AST_NODE_TYPES.CallExpression && condition.callee === read)) {
+            continue;
         }
+        if (held !== undefined) {
+            facts.knownChecks.add(condition);
+        }
+        addWindowCheck(sourceCode, facts, { condition, presentWhenTrue: held }, followed);
     }
 }
 
