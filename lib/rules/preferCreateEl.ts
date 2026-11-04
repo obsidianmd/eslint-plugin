@@ -101,7 +101,7 @@ export default ruleCreator({
         // Whether the document's `win` declares `helper`, so that
         // `doc.win.<helper>()` compiles.
         function winHasHelper(node: TSESTree.Node, helper: string): boolean {
-            const type = services.getTypeAtLocation(node);
+            const type = getNonNullableTypeAt(node);
             const winSymbol = type.getProperty("win");
             if (winSymbol === undefined) {
                 return false;
@@ -125,8 +125,19 @@ export default ruleCreator({
             return typeParameter?.constraint?.getText() === `keyof ${tagMap}`;
         }
 
+        // The type of `node` without null and undefined. A document that may be
+        // null, or one read through an optional chain (`view?.doc` is typed
+        // `Document | undefined` there), is still a document: the replacement
+        // reads `win` from the same value with the same `.` or `?.`, so it
+        // short-circuits or throws where the original call does. A call without
+        // `?.` on a document that may be null is already TS18047 under
+        // strictNullChecks, and `doc.win` keeps that error rather than adding one.
+        function getNonNullableTypeAt(node: TSESTree.Node): ts.Type {
+            return checker.getNonNullableType(services.getTypeAtLocation(node));
+        }
+
         function isDocumentType(node: TSESTree.Node): boolean {
-            const type = services.getTypeAtLocation(node);
+            const type = getNonNullableTypeAt(node);
             return (
                 type.getProperty("defaultView") !== undefined &&
                 type.getProperty("createElementNS") !== undefined &&
@@ -265,10 +276,9 @@ export default ruleCreator({
             const callee = node.callee as TSESTree.Identifier | TSESTree.MemberExpression;
             let helperSymbol: ts.Symbol | undefined;
             if (receiver) {
-                let type = services.getTypeAtLocation(receiver);
-                if (callee.type === TSESTree.AST_NODE_TYPES.MemberExpression && callee.optional) {
-                    type = checker.getNonNullableType(type);
-                }
+                // `el?.createDiv()` and `el.createDiv()` read the helper from the
+                // same value as the original, so null and undefined do not matter.
+                const type = getNonNullableTypeAt(receiver);
                 if ((type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) !== 0) {
                     return true;
                 }

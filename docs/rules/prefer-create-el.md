@@ -23,7 +23,8 @@ tag that has a shorter helper:
 
 The document decides where the replacement is called: the global `document` uses the global
 helpers, `activeDocument` uses `activeWindow.`, and any other value typed as a `Document`, such as
-`el.doc`, uses its window, `el.doc.win.`.
+`el.doc`, uses its window, `el.doc.win.`. A document that may be null or undefined counts too, such
+as `node.ownerDocument` (typed `Document | null`) or an optional `doc?: Document` parameter.
 
 [`prefer-active-doc`](prefer-active-doc.md) does not report the global `document` in a call this rule
 reports, as the replacement drops `document`; see
@@ -77,7 +78,15 @@ did, as it does with Obsidian's types. Otherwise:
 
 On an `any` value, or with no helper declared anywhere, the replacement is fixed as before. An
 optional chain is kept: `el?.createEl("div")` becomes `el?.createDiv()`, and `doc?.createElement("p")`
-becomes `doc?.win.createEl("p")`.
+becomes `doc?.win.createEl("p")`, also when `doc` may be null or is read through a chain, as in
+`view?.doc.createElement("p")`.
+
+A value that may be null or undefined gets the same fix or suggestion as one that cannot be: the
+replacement reads `win` or the helper from the same value, through the same `.` or `?.`, so it
+short-circuits or throws exactly where the original call does. Without `?.`, as in
+`doc.createElement("p")` with `doc: Document | null`, TypeScript already reports the call under
+`strictNullChecks` (TS18047), and the replacement `doc.win.createEl("p")` keeps that error rather
+than adding one.
 
 ### Iframe documents
 
