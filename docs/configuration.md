@@ -535,11 +535,11 @@ use `obsidianmd/no-misused-promises` instead of typescript-eslint's rule. The
 
 ### "You have used a rule which requires type information"
 
-This means `parserOptions` is not set, or the file being linted is not included in any `tsconfig.json`.
+This means no `parserOptions.projectService` (or `project`) reaches the file being linted: it is not set, or it is set in a block whose `files` do not match that file. A file it does reach that no `tsconfig.json` includes fails with ["… was not found by the project service"](#-was-not-found-by-the-project-service) instead.
 
-The most common case is the ESLint config file itself. The Obsidian sample plugin uses `eslint.config.mts`, which is matched by the recommended config's `**/*.{ts,cts,mts,tsx}` glob. Because this file is typically not listed in your `tsconfig.json`, typescript-eslint cannot provide type information for it.
+The most common case is the ESLint config file itself. The Obsidian sample plugin uses `eslint.config.mts`, which is matched by the recommended config's `**/*.{ts,cts,mts,tsx}` glob, but not by parser options scoped to `files: ["**/*.ts"]`.
 
-The fix is to use `allowDefaultProject` so these files are linted with default compiler options:
+The fix is to set the parser options in a block without `files`, with `allowDefaultProject` so files in no `tsconfig.json`, such as the config file, are linted with default compiler options:
 
 ```js
 {
@@ -553,12 +553,13 @@ The fix is to use `allowDefaultProject` so these files are linted with default c
 }
 ```
 
-If you are using `project` instead of `projectService`, ensure the path to your `tsconfig.json` is correct relative to where you run ESLint.
+If you are using `project` instead of `projectService`, it too has to reach every TypeScript file; `allowDefaultProject` is only available with `projectService`.
 
 ### "… requires type information" on `LICENSE`, `manifest.json` or `package.json`
 
 ```
 Error while loading rule '@typescript-eslint/await-thenable': You have used a rule which requires type information, but don't have parserOptions set to generate type information for this file. See https://tseslint.com/typed-linting for enabling linting with type information.
+Parser: typescript-eslint/parser
 Occurred while linting /path/to/your-plugin/LICENSE
 ```
 
@@ -573,21 +574,22 @@ shows, or see [Upgrading to 0.5.0](#upgrading-to-050) if you cannot edit that co
 A file ESLint lints is in no `tsconfig.json` and not matched by `allowDefaultProject`. With the
 sample plugin's layout this is the bundled `main.js` and the Node scripts `esbuild.config.mjs` and
 `version-bump.mjs`. If the file is build output or a script rather than plugin source, ignore it (see
-[Ignoring files](#ignoring-files)); otherwise add it to your `tsconfig.json`'s `include`, or for a
-few loose files, to `allowDefaultProject`.
+[Ignoring files](#ignoring-files)); otherwise add it to your `tsconfig.json`'s `include` (with
+`allowJs` for a JavaScript file), or for a few loose files, to `allowDefaultProject`.
 
 ### "Cannot read properties of undefined (reading 'includes')" with `--fix-dry-run`
 
 With `parserOptions.project` and TypeScript 6, `eslint --fix-dry-run` could stop with this error in a
 type-aware rule such as `@typescript-eslint/no-unsafe-assignment`. For a command-line run, and for
 any run with `CI=true` set, typescript-eslint builds the TypeScript program once and does not update
-it between fix passes, except under `--fix`. The second pass then reads types for the code as it was
-before the first fixes. The recommended config turns this off under `--fix-dry-run`. If you fix
+it between fix passes, except under `--fix`. From the second pass on, it type-checks each fixed file in a
+program of that file alone, without your `tsconfig.json` or TypeScript's `lib`, where TypeScript 6
+can crash. The recommended config turns this off under `--fix-dry-run`. If you fix
 through ESLint's API instead, for example in a script that runs with `CI=true`, set
 `parserOptions.disallowAutomaticSingleRunInference: true` or the environment variable
 `TSESTREE_SINGLE_RUN=false`, or use `projectService` as the examples here do.
 
-### "Configuration for rule '0' is invalid"
+### "Configuration for rule "0" is invalid"
 
 This happens when `obsidianmd.configs.recommended` is spread into a `rules` object instead of into the top-level config array. The recommended config is an **array of config objects**, not a rules object:
 
@@ -685,6 +687,7 @@ If your tseslint setup does not include type checking (e.g., you use `tseslint.c
 A few things to keep in mind with this approach:
 
 - **Obsidian globals** must be declared manually. The recommended config does this for you; here you need to add them yourself. The list above covers the most common ones. `DomElementInfo`, `SvgElementInfo`, `isBoolean`, `nextFrame`, and `ready` are also available.
+- **Test and worker files** are not exempted. The recommended config switches some rules off for them (see [Web worker files](#web-worker-files) and [Test files](#test-files)); `ruleConfigs` applies every rule to every file your block matches, so add those overrides yourself.
 - **Rules from other plugins** that the recommended config sets are not in `ruleConfigs` — notably typescript-eslint's `no-deprecated`, which it runs at `warn` with `caretRangeFromPoint` allowed. While `minAppVersion` in `manifest.json` is below 1.13.0, or there is no valid one, it allows `display()` as well: the `obsidian` typings mark `SettingTab#display()` deprecated since 1.13.0, but before 1.13 there is no `update()`, so a settings tab has to keep calling `display()`. From 1.13.0 the call is reported, alongside [`settings-tab/prefer-update-over-display`](rules/settings-tab/prefer-update-over-display.md). Add these rules yourself if you want them; for the `display()` allowance, the entries are `{ from: "package", package: "obsidian", name: "display" }` and `{ from: "file", name: "display" }`.
 - **Third-party plugins** bundled by the recommended config (`@microsoft/eslint-plugin-sdl`, `eslint-plugin-import`, `eslint-plugin-no-unsanitized`, `eslint-plugin-depend`, `@eslint-community/eslint-plugin-eslint-comments`) are not included. Add them separately if you want them.
 - **`package.json` and `manifest.json` linting** (`validate-manifest`, `depend/ban-dependencies`) is not set up, and is not covered by `ruleConfigs` — those presets only carry rules that apply to source files. `validate-manifest` needs its own config block, because `manifest.json` matches no source glob and needs the JSON language to be parsed at all. Install `@eslint/json` 2.x for it (`npm install --save-dev @eslint/json`):
@@ -748,11 +751,12 @@ The scanner only lints plugin source code. The following patterns are excluded:
 
 **Rule severity adjustments:**
 
-- Most rules are downgraded to `warn` (advisory). The security-critical rules stay at `error`: `no-eval`, `no-implied-eval`, `no-unsanitized/method`, `no-unsanitized/property`, `obsidianmd/regex-lookbehind`, and `obsidianmd/no-forbidden-elements`.
+- Most rules are downgraded to `warn` (advisory). The security-critical rules stay at `error`: `no-eval`, `no-implied-eval`, `no-unsanitized/method`, `no-unsanitized/property`, `obsidianmd/regex-lookbehind`, and `obsidianmd/no-forbidden-elements`. The rules on disable comments, `eslint-comments/no-unlimited-disable`, `eslint-comments/disable-enable-pair`, `eslint-comments/no-restricted-disable` and `eslint-comments/require-description`, also keep the recommended config's `error`.
 - Some rules are disabled because the scanner handles them separately or they produce too many false positives at scale: `no-undef`, `@typescript-eslint/no-unsafe-*`, `@typescript-eslint/restrict-template-expressions`, `@typescript-eslint/no-base-to-string`, `import/no-unresolved`, `obsidianmd/validate-manifest`, `obsidianmd/validate-license` (both switched off under their own `manifest.json` and `LICENSE` globs), `obsidianmd/commands/no-command-in-command-id`, `obsidianmd/commands/no-plugin-id-in-command-id`, and the three sentence-case rules.
-- Plugins submitted more recently are checked with stricter layers on top: `eslint-comments/require-description` at `warn`, then at `error`; and for the newest, `@typescript-eslint/no-unsafe-*` and the two command-id rules back at `warn`, and these obsidianmd rules at `error`: `settings-tab/no-manual-html-headings`, `settings-tab/no-problematic-settings-headings`, `sample-names`, `no-sample-code`, `platform`, `no-plugin-as-component`, `detach-leaves`, `no-static-styles-assignment`, `no-view-references-in-plugin`, and `no-unsupported-api`.
+- Plugins submitted more recently are checked with stricter layers on top: for the newest, `@typescript-eslint/no-unsafe-*` and the two command-id rules are back at `warn`, and these obsidianmd rules at `error`: `settings-tab/no-manual-html-headings`, `settings-tab/no-problematic-settings-headings`, `sample-names`, `no-sample-code`, `platform`, `no-plugin-as-component`, `detach-leaves`, `no-static-styles-assignment`, `no-view-references-in-plugin`, and `no-unsupported-api`. The second-oldest of the four layers runs `eslint-comments/require-description` at `warn`.
+- Findings from `@typescript-eslint/no-deprecated`, `@typescript-eslint/no-unused-vars`, `@typescript-eslint/no-namespace`, `@typescript-eslint/prefer-as-const`, `@typescript-eslint/prefer-namespace-keyword` and `obsidianmd/prefer-abstract-input-suggest` are reported as recommendations, which weigh less than warnings.
 - Disable comments are honoured, and unused ones are not reported.
-- When a plugin's dependencies cannot be installed, typescript-eslint's type-aware rules and `obsidianmd/no-misused-promises` are switched off: without the dependencies' types they say nothing about the source.
+- When a plugin's dependencies are not installed (for example, it has no `package.json`, or the install fails, which the scan reports), typescript-eslint's type-aware rules and `obsidianmd/no-misused-promises` are switched off: without the dependencies' types they say nothing about the source.
 
 **Rule replacements:**
 
@@ -778,7 +782,7 @@ You do not need to replicate this configuration. The recommended config with the
 <details>
 <summary>Full scanner-equivalent configuration</summary>
 
-If you want your local linting to match what the community plugin scanner checks, you can use the following configuration. This downgrades most rules to warnings and disables rules the scanner skips, matching the scanner's behavior as closely as possible.
+If you want your local linting to match what the community plugin scanner checks, you can use the following configuration. This disables rules the scanner skips and does not report unused disable comments, matching the scanner's behavior as closely as possible.
 
 ```js
 // eslint.config.mjs
@@ -846,6 +850,14 @@ export default defineConfig([
     },
   },
 
+  {
+    // The scanner honours disable comments but does not report unused ones
+    linterOptions: {
+      reportUnusedDisableDirectives: "off",
+      reportUnusedInlineConfigs: "off",
+    },
+  },
+
   globalIgnores([
     // Not in the scanner's list: it lints a checkout, where the built main.js is usually
     // absent. Locally it is build output, and linting it fails.
@@ -885,12 +897,17 @@ export default defineConfig([
     "**/*.spec.ts",
     "**/testUtils**",
     "automation/**",
-    "e2e-tests/**",
+    "**/e2e/**",
+    "**/e2e-tests/**",
+    "**/*.e2e.*",
+    "**/wdio.conf.*",
+    "**/wdio.*.conf.*",
+    "**/playwright.config.*",
   ]),
 ]);
 ```
 
-Note: The actual scanner also downgrades all non-security rule severities from `error` to `warn`. The configuration above does not replicate that behavior — it uses the recommended config's default severities and only adjusts the specific rules listed. If you want identical severity levels, you would need to override each rule individually.
+Note: The actual scanner also downgrades every rule the configuration above does not set from `error` to `warn`, except the `eslint-comments/*` rules. The configuration above does not replicate that behavior — it uses the recommended config's default severities and only adjusts the specific rules listed. If you want identical severity levels, you would need to override each rule individually.
 
 </details>
 
