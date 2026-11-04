@@ -2,7 +2,7 @@ import { ESLintUtils, type TSESLint, type TSESTree } from "@typescript-eslint/ut
 import type ts from "typescript";
 import tseslint from "typescript-eslint";
 import { type DisableDirectives, disableDirectives, isDisabled, problemStart } from "../disableDirectives.js";
-import { docsUrl, isJsProgram } from "../ruleCreator.js";
+import { docsUrl, isJsProgram, type PluginDocs } from "../ruleCreator.js";
 
 type RuleModule = TSESLint.RuleModule<string, readonly unknown[]>;
 type RuleContext = TSESLint.RuleContext<string, readonly unknown[]>;
@@ -31,7 +31,7 @@ const upstream = (tseslint.plugin as unknown as { rules: Record<string, RuleModu
 // in anywhere else (a user class, a subclass override, a `declare module
 // "obsidian"` augmentation) keeps its declaration outside obsidian.d.ts, so those
 // types are reported exactly as before.
-const rule: RuleModule = {
+const rule: TSESLint.RuleModule<string, readonly unknown[], PluginDocs> = {
     defaultOptions: upstream.defaultOptions,
     meta: {
         ...upstream.meta,
@@ -39,6 +39,7 @@ const rule: RuleModule = {
             description:
                 "Disallow Promises in places not designed to handle them, without treating Obsidian's chaining `then` as a Promise",
             url: docsUrl("no-misused-promises"),
+            requiresTypeChecking: true,
         },
     },
     create(context) {

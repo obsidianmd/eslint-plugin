@@ -69,6 +69,7 @@ export default ruleCreator({
             description:
                 "Prefer `.instanceOf(T)` over `instanceof T` for cross-window safe type checks on DOM Nodes and UIEvents.",
             url: docsUrl("prefer-instanceof"),
+            requiresTypeChecking: true,
         },
         schema: [],
         fixable: "code" as const,

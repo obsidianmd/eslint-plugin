@@ -77,6 +77,7 @@ export default ruleCreator({
             description:
                 "Prefer Obsidian DOM helpers (`createEl`, `createDiv`, `createSpan`, `createSvg`, `createFragment`) over native DOM methods.",
             url: docsUrl("prefer-create-el"),
+            requiresTypeChecking: true,
         },
         schema: [],
         fixable: "code" as const,

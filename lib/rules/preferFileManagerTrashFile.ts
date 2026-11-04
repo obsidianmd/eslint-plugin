@@ -11,6 +11,7 @@ export default ruleCreator({
             description:
                 "Prefer FileManager.trashFile() over Vault.trash() or Vault.delete() to respect user settings.",
             url: docsUrl("prefer-file-manager-trash-file"),
+            requiresTypeChecking: true,
         },
         schema: [],
         messages: {

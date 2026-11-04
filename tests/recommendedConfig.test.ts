@@ -572,6 +572,16 @@ describe("type-checked rule guard", () => {
 			);
 		}
 	});
+
+	// eslint-doc-generator reads meta.docs.requiresTypeChecking to mark a rule as
+	// needing type information in the README and the rule's doc.
+	it("type-requiring rules, and only those, set meta.docs.requiresTypeChecking", () => {
+		const marked = Object.entries(plugin.rules)
+			.filter(([, rule]) => (rule.meta?.docs as { requiresTypeChecking?: boolean } | undefined)?.requiresTypeChecking === true)
+			.map(([name]) => `obsidianmd/${name}`)
+			.sort();
+		assert.deepStrictEqual(marked, [...TYPE_CHECKED_RULES].sort());
+	});
 });
 
 // The README's own setup ends with a global block that sets parser options

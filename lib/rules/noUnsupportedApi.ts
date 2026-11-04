@@ -29,6 +29,7 @@ export default ruleCreator<Options, "apiNotAvailable">({
             description:
                 "Disallow usage of Obsidian APIs not available in the plugin's minimum app version",
             url: docsUrl("no-unsupported-api"),
+            requiresTypeChecking: true,
         },
         schema: [
             {
