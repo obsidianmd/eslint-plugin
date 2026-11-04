@@ -93,6 +93,21 @@ try {
                 filename: "en.ts",
                 code: `export default ["Enable Auto Reveal"] as const;`,
             },
+            {
+                name: "values that are not strings are not checked",
+                filename: "en.ts",
+                code: `export default { count: 3, on: true, none: null, pattern: /Open Settings/, list: [1, , 2] };`,
+            },
+            {
+                name: "a module re-exported from elsewhere is not checked here",
+                filename: "en.ts",
+                code: `const strings = { a: "Enable Auto Reveal" }; export { strings } from "./other";`,
+            },
+            {
+                name: "an exported name that is not a top-level object is not checked",
+                filename: "en.ts",
+                code: `const label = "Enable Auto Reveal"; export { label, missing }; export default label;`,
+            },
         ],
         invalid: [
             {
@@ -198,6 +213,69 @@ export default strings as Record<string, string>;`,
 export default strings;
 export const more = <const>{ b: "Open Settings" };`,
                 errors: [{ messageId: "useSentenceCase" }, { messageId: "useSentenceCase" }],
+            },
+            {
+                name: "a template literal without expressions is checked and fixed to a string",
+                filename: "en.ts",
+                code: "export default { a: `Enable Auto Reveal` };",
+                output: `export default { a: "Enable auto reveal" };`,
+                options: [{ allowAutoFix: true }],
+                errors: [{ messageId: "useSentenceCase", data: { suggestion: "Enable auto reveal" } }],
+            },
+            {
+                name: "an object spread inline and the elements of an array with holes and spreads are checked",
+                filename: "en.ts",
+                code: `export default { ...{ a: "Enable Auto Reveal" }, list: [, ...more, "Open Settings"] };`,
+                errors: [
+                    { messageId: "useSentenceCase", data: { suggestion: "Enable auto reveal" } },
+                    { messageId: "useSentenceCase", data: { suggestion: "Open settings" } },
+                ],
+            },
+            {
+                name: "every declarator of an exported declaration and a let or var object are checked",
+                filename: "en.ts",
+                code: `let first = { a: "Enable Auto Reveal" };
+var second = { b: "Open Settings" };
+export { first, second as default };
+export const third = { c: "Close All Tabs" }, fourth = { d: "Save All Files" };`,
+                errors: [
+                    { messageId: "useSentenceCase", data: { suggestion: "Enable auto reveal" }, line: 1 },
+                    { messageId: "useSentenceCase", data: { suggestion: "Open settings" }, line: 2 },
+                    { messageId: "useSentenceCase", data: { suggestion: "Close all tabs" }, line: 4 },
+                    { messageId: "useSentenceCase", data: { suggestion: "Save all files" }, line: 4 },
+                ],
+            },
+            {
+                name: "the fix writes a valid string, quotes included",
+                filename: "en.ts",
+                code: `export default { a: 'Say "Open Now" Here' }!;`,
+                output: `export default { a: "Say \\"open now\\" here" }!;`,
+                options: [{ allowAutoFix: true }],
+                errors: [{ messageId: "useSentenceCase", data: { suggestion: 'Say "open now" here' } }],
+            },
+            {
+                name: "JavaScript locale modules are checked too",
+                filename: "src/lang/en.mjs",
+                code: `export default { a: "Enable Auto Reveal" };`,
+                errors: [{ messageId: "useSentenceCase" }],
+            },
+            {
+                name: "a CommonJS-named locale module is checked too",
+                filename: "en/strings.cjs",
+                code: `export const strings = { a: "Enable Auto Reveal" };`,
+                errors: [{ messageId: "useSentenceCase" }],
+            },
+            {
+                name: "a plain JavaScript locale module is checked too",
+                filename: "en-US.js",
+                code: `export default { a: "Enable Auto Reveal" };`,
+                errors: [{ messageId: "useSentenceCase" }],
+            },
+            {
+                name: "the string itself is reported",
+                filename: "en.ts",
+                code: `export default { a: "Enable Auto Reveal" };`,
+                errors: [{ messageId: "useSentenceCase", line: 1, column: 21, endLine: 1, endColumn: 41 }],
             },
         ],
     });
