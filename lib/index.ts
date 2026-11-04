@@ -358,9 +358,10 @@ const flatRecommendedGeneralRules: RulesConfig = {
     "no-alert": "warn",
     "no-undef": "warn",
     "@typescript-eslint/ban-ts-comment": "off",
-    // obsidianmd/no-nodejs-modules checks require() calls itself, and its fix
-    // for a Node module is a Platform.isDesktop-guarded require(), which this
-    // blanket ban would report in turn.
+    // obsidianmd/no-nodejs-modules checks require() calls itself, and its
+    // message tells the developer to load a Node module with a dynamic import()
+    // or a require() guarded by Platform.isDesktop; this blanket ban would
+    // report that require() in turn.
     "@typescript-eslint/no-require-imports": "off",
     "@typescript-eslint/no-unused-vars": ["warn", ...noUnusedVarsOptions],
     "@typescript-eslint/no-unused-expressions": ["warn", ...noUnusedExpressionsOptions],
