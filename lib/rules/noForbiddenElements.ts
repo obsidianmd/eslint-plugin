@@ -27,10 +27,22 @@ const FORBIDDEN_ELEMENT_TYPES = ["link", "style"];
 const DOCUMENT_NAMES = new Set(["document", "activeDocument"]);
 const DOCUMENT_PROPERTIES = new Set(["document", "activeDocument", "doc", "ownerDocument"]);
 
-function isDocument(node: TSESTree.Node): boolean {
-    if (node.type === TSESTree.AST_NODE_TYPES.TSNonNullExpression) {
-        return isDocument(node.expression);
+// The expression inside `x!`, `x as T`, `x satisfies T` and `<T>x`, which only
+// change its type.
+function skipTypeAssertions(node: TSESTree.Node): TSESTree.Node {
+    while (
+        node.type === TSESTree.AST_NODE_TYPES.TSNonNullExpression ||
+        node.type === TSESTree.AST_NODE_TYPES.TSAsExpression ||
+        node.type === TSESTree.AST_NODE_TYPES.TSSatisfiesExpression ||
+        node.type === TSESTree.AST_NODE_TYPES.TSTypeAssertion
+    ) {
+        node = node.expression;
     }
+    return node;
+}
+
+function isDocument(node: TSESTree.Node): boolean {
+    node = skipTypeAssertions(node);
     if (node.type === TSESTree.AST_NODE_TYPES.Identifier) {
         return DOCUMENT_NAMES.has(node.name);
     }
@@ -60,13 +72,14 @@ function isForbiddenCreateElementCall(node: TSESTree.CallExpression): string | u
 }
 
 function isForbiddenCreateElCall(node: TSESTree.CallExpression): string | undefined {
-    // we are looking for foo.createEl(...)
+    // we are looking for foo.createEl(...), on any receiver: `containerEl`,
+    // `this.containerEl`, `el!`, or the element a call returns, as in
+    // `containerEl.createDiv().createEl(...)`
 
     if (!(
         node.callee.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
         node.callee.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
-        node.callee.property.name === "createEl" &&
-        (node.callee.object.type === TSESTree.AST_NODE_TYPES.Identifier || node.callee.object.type === TSESTree.AST_NODE_TYPES.MemberExpression)
+        node.callee.property.name === "createEl"
     )) {
         return undefined;
     }
@@ -77,9 +90,23 @@ function isForbiddenCreateElCall(node: TSESTree.CallExpression): string | undefi
     return isArgumentForbiddenElement(node.arguments[0]);
 }
 
+// The tag name when it is written out: a string, or a template literal without
+// expressions, as in `"style"` or `` `style` ``.
+function getLiteralTagName(arg: TSESTree.CallExpressionArgument): string | undefined {
+    const node = skipTypeAssertions(arg);
+    if (node.type === TSESTree.AST_NODE_TYPES.Literal && typeof node.value === "string") {
+        return node.value;
+    }
+    if (node.type === TSESTree.AST_NODE_TYPES.TemplateLiteral && node.expressions.length === 0) {
+        return node.quasis[0].value.cooked ?? undefined;
+    }
+    return undefined;
+}
+
 function isArgumentForbiddenElement(arg: TSESTree.CallExpressionArgument): string | undefined {
-    if (arg.type === TSESTree.AST_NODE_TYPES.Literal && typeof arg.value === "string") {
-        const tagName = arg.value.toLowerCase();
+    const literalTagName = getLiteralTagName(arg);
+    if (literalTagName !== undefined) {
+        const tagName = literalTagName.toLowerCase();
         for (const forbiddenTagName of FORBIDDEN_ELEMENT_TYPES) {
             if (tagName === forbiddenTagName) {
                 return tagName;

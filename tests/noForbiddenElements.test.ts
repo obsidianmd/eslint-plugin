@@ -53,6 +53,18 @@ ruleTester.run("no-forbidden-elements", noForbiddenElements, {
             name: "global createEl() without arguments is not reported",
             code: "const el = createEl();",
         },
+        {
+            name: "a template literal with an expression is not a literal tag name",
+            code: "document.createElement(`${tag}`); createEl(`st${suffix}`); containerEl.createEl(`${tag}`);",
+        },
+        {
+            name: "createElement on a call result is not a document",
+            code: "const style = getFactory().createElement('style');",
+        },
+        {
+            name: "createEl('div') on a call result is allowed",
+            code: "const div = containerEl.createDiv().createEl('div');",
+        },
     ],
     invalid: [
         {
@@ -147,6 +159,51 @@ ruleTester.run("no-forbidden-elements", noForbiddenElements, {
             name: "an ambient createEl declaration is still Obsidian's global",
             code: "declare function createEl(tag: string): HTMLElement;\nconst style = createEl('style');",
             errors: [{ messageId: "doNotAttachForbiddenStyleElements" }]
+        },
+        {
+            name: "createEl('style') on the element a call returns is forbidden",
+            code: "const style = containerEl.createDiv().createEl('style');",
+            errors: [{ messageId: "doNotAttachForbiddenStyleElements", data: { element: "style" } }]
+        },
+        {
+            name: "createEl('link') on a chain of calls is forbidden",
+            code: "this.containerEl.createDiv({ cls: 'wrapper' }).createSpan().createEl('link', { attr: { rel: 'stylesheet' } });",
+            errors: [{ messageId: "doNotAttachForbiddenStyleElements", data: { element: "link" } }]
+        },
+        {
+            name: "createEl('style') on a non-null, cast or optional receiver is forbidden",
+            code: "el!.createEl('style'); (el as HTMLElement).createEl('style'); getEl()?.createEl('style'); this.createEl('style');",
+            errors: [
+                { messageId: "doNotAttachForbiddenStyleElements", data: { element: "style" } },
+                { messageId: "doNotAttachForbiddenStyleElements", data: { element: "style" } },
+                { messageId: "doNotAttachForbiddenStyleElements", data: { element: "style" } },
+                { messageId: "doNotAttachForbiddenStyleElements", data: { element: "style" } },
+            ]
+        },
+        {
+            name: "createElement on a document cast to Document is forbidden",
+            code: "(activeWindow.document as Document).createElement('style'); (<Document>el.doc).createElement('link');",
+            errors: [
+                { messageId: "doNotAttachForbiddenStyleElements", data: { element: "style" } },
+                { messageId: "doNotAttachForbiddenStyleElements", data: { element: "link" } },
+            ]
+        },
+        {
+            name: "a template literal without expressions is a literal tag name",
+            code: "document.createElement(`style`); createEl(`link`); containerEl.createEl(`STYLE`);",
+            errors: [
+                { messageId: "doNotAttachForbiddenStyleElements", data: { element: "style" } },
+                { messageId: "doNotAttachForbiddenStyleElements", data: { element: "link" } },
+                { messageId: "doNotAttachForbiddenStyleElements", data: { element: "style" } },
+            ]
+        },
+        {
+            name: "a literal tag name with a type assertion is still a literal tag name",
+            code: "createEl('style' as keyof HTMLElementTagNameMap); document.createElement('link' as const);",
+            errors: [
+                { messageId: "doNotAttachForbiddenStyleElements", data: { element: "style" } },
+                { messageId: "doNotAttachForbiddenStyleElements", data: { element: "link" } },
+            ]
         },
         {
             name: "stylesheet link element with appendChild is forbidden",
