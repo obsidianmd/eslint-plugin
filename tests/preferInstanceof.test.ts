@@ -368,6 +368,32 @@ ruleTester.run("prefer-instanceof", preferInstanceofRule, {
             ],
         },
         {
+            name: "an array element at a computed index gets a suggestion with ?.",
+            code: `
+                ${MOCK_DOM}
+                declare const list: Node[]; declare const i: number;
+                if (list[i] instanceof HTMLElement) {}
+            `,
+            output: null,
+            errors: [
+                {
+                    messageId: "preferInstanceof",
+                    data: { className: "HTMLElement" },
+                    suggestions: [
+                        {
+                            messageId: "preferInstanceofOptionalSuggestion",
+                            data: { className: "HTMLElement" },
+                            output: `
+                ${MOCK_DOM}
+                declare const list: Node[]; declare const i: number;
+                if (list[i]?.instanceOf(HTMLElement)) {}
+            `,
+                        },
+                    ],
+                },
+            ],
+        },
+        {
             name: "a record entry read with a dot gets a suggestion with ?.",
             code: `
                 ${MOCK_DOM}
