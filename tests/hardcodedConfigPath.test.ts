@@ -26,6 +26,18 @@ ruleTester.run("hardcoded-config-path", hardcodedConfigPathRule, {
             code: 'const config = ".obsidianrc";',
         },
         {
+            name: ".obsidian after a letter or a digit of any case is part of a longer name",
+            code: 'const a = "vault.obsidian"; const b = "VAULT.obsidian"; const c = "backup2.obsidian";',
+        },
+        {
+            name: ".obsidian followed by an underscore, or by a dot and a capital or a digit, is a longer name",
+            code: 'const a = ".obsidian_backup"; const b = ".obsidian.Backup"; const c = ".obsidian.2";',
+        },
+        {
+            name: "a regular expression is not a string",
+            code: "const pattern = /\\.obsidian\\//;",
+        },
+        {
             name: "a file in the vault root named .obsidian.vimrc is allowed",
             code: 'const a = ".obsidian.vimrc"; const b = "vault/.obsidian.md"; const c = `${base}/.obsidian.${ext}`;',
         },
@@ -112,6 +124,11 @@ ruleTester.run("hardcoded-config-path", hardcodedConfigPathRule, {
         {
             name: "a template literal is reported once",
             code: "const config = `${a}/.obsidian/${b}/.obsidian`;",
+            errors: [{ messageId: "configPath" }],
+        },
+        {
+            name: "an untagged template is matched as it evaluates",
+            code: "const config = `\\x2eobsidian/plugins`;",
             errors: [{ messageId: "configPath" }],
         },
         {
