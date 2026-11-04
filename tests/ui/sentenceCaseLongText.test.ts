@@ -27,7 +27,7 @@ describe("sentence case on long text", () => {
         "a long dotted word that is not a URL": "x.".repeat(30_000) + "x!",
         "many brand names": "Open X ".repeat(15_000),
         "many URLs": "see a://b ".repeat(15_000),
-        "an opening bracket that is never closed": "(" + "a".repeat(30_000),
+        "an opening bracket that is never closed": "(" + "a".repeat(45_000),
         "many date format tokens that are not a format": "Do ".repeat(20_000) + "a",
     };
     for (const [name, text] of Object.entries(inputs)) {
@@ -36,6 +36,14 @@ describe("sentence case on long text", () => {
             assert.ok(ms < LIMIT_MS, `took ${ms.toFixed(0)} ms`);
         });
     }
+
+    // The file-name check alone: the rest of the evaluation of this much text
+    // takes most of the limit by itself.
+    it("many brand names that end in a file extension: linear time", () => {
+        const text = "Node.js ".repeat(20_000);
+        const ms = elapsed(() => assert.strictEqual(isSkippableString(text), false));
+        assert.ok(ms < LIMIT_MS, `took ${ms.toFixed(0)} ms`);
+    });
 });
 
 // Every string of up to `length` characters of `alphabet`.

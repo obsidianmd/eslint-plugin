@@ -325,17 +325,36 @@ function looksLikePath(text: string, brands: readonly string[]): boolean {
     if (/(?:^|[\s'"(])\.[\w-]+\//.test(text)) return true;
     // Check for words ending in a file extension
     // Examples: "src/main.ts", "C:\\Users\\file.txt", "/home/user/doc.pdf", "file.txt", "obsidian.md"
+    //
+    // The matches come in order, so the start of each one's word is found by
+    // going on from where the last one's search stopped: searching back from
+    // each dot was quadratic in a long text of brands such as "Node.js".
+    let wordBreak = -1;
+    let searched = 0;
+    let longestBrand: number | undefined;
     for (const m of text.matchAll(/\.([a-z0-9]{1,4})(?=['"\s]|$)/gi)) {
         const dot = m.index;
         // "1.2", "v2.0.1", "$1.99": digits on both sides of the dot
         if (/^[0-9]+$/.test(m[1]) && /[0-9]/.test(text[dot - 1] ?? "")) continue;
-        const wordStart = Math.max(...[" ", "\t", "\n", "'", "\"", "("].map((c) => text.lastIndexOf(c, dot))) + 1;
-        const word = text.slice(wordStart, dot + m[0].length).toLowerCase();
-        if (brands.some((brand) => brand.toLowerCase() === word)) continue;
+        // The word starts after the last space, tab, line feed, quote or "(" before the dot
+        for (; searched < dot; searched++) {
+            if (WORD_BREAKS.has(text[searched])) wordBreak = searched;
+        }
+        const end = dot + m[0].length;
+        // Lower-casing gives at least one code point for each code point, so a
+        // word over twice as long as the longest brand in lower case is none.
+        longestBrand ??= Math.max(0, ...brands.map((brand) => brand.toLowerCase().length));
+        if (end - (wordBreak + 1) <= 2 * longestBrand) {
+            const word = text.slice(wordBreak + 1, end).toLowerCase();
+            if (brands.some((brand) => brand.toLowerCase() === word)) continue;
+        }
         return true;
     }
     return false;
 }
+
+// What ends the word before a file extension in looksLikePath()
+const WORD_BREAKS = new Set([" ", "\t", "\n", "'", "\"", "("]);
 
 // Whether `text` has an HTML tag: "<", an optional "/", a letter, and a ">"
 // anywhere after it, as /<\/?[a-z][^>]*>/i matches. The first tag start
