@@ -1,5 +1,6 @@
 import { TSESTree } from "@typescript-eslint/utils";
 import { docsUrl, ruleCreator } from "../../ruleCreator.js";
+import { isCommandProperty } from "./property.js";
 import { phrasePattern } from "./words.js";
 
 const COMMAND = phrasePattern("command")!;
@@ -33,9 +34,7 @@ export default ruleCreator({
                 const commandObject = node.arguments[0];
                 for (const property of commandObject.properties) {
                     if (
-                        property.type === TSESTree.AST_NODE_TYPES.Property &&
-                        property.key.type === TSESTree.AST_NODE_TYPES.Identifier &&
-                        property.key.name === "name" &&
+                        isCommandProperty(property, "name") &&
                         property.value.type === TSESTree.AST_NODE_TYPES.Literal &&
                         typeof property.value.value === "string" &&
                         COMMAND.test(property.value.value)

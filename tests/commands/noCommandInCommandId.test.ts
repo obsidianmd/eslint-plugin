@@ -25,6 +25,14 @@ ruleTester.run("no-command-in-command-id", noCommandInIdRule, {
             name: "command object passed by name is not checked",
             code: "const command = { id: 'open-command' }; this.addCommand(command);",
         },
+        {
+            name: "a computed key that is a variable is not the id",
+            code: "this.addCommand({ [id]: 'open-command' });",
+        },
+        {
+            name: "another quoted key is not the id",
+            code: "this.addCommand({ 'id': 'open-note', 'name': 'Open command', 'idCommand': 'command' });",
+        },
     ],
     invalid: [
         {
@@ -50,6 +58,11 @@ ruleTester.run("no-command-in-command-id", noCommandInIdRule, {
         {
             name: "'command' between other separators is forbidden",
             code: "this.addCommand({ id: 'run_command' }); this.addCommand({ id: 'editor:COMMAND' }); this.addCommand({ id: 'open.command.now' });",
+            errors: [{ messageId: "commandInId" }, { messageId: "commandInId" }, { messageId: "commandInId" }],
+        },
+        {
+            name: "a quoted id key is checked",
+            code: "this.addCommand({ \"id\": \"open-command\", \"name\": \"Open\" }); this.addCommand({ 'id': 'runCommand' }); this.addCommand({ ['id']: 'command-palette' });",
             errors: [{ messageId: "commandInId" }, { messageId: "commandInId" }, { messageId: "commandInId" }],
         },
     ],

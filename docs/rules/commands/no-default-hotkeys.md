@@ -9,7 +9,7 @@
 ## What is reported
 
 A `hotkeys` property, whatever its value (an empty array too), in a command passed to `addCommand()`
-as an object literal:
+as an object literal. The key may be quoted (`"hotkeys": …`):
 
 ```ts
 this.addCommand({ id: "open-note", name: "Open note", hotkeys: [{ modifiers: ["Mod"], key: "O" }], callback }); // reported

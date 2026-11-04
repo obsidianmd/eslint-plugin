@@ -9,8 +9,9 @@
 ## What is reported
 
 The `name` of a command passed to `addCommand()` as an object literal, when it is a string literal
-that contains the plugin name as whole words, in any case. The plugin name is the `pluginName`
-option, or else the `name` in the `manifest.json` of the directory ESLint runs from:
+that contains the plugin name as whole words, in any case; the key may be quoted (`"name": …`).
+The plugin name is the `pluginName` option, or else the `name` in the `manifest.json` of the
+directory ESLint runs from:
 
 ```ts
 // manifest.json: { "name": "Word Tally", ... }

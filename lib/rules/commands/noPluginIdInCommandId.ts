@@ -1,6 +1,7 @@
 import { TSESTree } from "@typescript-eslint/utils";
 import { getManifest } from "../../manifest.js";
 import { docsUrl, ruleCreator } from "../../ruleCreator.js";
+import { isCommandProperty } from "./property.js";
 import { containsWords, idWords } from "./words.js";
 
 type Options = [{ pluginId?: string }?];
@@ -48,9 +49,7 @@ export default ruleCreator<Options, "pluginId">({
                 for (const property of commandObject.properties) {
                     if (
                         pluginIdWords.length > 0 &&
-                        property.type === TSESTree.AST_NODE_TYPES.Property &&
-                        property.key.type === TSESTree.AST_NODE_TYPES.Identifier &&
-                        property.key.name === "id" &&
+                        isCommandProperty(property, "id") &&
                         property.value.type === TSESTree.AST_NODE_TYPES.Literal &&
                         typeof property.value.value === "string" &&
                         containsWords(idWords(property.value.value), pluginIdWords)
