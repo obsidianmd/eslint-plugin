@@ -1,4 +1,5 @@
 import { RuleTester } from "@typescript-eslint/rule-tester";
+import globals from "globals";
 import noGlobalThisRule from "../lib/rules/noGlobalThis.js";
 
 const ruleTester = new RuleTester();
@@ -48,6 +49,14 @@ ruleTester.run("no-global-this", noGlobalThisRule, {
         {
             name: "a class member named global is allowed",
             code: "class Settings { global = true; globalThis() { return 1; } }",
+        },
+        {
+            name: "an accessor or an abstract class member named global is allowed",
+            code: "class Settings { accessor global = true; } abstract class Base { abstract global: boolean; abstract accessor globalThis: string; }",
+        },
+        {
+            name: "globalThis in an ambient module is allowed",
+            code: "declare module 'shim' { export default globalThis; }",
         },
         {
             name: "an enum member named global is allowed",
@@ -126,6 +135,16 @@ ruleTester.run("no-global-this", noGlobalThisRule, {
                 messageId: "avoidGlobal",
                 data: { name: "globalThis" },
                 suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "const o = { globalThis: window };" }],
+            }],
+        },
+        {
+            name: "a property value that is not shorthand is replaced on its own",
+            code: "const o = { scope: globalThis };",
+            output: null,
+            errors: [{
+                messageId: "avoidGlobal",
+                data: { name: "globalThis" },
+                suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "const o = { scope: window };" }],
             }],
         },
 
@@ -217,6 +236,28 @@ ruleTester.run("no-global-this", noGlobalThisRule, {
             output: "export const id = typeof window !== 'undefined' ? window.crypto.randomUUID() : '';",
             errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" } }],
         },
+        {
+            name: "a property read with a string key is fixed like a dotted one",
+            code: "globalThis['document'].body.empty();",
+            output: "window['document'].body.empty();",
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" } }],
+        },
+        {
+            name: "globalThis in a namespace, which is runtime code, is fixed",
+            code: "namespace Plugin { export const doc = globalThis.document; }",
+            output: "namespace Plugin { export const doc = window.document; }",
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" } }],
+        },
+        // Window has `document` as read-only; a read of it is fixed.
+        {
+            name: "a read as an assignment's value or in an object literal is fixed",
+            code: "declare let current: Document; current = globalThis.document; const o = { doc: globalThis.document };",
+            output: "declare let current: Document; current = window.document; const o = { doc: window.document };",
+            errors: [
+                { messageId: "avoidGlobal", data: { name: "globalThis" } },
+                { messageId: "avoidGlobal", data: { name: "globalThis" } },
+            ],
+        },
 
         // Suggested: the type changes.
         {
@@ -243,6 +284,22 @@ ruleTester.run("no-global-this", noGlobalThisRule, {
                 suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "window.setTimeout((n) => n, 10, 1);" }],
             }],
         },
+        // window.run() would resolve to Window's overload first, and the
+        // callback's `x` would become a string.
+        {
+            name: "a callback that takes its parameter type from only one of the signatures gets a suggestion",
+            code: "declare global { interface Window { run(cb: (x: string) => void): void; } function run(cb: (x: number) => void): void; } export {}; globalThis.run((x) => x);",
+            output: null,
+            errors: [{
+                messageId: "avoidGlobal",
+                data: { name: "globalThis" },
+                suggestions: [{
+                    messageId: "useWindow",
+                    data: { name: "globalThis" },
+                    output: "declare global { interface Window { run(cb: (x: string) => void): void; } function run(cb: (x: number) => void): void; } export {}; window.run((x) => x);",
+                }],
+            }],
+        },
         {
             name: "a cast window does not fit gets a suggestion",
             code: "const globals = globalThis as Record<string, unknown>;",
@@ -261,6 +318,50 @@ ruleTester.run("no-global-this", noGlobalThisRule, {
                 messageId: "avoidGlobal",
                 data: { name: "globalThis" },
                 suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "const assets = window as typeof globalThis & { TesseractCore: unknown };" }],
+            }],
+        },
+        {
+            name: "a property read with a key that is not written out gets a suggestion",
+            code: "declare const key: 'document'; globalThis[key].body;",
+            output: null,
+            errors: [{
+                messageId: "avoidGlobal",
+                data: { name: "globalThis" },
+                suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "declare const key: 'document'; window[key].body;" }],
+            }],
+        },
+        {
+            name: "a property Window declares but the global scope does not gets a suggestion",
+            code: "declare global { interface Window { myPlugin: { id: string } } } export {}; export const id = globalThis.myPlugin.id;",
+            output: null,
+            errors: [{
+                messageId: "avoidGlobal",
+                data: { name: "globalThis" },
+                suggestions: [{
+                    messageId: "useWindow",
+                    data: { name: "globalThis" },
+                    output: "declare global { interface Window { myPlugin: { id: string } } } export {}; export const id = window.myPlugin.id;",
+                }],
+            }],
+        },
+        {
+            name: "globalThis passed to a call whose result is used gets a suggestion",
+            code: "const merged = Object.assign(globalThis, { a: 1 });",
+            output: null,
+            errors: [{
+                messageId: "avoidGlobal",
+                data: { name: "globalThis" },
+                suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "const merged = Object.assign(window, { a: 1 });" }],
+            }],
+        },
+        {
+            name: "globalThis as the whole branch where window exists gets a suggestion",
+            code: "export const scope = typeof window !== 'undefined' ? globalThis : undefined;",
+            output: null,
+            errors: [{
+                messageId: "avoidGlobal",
+                data: { name: "globalThis" },
+                suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "export const scope = typeof window !== 'undefined' ? window : undefined;" }],
             }],
         },
         {
@@ -293,6 +394,31 @@ ruleTester.run("no-global-this", noGlobalThisRule, {
                 suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "window.onerror = null;" }],
             }],
         },
+        // Window has `document` and `scrollX` as read-only, with the type the
+        // globals have: any write to them gets a suggestion.
+        ...[
+            ["an assignment", "globalThis.document = doc;"],
+            ["an increment", "globalThis.scrollX++;"],
+            ["a delete", "delete globalThis.document;"],
+            ["a for-of target", "for (globalThis.document of docs) {}"],
+            ["a for-in target", "for (globalThis.document in docs) {}"],
+            ["an array pattern", "[globalThis.document] = docs;"],
+            ["an array pattern's default", "[globalThis.document = doc] = docs;"],
+            ["an array pattern's rest", "[...globalThis.document] = docs;"],
+            ["an object pattern", "({ doc: globalThis.document } = { doc });"],
+        ].map(([form, statement]) => {
+            const code = `declare const doc: Document; declare const docs: Document[]; ${statement}`;
+            return {
+                name: `a write to a read-only property of Window, as ${form}, gets a suggestion`,
+                code,
+                output: null,
+                errors: [{
+                    messageId: "avoidGlobal" as const,
+                    data: { name: "globalThis" },
+                    suggestions: [{ messageId: "useWindow" as const, data: { name: "globalThis" }, output: code.replace("globalThis", "window") }],
+                }],
+            };
+        }),
 
         // Neither: window.<name> would be wrong.
         {
@@ -333,6 +459,18 @@ ruleTester.run("no-global-this", noGlobalThisRule, {
                 { messageId: "avoidGlobal", data: { name: "globalThis" }, suggestions: [] },
                 { messageId: "avoidGlobal", data: { name: "globalThis" }, suggestions: [] },
             ],
+        },
+        {
+            name: "an in check for the document on its own is reported only, as window it would throw",
+            code: "export const hasDocument = 'document' in globalThis;",
+            output: null,
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" }, suggestions: [] }],
+        },
+        {
+            name: "a typeof check for the document through an optional chain is reported only",
+            code: "export const hasDocument = typeof globalThis?.document !== 'undefined';",
+            output: null,
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" }, suggestions: [] }],
         },
         {
             name: "code after a check that does not prove window exists is reported only",
@@ -401,6 +539,22 @@ untypedRuleTester.run("no-global-this without type information", noGlobalThisRul
             ],
         },
         {
+            name: "a cast to unknown is fixed without type information",
+            code: "(globalThis as unknown as { x: number }).x = 1;",
+            output: "(window as unknown as { x: number }).x = 1;",
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" } }],
+        },
+        {
+            name: "a timer function passed on rather than called gets a suggestion without type information",
+            code: "run(globalThis.setTimeout);",
+            output: null,
+            errors: [{
+                messageId: "avoidGlobal",
+                data: { name: "globalThis" },
+                suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "run(window.setTimeout);" }],
+            }],
+        },
+        {
             name: "a local named window is not the global without type information either",
             code: "function f(window) { globalThis.setTimeout(() => {}, 10); }",
             output: null,
@@ -424,6 +578,39 @@ noDomRuleTester.run("no-global-this without the DOM lib", noGlobalThisRule, {
             code: "const PILL = Symbol.for('pill'); export const pill = (globalThis as any)[PILL];",
             output: null,
             errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" }, suggestions: [] }],
+        },
+        // `window.process` compiles as `any`, whatever globalThis.process was.
+        {
+            name: "a project that declares window as any gets a suggestion",
+            code: "declare global { var window: any; } export {}; globalThis.process.exit();",
+            output: null,
+            errors: [{
+                messageId: "avoidGlobal",
+                data: { name: "globalThis" },
+                suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "declare global { var window: any; } export {}; window.process.exit();" }],
+            }],
+        },
+    ],
+});
+
+// The recommended config declares the browser's globals, and Node's for a
+// desktop-only plugin. They are variables without a declaration in the file:
+// still the globals.
+const globalsRuleTester = new RuleTester({
+    languageOptions: { globals: { ...globals.browser, ...globals.node } },
+});
+
+globalsRuleTester.run("no-global-this with the recommended config's globals", noGlobalThisRule, {
+    valid: [],
+    invalid: [
+        {
+            name: "globalThis and global are fixed",
+            code: "globalThis.setTimeout(() => {}, 100); global.process;",
+            output: "window.setTimeout(() => {}, 100); window.process;",
+            errors: [
+                { messageId: "avoidGlobal", data: { name: "globalThis" } },
+                { messageId: "avoidGlobal", data: { name: "global" } },
+            ],
         },
     ],
 });
