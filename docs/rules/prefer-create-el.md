@@ -27,8 +27,9 @@ helpers, `activeDocument` uses `activeWindow.`, and any other value typed as a `
 
 [`prefer-active-doc`](prefer-active-doc.md) does not report the global `document` in a call this rule
 reports, as the replacement drops `document`; see
-[Calls left to `prefer-create-el`](prefer-active-doc.md#calls-left-to-prefer-create-el). If you
-switch this rule off, neither rule reports these calls.
+[Calls left to `prefer-create-el`](prefer-active-doc.md#calls-left-to-prefer-create-el). Where a
+comment turns this rule off for a call, `prefer-active-doc` reports `document` there; if you switch
+this rule off in your config, neither rule reports these calls.
 
 Not reported:
 

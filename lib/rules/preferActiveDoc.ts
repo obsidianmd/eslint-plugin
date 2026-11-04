@@ -1,4 +1,5 @@
 import { TSESTree } from "@typescript-eslint/utils";
+import { disableDirectives, isDisabled, problemStart } from "../disableDirectives.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 import { isReportedOnGlobalDocument } from "./preferCreateEl.js";
 
@@ -40,6 +41,19 @@ export default ruleCreator({
         const createElRuns =
             Boolean(context.sourceCode.parserServices?.program) &&
             TYPESCRIPT_FILE.test(context.filename);
+        // prefer-create-el under the prefix this plugin is registered with.
+        const createElId = context.id.replace(/prefer-active-doc$/, "prefer-create-el");
+
+        // Whether a comment turns prefer-create-el off where it would report
+        // `call`, so it reports nothing there. Turning it off in the config is
+        // not visible to another rule.
+        function createElDisabledAt(call: TSESTree.CallExpression): boolean {
+            return isDisabled(
+                disableDirectives(context.sourceCode),
+                problemStart({ node: call, messageId: "preferActive" }),
+                (ruleId) => ruleId === createElId,
+            );
+        }
 
         return {
             Identifier(node: TSESTree.Identifier) {
@@ -145,14 +159,16 @@ export default ruleCreator({
                 // Leave `document.createElement("p")` and the other calls
                 // prefer-create-el reports to it: its createEl("p") drops
                 // `document`, while activeDocument.createElement("p") would
-                // still be reported by it.
+                // still be reported by it. Where a comment disables
+                // prefer-create-el for the call, report `document` as before.
                 if (
                     createElRuns &&
                     node.parent.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
                     node.parent.object === node &&
                     node.parent.parent.type === TSESTree.AST_NODE_TYPES.CallExpression &&
                     node.parent.parent.callee === node.parent &&
-                    isReportedOnGlobalDocument(node.parent.parent)
+                    isReportedOnGlobalDocument(node.parent.parent) &&
+                    !createElDisabledAt(node.parent.parent)
                 ) {
                     return;
                 }

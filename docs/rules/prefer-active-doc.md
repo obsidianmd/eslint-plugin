@@ -72,5 +72,14 @@ recommended config runs `prefer-create-el` on; anywhere else, such as a JavaScri
 still reports them. A call `prefer-create-el` leaves alone, such as
 `document.createElement("div", { is: "my-div" })`, is reported here as before.
 
-This rule cannot tell whether `prefer-create-el` is switched on. If you switch it off for TypeScript
-files, neither rule reports these calls.
+Where a comment turns `prefer-create-el` off for the call (`eslint-disable-next-line`,
+`eslint-disable-line`, or an `eslint-disable` range naming it), this rule reports `document` there
+as before:
+
+```ts
+// eslint-disable-next-line obsidianmd/prefer-create-el -- the canvas is sized before use
+const canvas = document.createElement("canvas"); // reported: use activeDocument
+```
+
+A rule cannot see the config of another, so if you switch `prefer-create-el` off for TypeScript files
+in your config, neither rule reports these calls.
