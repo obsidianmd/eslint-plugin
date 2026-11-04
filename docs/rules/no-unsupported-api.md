@@ -130,6 +130,7 @@ keeping the typings current does not raise the minimum app version you support.
 Reading the `@since` tags means parsing all of `obsidian.d.ts`, so the rule caches the result in
 `.cache/eslint-plugin-obsidianmd/since-map.json` in the `node_modules` directory that holds
 `obsidian`, normally `node_modules/.cache/eslint-plugin-obsidianmd/since-map.json`. The cache records
-the `obsidian` version it was built from, and the rule rebuilds it when the installed version
-differs, so upgrading `obsidian` refreshes it; deleting the file forces a rebuild. Where the file
+the `obsidian` version it was built from and the version of this plugin that built it, and the rule
+rebuilds it when either differs, so upgrading `obsidian` or this plugin refreshes it; deleting the
+file forces a rebuild. Where the file
 cannot be written, the rule parses the typings on every ESLint run instead.
