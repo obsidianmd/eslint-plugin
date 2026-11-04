@@ -497,6 +497,11 @@ A few of these are worth knowing in advance:
   16.4 just like `(?<=x)`.
 - `@typescript-eslint/no-require-imports` is off again, so a disable comment for it is reported as
   unused; delete the comment. The same goes for `no-undef` in TypeScript files, where it is now off.
+- In TypeScript files, implied eval such as `window.setTimeout("…", 1)` is reported once, by
+  `@typescript-eslint/no-implied-eval`: the core `no-implied-eval` is now off there, as in
+  typescript-eslint's own configs, and keeps reporting it in JavaScript files. A disable comment
+  naming `no-implied-eval` in a TypeScript file is reported as unused; name
+  `@typescript-eslint/no-implied-eval` instead.
 
 ### Install `obsidian` yourself
 

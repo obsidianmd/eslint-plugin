@@ -409,7 +409,6 @@ describe("scanner-aligned severities", () => {
 	it("security rules should be at error", () => {
 		const securityRules = [
 			"no-eval",
-			"no-implied-eval",
 			"no-unsanitized/method",
 			"no-unsanitized/property",
 		];
@@ -420,6 +419,13 @@ describe("scanner-aligned severities", () => {
 				`security rule ${rule} should be 'error'`
 			);
 		}
+	});
+
+	// typescript-eslint's rule replaces the core one in TypeScript files (see
+	// impliedEval.test.ts).
+	it("implied eval should be at error", () => {
+		assert.strictEqual(getSeverity(tsRules["@typescript-eslint/no-implied-eval"]), "error");
+		assert.strictEqual(getSeverity(jsRules["no-implied-eval"]), "error");
 	});
 
 	it("scanner-escalated obsidianmd rules should be at error", () => {

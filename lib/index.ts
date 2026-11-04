@@ -241,6 +241,11 @@ const recommendedTypeCheckedGeneralRules: RulesConfig = {
     // declared in a `declare global` block or a .d.ts, so typescript-eslint
     // advises turning it off for TypeScript. JavaScript files keep it.
     "no-undef": "off",
+    // @typescript-eslint/no-implied-eval (from recommendedTypeChecked) reports
+    // every call the core rule does, and also strings it knows only by type;
+    // with both on, each implied eval was reported twice. typescript-eslint's
+    // configs turn the core rule off where theirs runs. JavaScript files keep it.
+    "no-implied-eval": "off",
 };
 
 // Combined rules for TypeScript files
