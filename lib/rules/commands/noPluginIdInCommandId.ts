@@ -1,20 +1,25 @@
 import { TSESTree } from "@typescript-eslint/utils";
 import { getManifest } from "../../manifest.js";
 import { docsUrl, ruleCreator } from "../../ruleCreator.js";
+import { removeIdWords } from "./idRemoval.js";
+import { commandIds, idRewrite } from "./idSuggestion.js";
 import { isCommandProperty } from "./property.js";
 import { containsWords, idWords } from "./words.js";
 
 type Options = [{ pluginId?: string }?];
 
-export default ruleCreator<Options, "pluginId">({
+export default ruleCreator<Options, "pluginId" | "removePluginId">({
     meta: {
         type: "suggestion" as const,
         docs: {
             description: "Disallow including the plugin ID in a command ID.",
             url: docsUrl("no-plugin-id-in-command-id", "commands"),
         },
+        hasSuggestions: true as const,
         messages: {
             pluginId: "The command ID should not include the plugin ID. Obsidian will make sure that there are no conflicts with other plugins.",
+            removePluginId:
+                "Rename the command ID to \"{{id}}\", without the plugin ID. Users lose any hotkey they set for this command.",
         },
         schema: [
             {
@@ -34,7 +39,12 @@ export default ruleCreator<Options, "pluginId">({
         const options = context.options[0] || {};
         const pluginId = options.pluginId ?? getManifest()?.id;
         const pluginIdWords = typeof pluginId === "string" ? idWords(pluginId) : [];
+        const ids = commandIds();
+        const reported: Array<{ property: TSESTree.Property; value: TSESTree.StringLiteral }> = [];
         return {
+            ObjectExpression(node: TSESTree.ObjectExpression) {
+                ids.add(node);
+            },
             CallExpression(node: TSESTree.CallExpression) {
                 if (
                     node.callee.type !== TSESTree.AST_NODE_TYPES.MemberExpression ||
@@ -54,11 +64,20 @@ export default ruleCreator<Options, "pluginId">({
                         typeof property.value.value === "string" &&
                         containsWords(idWords(property.value.value), pluginIdWords)
                     ) {
-                        context.report({
-                            node: property,
-                            messageId: "pluginId",
-                        });
+                        reported.push({ property, value: property.value });
                     }
+                }
+            },
+            // Reported once every command ID in the file is known, so that a
+            // suggestion never gives two commands the same ID
+            "Program:exit"() {
+                for (const { property, value } of reported) {
+                    const rewrite = idRewrite(value, removeIdWords(value.value, pluginIdWords), ids);
+                    context.report({
+                        node: property,
+                        messageId: "pluginId",
+                        suggest: rewrite ? [{ messageId: "removePluginId", data: { id: rewrite.id }, fix: rewrite.fix }] : [],
+                    });
                 }
             },
         };

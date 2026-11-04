@@ -1,12 +1,13 @@
 import { TSESTree } from "@typescript-eslint/utils";
 import { getManifest } from "../../manifest.js";
 import { docsUrl, ruleCreator } from "../../ruleCreator.js";
+import { removePhrase } from "./nameRemoval.js";
 import { isCommandProperty } from "./property.js";
 import { phrasePattern } from "./words.js";
 
 type Options = [{ pluginName?: string }?];
 
-export default ruleCreator<Options, "pluginName">({
+export default ruleCreator<Options, "pluginName" | "removePluginName">({
     meta: {
         type: "suggestion" as const,
         docs: {
@@ -14,8 +15,11 @@ export default ruleCreator<Options, "pluginName">({
                 "Disallow including the plugin name in a command name.",
             url: docsUrl("no-plugin-name-in-command-name", "commands"),
         },
+        hasSuggestions: true as const,
         messages: {
             pluginName: "The command name should not include the plugin name, the plugin name is already shown next to the command name in the UI.",
+            removePluginName:
+                "Rename the command to \"{{name}}\", without the plugin name, which Obsidian shows before the command name already.",
         },
         schema: [
             {
@@ -55,9 +59,22 @@ export default ruleCreator<Options, "pluginName">({
                         typeof property.value.value === "string" &&
                         pluginNamePattern.test(property.value.value)
                     ) {
+                        const value = property.value;
+                        const edit = removePhrase(value.value, pluginNamePattern, {
+                            prefixAfterSpace: true,
+                            suffixAfterSpace: false,
+                        });
+                        const source = edit?.toSource(value.raw);
                         context.report({
                             node: property,
                             messageId: "pluginName",
+                            suggest: edit && source
+                                ? [{
+                                    messageId: "removePluginName",
+                                    data: { name: edit.text },
+                                    fix: (fixer) => fixer.replaceText(value, source),
+                                }]
+                                : [],
                         });
                     }
                 }

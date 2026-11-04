@@ -1,5 +1,6 @@
 import { TSESTree } from "@typescript-eslint/utils";
 import { docsUrl, ruleCreator } from "../../ruleCreator.js";
+import { removePhrase } from "./nameRemoval.js";
 import { isCommandProperty } from "./property.js";
 import { phrasePattern } from "./words.js";
 
@@ -12,9 +13,11 @@ export default ruleCreator({
             description: "Disallow using the word 'command' in a command name.",
             url: docsUrl("no-command-in-command-name", "commands"),
         },
+        hasSuggestions: true as const,
         messages: {
             commandInName:
                 "Adding `command` to the command name is not necessary.",
+            removeCommand: "Rename the command to \"{{name}}\", without `command`.",
         },
         schema: [],
     },
@@ -39,9 +42,23 @@ export default ruleCreator({
                         typeof property.value.value === "string" &&
                         COMMAND.test(property.value.value)
                     ) {
+                        const value = property.value;
+                        // "Command: run" and "Run command", but not "Command palette"
+                        const edit = removePhrase(value.value, COMMAND, {
+                            prefixAfterSpace: false,
+                            suffixAfterSpace: true,
+                        });
+                        const source = edit?.toSource(value.raw);
                         context.report({
                             node: property,
                             messageId: "commandInName",
+                            suggest: edit && source
+                                ? [{
+                                    messageId: "removeCommand",
+                                    data: { name: edit.text },
+                                    fix: (fixer) => fixer.replaceText(value, source),
+                                }]
+                                : [],
                         });
                     }
                 }
