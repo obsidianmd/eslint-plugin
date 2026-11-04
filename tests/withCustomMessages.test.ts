@@ -170,8 +170,59 @@ describe("withCustomMessages", () => {
     });
 
     it("rejects a missing rule and messages that are not strings", () => {
-        assert.throws(() => withCustomMessages(undefined as never, {}), TypeError);
-        assert.throws(() => withCustomMessages(coreRule("no-console"), { a: 1 } as never), TypeError);
+        const notARule = /takes a rule object with a create\(\) function/;
+        const notMessages = /takes an object mapping messages/;
+        assert.throws(() => withCustomMessages(undefined as never, {}), notARule);
+        assert.throws(() => withCustomMessages(null as never, {}), notARule);
+        assert.throws(() => withCustomMessages({ meta: {} } as never, {}), notARule);
+        assert.throws(() => withCustomMessages(coreRule("no-console"), { a: 1 } as never), notMessages);
+        assert.throws(() => withCustomMessages(coreRule("no-console"), null as never), notMessages);
+        assert.throws(() => withCustomMessages(coreRule("no-console"), ["Custom"] as never), notMessages);
+    });
+
+    it("keeps the messages it was given, though the object changes later", () => {
+        const messages: Record<string, string> = { "Unexpected console statement": "Custom" };
+        const rule = withCustomMessages(coreRule("no-console"), messages);
+        messages["Unexpected console statement"] = "Changed";
+        assert.deepStrictEqual(messagesOf(lint(rule, "error", "console.log(1);")), ["Custom"]);
+    });
+
+    it("reads every placeholder of the message it matches, spaced or missing", () => {
+        const placeholders: Rule.RuleModule = {
+            meta: { messages: { spaced: "Found {{ name }}", missing: "Lost {{gone}}" } },
+            create(context) {
+                return {
+                    Identifier(node) {
+                        context.report({ node, messageId: node.name === "a" ? "spaced" : "missing", data: { name: node.name } });
+                    },
+                };
+            },
+        };
+        const rule = withCustomMessages(placeholders, { "Found a": "Custom a", "Lost {{gone}}": "Custom lost" });
+        assert.deepStrictEqual(messagesOf(lint(rule, "error", "a; b;")), ["Custom a", "Custom lost"]);
+    });
+
+    it("replaces the messages of a rule that reports with a location or without data", () => {
+        const positional: Rule.RuleModule = {
+            create(context) {
+                return {
+                    Identifier(node) {
+                        const report = context.report as (...args: unknown[]) => void;
+                        if (node.name === "a") {
+                            // (node, loc, message, data)
+                            report(node, { line: 1, column: 0 }, "Old {{name}}", { name: node.name });
+                        } else {
+                            report(node, "Old {{name}}");
+                        }
+                    },
+                };
+            },
+        };
+        const rule = withCustomMessages(positional, { "Old a": "New a", "Old {{name}}": "New unnamed" });
+        assert.deepStrictEqual(
+            lint(rule, "error", "a; b;").map((m) => [m.message, m.column]),
+            [["New a", 1], ["New unnamed", 4]],
+        );
     });
 
     it("works in a config ESLint serializes, as --print-config and --cache do", async () => {
