@@ -218,6 +218,8 @@ original rule off where you enable the wrapped one, or both report.
 
 In an `eslint.config.ts`, take typescript-eslint's rules from `@typescript-eslint/eslint-plugin`
 (`import tsPlugin from "@typescript-eslint/eslint-plugin"`): `tseslint.plugin` is typed without them.
+With pnpm, add `@typescript-eslint/eslint-plugin` to your `devDependencies` first, at your
+`typescript-eslint` version: pnpm does not let your config import a package your project does not list.
 
 ESLint's `--cache` does not see a change to the messages, which are not part of the rule's options:
 delete the cache file (`.eslintcache` by default) after changing them.
