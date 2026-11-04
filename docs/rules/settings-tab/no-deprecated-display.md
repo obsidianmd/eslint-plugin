@@ -15,10 +15,12 @@ A `display()` method (or `display` class field) on a settings tab that also impl
 declarative settings and never calls `display()`.
 
 Below 1.13, or without `getSettingDefinitions()`, `display()` still does the work and is not
-reported. Neither is it when `getSettingDefinitions()` only returns an empty array
-(`return [];`, `() => []`, also through a type assertion such as `[] as SettingDefinitionItem[]`)
-or `{}`: Obsidian renders a tab from its definitions only when there are some, so `display()` still
-renders that tab.
+reported. Neither is it when `getSettingDefinitions()` never returns definitions: when every
+`return` in it returns an empty array (`return [];`, `() => []`, also through a type assertion such
+as `[] as SettingDefinitionItem[]`), `{}`, `undefined`, `null` or nothing (`return;`), or when it has
+no `return` at all (`getSettingDefinitions() {}`). Obsidian skips `display()` only when
+`getSettingDefinitions()` returns a non-empty array, so `display()` still renders that tab. A
+`return` inside a function nested in `getSettingDefinitions()` does not count.
 
 An editor suggestion removes the `display` member, including a trailing semicolon and, when the
 member has its line to itself, a trailing `//` comment and the line. `--fix` never removes it,
