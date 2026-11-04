@@ -1,4 +1,5 @@
 import { RuleTester } from "@typescript-eslint/rule-tester";
+import globals from "globals";
 import preferWindowTimersRule from "../lib/rules/preferWindowTimers.js";
 
 const ruleTester = new RuleTester();
@@ -52,6 +53,10 @@ ruleTester.run("prefer-window-timers", preferWindowTimersRule, {
         {
             name: "other functions such as requestIdleCallback are not reported",
             code: "const id = requestIdleCallback(() => {}); cancelIdleCallback(id);",
+        },
+        {
+            name: "other functions on activeWindow are not reported",
+            code: "activeWindow.requestIdleCallback(() => {}); activeWindow.open('https://obsidian.md');",
         },
     ],
     invalid: [
@@ -283,6 +288,169 @@ ruleTester.run("prefer-window-timers", preferWindowTimersRule, {
             output: `export const isBrowser = typeof window !== "undefined"; export function later(fn: () => void) { window.setTimeout(fn, 0); }`,
             errors: [{ messageId: "preferWindowTimer", data: { name: "setTimeout" } }],
         },
+        {
+            name: "a typeof window check outside an arrow function or a function expression does not stop the fix",
+            code: `const isBrowser = typeof window !== "undefined"; export const later = (fn: () => void) => { setTimeout(fn, 0); }; export const again = function (fn: () => void) { setTimeout(fn, 0); };`,
+            output: `const isBrowser = typeof window !== "undefined"; export const later = (fn: () => void) => { window.setTimeout(fn, 0); }; export const again = function (fn: () => void) { window.setTimeout(fn, 0); };`,
+            errors: [
+                { messageId: "preferWindowTimer", data: { name: "setTimeout" } },
+                { messageId: "preferWindowTimer", data: { name: "setTimeout" } },
+            ],
+        },
+        {
+            name: "a typeof window check after the call does not stop the fix",
+            code: `export function later(fn: () => void) { setTimeout(fn, 0); if (typeof window === "undefined") { return; } }`,
+            output: `export function later(fn: () => void) { window.setTimeout(fn, 0); if (typeof window === "undefined") { return; } }`,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "setTimeout" } }],
+        },
+        {
+            name: "a type named window does not hide the global window",
+            code: `type window = { id: number }; export function later(fn: () => void) { setTimeout(fn, 0); }`,
+            output: `type window = { id: number }; export function later(fn: () => void) { window.setTimeout(fn, 0); }`,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "setTimeout" } }],
+        },
+        {
+            name: "a typeof check of another global does not stop the fix",
+            code: `export const hasWindow = typeof window; export function stop(n: number) { if (typeof process === "undefined") { clearTimeout(n); } }`,
+            output: `export const hasWindow = typeof window; export function stop(n: number) { if (typeof process === "undefined") { window.clearTimeout(n); } }`,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "clearTimeout" } }],
+        },
+
+        // --- Other ways of checking for a window ---
+        {
+            name: "the branch where document is undefined is reported only",
+            code: `export function later(fn: () => void) { if (typeof document === "undefined") { setTimeout(fn, 0); } }`,
+            output: null,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "setTimeout" }, suggestions: [] }],
+        },
+        {
+            name: "the branch where globalThis.document is undefined is reported only",
+            code: `export function later(fn: () => void) { if (typeof globalThis.document === "undefined") { setTimeout(fn, 0); } }`,
+            output: null,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "setTimeout" }, suggestions: [] }],
+        },
+        {
+            name: "the branch where globalThis?.document is undefined is reported only",
+            code: `export function later(fn: () => void) { if (typeof globalThis?.document === "undefined") { setTimeout(fn, 0); } }`,
+            output: null,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "setTimeout" }, suggestions: [] }],
+        },
+        {
+            name: "the else branch of an in check for window is reported only",
+            code: `export function later(fn: () => void) { if ("window" in globalThis) { window.setTimeout(fn, 0); } else { setTimeout(fn, 0); } }`,
+            output: null,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "setTimeout" }, suggestions: [] }],
+        },
+        {
+            name: "the branch where an in check proves the document exists is fixed",
+            code: `export function later(fn: () => void) { if ("document" in globalThis) { setTimeout(fn, 0); } }`,
+            output: `export function later(fn: () => void) { if ("document" in globalThis) { window.setTimeout(fn, 0); } }`,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "setTimeout" } }],
+        },
+        {
+            name: "a loose == check for an undefined window is reported only",
+            code: `export function later(fn: () => void) { if (typeof window == "undefined") { setTimeout(fn, 0); } }`,
+            output: null,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "setTimeout" }, suggestions: [] }],
+        },
+        {
+            name: "the branch of a loose != check where window exists is fixed",
+            code: `export function later(fn: () => void) { if (typeof window != "undefined") { setTimeout(fn, 0); } }`,
+            output: `export function later(fn: () => void) { if (typeof window != "undefined") { window.setTimeout(fn, 0); } }`,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "setTimeout" } }],
+        },
+        {
+            name: "a negated check for an undefined window is fixed",
+            code: `export function later(fn: () => void) { if (!(typeof window === "undefined")) { setTimeout(fn, 0); } }`,
+            output: `export function later(fn: () => void) { if (!(typeof window === "undefined")) { window.setTimeout(fn, 0); } }`,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "setTimeout" } }],
+        },
+
+        // --- Where the check decides whether the call runs ---
+        {
+            name: "the right of && after a check that window exists is fixed",
+            code: `export function stop(n: number) { typeof window !== "undefined" && clearTimeout(n); }`,
+            output: `export function stop(n: number) { typeof window !== "undefined" && window.clearTimeout(n); }`,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "clearTimeout" } }],
+        },
+        {
+            name: "the right of || after a check that window is undefined is fixed",
+            code: `export function stop(n: number) { typeof window === "undefined" || clearTimeout(n); }`,
+            output: `export function stop(n: number) { typeof window === "undefined" || window.clearTimeout(n); }`,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "clearTimeout" } }],
+        },
+        {
+            name: "the branch of an && condition that includes a check that window exists is fixed",
+            code: `export function stop(n: number, ready: boolean) { if (typeof window !== "undefined" && ready) { clearTimeout(n); } }`,
+            output: `export function stop(n: number, ready: boolean) { if (typeof window !== "undefined" && ready) { window.clearTimeout(n); } }`,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "clearTimeout" } }],
+        },
+        {
+            name: "code after an early return on an || condition that includes a check that window is undefined is fixed",
+            code: `export function stop(n: number, ready: boolean) { if (typeof window === "undefined" || !ready) { return; } clearTimeout(n); }`,
+            output: `export function stop(n: number, ready: boolean) { if (typeof window === "undefined" || !ready) { return; } window.clearTimeout(n); }`,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "clearTimeout" } }],
+        },
+        {
+            name: "the alternate of a conditional on an undefined window is fixed",
+            code: `export const stop = (n: number) => typeof window === "undefined" ? undefined : clearTimeout(n);`,
+            output: `export const stop = (n: number) => typeof window === "undefined" ? undefined : window.clearTimeout(n);`,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "clearTimeout" } }],
+        },
+        {
+            name: "the else branch of an if on an undefined window is fixed",
+            code: `export function stop(n: number) { if (typeof window === "undefined") { console.log("no window"); } else { clearTimeout(n); } }`,
+            output: `export function stop(n: number) { if (typeof window === "undefined") { console.log("no window"); } else { window.clearTimeout(n); } }`,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "clearTimeout" } }],
+        },
+        {
+            name: "code after a throw when window is undefined is fixed",
+            code: `export function stop(n: number) { if (typeof window === "undefined") throw new Error("no window"); clearTimeout(n); }`,
+            output: `export function stop(n: number) { if (typeof window === "undefined") throw new Error("no window"); window.clearTimeout(n); }`,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "clearTimeout" } }],
+        },
+        {
+            name: "code after a continue when window is undefined is fixed",
+            code: `export function stop(ids: number[]) { for (const n of ids) { if (typeof window === "undefined") continue; clearTimeout(n); } }`,
+            output: `export function stop(ids: number[]) { for (const n of ids) { if (typeof window === "undefined") continue; window.clearTimeout(n); } }`,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "clearTimeout" } }],
+        },
+        {
+            name: "code after a break when window is undefined is fixed",
+            code: `export function stop(ids: number[]) { for (const n of ids) { if (typeof window === "undefined") break; clearTimeout(n); } }`,
+            output: `export function stop(ids: number[]) { for (const n of ids) { if (typeof window === "undefined") break; window.clearTimeout(n); } }`,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "clearTimeout" } }],
+        },
+        {
+            name: "code after an if on an undefined window that does not exit is reported only",
+            code: `export function stop(n: number) { if (typeof window === "undefined") { console.log("no window"); } clearTimeout(n); }`,
+            output: null,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "clearTimeout" }, suggestions: [] }],
+        },
+        {
+            name: "code after an empty if on an undefined window is reported only",
+            code: `export function stop(n: number) { if (typeof window === "undefined") {} clearTimeout(n); }`,
+            output: null,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "clearTimeout" }, suggestions: [] }],
+        },
+        {
+            name: "code after a nested if that returns when window is undefined is reported only",
+            code: `export function stop(n: number, ready: boolean) { if (ready) { if (typeof window === "undefined") return; } clearTimeout(n); }`,
+            output: null,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "clearTimeout" }, suggestions: [] }],
+        },
+        {
+            name: "a check in one branch of a conditional does not decide the other branch",
+            code: `export const stop = (n: number, ready: boolean) => ready ? typeof window === "undefined" : clearTimeout(n);`,
+            output: null,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "clearTimeout" }, suggestions: [] }],
+        },
+        {
+            name: "clearTimeout with a never argument is still fixed",
+            code: `declare const n: never; clearTimeout(n);`,
+            output: `declare const n: never; window.clearTimeout(n);`,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "clearTimeout" } }],
+        },
     ],
 });
 
@@ -310,6 +478,28 @@ untypedRuleTester.run("prefer-window-timers without type information", preferWin
             code: "clearTimeout(0);",
             output: "window.clearTimeout(0);",
             errors: [{ messageId: "preferWindowTimer", data: { name: "clearTimeout" } }],
+        },
+        {
+            name: "clearTimeout with no argument is fixed without type information",
+            code: "clearTimeout();",
+            output: "window.clearTimeout();",
+            errors: [{ messageId: "preferWindowTimer", data: { name: "clearTimeout" } }],
+        },
+        {
+            name: "clearTimeout with undefined is fixed without type information",
+            code: "clearTimeout(undefined);",
+            output: "window.clearTimeout(undefined);",
+            errors: [{ messageId: "preferWindowTimer", data: { name: "clearTimeout" } }],
+        },
+        {
+            name: "clearTimeout with a literal other than a number gets a suggestion without type information",
+            code: "clearTimeout(null);",
+            output: null,
+            errors: [{
+                messageId: "preferWindowTimer",
+                data: { name: "clearTimeout" },
+                suggestions: [{ messageId: "useWindowTimer", data: { name: "clearTimeout" }, output: "window.clearTimeout(null);" }],
+            }],
         },
         {
             name: "a discarded setTimeout is fixed without type information",
@@ -351,6 +541,30 @@ noDomRuleTester.run("prefer-window-timers without the DOM lib", preferWindowTime
                 { messageId: "preferWindowTimer", data: { name: "clearInterval" }, suggestions: [] },
                 { messageId: "preferWindowTimer", data: { name: "cancelAnimationFrame" }, suggestions: [] },
             ],
+        },
+    ],
+});
+
+// The recommended config declares the browser's globals. They are variables
+// without a declaration in the file: still the globals.
+const globalsRuleTester = new RuleTester({
+    languageOptions: { globals: { ...globals.browser, activeWindow: "readonly" } },
+});
+
+globalsRuleTester.run("prefer-window-timers with the recommended config's globals", preferWindowTimersRule, {
+    valid: [],
+    invalid: [
+        {
+            name: "bare setTimeout is fixed",
+            code: "setTimeout(() => {}, 100);",
+            output: "window.setTimeout(() => {}, 100);",
+            errors: [{ messageId: "preferWindowTimer", data: { name: "setTimeout" } }],
+        },
+        {
+            name: "activeWindow.setTimeout is fixed",
+            code: "activeWindow.setTimeout(() => {}, 100);",
+            output: "window.setTimeout(() => {}, 100);",
+            errors: [{ messageId: "noActiveWindowTimer", data: { name: "setTimeout" } }],
         },
     ],
 });
