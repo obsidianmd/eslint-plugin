@@ -31,6 +31,15 @@ ruleTester.run("detach-leaves", detachLeavesRule, {
             name: "onunload as an arrow-function property is not checked",
             code: 'class MyPlugin { onunload = () => { this.app.workspace.detachLeavesOfType("foo"); }; }',
         },
+        {
+            // The key is whatever the variable holds, here "dispose".
+            name: "a computed key named by a variable is not onunload",
+            code: 'const onunload = "dispose";\nclass Cache { [onunload]() { this.app.workspace.detachLeavesOfType("foo"); } }',
+        },
+        {
+            name: "a computed string other than onunload is not checked",
+            code: 'class MyPlugin { ["onload"]() { this.app.workspace.detachLeavesOfType("foo"); } }',
+        },
     ],
     invalid: [
         {
@@ -576,6 +585,56 @@ ruleTester.run("detach-leaves", detachLeavesRule, {
             code: IMPORT + 'abstract class MyPlugin extends Plugin {\n    abstract helper(): void\n    onunload() {\n        this.app.workspace.detachLeavesOfType("foo");\n    }\n    [Symbol.iterator]() {}\n}',
             errors: [{ messageId: "onunload" }],
             output: IMPORT + "abstract class MyPlugin extends Plugin {\n    abstract helper(): void\n    onunload() {}\n    [Symbol.iterator]() {}\n}",
+        },
+        {
+            name: "a quoted onunload is onunload",
+            code: 'class MyPlugin { "onunload"() { this.app.workspace.detachLeavesOfType("foo"); } }',
+            errors: [{ messageId: "onunload" }],
+            output: 'class MyPlugin { "onunload"() {} }',
+        },
+        {
+            name: "a quoted onunload in a Plugin goes like an unquoted one",
+            code: IMPORT + 'class MyPlugin extends Plugin {\n    "onunload"() {\n        this.app.workspace.detachLeavesOfType("foo");\n    }\n}',
+            errors: [{ messageId: "onunload" }],
+            output: IMPORT + "class MyPlugin extends Plugin {}",
+        },
+        {
+            name: "an onunload computed from a string is onunload, and keeps the method",
+            code: IMPORT + [
+                "class StringPlugin extends Plugin {",
+                '    ["onunload"]() {',
+                '        this.app.workspace.detachLeavesOfType("foo");',
+                "    }",
+                "}",
+                "class TemplatePlugin extends Plugin {",
+                "    [`onunload`]() {",
+                '        this.app.workspace.detachLeavesOfType("foo");',
+                "    }",
+                "}",
+            ].join("\n"),
+            errors: [{ messageId: "onunload" }, { messageId: "onunload" }],
+            output: IMPORT + [
+                "class StringPlugin extends Plugin {",
+                '    ["onunload"]() {}',
+                "}",
+                "class TemplatePlugin extends Plugin {",
+                "    [`onunload`]() {}",
+                "}",
+            ].join("\n"),
+        },
+        {
+            // KEY may be "onunload": removing the method would let [KEY]() run
+            // in its place.
+            name: "a member computed from an unknown value keeps the method",
+            code: 'import { Plugin } from "obsidian";\nimport { KEY } from "./keys";\nclass MyPlugin extends Plugin {\n    [KEY]() {}\n    onunload() {\n        this.app.workspace.detachLeavesOfType("foo");\n    }\n}',
+            errors: [{ messageId: "onunload" }],
+            output: 'import { Plugin } from "obsidian";\nimport { KEY } from "./keys";\nclass MyPlugin extends Plugin {\n    [KEY]() {}\n    onunload() {}\n}',
+        },
+        {
+            name: "a member computed from a known value other than onunload lets the method go",
+            code: IMPORT + 'const KEY = "dispose";\nclass MyPlugin extends Plugin {\n    [KEY]() {}\n    onunload() {\n        this.app.workspace.detachLeavesOfType("foo");\n    }\n}',
+            errors: [{ messageId: "onunload" }],
+            output: IMPORT + 'const KEY = "dispose";\nclass MyPlugin extends Plugin {\n    [KEY]() {}\n}',
         },
         {
             name: "a field without a semicolon before the last member does not keep it",

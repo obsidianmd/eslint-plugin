@@ -1,4 +1,5 @@
 import { ASTUtils, TSESTree, type TSESLint } from "@typescript-eslint/utils";
+import { staticMemberName } from "../memberName.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 type ClassNode = TSESTree.ClassDeclaration | TSESTree.ClassExpression;
@@ -23,10 +24,9 @@ export default ruleCreator({
 
         return {
             MethodDefinition(node: TSESTree.MethodDefinition) {
-                if (
-                    node.key.type === TSESTree.AST_NODE_TYPES.Identifier &&
-                    node.key.name === "onunload"
-                ) {
+                // `onunload()`, `"onunload"()` and `["onunload"]()`, but not
+                // `[onunload]()`, which is named by what the variable holds.
+                if (staticMemberName(node) === "onunload") {
                     if (
                         node.value.type === TSESTree.AST_NODE_TYPES.FunctionExpression &&
                         node.value.body &&
@@ -106,8 +106,8 @@ export default ruleCreator({
         // its onunload(), which the method overrides. Kept, too: a method with
         // a comment on or next to it, decorators, parameters (a default value
         // runs), `async` (it returns a promise), a static or computed one,
-        // overloads, and one whose removal would let the members around it run
-        // together.
+        // overloads, another member that may be named onunload, and one whose
+        // removal would let the members around it run together.
         function removeMethod(
             fixer: TSESLint.RuleFixer,
             method: TSESTree.MethodDefinition,
@@ -125,7 +125,7 @@ export default ruleCreator({
                 method.value.generator ||
                 method.value.typeParameters !== undefined ||
                 !extendsObsidianPlugin(classNode) ||
-                classBody.body.some((member) => member !== method && isOnunloadMember(member))
+                classBody.body.some((member) => member !== method && mayBeOnunload(member))
             ) {
                 return null;
             }
@@ -175,6 +175,20 @@ export default ruleCreator({
             return fixer.replaceTextRange([before.range[1], after.range[0]], space);
         }
 
+        // A member named onunload, or computed from a value the code does not
+        // give, such as an import: `[KEY]() {}` may be onunload, and would run
+        // in place of the removed method.
+        function mayBeOnunload(member: TSESTree.ClassElement): boolean {
+            if (staticMemberName(member) === "onunload") {
+                return true;
+            }
+            if (!("key" in member) || !member.computed) {
+                return false;
+            }
+            const value = ASTUtils.getStaticValue(member.key, sourceCode.getScope(member));
+            return value === null || value.value === "onunload";
+        }
+
         // `class extends Plugin`, with Plugin imported from "obsidian", or
         // `class extends obsidian.Plugin` with `import * as obsidian`.
         function extendsObsidianPlugin(classNode: ClassNode): boolean {
@@ -214,15 +228,6 @@ export default ruleCreator({
         }
     },
 });
-
-function isOnunloadMember(member: TSESTree.ClassElement): boolean {
-    return (
-        "key" in member &&
-        !member.computed &&
-        ((member.key.type === TSESTree.AST_NODE_TYPES.Identifier && member.key.name === "onunload") ||
-            (member.key.type === TSESTree.AST_NODE_TYPES.Literal && member.key.value === "onunload"))
-    );
-}
 
 function isComment(token: TSESTree.Token): token is TSESTree.Comment {
     return token.type === TSESTree.AST_TOKEN_TYPES.Line || token.type === TSESTree.AST_TOKEN_TYPES.Block;
