@@ -72,7 +72,7 @@ function testNoExtraneousDependencies(): void {
                 name: "importing listed dependency is allowed",
                 code: "import dep from 'listed-dep';",
                 filename: tmpFilename,
-                options: extraneousDepsOptions,
+                options: [...extraneousDepsOptions],
             },
         ],
         invalid: [
@@ -80,7 +80,7 @@ function testNoExtraneousDependencies(): void {
                 name: "importing unlisted dependency is forbidden",
                 code: "import dep from 'unlisted-dep';",
                 filename: tmpFilename,
-                options: extraneousDepsOptions,
+                options: [...extraneousDepsOptions],
                 errors: [{ message: "'unlisted-dep' should be listed in the project's dependencies. Run 'npm i -S unlisted-dep' to add it" }],
             },
         ],

@@ -1136,38 +1136,38 @@ function testExplicitlyConfiguredRules(): void {
             {
                 name: "non-restricted global is allowed",
                 code: "console.log('hello');",
-                options: restrictedGlobalsOptions,
+                options: [...restrictedGlobalsOptions],
             },
             {
                 name: "local variable named app is allowed",
                 code: "const app = getApp(); app.vault;",
-                options: restrictedGlobalsOptions,
+                options: [...restrictedGlobalsOptions],
             },
             {
                 // A stray "warn" in the list, written as a severity, made `warn`
                 // a restricted global name.
                 name: "a global named warn is allowed",
                 code: "warn('x');",
-                options: restrictedGlobalsOptions,
+                options: [...restrictedGlobalsOptions],
             },
         ],
         invalid: [
             {
                 name: "global app is forbidden",
                 code: "app.vault.getFiles();",
-                options: restrictedGlobalsOptions,
+                options: [...restrictedGlobalsOptions],
                 errors: [{ messageId: "customMessage" }],
             },
             {
                 name: "global fetch is forbidden",
                 code: "fetch('https://example.com');",
-                options: restrictedGlobalsOptions,
+                options: [...restrictedGlobalsOptions],
                 errors: [{ messageId: "customMessage" }],
             },
             {
                 name: "global localStorage is forbidden",
                 code: "localStorage.getItem('key');",
-                options: restrictedGlobalsOptions,
+                options: [...restrictedGlobalsOptions],
                 errors: [{ messageId: "customMessage" }],
             },
         ],
