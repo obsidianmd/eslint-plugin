@@ -600,6 +600,36 @@ ruleTester.run("no-global-this on probes of the global object", noGlobalThisRule
     ],
 });
 
+// A try that reads the window throws without one, so its catch runs without
+// one; a catch that drops the error would hide `window` failing in the try.
+ruleTester.run("no-global-this in try and catch", noGlobalThisRule, {
+    valid: [],
+    invalid: [
+        {
+            name: "globalThis in the catch of a try that reads document is reported only",
+            code: "export function now() { try { return document.timeline.currentTime; } catch { return globalThis.performance.now(); } }",
+            output: null,
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" }, suggestions: [] }],
+        },
+        {
+            name: "globalThis in a try whose catch drops the error gets a suggestion",
+            code: "export function id() { try { return globalThis.crypto.randomUUID(); } catch { return ''; } }",
+            output: null,
+            errors: [{
+                messageId: "avoidGlobal",
+                data: { name: "globalThis" },
+                suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "export function id() { try { return window.crypto.randomUUID(); } catch { return ''; } }" }],
+            }],
+        },
+        {
+            name: "globalThis in a try whose catch reports the error is fixed",
+            code: "export function id() { try { return globalThis.crypto.randomUUID(); } catch (e) { console.error(e); return ''; } }",
+            output: "export function id() { try { return window.crypto.randomUUID(); } catch (e) { console.error(e); return ''; } }",
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" } }],
+        },
+    ],
+});
+
 // Look-alikes of a window check that are not one: still fixed.
 ruleTester.run("no-global-this next to window checks", noGlobalThisRule, {
     valid: [],

@@ -78,10 +78,23 @@ the code that returns, throws, breaks or continues. A check that does not decide
 `const browser = typeof window !== "undefined";` on its own, counts for the rest of its function, but
 not in the functions nested in it.
 
-Not recognised: a check in another file (`import { isBrowser } from "./env"`), one held in a class
-member or an object property (`this.isBrowser`), and a `try`/`catch`. There, code that runs without a
-window can still be fixed, so keep it in a web worker or test file, where the recommended config
-switches this rule off, or disable the rule for it.
+A `try` whose block reads `window`, `document`, `activeWindow`, `activeDocument`, `globalThis.window`
+or `globalThis.document` throws where there is no window. So its `catch` and `finally` run without a
+window, and so does the code after it when the `catch` goes on rather than returning or throwing:
+
+```ts
+try { document.title; } catch { setTimeout(fn, 0); } // reported only
+try { activeWindow.focus(); } catch {} setTimeout(fn, 0); // reported only
+```
+
+Code in the `try` itself gets a suggestion instead of a fix when the `catch` drops the error (it has no
+parameter, or does not read it, and does nothing but return), as in `try { setTimeout(fn, 0); } catch {}`,
+where `window.setTimeout()` failing would go unseen.
+
+Not recognised: a check in another file (`import { isBrowser } from "./env"`), and one held in a class
+member or an object property (`this.isBrowser`). There, code that runs without a window can still be
+fixed, so keep it in a web worker or test file, where the recommended config switches this rule off,
+or disable the rule for it.
 
 ## Web workers and tests
 

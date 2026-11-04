@@ -57,7 +57,9 @@ A probe of the global object for a property that may be missing gets a suggestio
 types: `typeof globalThis.crypto`, `"requestIdleCallback" in globalThis`, `!globalThis.crypto`,
 `globalThis.crypto?.randomUUID()` or `globalThis.queueMicrotask ?? fallback`. Such code is written
 to work where the property is missing, as in a web worker or in Node tests, and there
-`window.crypto` throws because there is no `window`.
+`window.crypto` throws because there is no `window`. So does code that may run without a window: in a
+`try` whose `catch` drops the error, as in `try { … } catch {}`; see
+[Window checks](prefer-window-timers.md#window-checks).
 
 Without type information, only rewrites that can never change a type are fixed: a cast to `any`,
 `unknown` or `never`, an argument to a call whose result is not used, and the timer

@@ -410,6 +410,67 @@ ruleTester.run("prefer-window-timers", preferWindowTimersRule, {
             errors: [{ messageId: "preferWindowTimer", data: { name: "setTimeout" }, suggestions: [] }],
         },
 
+        // --- try/catch ---
+        // A try that reads the window throws without one: its catch and finally,
+        // and the code after it when the catch goes on, run without a window.
+        ...[
+            ["in the catch of a try that reads document", `try { document.title; } catch { setTimeout(fn, 0); }`],
+            ["in the catch of a try that reads window", `try { window.setTimeout(fn, 0); } catch { setTimeout(fn, 0); }`],
+            ["in a catch that uses the error, after a read of activeDocument", `try { activeDocument.body.addClass("x"); } catch (e) { console.error(e); setTimeout(fn, 0); }`],
+            ["after a try that reads activeWindow and an empty catch", `try { activeWindow.focus(); } catch {} setTimeout(fn, 0);`],
+            ["after a try that reads globalThis.document and a catch with a comment", `try { globalThis.document.title; } catch { /* no DOM */ } setTimeout(fn, 0);`],
+            ["after a try that reads document and a catch that goes on", `try { document.title; } catch (e) { console.error(e); } setTimeout(fn, 0);`],
+            ["in the finally of a try that reads globalThis.window", `try { globalThis.window.focus(); } finally { setTimeout(fn, 0); }`],
+            ["in a function made in such a catch", `try { document.title; } catch { queueMicrotask(() => { setTimeout(fn, 0); }); }`],
+        ].map(([form, body]) => ({
+            name: `a timer ${form} is reported only`,
+            code: `export function later(fn: () => void) { ${body} }`,
+            output: null,
+            errors: [{ messageId: "preferWindowTimer" as const, data: { name: "setTimeout" }, suggestions: [] }],
+        })),
+        // A catch that drops the error would hide window.setTimeout() failing.
+        ...[
+            ["an empty catch", `try { setTimeout(fn, 0); } catch {}`],
+            ["a catch whose error is not read", `try { setTimeout(fn, 0); } catch (_error) {}`],
+            ["a catch that only returns", `try { setTimeout(fn, 0); } catch { return; }`],
+        ].map(([form, body]) => ({
+            name: `a timer in a try with ${form} gets a suggestion`,
+            code: `export function later(fn: () => void) { ${body} }`,
+            output: null,
+            errors: [{
+                messageId: "preferWindowTimer" as const,
+                data: { name: "setTimeout" },
+                suggestions: [{
+                    messageId: "useWindowTimer" as const,
+                    data: { name: "setTimeout" },
+                    output: `export function later(fn: () => void) { ${body.replace("setTimeout(fn", "window.setTimeout(fn")} }`,
+                }],
+            }],
+        })),
+        {
+            name: "activeWindow in a try with an empty catch gets a suggestion",
+            code: `export function later(fn: () => void) { try { activeWindow.setTimeout(fn, 0); } catch {} }`,
+            output: null,
+            errors: [{
+                messageId: "noActiveWindowTimer",
+                data: { name: "setTimeout" },
+                suggestions: [{ messageId: "useWindowTimer", data: { name: "setTimeout" }, output: `export function later(fn: () => void) { try { window.setTimeout(fn, 0); } catch {} }` }],
+            }],
+        },
+        ...[
+            ["in a try whose catch uses the error", `try { setTimeout(fn, 0); } catch (e) { console.error(e); }`],
+            ["after a try that reads document and a catch that returns", `try { document.title; } catch { return; } setTimeout(fn, 0);`],
+            ["after the read of document in the same try", `try { document.title; setTimeout(fn, 0); } catch (e) { console.error(e); }`],
+            ["after a try that does not read the window", `try { save(); } catch {} setTimeout(fn, 0);`],
+            ["in the catch of a try that reads a property named document", `try { el.document.title; } catch { setTimeout(fn, 0); }`],
+            ["in a callback made in a try with an empty catch", `try { el.on("click", () => { setTimeout(fn, 0); }); } catch {}`],
+        ].map(([form, body]) => ({
+            name: `a timer ${form} is fixed`,
+            code: `declare const el: any; declare function save(): void; export function later(fn: () => void) { ${body} }`,
+            output: `declare const el: any; declare function save(): void; export function later(fn: () => void) { ${body.replace("setTimeout(fn", "window.setTimeout(fn")} }`,
+            errors: [{ messageId: "preferWindowTimer" as const, data: { name: "setTimeout" } }],
+        })),
+
         // --- Where the check decides whether the call runs ---
         {
             name: "the right of && after a check that window exists is fixed",

@@ -32,7 +32,9 @@ export function getTypeInfo(context: Context): TypeInfo | null {
  *   DOM lib;
  * - no earlier `typeof window` (or `typeof document`) check says the code
  *   also runs where there is no window, unless it proves the window is there
- *   at `node`.
+ *   at `node`;
+ * - `node` is not where a `try` that reads the window goes on when that
+ *   throws: its `catch` or `finally`, or the code after it.
  *
  * Writing `window` anywhere else is wrong, so a rule offers neither a fix
  * nor a suggestion there.
@@ -46,6 +48,16 @@ export function isGlobalWindowAt(context: Context, node: TSESTree.Node): boolean
         return false;
     }
     return !followsWindowCheck(context.sourceCode, node);
+}
+
+/**
+ * Whether code at `node`, where isGlobalWindowAt holds, may still run without
+ * a window as far as the file shows: it is in a `try` whose `catch` drops the
+ * error, as in `try { setTimeout(fn, 0); } catch {}`, where `window` failing
+ * would go unseen. A rule offers its rewrite there as a suggestion, not a fix.
+ */
+export function mayLackWindowAt(context: Context, node: TSESTree.Node): boolean {
+    return isInSilentTry(context.sourceCode, node);
 }
 
 /** The declared type of the global `window`, with type information. */
@@ -113,7 +125,13 @@ interface WindowCheck {
     presentWhenTrue: boolean | undefined;
 }
 
-const windowChecksCache = new WeakMap<TSESTree.Program, WindowCheck[]>();
+interface WindowFacts {
+    checks: WindowCheck[];
+    // Each `try` whose block reads the window, so throws without one.
+    windowTries: TSESTree.TryStatement[];
+}
+
+const windowFactsCache = new WeakMap<TSESTree.Program, WindowFacts>();
 
 // A check before `node` says the code also runs where there is no window, as
 // in `typeof window === "undefined" ? globalThis.setTimeout(…) : window.setTimeout(…)`,
@@ -126,14 +144,102 @@ const windowChecksCache = new WeakMap<TSESTree.Program, WindowCheck[]>();
 // counts in the same function, but not in the functions nested in it; there,
 // each read of `browser` is a check of its own.
 function followsWindowCheck(sourceCode: Context["sourceCode"], node: TSESTree.Node): boolean {
-    return getWindowChecks(sourceCode).some(({ condition, presentWhenTrue }) => {
-        const scope = enclosingFunction(condition);
-        if (condition.range[1] > node.range[0] || !contains(scope, node)) {
-            return false;
+    const facts = getWindowFacts(sourceCode);
+    return (
+        facts.checks.some(({ condition, presentWhenTrue }) => {
+            const scope = enclosingFunction(condition);
+            if (condition.range[1] > node.range[0] || !contains(scope, node)) {
+                return false;
+            }
+            const value = presentWhenTrue === undefined ? undefined : conditionValueAt(condition, node);
+            return value === undefined ? enclosingFunction(node) === scope : value !== presentWhenTrue;
+        }) || facts.windowTries.some((statement) => runsWhenTryFails(statement, node))
+    );
+}
+
+// Whether `node` runs when the block of `statement` throws: in its `catch` or
+// `finally`, or after it when the `catch` goes on, as in
+// `try { document.title; } catch {} setTimeout(fn, 0);`.
+function runsWhenTryFails(statement: TSESTree.TryStatement, node: TSESTree.Node): boolean {
+    const { handler, finalizer } = statement;
+    if ((handler && contains(handler.body, node)) || (finalizer && contains(finalizer, node))) {
+        return true;
+    }
+    return (
+        handler !== null &&
+        !exits(handler.body) &&
+        node.range[0] >= statement.range[1] &&
+        contains(statement.parent, node)
+    );
+}
+
+// Whether `node` is in the block of a `try`, in the same function, whose
+// `catch` drops the error: it has no parameter, or does not read it, and does
+// nothing but return. `try { … } catch (e) { console.error(e); }` keeps the error.
+function isInSilentTry(sourceCode: Context["sourceCode"], node: TSESTree.Node): boolean {
+    let child: TSESTree.Node = node;
+    for (let parent = node.parent; parent && !isFunction(parent); child = parent, parent = parent.parent) {
+        if (parent.type !== TSESTree.AST_NODE_TYPES.TryStatement || parent.block !== child || !parent.handler) {
+            continue;
         }
-        const value = presentWhenTrue === undefined ? undefined : conditionValueAt(condition, node);
-        return value === undefined ? enclosingFunction(node) === scope : value !== presentWhenTrue;
-    });
+        const handler = parent.handler;
+        const doesNothing = handler.body.body.every(
+            (statement) =>
+                statement.type === TSESTree.AST_NODE_TYPES.ReturnStatement ||
+                statement.type === TSESTree.AST_NODE_TYPES.EmptyStatement,
+        );
+        const errorUnread = sourceCode
+            .getDeclaredVariables(handler)
+            .every((variable) => variable.references.every((reference) => !reference.isRead()));
+        if (doesNothing && errorUnread) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// The names whose read throws where there is no window.
+const WINDOW_READS = new Set(["window", "document", "activeWindow", "activeDocument"]);
+
+// Whether `node` reads the window, which throws where there is none:
+// `document.title`, `activeWindow.focus()`, `globalThis.window.focus()`. Not
+// `typeof window`, `el.document` or `{ document: 1 }`.
+function readsWindow(node: TSESTree.Node): boolean {
+    if (node.type === TSESTree.AST_NODE_TYPES.MemberExpression) {
+        const key = staticKey(node);
+        const object = skipChainAndCasts(node.object);
+        return (
+            key !== undefined &&
+            WINDOW_READS.has(key) &&
+            object.type === TSESTree.AST_NODE_TYPES.Identifier &&
+            GLOBAL_OBJECTS.has(object.name)
+        );
+    }
+    if (node.type !== TSESTree.AST_NODE_TYPES.Identifier || !WINDOW_READS.has(node.name)) {
+        return false;
+    }
+    const parent = node.parent;
+    switch (parent?.type) {
+        case TSESTree.AST_NODE_TYPES.MemberExpression:
+            return parent.object === node || parent.computed;
+        case TSESTree.AST_NODE_TYPES.Property:
+            return parent.key !== node || parent.computed || parent.shorthand;
+        case TSESTree.AST_NODE_TYPES.UnaryExpression:
+            return parent.operator !== "typeof";
+        case TSESTree.AST_NODE_TYPES.TSTypeQuery:
+        case TSESTree.AST_NODE_TYPES.TSQualifiedName:
+            return false;
+        default:
+            return true;
+    }
+}
+
+function isFunction(node: TSESTree.Node): boolean {
+    return (
+        node.type === TSESTree.AST_NODE_TYPES.FunctionDeclaration ||
+        node.type === TSESTree.AST_NODE_TYPES.FunctionExpression ||
+        node.type === TSESTree.AST_NODE_TYPES.ArrowFunctionExpression
+    );
 }
 
 // The condition `check` (see isWindowCheck) makes.
@@ -249,37 +355,44 @@ function exits(statement: TSESTree.Statement): boolean {
     }
 }
 
-// Every window check in the file, found on the AST alone, so that no comment,
-// spacing or escape inside a check can hide it. The walk runs once per file,
-// and only when a rule asks: about 20 ms for a 500 KiB file.
-function getWindowChecks(sourceCode: Context["sourceCode"]): WindowCheck[] {
-    const cached = windowChecksCache.get(sourceCode.ast);
+// Every window check in the file, and every `try` that reads the window,
+// found on the AST alone, so that no comment, spacing or escape inside a
+// check can hide it. The walk runs once per file, and only when a rule asks:
+// about 20 ms for a 500 KiB file.
+function getWindowFacts(sourceCode: Context["sourceCode"]): WindowFacts {
+    const cached = windowFactsCache.get(sourceCode.ast);
     if (cached) {
         return cached;
     }
-    const checks: WindowCheck[] = [];
+    const facts: WindowFacts = { checks: [], windowTries: [] };
     const followed = new Set<TSESTree.Node>();
-    const visit = (node: TSESTree.Node): void => {
+    // Whether `node` or anything in it reads the window.
+    const visit = (node: TSESTree.Node): boolean => {
         const name = checkedName(node);
         if (name !== undefined) {
-            addWindowCheck(sourceCode, checks, toWindowCheck(node, name), followed);
+            addWindowCheck(sourceCode, facts.checks, toWindowCheck(node, name), followed);
         }
+        let reads = readsWindow(node);
         for (const key of sourceCode.visitorKeys[node.type] ?? []) {
             const child: unknown = (node as unknown as Record<string, unknown>)[key];
             if (Array.isArray(child)) {
                 for (const item of child) {
-                    if (isNode(item)) {
-                        visit(item);
+                    if (isNode(item) && visit(item)) {
+                        reads = true;
                     }
                 }
-            } else if (isNode(child)) {
-                visit(child);
+            } else if (isNode(child) && visit(child)) {
+                reads = true;
+                if (node.type === TSESTree.AST_NODE_TYPES.TryStatement && child === node.block) {
+                    facts.windowTries.push(node);
+                }
             }
         }
+        return reads;
     };
     visit(sourceCode.ast);
-    windowChecksCache.set(sourceCode.ast, checks);
-    return checks;
+    windowFactsCache.set(sourceCode.ast, facts);
+    return facts;
 }
 
 function isNode(value: unknown): value is TSESTree.Node {
@@ -468,11 +581,7 @@ function chainedName(node: TSESTree.Node, roots?: Set<string>): string | undefin
     let name: string | undefined;
     let current = skipChainAndCasts(node);
     while (current.type === TSESTree.AST_NODE_TYPES.MemberExpression) {
-        const key = current.computed
-            ? staticString(current.property)
-            : current.property.type === TSESTree.AST_NODE_TYPES.Identifier
-              ? current.property.name
-              : undefined;
+        const key = staticKey(current);
         name ??= key === undefined ? undefined : environmentName(key);
         current = skipChainAndCasts(current.object);
     }
@@ -537,6 +646,14 @@ function skipChainAndCasts(node: TSESTree.Node): TSESTree.Node {
         node = node.expression;
     }
     return node;
+}
+
+// The name of the property `member` reads, when it is written out.
+function staticKey(member: TSESTree.MemberExpression): string | undefined {
+    if (member.computed) {
+        return staticString(member.property);
+    }
+    return member.property.type === TSESTree.AST_NODE_TYPES.Identifier ? member.property.name : undefined;
 }
 
 // The value of a string literal, or of a template literal without expressions.

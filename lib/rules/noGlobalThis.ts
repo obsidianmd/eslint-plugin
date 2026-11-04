@@ -8,6 +8,7 @@ import {
     isProbeOfGlobal,
     isResultDiscarded,
     isTimerCallTypeSafe,
+    mayLackWindowAt,
     type TypeInfo,
 } from "../globalWindow.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
@@ -79,8 +80,9 @@ export default ruleCreator({
                 let rewrite = classify(node);
                 // `typeof globalThis.crypto`, `"x" in globalThis`: written to work
                 // where the property is missing, which as `window.x` throws
-                // where there is no window.
-                if (rewrite === "fix" && isProbeOfGlobal(node)) {
+                // where there is no window. The same goes for code that may run
+                // without one, such as the body of `try { … } catch {}`.
+                if (rewrite === "fix" && (isProbeOfGlobal(node) || mayLackWindowAt(context, node))) {
                     rewrite = "suggest";
                 }
                 if (rewrite === "none") {
