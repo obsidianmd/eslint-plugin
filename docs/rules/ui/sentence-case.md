@@ -42,7 +42,7 @@ Not checked at all: text with inline code (`` `npm install` ``) or HTML tags, te
 identifiers (`API_KEY`).
 
 The rule is off in `recommended` and `recommendedWithLocalesEn`, because it reports too much
-ordinary text to be on by default. 0.3.0 meant to turn it off, but it stayed on until 0.5.0. To use
+ordinary text to be on by default. 0.3.0 meant to turn it off, but it stayed on through 0.4.2. To use
 it, turn it on yourself:
 
 ```js
