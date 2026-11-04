@@ -685,6 +685,20 @@ ruleTester.run("prefer-instanceof with strictNullChecks", preferInstanceofRule, 
         },
 
         // --- Narrowed or asserted to a non-null value: still fixed ---
+        // `?.` on a value that cannot be null adds no undefined: the chain is
+        // wrapped, as `view?.containerEl.instanceOf()` would read differently.
+        {
+            name: "an optional chain that cannot be undefined is fixed and wrapped",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare const view: { containerEl: HTMLElement };
+                if (view?.containerEl instanceof HTMLDivElement) {}
+            `,
+            output: `${OBSIDIAN_INSTANCEOF}
+                declare const view: { containerEl: HTMLElement };
+                if ((view?.containerEl).instanceOf(HTMLDivElement)) {}
+            `,
+            errors: [{ messageId: "preferInstanceof", data: { className: "HTMLDivElement" } }],
+        },
         {
             name: "a nullable property narrowed by a check is fixed",
             code: `${OBSIDIAN_INSTANCEOF}
@@ -1232,6 +1246,19 @@ nonStrictRuleTester.run("prefer-instanceof without strictNullChecks", preferInst
                 if (el.firstElementChild!.instanceOf(HTMLElement)) {}
             `,
             errors: [{ messageId: "preferInstanceof", data: { className: "HTMLElement" } }],
+        },
+        // The `!` is trusted as on any other value; the chain is wrapped.
+        {
+            name: "a non-null assertion on an optional chain is fixed",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare const view: { containerEl: HTMLElement } | undefined;
+                if (view?.containerEl! instanceof HTMLDivElement) {}
+            `,
+            output: `${OBSIDIAN_INSTANCEOF}
+                declare const view: { containerEl: HTMLElement } | undefined;
+                if ((view?.containerEl!).instanceOf(HTMLDivElement)) {}
+            `,
+            errors: [{ messageId: "preferInstanceof", data: { className: "HTMLDivElement" } }],
         },
     ],
 });
