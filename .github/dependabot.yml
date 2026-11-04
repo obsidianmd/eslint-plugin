@@ -1,0 +1,22 @@
+version: 2
+updates:
+    # Keeps the pinned action SHAs current; the changelog check skips the
+    # `dependencies` label Dependabot adds.
+    - package-ecosystem: github-actions
+      directory: /
+      schedule:
+          interval: monthly
+      groups:
+          actions:
+              patterns: ["*"]
+    # Lockfile only: a range bump would raise the published floors, and the
+    # typescript-eslint floor must stay ^8.35.1 (a higher one makes npm nest a
+    # second copy and fail with "Cannot redefine plugin").
+    - package-ecosystem: npm
+      directory: /
+      schedule:
+          interval: monthly
+      versioning-strategy: lockfile-only
+      groups:
+          dev:
+              dependency-type: development
