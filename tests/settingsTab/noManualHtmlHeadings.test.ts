@@ -35,6 +35,18 @@ ruleTester.run("no-manual-html-headings", noManualHeadingsRule, {
             `,
         },
         {
+            name: "createEl() without a tag is not checked, and does not crash",
+            code: `
+                ${MOCK_CLASS}
+                class MyTab extends PluginSettingTab {
+                    display() {
+                        // @ts-expect-error -- the tag is missing
+                        this.containerEl.createEl();
+                    }
+                }
+            `,
+        },
+        {
             name: "a heading created outside a settings tab is allowed",
             code: `
                 declare const el: { createEl(tag: string, options?: unknown): HTMLElement };
@@ -132,15 +144,23 @@ ruleTester.run("no-manual-html-headings", noManualHeadingsRule, {
                 class MyTab extends PluginSettingTab {
                     display() {
                         this.containerEl.createEl("h1");
+                        this.containerEl.createEl("h2");
+                        this.containerEl.createEl("h3");
+                        this.containerEl.createEl("h4");
+                        this.containerEl.createEl("h5");
                         this.containerEl.createEl("h6");
                     }
                 }
             `,
-            errors: [{ messageId: "headingEl" }, { messageId: "headingEl" }],
+            errors: Array.from({ length: 6 }, () => ({ messageId: "headingEl" as const })),
             output: `
                 ${MOCK_CLASS}
                 class MyTab extends PluginSettingTab {
                     display() {
+                        new Setting(this.containerEl).setName("").setHeading();
+                        new Setting(this.containerEl).setName("").setHeading();
+                        new Setting(this.containerEl).setName("").setHeading();
+                        new Setting(this.containerEl).setName("").setHeading();
                         new Setting(this.containerEl).setName("").setHeading();
                         new Setting(this.containerEl).setName("").setHeading();
                     }
@@ -448,6 +468,164 @@ ruleTester.run("no-manual-html-headings", noManualHeadingsRule, {
             output: null,
             errors: [{ messageId: "headingEl", suggestions: [] }],
         },
+        {
+            name: "a Setting without setName() has no fix",
+            code: `
+                declare class Setting { constructor(el: HTMLElement); setHeading(): this; }
+                declare class PluginSettingTab { containerEl: HTMLElement; }
+                class MyTab extends PluginSettingTab {
+                    display(): void {
+                        this.containerEl.createEl("h3", { text: "Parser" });
+                    }
+                }
+            `,
+            output: null,
+            errors: [{ messageId: "headingEl", suggestions: [] }],
+        },
+        {
+            name: "a local interface named Setting cannot be constructed, so there is no fix",
+            code: `
+                import { PluginSettingTab } from "obsidian";
+                interface Setting { name: string }
+                class MyTab extends PluginSettingTab {
+                    display(): void {
+                        this.containerEl.createEl("h3", { text: "Parser" });
+                    }
+                }
+            `,
+            output: null,
+            errors: [{ messageId: "headingEl", suggestions: [] }],
+        },
+        {
+            name: "a type-only specifier for Setting cannot be constructed, so there is no fix",
+            code: obsidianTab(`containerEl.createEl("h3", { text: "Parser" });`, "type Setting, PluginSettingTab"),
+            output: null,
+            errors: [{ messageId: "headingEl", suggestions: [] }],
+        },
+        {
+            // Not to a side-effect import, a type-only import or another module's.
+            name: "Setting is added to the named value import from obsidian",
+            code: `
+                import { join } from "node:path";
+                import "obsidian";
+                import type { App } from "obsidian";
+                import { PluginSettingTab } from "obsidian";
+                class MyTab extends PluginSettingTab {
+                    display(): void {
+                        this.containerEl.createEl("h2", { text: "Advanced" });
+                    }
+                }
+            `,
+            output: `
+                import { join } from "node:path";
+                import "obsidian";
+                import type { App } from "obsidian";
+                import { PluginSettingTab, Setting } from "obsidian";
+                class MyTab extends PluginSettingTab {
+                    display(): void {
+                        new Setting(this.containerEl).setName("Advanced").setHeading();
+                    }
+                }
+            `,
+            errors: [{ messageId: "headingEl" }],
+        },
+        {
+            name: "a quoted text key is read as the text",
+            code: obsidianTab(`containerEl.createEl("h2", { "text": "Advanced" });`),
+            output: obsidianTab(`new Setting(containerEl).setName("Advanced").setHeading();`),
+            errors: [{ messageId: "headingEl" }],
+        },
+        {
+            name: "a computed key, a spread or a getter in the options leaves the text unknown, so there is no fix",
+            code: `
+                declare const text: "cls";
+                declare const base: DomElementInfo;
+                ${obsidianTab(`
+                containerEl.createEl("h2", { [text]: "Advanced" });
+                containerEl.createEl("h2", { ...base, text: "Advanced" });
+                containerEl.createEl("h2", { get text() { return "Advanced"; } });`)}
+            `,
+            output: null,
+            errors: [
+                { messageId: "headingEl", suggestions: [] },
+                { messageId: "headingEl", suggestions: [] },
+                { messageId: "headingEl", suggestions: [] },
+            ],
+        },
+        {
+            name: "a spread after the options has no fix",
+            code: `
+                declare const callbacks: ((el: HTMLElement) => void)[];
+                ${obsidianTab(`containerEl.createEl("h2", { text: "Advanced" }, ...callbacks);`)}
+            `,
+            output: null,
+            errors: [{ messageId: "headingEl", suggestions: [] }],
+        },
+        {
+            name: "text replaced by setText() is lost, so the rewrite to the setText() name is a suggestion",
+            code: obsidianTab(`containerEl.createEl("h2", { text: "General" }).setText("Advanced");`),
+            output: null,
+            errors: [{
+                messageId: "headingEl",
+                suggestions: [{
+                    messageId: "replaceWithSettingHeading",
+                    output: obsidianTab(`new Setting(containerEl).setName("Advanced").setHeading();`),
+                }],
+            }],
+        },
+        {
+            name: "a setText() without an argument has no fix",
+            code: obsidianTab(`containerEl.createEl("h2").setText();`),
+            output: null,
+            errors: [{ messageId: "headingEl", suggestions: [] }],
+        },
+        {
+            name: "a heading created through optional chaining or under void is fixed",
+            code: obsidianTab(`
+                containerEl?.createEl("h2", { text: "General" });
+                void containerEl.createEl("h2", { text: "Advanced" });`),
+            output: obsidianTab(`
+                new Setting(containerEl).setName("General").setHeading();
+                void new Setting(containerEl).setName("Advanced").setHeading();`),
+            errors: [{ messageId: "headingEl" }, { messageId: "headingEl" }],
+        },
+        {
+            name: "a heading tested with ! is used, so there is no fix",
+            code: obsidianTab(`if (!containerEl.createEl("h2", { text: "Advanced" })) return;`),
+            output: null,
+            errors: [{ messageId: "headingEl", suggestions: [] }],
+        },
+        {
+            name: "a heading destructured into variables has no fix",
+            code: obsidianTab(`const { textContent } = containerEl.createEl("h2", { text: "Advanced" });`),
+            output: null,
+            errors: [{ messageId: "headingEl", suggestions: [] }],
+        },
+        {
+            name: "a comma expression as the text keeps its parentheses",
+            code: `
+                declare let count: number;
+                ${obsidianTab(`containerEl.createEl("h2", { text: (count++, "Advanced") });`)}
+            `,
+            output: `
+                declare let count: number;
+                ${obsidianTab(`new Setting(containerEl).setName((count++, "Advanced")).setHeading();`)}
+            `,
+            errors: [{ messageId: "headingEl" }],
+        },
+        {
+            // Obsidian's setName() has a string overload and a string | DocumentFragment one.
+            name: "a DocumentFragment text fits one of the setName() overloads, so it is fixed",
+            code: `
+                declare const fragment: DocumentFragment;
+                ${obsidianTab(`containerEl.createEl("h2", { text: fragment });`)}
+            `,
+            output: `
+                declare const fragment: DocumentFragment;
+                ${obsidianTab(`new Setting(containerEl).setName(fragment).setHeading();`)}
+            `,
+            errors: [{ messageId: "headingEl" }],
+        },
     ],
 });
 
@@ -576,6 +754,14 @@ untypedRuleTester.run("no-manual-html-headings without type information", noManu
             errors: [{ messageId: "headingEl" }],
         },
         {
+            // A configured global is a variable without a definition in the file.
+            name: "Setting is added to the import from obsidian although a global Setting is configured",
+            languageOptions: { globals: { Setting: "readonly" } },
+            code: obsidianTab(`containerEl.createEl("h2", { text: "Settings" });`, "PluginSettingTab"),
+            output: obsidianTab(`new Setting(containerEl).setName("Settings").setHeading();`, "PluginSettingTab, Setting"),
+            errors: [{ messageId: "headingEl" }],
+        },
+        {
             name: "without an import from obsidian to add Setting to, there is no fix",
             code: `
                 const { PluginSettingTab } = require("obsidian");
@@ -587,6 +773,234 @@ untypedRuleTester.run("no-manual-html-headings without type information", noManu
             `,
             output: null,
             errors: [{ messageId: "headingEl", suggestions: [] }],
+        },
+        {
+            name: "a setText that is passed on, or called with a spread, has no fix",
+            code: obsidianTab(`
+                register(containerEl.createEl("h2").setText);
+                containerEl.createEl("h2").setText(...parts);`),
+            output: null,
+            errors: [{ messageId: "headingEl", suggestions: [] }, { messageId: "headingEl", suggestions: [] }],
+        },
+        {
+            name: "a heading without text is fixed with an empty name",
+            code: obsidianTab(`containerEl.createEl("h2");`),
+            output: obsidianTab(`new Setting(containerEl).setName("").setHeading();`),
+            errors: [{ messageId: "headingEl" }],
+        },
+        {
+            name: "a literal that is not a string, or another element of the tab, gets a suggestion",
+            code: obsidianTab(`
+                containerEl.createEl("h2", { text: 2 });
+                this.contentEl.createEl("h2", { text: "Advanced" });`),
+            output: null,
+            errors: [
+                {
+                    messageId: "headingEl",
+                    suggestions: [{
+                        messageId: "replaceWithSettingHeading",
+                        output: obsidianTab(`
+                new Setting(containerEl).setName(2).setHeading();
+                this.contentEl.createEl("h2", { text: "Advanced" });`),
+                    }],
+                },
+                {
+                    messageId: "headingEl",
+                    suggestions: [{
+                        messageId: "replaceWithSettingHeading",
+                        output: obsidianTab(`
+                containerEl.createEl("h2", { text: 2 });
+                new Setting(this.contentEl).setName("Advanced").setHeading();`),
+                    }],
+                },
+            ],
+        },
+        {
+            name: "a getter for the text has no fix",
+            code: obsidianTab(`containerEl.createEl("h2", { get text() { return "Advanced"; } });`),
+            output: null,
+            errors: [{ messageId: "headingEl", suggestions: [] }],
+        },
+        {
+            name: "a template literal or a concatenation with a string is a known string",
+            code: obsidianTab(`
+                containerEl.createEl("h2", { text: \`Version \${version}\` });
+                containerEl.createEl("h2", { text: "Settings for " + name });`),
+            output: obsidianTab(`
+                new Setting(containerEl).setName(\`Version \${version}\`).setHeading();
+                new Setting(containerEl).setName("Settings for " + name).setHeading();`),
+            errors: [{ messageId: "headingEl" }, { messageId: "headingEl" }],
+        },
+        {
+            name: "a const bound to a string literal is a known string",
+            code: obsidianTab(`
+                const label = "Advanced";
+                containerEl.createEl("h2", { text: label });`),
+            output: obsidianTab(`
+                const label = "Advanced";
+                new Setting(containerEl).setName(label).setHeading();`),
+            errors: [{ messageId: "headingEl" }],
+        },
+        ...[
+            ["a let, which may change", `let label = "Advanced";`],
+            ["a const bound to a concatenation", `const label = "Settings for " + name;`],
+            ["an undeclared name", ``],
+        ].map(([kind, declaration]) => ({
+            name: `text from ${kind} gets a suggestion`,
+            code: obsidianTab(`${declaration}
+                containerEl.createEl("h2", { text: label });`),
+            output: null,
+            errors: [{
+                messageId: "headingEl" as const,
+                suggestions: [{
+                    messageId: "replaceWithSettingHeading" as const,
+                    output: obsidianTab(`${declaration}
+                new Setting(containerEl).setName(label).setHeading();`),
+                }],
+            }],
+        })),
+        {
+            name: "an optional string parameter gets a suggestion",
+            code: `
+                import { PluginSettingTab, Setting } from "obsidian";
+                class MyTab extends PluginSettingTab {
+                    renderSection(containerEl: HTMLElement, title?: string): void {
+                        containerEl.createEl("h3", { text: title });
+                    }
+                }
+            `,
+            output: null,
+            errors: [{
+                messageId: "headingEl",
+                suggestions: [{
+                    messageId: "replaceWithSettingHeading",
+                    output: `
+                import { PluginSettingTab, Setting } from "obsidian";
+                class MyTab extends PluginSettingTab {
+                    renderSection(containerEl: HTMLElement, title?: string): void {
+                        new Setting(containerEl).setName(title).setHeading();
+                    }
+                }
+            `,
+                }],
+            }],
+        },
+        ...[
+            ["an undeclared element", ``, `el`],
+            ["a let that is reassigned", `let el = this.containerEl; el = el.createDiv();`, `el`],
+            ["a let without a value", `let el;`, `el`],
+            ["a var declared twice", `var el = this.containerEl; var el = el.createDiv();`, `el`],
+            ["another property of the tab", `const { headerEl } = this;`, `headerEl`],
+            ["containerEl of another object", `const { containerEl: el } = this.plugin;`, `el`],
+        ].map(([kind, declaration, element]) => ({
+            name: `the parent from ${kind} gets a suggestion`,
+            code: obsidianTab(`${declaration}
+                ${element}.createEl("h2", { text: "Advanced" });`),
+            output: null,
+            errors: [{
+                messageId: "headingEl" as const,
+                suggestions: [{
+                    messageId: "replaceWithSettingHeading" as const,
+                    output: obsidianTab(`${declaration}
+                new Setting(${element}).setName("Advanced").setHeading();`),
+                }],
+            }],
+        })),
+        {
+            name: "an unannotated parameter gets a suggestion",
+            code: `
+                import { PluginSettingTab, Setting } from "obsidian";
+                class MyTab extends PluginSettingTab {
+                    renderSection(el): void {
+                        el.createEl("h3", { text: "Sync" });
+                    }
+                }
+            `,
+            output: null,
+            errors: [{
+                messageId: "headingEl",
+                suggestions: [{
+                    messageId: "replaceWithSettingHeading",
+                    output: `
+                import { PluginSettingTab, Setting } from "obsidian";
+                class MyTab extends PluginSettingTab {
+                    renderSection(el): void {
+                        new Setting(el).setName("Sync").setHeading();
+                    }
+                }
+            `,
+                }],
+            }],
+        },
+        {
+            name: "this in a function declared in the tab is not the tab, so it gets a suggestion",
+            code: obsidianTab(`
+                function render(this: unknown) {
+                    const { containerEl } = this;
+                    containerEl.createEl("h2", { text: "Advanced" });
+                }`),
+            output: null,
+            errors: [{
+                messageId: "headingEl",
+                suggestions: [{
+                    messageId: "replaceWithSettingHeading",
+                    output: obsidianTab(`
+                function render(this: unknown) {
+                    const { containerEl } = this;
+                    new Setting(containerEl).setName("Advanced").setHeading();
+                }`),
+                }],
+            }],
+        },
+        {
+            name: "this in an instance arrow field is the tab, and in a static member it is not",
+            code: `
+                import { PluginSettingTab, Setting } from "obsidian";
+                class MyTab extends PluginSettingTab {
+                    renderAdvanced = () => { this.containerEl.createEl("h2", { text: "Advanced" }); };
+                    static renderSync = () => { this.containerEl.createEl("h2", { text: "Sync" }); };
+                    static renderGeneral() { this.containerEl.createEl("h2", { text: "General" }); }
+                }
+            `,
+            output: `
+                import { PluginSettingTab, Setting } from "obsidian";
+                class MyTab extends PluginSettingTab {
+                    renderAdvanced = () => { new Setting(this.containerEl).setName("Advanced").setHeading(); };
+                    static renderSync = () => { this.containerEl.createEl("h2", { text: "Sync" }); };
+                    static renderGeneral() { this.containerEl.createEl("h2", { text: "General" }); }
+                }
+            `,
+            errors: [
+                { messageId: "headingEl" },
+                {
+                    messageId: "headingEl",
+                    suggestions: [{
+                        messageId: "replaceWithSettingHeading",
+                        output: `
+                import { PluginSettingTab, Setting } from "obsidian";
+                class MyTab extends PluginSettingTab {
+                    renderAdvanced = () => { this.containerEl.createEl("h2", { text: "Advanced" }); };
+                    static renderSync = () => { new Setting(this.containerEl).setName("Sync").setHeading(); };
+                    static renderGeneral() { this.containerEl.createEl("h2", { text: "General" }); }
+                }
+            `,
+                    }],
+                },
+                {
+                    messageId: "headingEl",
+                    suggestions: [{
+                        messageId: "replaceWithSettingHeading",
+                        output: `
+                import { PluginSettingTab, Setting } from "obsidian";
+                class MyTab extends PluginSettingTab {
+                    renderAdvanced = () => { this.containerEl.createEl("h2", { text: "Advanced" }); };
+                    static renderSync = () => { this.containerEl.createEl("h2", { text: "Sync" }); };
+                    static renderGeneral() { new Setting(this.containerEl).setName("General").setHeading(); }
+                }
+            `,
+                    }],
+                },
+            ],
         },
     ],
 });
