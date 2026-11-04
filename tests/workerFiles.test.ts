@@ -1,5 +1,6 @@
 import assert from "node:assert";
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import { ESLint, type Linter } from "eslint";
 import globals from "globals";
 import plugin from "../lib/index.js";
@@ -136,6 +137,20 @@ for (const configName of ["recommended", "recommendedWithLocalesEn"] as const) {
 				}
 			});
 		}
+
+		// An oracle independent of the plugin's own list: the globals TypeScript
+		// declares for a dedicated worker. A browser global among them that the
+		// config switched off would be reported by no-undef in code that works.
+		it("keeps every browser global TypeScript's webworker lib declares", async () => {
+			const lib = fs.readFileSync(createRequire(import.meta.url).resolve("typescript/lib/lib.webworker.d.ts"), "utf8");
+			const workerNames = [...lib.matchAll(/^declare (?:var|function) (\w+)/gm)]
+				.map((match) => match[1])
+				.filter((name) => Object.hasOwn(globals.browser, name));
+			assert.ok(workerNames.length > 50, `only ${workerNames.length} names found`);
+			const { languageOptions } = await eslint.calculateConfigForFile("src/workers/shims.js");
+			const declared = languageOptions?.globals ?? {};
+			assert.deepStrictEqual(workerNames.filter((name) => !(name in declared) || declared[name] === "off"), []);
+		});
 
 		it("uses the worker's own values for globals both scopes have", async () => {
 			const { languageOptions } = await eslint.calculateConfigForFile("src/workers/shims.js");
