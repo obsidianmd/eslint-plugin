@@ -23,7 +23,7 @@ type SettingRef =
 // `.setName(…)` accept.
 interface SettingTypes {
     checker: ts.TypeChecker;
-    containerType: ts.Type;
+    containerTypes: ts.Type[];
     nameTypes: ts.Type[];
 }
 
@@ -196,7 +196,7 @@ export default ruleCreator({
                 return null;
             }
             if (types) {
-                const containerFits = isAssignable(types, receiver, [types.containerType]);
+                const containerFits = isAssignable(types, receiver, types.containerTypes);
                 const nameFits = nameNode === null || isAssignable(types, nameNode, types.nameTypes);
                 if (!containerFits || !nameFits) {
                     // `new Setting(fragment)` or `.setName(maybeUndefined)` would not compile.
@@ -294,9 +294,10 @@ export default ruleCreator({
         }
 
         // The parameter types of `new Setting()` and `setName()`. False when
-        // Setting lacks setName() or setHeading(), or obsidian does not export
-        // it. Null without type information, or when Setting does not resolve to
-        // a class.
+        // `new Setting(el)` would not compile for any `el`, Setting lacks
+        // setName() or setHeading(), or obsidian does not export it. Null
+        // without type information, or when Setting does not resolve to a value
+        // or is `any`.
         function settingTypes(ref: SettingRef): SettingTypes | false | null {
             if (!program || !nodeMap) {
                 return null;
@@ -328,10 +329,19 @@ export default ruleCreator({
                 symbol = checker.getAliasedSymbol(symbol);
             }
             const constructorType = checker.getTypeOfSymbolAtLocation(symbol, location);
-            const signature = constructorType.getConstructSignatures()[0];
-            const containerParam = signature?.getParameters()[0];
-            if (!signature || !containerParam) {
+            // `new` on `any` compiles whatever it is given, so the syntax decides.
+            if (constructorType.flags & ts.TypeFlags.Any) {
                 return null;
+            }
+            // `new Setting(el)` compiles only through a construct signature that
+            // takes one argument. Without one it is TS2554 ("Expected 0
+            // arguments"), or Setting cannot be constructed at all.
+            const signatures = constructorType
+                .getConstructSignatures()
+                .filter((s) => takesOneArgument(checker, s));
+            const signature = signatures[0];
+            if (!signature) {
+                return false;
             }
             const instanceType = signature.getReturnType();
             const setName = instanceType.getProperty("setName");
@@ -346,7 +356,7 @@ export default ruleCreator({
                 .map((p) => checker.getTypeOfSymbolAtLocation(p, location));
             return {
                 checker,
-                containerType: checker.getTypeOfSymbolAtLocation(containerParam, location),
+                containerTypes: signatures.map((s) => checker.getTypeOfSymbolAtLocation(s.getParameters()[0], location)),
                 nameTypes,
             };
         }
@@ -511,3 +521,20 @@ export default ruleCreator({
         }
     },
 });
+
+// Whether a call with one argument fits the signature: it has a first
+// parameter, and every later one is optional or a rest parameter.
+function takesOneArgument(checker: ts.TypeChecker, signature: ts.Signature): boolean {
+    const [first, ...rest] = signature.getParameters();
+    return (
+        first !== undefined &&
+        rest.every((param) => {
+            const declaration = param.valueDeclaration;
+            return (
+                declaration !== undefined &&
+                ts.isParameter(declaration) &&
+                (declaration.dotDotDotToken !== undefined || checker.isOptionalParameter(declaration))
+            );
+        })
+    );
+}

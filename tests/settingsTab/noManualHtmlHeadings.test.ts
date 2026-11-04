@@ -483,6 +483,146 @@ ruleTester.run("no-manual-html-headings", noManualHeadingsRule, {
             errors: [{ messageId: "headingEl", suggestions: [] }],
         },
         {
+            // `new Setting(this.containerEl)` would be TS2554, "Expected 0
+            // arguments, but got 1".
+            name: "a Setting whose constructor takes no parameter has no fix",
+            code: `
+                declare class Setting { setName(name: string): this; setHeading(): this; }
+                declare class PluginSettingTab { containerEl: HTMLElement; }
+                class MyTab extends PluginSettingTab {
+                    display(): void {
+                        this.containerEl.createEl("h2", { text: "A" });
+                    }
+                }
+            `,
+            output: null,
+            errors: [{ messageId: "headingEl", suggestions: [] }],
+        },
+        {
+            name: "a Setting with an explicit constructor() has no fix either",
+            code: `
+                declare class Setting { constructor(); setName(name: string): this; setHeading(): this; }
+                declare class PluginSettingTab { containerEl: HTMLElement; }
+                class MyTab extends PluginSettingTab {
+                    display(): void {
+                        this.containerEl.createEl("h2", { text: "A" });
+                    }
+                }
+            `,
+            output: null,
+            errors: [{ messageId: "headingEl", suggestions: [] }],
+        },
+        {
+            name: "a Setting that cannot be constructed has no fix",
+            code: `
+                declare const Setting: { setName(name: string): unknown };
+                declare class PluginSettingTab { containerEl: HTMLElement; }
+                class MyTab extends PluginSettingTab {
+                    display(): void {
+                        this.containerEl.createEl("h2", { text: "A" });
+                    }
+                }
+            `,
+            output: null,
+            errors: [{ messageId: "headingEl", suggestions: [] }],
+        },
+        {
+            // The second overload takes the container, so the rewrite compiles.
+            name: "a Setting with a constructor overload that takes the container is fixed",
+            code: `
+                declare class Setting { constructor(); constructor(el: HTMLElement); setName(name: string): this; setHeading(): this; }
+                declare class PluginSettingTab { containerEl: HTMLElement; }
+                class MyTab extends PluginSettingTab {
+                    display(): void {
+                        this.containerEl.createEl("h2", { text: "A" });
+                    }
+                }
+            `,
+            output: `
+                declare class Setting { constructor(); constructor(el: HTMLElement); setName(name: string): this; setHeading(): this; }
+                declare class PluginSettingTab { containerEl: HTMLElement; }
+                class MyTab extends PluginSettingTab {
+                    display(): void {
+                        new Setting(this.containerEl).setName("A").setHeading();
+                    }
+                }
+            `,
+            errors: [{ messageId: "headingEl" }],
+        },
+        {
+            name: "a Setting whose constructor needs a second argument has no fix",
+            code: `
+                declare class Setting { constructor(el: HTMLElement, mode: number); setName(name: string): this; setHeading(): this; }
+                declare class PluginSettingTab { containerEl: HTMLElement; }
+                class MyTab extends PluginSettingTab {
+                    display(): void {
+                        this.containerEl.createEl("h2", { text: "A" });
+                    }
+                }
+            `,
+            output: null,
+            errors: [{ messageId: "headingEl", suggestions: [] }],
+        },
+        {
+            name: "a Setting whose constructor takes optional and rest arguments after the container is fixed",
+            code: `
+                declare class Setting { constructor(el: HTMLElement, mode?: number, ...rest: string[]); setName(name: string): this; setHeading(): this; }
+                declare class PluginSettingTab { containerEl: HTMLElement; }
+                class MyTab extends PluginSettingTab {
+                    display(): void {
+                        this.containerEl.createEl("h2", { text: "A" });
+                    }
+                }
+            `,
+            output: `
+                declare class Setting { constructor(el: HTMLElement, mode?: number, ...rest: string[]); setName(name: string): this; setHeading(): this; }
+                declare class PluginSettingTab { containerEl: HTMLElement; }
+                class MyTab extends PluginSettingTab {
+                    display(): void {
+                        new Setting(this.containerEl).setName("A").setHeading();
+                    }
+                }
+            `,
+            errors: [{ messageId: "headingEl" }],
+        },
+        {
+            name: "a Setting with no constructor parameter in the overload the container fits has no fix",
+            code: `
+                declare class Setting { constructor(); constructor(el: DocumentFragment); setName(name: string): this; setHeading(): this; }
+                declare class PluginSettingTab { containerEl: HTMLElement; }
+                class MyTab extends PluginSettingTab {
+                    display(): void {
+                        this.containerEl.createEl("h2", { text: "A" });
+                    }
+                }
+            `,
+            output: null,
+            errors: [{ messageId: "headingEl", suggestions: [] }],
+        },
+        {
+            // `new` on an `any` compiles, so the syntax decides, as without type information.
+            name: "a Setting typed any is fixed as without type information",
+            code: `
+                declare const Setting: any;
+                declare class PluginSettingTab { containerEl: HTMLElement; }
+                class MyTab extends PluginSettingTab {
+                    display(): void {
+                        this.containerEl.createEl("h2", { text: "A" });
+                    }
+                }
+            `,
+            output: `
+                declare const Setting: any;
+                declare class PluginSettingTab { containerEl: HTMLElement; }
+                class MyTab extends PluginSettingTab {
+                    display(): void {
+                        new Setting(this.containerEl).setName("A").setHeading();
+                    }
+                }
+            `,
+            errors: [{ messageId: "headingEl" }],
+        },
+        {
             name: "a local interface named Setting cannot be constructed, so there is no fix",
             code: `
                 import { PluginSettingTab } from "obsidian";

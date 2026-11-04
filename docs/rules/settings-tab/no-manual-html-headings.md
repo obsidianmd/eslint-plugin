@@ -57,7 +57,10 @@ There is no fix or suggestion where the rewrite would not compile or would lose 
 heading element is used afterwards (read from a variable, chained on, passed on or returned), the
 parent is not an HTML element (such as a `DocumentFragment`), the text may be `undefined`, the
 options are not an object literal, `Setting` is only imported as a type or there is no named import
-from `"obsidian"` to add it to, or the project's `Setting` has no `setHeading()`.
+from `"obsidian"` to add it to, or the project's `Setting` has no `setHeading()`. With type
+information, the same goes for a `Setting` whose constructor cannot be called with the parent
+element alone: one that takes no parameter or needs a second argument, as in hand-written
+declarations.
 
 ```ts
 const title = containerEl.createEl("h3", { text: "Models" }); // reported, no fix
