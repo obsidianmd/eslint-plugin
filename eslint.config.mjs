@@ -2,6 +2,10 @@ import obsidianmd from "./dist/lib/index.js";
 import eslintPluginPlugin from "eslint-plugin-eslint-plugin";
 
 export default [
+    // The build output, and fixtures that tests lint with their own config:
+    // tests/fixtures/ts-extensions has .cts/.mts/.tsx files, which the
+    // recommended config type-checks but the project below does not cover.
+    { ignores: ["dist/**", "tests/fixtures/**"] },
     ...obsidianmd.configs.recommended,
     {
         files: ["**/*.ts"],
