@@ -112,10 +112,9 @@ document.createEl("div");                                          // createDiv(
 are the files the
 recommended config runs `prefer-create-el` on; anywhere else, such as a JavaScript file, this rule
 still reports them. A call `prefer-create-el` leaves alone, such as
-`document.createElement("div", { is: "my-div" })`, is reported here as before. Inside an
-implementation of a DOM helper (see
-[Helper implementations](prefer-create-el.md#helper-implementations)), neither rule reports these
-calls.
+`document.createElement("div", { is: "my-div" })`, is reported here as before, and so is a call
+inside an implementation of a DOM helper, such as a polyfill, which `prefer-create-el` leaves alone
+(see [Helper implementations](prefer-create-el.md#helper-implementations)).
 
 Where a comment turns `prefer-create-el` off for the call (`eslint-disable-next-line`,
 `eslint-disable-line`, or an `eslint-disable` range naming it), this rule reports `document` there

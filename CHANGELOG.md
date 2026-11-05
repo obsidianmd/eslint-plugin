@@ -50,6 +50,7 @@ the new `checkId` option.
   - `commands/no-plugin-name-in-command-name` offers no suggestion where a lower-case word follows the plugin name after a space, as in "Zoom in" of the plugin "Zoom", which became "In".
   - The suggestions that rename a command ID say that `executeCommandById()` calls, `obsidian://` URIs and other plugins that use the old ID stop working, besides users' hotkeys.
   - `validate-license` no longer reports the sample plugin's `Dynalist Inc.` line in a license that also has another holder's copyright line: it is the upstream notice kept as attribution.
+- `prefer-active-doc` reports `document` in an implementation of a DOM helper, such as a polyfill (`window.createDiv = () => document.createElement("div")`), which `prefer-create-el` leaves alone since #242; before, neither rule reported it ([#247](https://github.com/obsidianmd/eslint-plugin/pull/247)).
 
 ### Changed
 

@@ -34,7 +34,8 @@ reports, as the replacement drops `document`; see
 [Calls left to `prefer-create-el`](prefer-active-doc.md#calls-left-to-prefer-create-el). Where a
 comment turns this rule off for a call, `prefer-active-doc` reports `document` there; if you switch
 this rule off in your config, neither rule reports these calls. Inside an implementation of the
-helpers (see [Helper implementations](#helper-implementations)), neither rule reports them either.
+helpers (see [Helper implementations](#helper-implementations)), where this rule reports nothing,
+`prefer-active-doc` reports `document`.
 
 Not reported:
 
@@ -121,6 +122,7 @@ Element.prototype.createEl = function (tag, o) { return document.createElement(t
 ```
 
 There the replacement would call the function it is in, or the polyfill being defined, and recurse.
+[`prefer-active-doc`](prefer-active-doc.md) still reports the global `document` in such code.
 
 ### Iframe documents
 

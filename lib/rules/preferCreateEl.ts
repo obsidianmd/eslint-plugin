@@ -57,12 +57,113 @@ function isReplacedMethodCall(
  * `document.createElementNS(svgNamespace, tag, …)`,
  * `document.createDocumentFragment()` and `document.createEl("div" | "span", …)`.
  * The replacement calls a global helper (`createEl(tag)`, `createDiv()`, …),
- * which leaves no `document` for prefer-active-doc to report. (Inside an
+ * which leaves no `document` for prefer-active-doc to report. Inside an
  * implementation of the helpers themselves, such as a polyfill, this rule
- * reports nothing, and prefer-active-doc then leaves the call alone too.)
+ * reports nothing, so prefer-active-doc reports `document` there.
  */
 export function isReportedOnGlobalDocument(call: TSESTree.CallExpression): boolean {
-    return Object.keys(REPLACED_METHODS).some((method) => isReplacedMethodCall(call, method));
+    return (
+        !isInHelperImplementation(call) &&
+        Object.keys(REPLACED_METHODS).some((method) => isReplacedMethodCall(call, method))
+    );
+}
+
+// Whether `node` is inside a function named after one of Obsidian's DOM
+// helpers: `function createDiv() {}`, a method or property
+// (`createSpan(o) { return this.createEl("span", o); }`,
+// `{ createFragment: () => … }`), or a function assigned to one
+// (`window.createDiv = …`, `Element.prototype.createEl = function () {}`,
+// `Object.defineProperty(proto, "createEl", { value() {} })`). There the
+// replacement could call the function it is in, or the polyfill being
+// defined, and recurse forever.
+export function isInHelperImplementation(node: TSESTree.Node): boolean {
+    for (let current = node.parent; current; current = current.parent) {
+        if (
+            (current.type === TSESTree.AST_NODE_TYPES.FunctionDeclaration ||
+                current.type === TSESTree.AST_NODE_TYPES.FunctionExpression ||
+                current.type === TSESTree.AST_NODE_TYPES.ArrowFunctionExpression) &&
+            getFunctionNames(current).some((name) => HELPER_NAMES.has(name))
+        ) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// The names a function goes by: its own, and that of the variable,
+// property, method or member it is the value of.
+function getFunctionNames(
+    fn: TSESTree.FunctionDeclaration | TSESTree.FunctionExpression | TSESTree.ArrowFunctionExpression,
+): string[] {
+    const names: string[] = [];
+    if (fn.id) {
+        names.push(fn.id.name);
+    }
+    let child: TSESTree.Node = fn;
+    let parent = fn.parent;
+    while (
+        parent.type === TSESTree.AST_NODE_TYPES.TSAsExpression ||
+        parent.type === TSESTree.AST_NODE_TYPES.TSSatisfiesExpression ||
+        parent.type === TSESTree.AST_NODE_TYPES.TSNonNullExpression ||
+        parent.type === TSESTree.AST_NODE_TYPES.TSTypeAssertion
+    ) {
+        child = parent;
+        parent = parent.parent;
+    }
+    const keyName = (key: TSESTree.Node, computed: boolean) =>
+        !computed && key.type === TSESTree.AST_NODE_TYPES.Identifier ? key.name : getStringLiteralValue(key);
+    let name: string | undefined;
+    switch (parent.type) {
+        case TSESTree.AST_NODE_TYPES.VariableDeclarator:
+            if (parent.init === child && parent.id.type === TSESTree.AST_NODE_TYPES.Identifier) {
+                name = parent.id.name;
+            }
+            break;
+        case TSESTree.AST_NODE_TYPES.AssignmentExpression:
+            if (parent.right === child) {
+                name =
+                    parent.left.type === TSESTree.AST_NODE_TYPES.Identifier
+                        ? parent.left.name
+                        : parent.left.type === TSESTree.AST_NODE_TYPES.MemberExpression
+                            ? keyName(parent.left.property, parent.left.computed)
+                            : undefined;
+            }
+            break;
+        case TSESTree.AST_NODE_TYPES.MethodDefinition:
+        case TSESTree.AST_NODE_TYPES.PropertyDefinition:
+            name = keyName(parent.key, parent.computed);
+            break;
+        case TSESTree.AST_NODE_TYPES.Property:
+            if (parent.value === child) {
+                name = keyName(parent.key, parent.computed);
+                const descriptorName = getDefinedPropertyName(parent);
+                if (descriptorName !== undefined) {
+                    names.push(descriptorName);
+                }
+            }
+            break;
+    }
+    if (name !== undefined) {
+        names.push(name);
+    }
+    return names;
+}
+
+// For `value`, `get` or `set` in the descriptor of
+// `Object.defineProperty(target, "name", { value: … })`, the property's name.
+function getDefinedPropertyName(property: TSESTree.Property): string | undefined {
+    const descriptor = property.parent;
+    const call = descriptor.parent;
+    if (
+        call?.type !== TSESTree.AST_NODE_TYPES.CallExpression ||
+        call.arguments[2] !== descriptor ||
+        call.callee.type !== TSESTree.AST_NODE_TYPES.MemberExpression ||
+        call.callee.property.type !== TSESTree.AST_NODE_TYPES.Identifier ||
+        call.callee.property.name !== "defineProperty"
+    ) {
+        return undefined;
+    }
+    return getStringLiteralValue(call.arguments[1]);
 }
 
 function getStringLiteralValue(
@@ -447,104 +548,6 @@ export default ruleCreator({
                 }
             }
             return false;
-        }
-
-        // Whether `node` is inside a function named after one of Obsidian's DOM
-        // helpers: `function createDiv() {}`, a method or property
-        // (`createSpan(o) { return this.createEl("span", o); }`,
-        // `{ createFragment: () => … }`), or a function assigned to one
-        // (`window.createDiv = …`, `Element.prototype.createEl = function () {}`,
-        // `Object.defineProperty(proto, "createEl", { value() {} })`). There the
-        // replacement could call the function it is in, or the polyfill being
-        // defined, and recurse forever.
-        function isInHelperImplementation(node: TSESTree.Node): boolean {
-            for (let current = node.parent; current; current = current.parent) {
-                if (
-                    (current.type === TSESTree.AST_NODE_TYPES.FunctionDeclaration ||
-                        current.type === TSESTree.AST_NODE_TYPES.FunctionExpression ||
-                        current.type === TSESTree.AST_NODE_TYPES.ArrowFunctionExpression) &&
-                    getFunctionNames(current).some((name) => HELPER_NAMES.has(name))
-                ) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        // The names a function goes by: its own, and that of the variable,
-        // property, method or member it is the value of.
-        function getFunctionNames(
-            fn: TSESTree.FunctionDeclaration | TSESTree.FunctionExpression | TSESTree.ArrowFunctionExpression,
-        ): string[] {
-            const names: string[] = [];
-            if (fn.id) {
-                names.push(fn.id.name);
-            }
-            let child: TSESTree.Node = fn;
-            let parent = fn.parent;
-            while (
-                parent.type === TSESTree.AST_NODE_TYPES.TSAsExpression ||
-                parent.type === TSESTree.AST_NODE_TYPES.TSSatisfiesExpression ||
-                parent.type === TSESTree.AST_NODE_TYPES.TSNonNullExpression ||
-                parent.type === TSESTree.AST_NODE_TYPES.TSTypeAssertion
-            ) {
-                child = parent;
-                parent = parent.parent;
-            }
-            const keyName = (key: TSESTree.Node, computed: boolean) =>
-                !computed && key.type === TSESTree.AST_NODE_TYPES.Identifier ? key.name : getStringLiteralValue(key);
-            let name: string | undefined;
-            switch (parent.type) {
-                case TSESTree.AST_NODE_TYPES.VariableDeclarator:
-                    if (parent.init === child && parent.id.type === TSESTree.AST_NODE_TYPES.Identifier) {
-                        name = parent.id.name;
-                    }
-                    break;
-                case TSESTree.AST_NODE_TYPES.AssignmentExpression:
-                    if (parent.right === child) {
-                        name =
-                            parent.left.type === TSESTree.AST_NODE_TYPES.Identifier
-                                ? parent.left.name
-                                : parent.left.type === TSESTree.AST_NODE_TYPES.MemberExpression
-                                    ? keyName(parent.left.property, parent.left.computed)
-                                    : undefined;
-                    }
-                    break;
-                case TSESTree.AST_NODE_TYPES.MethodDefinition:
-                case TSESTree.AST_NODE_TYPES.PropertyDefinition:
-                    name = keyName(parent.key, parent.computed);
-                    break;
-                case TSESTree.AST_NODE_TYPES.Property:
-                    if (parent.value === child) {
-                        name = keyName(parent.key, parent.computed);
-                        const descriptorName = getDefinedPropertyName(parent);
-                        if (descriptorName !== undefined) {
-                            names.push(descriptorName);
-                        }
-                    }
-                    break;
-            }
-            if (name !== undefined) {
-                names.push(name);
-            }
-            return names;
-        }
-
-        // For `value`, `get` or `set` in the descriptor of
-        // `Object.defineProperty(target, "name", { value: … })`, the property's name.
-        function getDefinedPropertyName(property: TSESTree.Property): string | undefined {
-            const descriptor = property.parent;
-            const call = descriptor.parent;
-            if (
-                call?.type !== TSESTree.AST_NODE_TYPES.CallExpression ||
-                call.arguments[2] !== descriptor ||
-                call.callee.type !== TSESTree.AST_NODE_TYPES.MemberExpression ||
-                call.callee.property.type !== TSESTree.AST_NODE_TYPES.Identifier ||
-                call.callee.property.name !== "defineProperty"
-            ) {
-                return undefined;
-            }
-            return getStringLiteralValue(call.arguments[1]);
         }
 
         // `canAutofix` is null when the replacement would not compile at all: the

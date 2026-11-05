@@ -198,7 +198,7 @@ export default defineConfig([
     files: ["**/*.ts"],
     rules: {
       "obsidianmd/sample-names": "off",
-      "obsidianmd/prefer-file-manager-trash-file": "error",
+      "obsidianmd/hardcoded-config-path": "error",
     },
   },
 ]);
