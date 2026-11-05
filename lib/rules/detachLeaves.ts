@@ -1,4 +1,6 @@
 import { ASTUtils, TSESTree, type TSESLint } from "@typescript-eslint/utils";
+import type ts from "typescript";
+import { getTypeInfo } from "../globalWindow.js";
 import { staticMemberName } from "../memberName.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
@@ -21,12 +23,13 @@ export default ruleCreator({
     create: (context) => {
         const sourceCode = context.sourceCode;
         const text = sourceCode.text;
+        const types = getTypeInfo(context);
 
         return {
             MethodDefinition(node: TSESTree.MethodDefinition) {
                 // `onunload()`, `"onunload"()` and `["onunload"]()`, but not
                 // `[onunload]()`, which is named by what the variable holds.
-                if (staticMemberName(node) === "onunload") {
+                if (staticMemberName(node) === "onunload" && isPluginClass(node.parent.parent, new Set())) {
                     if (
                         node.value.type === TSESTree.AST_NODE_TYPES.FunctionExpression &&
                         node.value.body &&
@@ -192,6 +195,78 @@ export default ruleCreator({
             }
             const value = ASTUtils.getStaticValue(member.key, sourceCode.getScope(member));
             return value === null || value.value === "onunload";
+        }
+
+        // Whether the class is an Obsidian plugin: it extends Obsidian's
+        // Plugin, directly, through classes of the file's own, or, with type
+        // information, through any class. The onunload() of another class,
+        // such as a Component the plugin unloads while it keeps running, is
+        // not the plugin's, and may well detach the leaves of a view type it
+        // unregisters.
+        function isPluginClass(classNode: ClassNode, seen: Set<TSESTree.Node>): boolean {
+            if (seen.has(classNode)) {
+                return false;
+            }
+            seen.add(classNode);
+            if (extendsObsidianPlugin(classNode)) {
+                return true;
+            }
+            const base = localClass(classNode.superClass);
+            if (base && isPluginClass(base, seen)) {
+                return true;
+            }
+            if (!types || !classNode.superClass) {
+                return false;
+            }
+            // The instance type of what the class extends, which may be a
+            // class of another file or a mixin's result.
+            const constructorType = types.checker.getTypeAtLocation(types.toTs(classNode.superClass));
+            return constructorType
+                .getConstructSignatures()
+                .some((signature) => isObsidianPluginType(signature.getReturnType(), new Set()));
+        }
+
+        // The class a superclass identifier names, when the file declares it.
+        function localClass(superClass: TSESTree.Expression | null): ClassNode | null {
+            if (superClass?.type !== TSESTree.AST_NODE_TYPES.Identifier) {
+                return null;
+            }
+            const variable = ASTUtils.findVariable(sourceCode.getScope(superClass), superClass);
+            const def = variable?.defs.length === 1 ? variable.defs[0] : undefined;
+            if (def?.node.type === TSESTree.AST_NODE_TYPES.ClassDeclaration) {
+                return def.node;
+            }
+            if (
+                def?.node.type === TSESTree.AST_NODE_TYPES.VariableDeclarator &&
+                def.node.init?.type === TSESTree.AST_NODE_TYPES.ClassExpression
+            ) {
+                return def.node.init;
+            }
+            return null;
+        }
+
+        // Whether the type, or a base type of it at any depth, is the Plugin
+        // class declared in the obsidian package.
+        function isObsidianPluginType(type: ts.Type, seen: Set<ts.Type>): boolean {
+            const target = (type as Partial<ts.TypeReference>).target ?? type;
+            if (seen.has(target)) {
+                return false;
+            }
+            seen.add(target);
+            const symbol = target.getSymbol();
+            if (
+                symbol?.getName() === "Plugin" &&
+                (symbol.getDeclarations() ?? []).some((declaration) =>
+                    /(^|\/)node_modules\/obsidian\/obsidian\.d\.ts$/.test(
+                        declaration.getSourceFile().fileName.replace(/\\/g, "/"),
+                    ),
+                )
+            ) {
+                return true;
+            }
+            const bases = target.isClassOrInterface() ? target.getBaseTypes() : undefined;
+            const parts = target.isIntersection() ? target.types : [];
+            return [...(bases ?? []), ...parts].some((base) => isObsidianPluginType(base, seen));
         }
 
         // `class extends Plugin`, with Plugin imported from "obsidian", or
