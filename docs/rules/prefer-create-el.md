@@ -39,6 +39,9 @@ Not reported:
 - `createElement()` with an options argument, and `createElementNS()` with a namespace other than SVG
 - calls on anything that is not a document, and `createEl()` with a tag other than `div` or `span`
 - an iframe's document; see [Iframe documents](#iframe-documents)
+- `activeDocument` or another document when its window's type does not declare the helper, as with
+  Obsidian's own types; see [Popout window documents](#popout-window-documents)
+- code inside an implementation of the helpers; see [Helper implementations](#helper-implementations)
 
 The rule needs type information, so the recommended config runs it on TypeScript files only. It
 switches the rule off for worker and test files, which have no Obsidian DOM helpers; see
@@ -48,9 +51,10 @@ switches the rule off for worker and test files, which have no Obsidian DOM help
 
 `--fix` applies a replacement only when the types say it exists: `createEl()` for the global
 `document` when the global helpers are declared, `doc.win.createEl()` when the document's `win`
-declares them, and `activeWindow.createEl()` when `Window` declares them. Otherwise the replacement
-is offered as a suggestion. Obsidian's own types declare `activeWindow` as a plain `Window`, so
-`activeDocument.createElement()` gets a suggestion rather than a fix that would not compile.
+declares them, and `activeWindow.createEl()` when `Window` declares them. For the global `document`
+without the global helpers declared, the replacement is offered as a suggestion; for
+`activeDocument` and other documents, the call is not reported (see
+[Popout window documents](#popout-window-documents)).
 
 `createEl()` and `createSvg()` take only tag names the DOM types know (`keyof HTMLElementTagNameMap`
 and `keyof SVGElementTagNameMap`). A tag literal, or a variable typed as a union of known tags, is
@@ -59,9 +63,8 @@ fixed. A `string` variable, a custom element such as `'my-element'`, a deprecate
 suggestion, because the replacement would not compile.
 
 A bare replacement such as `createDiv()` is not offered either when the file binds that name itself:
-inside `function createDiv() { … }`, or with a variable, parameter or import of that name in scope,
-the call would reach that binding instead of Obsidian's helper, and inside the function it would
-recurse. A method named `createDiv` is not a binding, so code inside it is still fixed.
+with a variable, parameter or import of that name in scope, the call would reach that binding
+instead of Obsidian's helper.
 
 `createEl("div", …)` and `el.createEl("span", …)` are fixed when the types show that the shorter
 helper exists where it is called, accepts the arguments after the tag and returns what `createEl()`
@@ -89,6 +92,32 @@ short-circuits or throws exactly where the original call does. Without `?.`, as 
 `doc.createElement("p")` with `doc: Document | null`, TypeScript already reports the call under
 `strictNullChecks` (TS18047), and the replacement `doc.win.createEl("p")` keeps that error rather
 than adding one.
+
+### Popout window documents
+
+Obsidian's own types declare `activeWindow` and a document's `win` as a plain `Window`, which has no
+DOM helpers, so `activeWindow.createEl("p")` and `doc.win.createDiv()` fail to compile with TS2339.
+`activeDocument.createElement("p")` and `doc.createElement("div")` are then the right calls for an
+element in a popout window's document, and are not reported. (`activeDocument.createEl()` is no
+replacement: `createEl()` on a node appends the element to it, and a document takes no second root
+element.) A project that declares the helpers on `Window` gets the fix to `activeWindow.createEl()`
+or `doc.win.createEl()`.
+
+### Helper implementations
+
+Code inside a function named after one of the helpers (`createEl`, `createDiv`, `createSpan`,
+`createSvg`, `createFragment`) is not reported: a function declaration or expression of that name, a
+method or property of that name, or a function assigned to it, such as a polyfill or a test fake:
+
+```ts
+class FakeElement {
+    createSpan(o?: DomElementInfo) { return this.createEl("span", o); }
+}
+window.createDiv = (o, cb) => { const el = document.createElement("div"); /* … */ return el; };
+Element.prototype.createEl = function (tag, o) { return document.createElement(tag); };
+```
+
+There the replacement would call the function it is in, or the polyfill being defined, and recurse.
 
 ### Iframe documents
 

@@ -632,7 +632,9 @@ A few of these are worth knowing in advance:
   plugins this was the largest new source of errors: the plugins it reports went from 775 to 1,946.
   Move fixed styles to your `styles.css`, and set what has to change at run time as CSS variables
   with `` setCssProps({ "--my-width": `${width}px` }) `` (see
-  [`no-static-styles-assignment`](rules/no-static-styles-assignment.md)).
+  [`no-static-styles-assignment`](rules/no-static-styles-assignment.md)). Since 0.5.1 it reports
+  only properties given a fixed value: a computed one, such as
+  `` setCssStyles({ top: `${y}px` }) ``, or clearing a style with `""` is not reported.
 - `prefer-instanceof` reports more: values that may be `null`, such as
   `el.parentElement instanceof HTMLElement` (with a `?.instanceOf()` suggestion, not a fix), and
   instances of generic classes. The plugins it reports went from 372 to 1,052 in the same run.

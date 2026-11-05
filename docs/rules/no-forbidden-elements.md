@@ -27,5 +27,21 @@ document is only recognised by the expressions above, also with `!` or a type as
 `as Document`: one stored in a variable first (`const doc = el.doc; doc.createElement("style")`) or
 returned by a call is not followed, and an iframe's `contentDocument` is not the plugin's document.
 
+### Shadow roots
+
+`styles.css` does not reach inside a shadow root, so a `<style>` or `<link>` there is the only way to
+style its contents, and is not reported:
+
+- `createEl("style")` called on a shadow root or an element created in one: `el.attachShadow(…)`,
+  `el.shadowRoot`, a variable or parameter named `shadowRoot` or typed `ShadowRoot`, a `const`
+  holding one of these, and the result of `createEl()`, `createDiv()` or `createSpan()` on one, as
+  in `const head = shadowRoot.createEl("head"); head.createEl("style", { text: css })`;
+- an element created on a document and passed straight to a shadow root's `appendChild()`,
+  `append()`, `prepend()` or `insertBefore()`, or held in a `const` that every such call in the file
+  passes to a shadow root. An element that is never inserted in the file, or is also inserted
+  elsewhere, is still reported.
+
+A shadow root held in a class property (`this.shadowHead.createEl("style")`) is not followed.
+
 Put the plugin's CSS in `styles.css` instead, which Obsidian loads for you. The [community scanner](../configuration.md#community-plugin-scanner-configuration)
 keeps this rule at `error`.

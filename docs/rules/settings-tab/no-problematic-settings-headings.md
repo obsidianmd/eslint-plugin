@@ -12,13 +12,21 @@
 
 A settings heading, `new Setting(…).setName("…").setHeading()` with a string-literal name, inside a
 class that extends `PluginSettingTab`, declared or as a class expression, including in its callbacks
-and nested functions, whose name contains (ignoring case):
+and nested functions, whose name:
 
-- "settings" or "options": every heading in a settings tab is about settings, so the word adds
-  nothing. Reported without a fix; rename the heading.
-- "general": keep general settings at the top without a heading. The fix removes the heading.
-- the plugin's name, from the `pluginName` option or else the `name` in `manifest.json`: the tab
+- contains the word "settings" or "options", ignoring case: every heading in a settings tab is
+  about settings, so the word adds nothing. The message names the word. Reported without a fix;
+  rename the heading (`"Advanced"` rather than `"Advanced settings"`).
+- is "General": keep general settings at the top without a heading. The fix removes the heading.
+- is the plugin's name, from the `pluginName` option or else the `name` in `manifest.json`: the tab
   already carries it. The fix removes the heading.
+
+The words are matched as whole words: "Subsettings" does not contain "settings". "General" and the
+plugin's name must be the whole name, ignoring case, spaces, and the words "settings" and
+"options" with the punctuation around them: `"General"`, `"General settings"` and, for a plugin
+named Numerals, `"Numerals"` and `"Numerals: Settings"` are reported. A heading that has the word
+among others names a section of its own and is not reported: `"General appearance"`, or
+`"Inline Numerals"` for a plugin named Numerals, or `"Recurring tasks"` for one named Tasks.
 
 The name is that of the last `setName()` in the chain, since each one replaces the one before, and
 it may come before or after `setHeading()`: `new Setting(…).setHeading().setName("General")` is

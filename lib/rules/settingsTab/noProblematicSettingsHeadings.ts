@@ -13,6 +13,21 @@ const HEADING_ONLY_METHODS = new Set(["setName", "setHeading", "setClass"]);
 // keeps the statement from being removed at all.
 const REMOVABLE_METHODS = new Set([...HEADING_ONLY_METHODS, "setDesc", "setTooltip", "setDisabled"]);
 
+// "settings" or "options" as a word of its own, in any case: not "subsettings".
+const SETTINGS_WORD = /(?<![\p{L}\p{N}_])(settings|options)(?![\p{L}\p{N}_])/iu;
+
+// A heading's name, without "settings" and "options" and the punctuation and
+// spaces around them, in lower case: "General settings:" becomes "general".
+// Null when nothing is left.
+function headingSubject(name: string): string | null {
+    const subject = name
+        .replace(new RegExp(SETTINGS_WORD.source, "giu"), " ")
+        .replace(/[\s:\-–—|·•.]+/gu, " ")
+        .trim()
+        .toLowerCase();
+    return subject === "" ? null : subject;
+}
+
 // How the removal of the heading is offered, and, for the suggestion's
 // description, the calls it removes that are more than the heading.
 interface Removal {
@@ -29,7 +44,7 @@ export default ruleCreator<Options, "settings" | "general" | "pluginName" | "rem
         },
         type: "problem" as const,
         messages: {
-            settings: 'Avoid using "settings" in settings headings.',
+            settings: 'Avoid using "{{word}}" in settings headings.',
             general: 'Avoid using a "General" heading in settings.',
             pluginName: "Avoid including the plugin name in settings headings.",
             removeHeading:
@@ -97,19 +112,24 @@ export default ruleCreator<Options, "settings" | "general" | "pluginName" | "rem
                     return;
                 }
 
-                const text = textArg.value.toLowerCase();
-
-                if (text.includes("settings") || text.includes("options")) {
-                    context.report({ node, messageId: "settings" });
+                const word = SETTINGS_WORD.exec(textArg.value)?.[1];
+                if (word !== undefined) {
+                    context.report({ node, messageId: "settings", data: { word: word.toLowerCase() } });
+                }
+                // A heading that is only "General" or the plugin's name, with or
+                // without "settings" or "options", as the plugin guidelines
+                // describe. One that has the word among others, such as
+                // "General appearance" or "Inline Numerals" for a plugin named
+                // Numerals, names a section of its own.
+                const subject = headingSubject(textArg.value);
+                if (subject === null) {
+                    return;
                 }
                 const removal = planRemoval(top, calls, settingConstructor);
-                if (text.includes("general")) {
+                if (subject === "general") {
                     reportRemoval(node, "general", removal);
                 }
-                if (
-                    pluginName &&
-                    text.includes(pluginName.toLowerCase())
-                ) {
+                if (pluginName && subject === headingSubject(pluginName)) {
                     reportRemoval(node, "pluginName", removal);
                 }
             },

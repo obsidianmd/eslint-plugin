@@ -6,6 +6,23 @@ const ruleTester = new RuleTester();
 
 ruleTester.run("no-forbidden-elements", noForbiddenElements, {
     valid: [
+        // --- A shadow root, which styles.css does not reach ---
+        {
+            name: "a <style> in a shadow root's head is allowed (callout-manager)",
+            code: "class P { shadowRoot: ShadowRoot; shadowHead: HTMLElement; customStyleEl: HTMLStyleElement;\n  constructor(frag: DocumentFragment) {\n    const shadowHostEl = frag.createDiv();\n    const shadowRoot = (this.shadowRoot = shadowHostEl.attachShadow({ delegatesFocus: false, mode: 'closed' }));\n    const shadowHead = (this.shadowHead = shadowRoot.createEl('head'));\n    shadowHead.createEl('style', { text: CSS });\n    this.customStyleEl = shadowHead.createEl('style', { attr: { 'data-custom-styles': 'true' } });\n  } }",
+        },
+        {
+            name: "createEl('style') on attachShadow() or el.shadowRoot is allowed",
+            code: "host.attachShadow({ mode: 'open' }).createEl('style'); el.shadowRoot!.createEl('style'); this.el.shadowRoot?.createEl('link', { attr: { rel: 'stylesheet' } });",
+        },
+        {
+            name: "createEl('style') on a parameter typed ShadowRoot is allowed",
+            code: "function style(root: ShadowRoot) { root.createEl('style', { text: css }); }",
+        },
+        {
+            name: "a created <style> appended only to a shadow root is allowed",
+            code: "const shadow = host.attachShadow({ mode: 'open' });\nconst style = document.createElement('style');\nstyle.textContent = css;\nshadow.appendChild(style);\nshadowRoot.append(document.createElement('style'));",
+        },
         {
             name: "createElement('p') is allowed",
             code: "const style = document.createElement('p'); document.head.appendChild(style);",
@@ -96,6 +113,22 @@ ruleTester.run("no-forbidden-elements", noForbiddenElements, {
         },
     ],
     invalid: [
+        // --- Not in a shadow root ---
+        {
+            name: "a created <style> appended to a shadow root and to the document head is reported",
+            code: "const shadow = host.attachShadow({ mode: 'open' });\nconst style = document.createElement('style');\nshadow.appendChild(style);\ndocument.head.appendChild(style.cloneNode());\ndocument.head.appendChild(style);",
+            errors: [{ messageId: "doNotAttachForbiddenStyleElements" }],
+        },
+        {
+            name: "a created <style> never inserted in the file is reported",
+            code: "const style = document.createElement('style'); export { style };",
+            errors: [{ messageId: "doNotAttachForbiddenStyleElements" }],
+        },
+        {
+            name: "a host element or a let that may change is not a shadow root",
+            code: "const host = containerEl.createDiv(); host.attachShadow({ mode: 'open' }); host.createEl('style');\nlet root = el.shadowRoot; root = el; root.createEl('style');",
+            errors: [{ messageId: "doNotAttachForbiddenStyleElements" }, { messageId: "doNotAttachForbiddenStyleElements" }],
+        },
         {
             name: "createElement('style') with appendChild is forbidden",
             code: "const style = document.createElement('style'); document.head.appendChild(style);",

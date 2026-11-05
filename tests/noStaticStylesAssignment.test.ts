@@ -105,6 +105,32 @@ ruleTester.run("no-static-styles-assignment", noInlineStylesRule, {
             name: "toggleAttribute('style') is not setting a style",
             code: "el.toggleAttribute('style', true);",
         },
+
+        // --- Computed values in setCssStyles() and setCssProps() are what they are for ---
+        {
+            name: "setCssStyles and setCssProps with computed values are allowed, unquoted or quoted",
+            code: "popup.setCssProps({ left: `${left}px`, top: `${anchor.bottom + 6}px`, width: `${width}px` }); ta.setCssStyles({ height: `${ta.scrollHeight + 2}px` }); el.setCssStyles({ 'top': `${y}px` }); el.setCssProps({ width }); el.setCssStyles({ display: visible ? 'block' : 'none' });",
+        },
+
+        // --- Clearing an inline style is not setting one ---
+        {
+            name: "assigning an empty string or null clears a style",
+            code: "el.style.display = ''; el.style.height = \"\"; el.style.width = ``; el.style.cssText = ''; iconContainer.style.margin = null; el.style.color = undefined;",
+        },
+        {
+            name: "setProperty, setAttribute('style') and setCss* with an empty value clear a style",
+            code: "document.body.style.setProperty('cursor', ''); el.style.setProperty('color', null); el.setAttribute('style', ''); el.setCssStyles({ height: '' }); el.setCssProps({ top: null, left: '' }); el.setCssStyles({ height: undefined });",
+        },
+        {
+            name: "removeProperty is not reported",
+            code: "el.style.removeProperty('color');",
+        },
+
+        // --- Custom properties are allowed in setProperty() as in setCssProps() ---
+        {
+            name: "setProperty with a fixed value for a custom property is allowed",
+            code: "el.style.setProperty('--dialog-width', '60vw'); el.style.setProperty(`--a`, `1px`);",
+        },
     ],
     invalid: [
         {
@@ -136,11 +162,6 @@ ruleTester.run("no-static-styles-assignment", noInlineStylesRule, {
                     data: { property: "element.style.setProperty" },
                 },
             ],
-        },
-        {
-            name: "setProperty with a literal value is forbidden for a custom property too",
-            code: "el.style.setProperty('--my-var', 'blue');",
-            errors: [{ messageId: "avoidStyleAssignment" }],
         },
         {
             name: "setAttribute('style', literal) is forbidden",
@@ -219,18 +240,23 @@ ruleTester.run("no-static-styles-assignment", noInlineStylesRule, {
             errors: [{ messageId: "avoidStyleAssignment", data: { property: "el.setCssProps" } }],
         },
         {
-            name: "an unquoted property is forbidden whatever its value, as a quoted one is",
-            code: "el.setCssStyles({ top: `${y}px` }); el.setCssStyles({ 'top': `${y}px` }); el.setCssProps({ width });",
-            errors: [
-                { messageId: "avoidStyleAssignment", data: { property: "el.setCssStyles" } },
-                { messageId: "avoidStyleAssignment", data: { property: "el.setCssStyles" } },
-                { messageId: "avoidStyleAssignment", data: { property: "el.setCssProps" } },
-            ],
-        },
-        {
             name: "a CSS property next to CSS variables is forbidden, once per call",
             code: "el.setCssProps({ '--a': 'red', color: 'red', display: 'none' });",
-            errors: [{ messageId: "avoidStyleAssignment", data: { property: "el.setCssProps" } }],
+            errors: [{ messageId: "avoidStyleAssignment", data: { property: "el.setCssProps" }, column: 32, endColumn: 44 }],
+        },
+        {
+            name: "a mixed object is reported at its first fixed value",
+            code: "el.setCssStyles({ left: `${x}px`, height: '', position: 'absolute', top: `${y}px` });",
+            errors: [{ messageId: "avoidStyleAssignment", data: { property: "el.setCssStyles" }, column: 47, endColumn: 67 }],
+        },
+        {
+            name: "a non-empty fixed value is still a fixed value",
+            code: "el.style.display = 'none'; el.style.setProperty('color', 'red'); el.setCssStyles({ opacity: 0 });",
+            errors: [
+                { messageId: "avoidStyleAssignment", data: { property: "element.style.display" } },
+                { messageId: "avoidStyleAssignment", data: { property: "element.style.setProperty" } },
+                { messageId: "avoidStyleAssignment", data: { property: "el.setCssStyles" } },
+            ],
         },
         {
             name: "a computed static template key is forbidden like a quoted one",

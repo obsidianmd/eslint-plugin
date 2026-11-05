@@ -12,6 +12,29 @@ const ruleTester = new RuleTester();
 
 ruleTester.run("no-problematic-settings-headings", rule, {
     valid: [
+        // --- A word among others names a section of its own ---
+        {
+            name: "a heading containing the plugin name among other words is allowed (numerals)",
+            code: tab(`
+                new Setting(this.containerEl).setHeading().setName("Inline Numerals");
+                new Setting(this.containerEl).setName("My Awesome Plugin Configuration").setHeading();`),
+            options: [{ pluginName: "Numerals" }],
+        },
+        {
+            name: "the plugin name inside another word is allowed",
+            code: tab(`
+                new Setting(this.containerEl).setName("Backlinks").setHeading();
+                new Setting(this.containerEl).setName("Recurring tasks").setHeading();`),
+            options: [{ pluginName: "Links" }],
+        },
+        {
+            name: "'general' among other words or inside a word is allowed, and 'settings' inside a word",
+            code: tab(`
+                new Setting(this.containerEl).setName("General appearance").setHeading();
+                new Setting(this.containerEl).setName("Generalized search").setHeading();
+                new Setting(this.containerEl).setName("Subsettings").setHeading();
+                new Setting(this.containerEl).setName("Optionsmenu").setHeading();`),
+        },
         {
             name: "custom heading name is allowed",
             code: `
@@ -123,6 +146,25 @@ ruleTester.run("no-problematic-settings-headings", rule, {
     ],
     invalid: [
         {
+            name: "the message names the word it matched (novel-word-count)",
+            code: tab(`new Setting(this.containerEl).setName("Show advanced options").setHeading();`),
+            output: null,
+            errors: [{ messageId: "settings", data: { word: "options" }, suggestions: [] }],
+        },
+        {
+            name: "the plugin name alone, in any case, is removed",
+            code: tab(`new Setting(this.containerEl).setName("numerals").setHeading();`),
+            options: [{ pluginName: "Numerals" }],
+            output: tab(`;`),
+            errors: [{ messageId: "pluginName" }],
+        },
+        {
+            name: "'General settings' is a General heading, and is removed",
+            code: tab(`new Setting(this.containerEl).setName("General settings").setHeading();`),
+            output: tab(`;`),
+            errors: [{ messageId: "settings", data: { word: "settings" } }, { messageId: "general" }],
+        },
+        {
             name: "heading with 'Settings' is forbidden",
             code: `
                 ${MOCK_CLASS}
@@ -181,17 +223,17 @@ ruleTester.run("no-problematic-settings-headings", rule, {
             `,
         },
         {
-            name: "heading containing plugin name is forbidden and auto-removed",
+            name: "a heading that is the plugin name with 'settings' is forbidden and auto-removed",
             code: `
                 ${MOCK_CLASS}
                 class MyTab extends PluginSettingTab {
                     display() {
-                        new Setting(this.containerEl).setName("My Awesome Plugin Configuration").setHeading();
+                        new Setting(this.containerEl).setName("  my awesome plugin: Settings ").setHeading();
                     }
                 }
             `,
             options: [{ pluginName: "My Awesome Plugin" }],
-            errors: [{ messageId: "pluginName" }],
+            errors: [{ messageId: "settings", data: { word: "settings" } }, { messageId: "pluginName" }],
             output: `
                 ${MOCK_CLASS}
                 class MyTab extends PluginSettingTab {
@@ -253,7 +295,7 @@ ruleTester.run("no-problematic-settings-headings", rule, {
             name: "a heading with a control is not removed (spacekeys)",
             code: tab(`
                 new Setting(this.containerEl)
-                    .setName("Spacekeys keymap file")
+                    .setName("Spacekeys")
                     .setDesc("YAML or Markdown file defining a custom keymap.")
                     .setHeading()
                     .addButton((btn) => btn.setIcon("refresh-cw"));`),
