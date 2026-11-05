@@ -1,7 +1,11 @@
 import { TSESTree } from "@typescript-eslint/utils";
+import { type MinAppVersionOptions, minAppVersionSchema, supportsVersion } from "../minAppVersion.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
-export default ruleCreator({
+// The Obsidian version that added AbstractInputSuggest.
+const ABSTRACT_INPUT_SUGGEST_SINCE = "1.4.10";
+
+export default ruleCreator<MinAppVersionOptions, "preferAbstractInputSuggest">({
     meta: {
         type: "suggestion" as const,
         docs: {
@@ -9,14 +13,19 @@ export default ruleCreator({
                 "Disallow Liam's frequently copied `TextInputSuggest` implementation in favor of the built-in `AbstractInputSuggest`.",
             url: docsUrl("prefer-abstract-input-suggest"),
         },
-        schema: [],
+        schema: minAppVersionSchema,
         messages: {
             preferAbstractInputSuggest:
                 "This appears to be a custom `TextInputSuggest` implementation. Please use the built-in `AbstractInputSuggest` API instead.",
         },
     },
-    defaultOptions: [],
+    defaultOptions: [{}],
     create(context) {
+        // Below 1.4.10 there is no AbstractInputSuggest to use instead.
+        if (supportsVersion(context.options[0]?.minAppVersion, ABSTRACT_INPUT_SUGGEST_SINCE) === false) {
+            return {};
+        }
+
         return {
             // We start by looking for any call to a function named `createPopper`.
             "CallExpression[callee.name='createPopper']"(
