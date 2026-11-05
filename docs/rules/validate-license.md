@@ -16,7 +16,12 @@ This rule catches the sample plugin's `LICENSE` left unedited. Its copyright lin
   is reported too, unless `disableUnchangedYear` is set. `currentYear` sets the year to compare
   against; it defaults to the current year.
 
-Not reported: a copyright line with any other holder, whatever its year.
+Not reported: a copyright line with any other holder, whatever its year, and the `Dynalist Inc.`
+line in a file that also has a copyright line of another holder.
+
+- Next to your own notice, the sample plugin's is the upstream notice kept as attribution for the
+  code taken from it, which the license asks you to keep. The FSF's notice on a GPL-family
+  licence text, below, does not count as another holder.
 
 - Your own notice does not have to carry the current year. Reporting every past year warned nearly
   every plugin, and again every 1 January, which breaks a `--max-warnings 0` build on a date.

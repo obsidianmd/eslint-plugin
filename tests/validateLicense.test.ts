@@ -113,6 +113,25 @@ ruleTester.run("validate-license", licenseRule as unknown as Rule.RuleModule, {
             code: `foo\nbar\nbaz`,
         },
         {
+            // ryohma0510/obsidian-note-progressbar: the sample plugin's notice
+            // kept as attribution for the code taken from it.
+            name: "the sample holder's line next to another holder's is kept attribution, not reported",
+            filename: "LICENSE",
+            code: [
+                "This project contains code under multiple licenses:",
+                "=== Original Obsidian Sample Plugin by Dynalist Inc. (ISC License) ===",
+                "Copyright (C) 2020-2025 by Dynalist Inc.",
+                "",
+                "=== Modifications and Additions by Ryoma Kawahara (MIT License) ===",
+                "Copyright (c) 2026 Ryoma Kawahara",
+            ].join("\n"),
+        },
+        {
+            name: "another holder's line before the sample's counts too",
+            filename: "LICENSE",
+            code: `${FSF_NOTICE}\nCopyright (C) 2020-2022 by John Doe\nCopyright (C) 2020-2022 by Dynalist Inc.`,
+        },
+        {
             // "Portions Copyright ..." credits the sample plugin's code, which a
             // fork may keep; only a line that is itself the notice is checked.
             name: "a copyright notice that does not start its line is not checked",
@@ -194,12 +213,14 @@ ruleTester.run("validate-license", licenseRule as unknown as Rule.RuleModule, {
             ],
         },
         {
-            name: "only the sample holder's line is reported among several copyright lines",
+            // The FSF's notice is the licence text's, not another holder of
+            // the plugin's copyright.
+            name: "the sample holder's line next to the FSF's notice is reported",
             filename: "LICENSE",
-            code: `${FSF_NOTICE}\nCopyright (C) 2020-2022 by John Doe\nCopyright (C) 2020-2022 by Dynalist Inc.`,
+            code: `${FSF_NOTICE}\nCopyright (C) 2020-2022 by Dynalist Inc.`,
             errors: [
-                { messageId: "unchangedYear", data: { expected: currentYear.toString(), actual: "2022" }, line: 5 },
-                { messageId: "unchangedCopyright", line: 5 }
+                { messageId: "unchangedYear", data: { expected: currentYear.toString(), actual: "2022" }, line: 4 },
+                { messageId: "unchangedCopyright", line: 4 }
             ],
         },
         {
