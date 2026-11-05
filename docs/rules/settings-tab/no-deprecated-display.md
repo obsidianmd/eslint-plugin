@@ -10,17 +10,21 @@
 
 ## What is reported
 
-A `display()` method (or `display` class field) on a settings tab that also implements
-`getSettingDefinitions()`, once `minAppVersion` is 1.13.0 or later. Obsidian then renders the
-declarative settings and never calls `display()`.
+A `display()` method (or `display` class field, also written `"display"` or `["display"]`) on a
+settings tab that also implements `getSettingDefinitions()`, once `minAppVersion` is 1.13.0 or
+later. Obsidian then renders the declarative settings and never calls `display()`.
 
 Below 1.13, or without `getSettingDefinitions()`, `display()` still does the work and is not
-reported. Neither is it when `getSettingDefinitions()` only returns an empty array
-(`return [];`): Obsidian renders a tab from its definitions only when there are some, so
-`display()` still renders that tab.
+reported. Neither is it when `getSettingDefinitions()` never returns definitions: when every
+`return` in it returns an empty array (`return [];`, `() => []`, also through a type assertion such
+as `[] as SettingDefinitionItem[]`), `{}`, `undefined`, `null` or nothing (`return;`), or when it has
+no `return` at all (`getSettingDefinitions() {}`). Obsidian skips `display()` only when
+`getSettingDefinitions()` returns a non-empty array, so `display()` still renders that tab. A
+`return` inside a function nested in `getSettingDefinitions()` does not count.
 
-An editor suggestion removes the `display` member, including a trailing semicolon, a trailing `//`
-comment and its line. `--fix` never removes it, because that is not always safe:
+An editor suggestion removes the `display` member, including a trailing semicolon and, when the
+member has its line to itself, a trailing `//` comment and the line. `--fix` never removes it,
+because that is not always safe:
 
 - With `obsidian` typings older than 1.13, `display()` is abstract, so the class no longer compiles
   without it. Upgrade the `obsidian` package first.
@@ -31,7 +35,8 @@ comment and its line. `--fix` never removes it, because that is not always safe:
 Only a class that extends `PluginSettingTab` by that name is checked, declared or as a class
 expression; an `abstract` class is skipped, and so is a superclass written as a property access
 (`obsidian.PluginSettingTab`). The version comes from the `minAppVersion` option, or else from `manifest.json` in the directory
-ESLint runs from. When neither gives a valid `x.y.z` version, the rule does nothing.
+ESLint runs from. When that version is not a valid `x.y.z` version, the rule does nothing; an
+invalid option, such as `"1.13"`, is not replaced by the manifest's version.
 
 ## Further reading
 

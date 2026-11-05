@@ -1,4 +1,5 @@
-// Acronyms that should remain uppercase
+// Acronyms that keep their casing: all caps, or as listed for one written in
+// mixed case, such as "OAuth"
 export const DEFAULT_ACRONYMS: string[] = [
     // Network protocols
     "API",

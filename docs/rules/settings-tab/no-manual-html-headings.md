@@ -11,14 +11,18 @@
 ## What is reported
 
 A heading element (`h1` to `h6`) created with `createEl()` on an element, such as
-`containerEl.createEl("h2", { text: "Advanced" })`, inside a class declaration that extends
-`PluginSettingTab`. Obsidian's setting headings keep the settings UI consistent:
+`containerEl.createEl("h2", { text: "Advanced" })`, inside a class that extends `PluginSettingTab`,
+declared or as a class expression, including in its callbacks and nested functions. Obsidian's
+setting headings keep the settings UI consistent:
 
 ```ts
 new Setting(containerEl).setName("Advanced").setHeading();
 ```
 
-Headings created outside a settings tab are not reported.
+Headings created outside a settings tab are not reported. The nearest enclosing class decides, so a
+heading in a class nested in the tab, such as a helper class of its own, is not reported either,
+while the rest of the tab still is. A superclass written as a property access
+(`obsidian.PluginSettingTab`) is not recognised.
 
 ## Fixes and suggestions
 
@@ -46,14 +50,28 @@ offered as a suggestion instead. A heading kept in a variable that is never read
 too.
 
 ```ts
-containerEl.createEl("h4", { text: "Display", cls: "my-heading" }); // suggestion: the class is dropped
+containerEl.createEl("h4", { text: "Display", cls: "my-heading" });
+// suggestion, with type information: new Setting(containerEl).setName("Display").setClass("my-heading").setHeading()
+containerEl.createEl("h4", { text: "Display", attr: { id: "display" } });
+// suggestion: new Setting(containerEl).setName("Display").setHeading(), "dropping the `attr` option"
 ```
+
+With type information, where Obsidian's declarations give `Setting` a `setClass()` that takes the
+`cls` value (a string; an array of classes does not fit), the suggestion keeps the class with
+`.setClass()`. The class then moves from the heading element (the `<h4>`) to the setting's element,
+`settingEl`, so a style that selects the heading by it, such as `h4.my-heading`, no longer applies:
+check your CSS before you apply it. Without type information the class is dropped, like the other
+options. Whatever the suggestion drops, its description names: the other options (`attr`, `title`,
+`parent`, …), a `text` option that `.setText()` replaces, and the callback.
 
 There is no fix or suggestion where the rewrite would not compile or would lose the text: the
 heading element is used afterwards (read from a variable, chained on, passed on or returned), the
 parent is not an HTML element (such as a `DocumentFragment`), the text may be `undefined`, the
 options are not an object literal, `Setting` is only imported as a type or there is no named import
-from `"obsidian"` to add it to, or the project's `Setting` has no `setHeading()`.
+from `"obsidian"` to add it to, or the project's `Setting` has no `setHeading()`. With type
+information, the same goes for a `Setting` whose constructor cannot be called with the parent
+element alone: one that takes no parameter or needs a second argument, as in hand-written
+declarations.
 
 ```ts
 const title = containerEl.createEl("h3", { text: "Models" }); // reported, no fix

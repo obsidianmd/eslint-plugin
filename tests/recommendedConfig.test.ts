@@ -1,4 +1,5 @@
 import assert from "node:assert";
+import fs from "node:fs";
 import comments from "@eslint-community/eslint-plugin-eslint-comments/configs";
 import js from "@eslint/js";
 import json from "@eslint/json";
@@ -6,6 +7,7 @@ import { ESLint, type Linter } from "eslint";
 import { builtinRules } from "eslint/use-at-your-own-risk";
 import tseslint from "typescript-eslint";
 import plugin from "../lib/index.js";
+import { PlainTextLanguage } from "../lib/plainTextLanguage.js";
 
 async function rulesFor(configName: keyof typeof plugin.configs, filename: string): Promise<Record<string, any>> {
 	const eslint = new ESLint({
@@ -370,20 +372,25 @@ describe("LICENSE survives rules applied to every file", () => {
 });
 
 // The block docs/configuration.md tells users to add for a licence file under
-// another name.
+// another name, taken from the docs as written.
 describe("validate-license on a user-configured filename", () => {
+	function docsBlock(): Linter.Config {
+		const text = fs.readFileSync(new URL("../docs/configuration.md", import.meta.url), "utf8");
+		const section = text.slice(
+			text.indexOf("### Files linted beyond your source"),
+			text.indexOf("## Using alongside stricter typescript-eslint configs")
+		);
+		const match = /```js\n(\{\n {2}files: \["COPYING"\],\n[\s\S]*?\n\})\n```/.exec(section);
+		assert.ok(match, "no COPYING block under ### Files linted beyond your source");
+		return new Function(`return (${match[1]});`)() as Linter.Config;
+	}
+
 	it("reports on COPYING", async () => {
 		const eslint = new ESLint({
 			overrideConfigFile: true,
 			overrideConfig: [
 				...(plugin.configs.recommended as Linter.Config[]),
-				{
-					files: ["COPYING"],
-					language: "obsidianmd/plain-text",
-					rules: {
-						"obsidianmd/validate-license": "warn",
-					},
-				},
+				docsBlock(),
 			],
 		});
 		const [result] = await eslint.lintText(
@@ -397,6 +404,57 @@ describe("validate-license on a user-configured filename", () => {
 	});
 });
 
+// The severity of every obsidianmd rule in the recommended config, by list.
+const ESCALATED_RULES = [
+	"obsidianmd/detach-leaves",
+	"obsidianmd/platform",
+	"obsidianmd/sample-names",
+	"obsidianmd/no-sample-code",
+	"obsidianmd/no-static-styles-assignment",
+	"obsidianmd/settings-tab/no-manual-html-headings",
+	"obsidianmd/settings-tab/no-problematic-settings-headings",
+	"obsidianmd/no-forbidden-elements",
+	"obsidianmd/regex-lookbehind",
+];
+const ESCALATED_TYPE_CHECKED_RULES = [
+	"obsidianmd/no-plugin-as-component",
+	"obsidianmd/no-view-references-in-plugin",
+	"obsidianmd/no-unsupported-api",
+];
+const WARN_RULES = [
+	"obsidianmd/commands/no-command-in-command-id",
+	"obsidianmd/commands/no-command-in-command-name",
+	"obsidianmd/commands/no-default-hotkeys",
+	"obsidianmd/commands/no-plugin-id-in-command-id",
+	"obsidianmd/commands/no-plugin-name-in-command-name",
+	"obsidianmd/settings-tab/require-display",
+	"obsidianmd/settings-tab/prefer-setting-definitions",
+	"obsidianmd/settings-tab/prefer-update-over-display",
+	"obsidianmd/settings-tab/no-deprecated-display",
+	"obsidianmd/vault/iterate",
+	"obsidianmd/editor-drop-paste",
+	"obsidianmd/hardcoded-config-path",
+	"obsidianmd/no-global-this",
+	"obsidianmd/no-tfile-tfolder-cast",
+	"obsidianmd/object-assign",
+	"obsidianmd/prefer-get-language",
+	"obsidianmd/prefer-abstract-input-suggest",
+	"obsidianmd/prefer-active-doc",
+	"obsidianmd/prefer-window-timers",
+];
+const WARN_TYPE_CHECKED_RULES = [
+	"obsidianmd/prefer-create-el",
+	"obsidianmd/prefer-file-manager-trash-file",
+	"obsidianmd/prefer-instanceof",
+];
+// Asserted on their own below.
+const OTHER_SEVERITY_RULES = [
+	"obsidianmd/ui/sentence-case",
+	"obsidianmd/no-nodejs-modules",
+	"obsidianmd/rule-custom-message",
+	"obsidianmd/no-misused-promises",
+];
+
 describe("scanner-aligned severities", () => {
 	let tsRules: Record<string, any>;
 	let jsRules: Record<string, any>;
@@ -409,7 +467,6 @@ describe("scanner-aligned severities", () => {
 	it("security rules should be at error", () => {
 		const securityRules = [
 			"no-eval",
-			"no-implied-eval",
 			"no-unsanitized/method",
 			"no-unsanitized/property",
 		];
@@ -422,19 +479,15 @@ describe("scanner-aligned severities", () => {
 		}
 	});
 
+	// typescript-eslint's rule replaces the core one in TypeScript files (see
+	// impliedEval.test.ts).
+	it("implied eval should be at error", () => {
+		assert.strictEqual(getSeverity(tsRules["@typescript-eslint/no-implied-eval"]), "error");
+		assert.strictEqual(getSeverity(jsRules["no-implied-eval"]), "error");
+	});
+
 	it("scanner-escalated obsidianmd rules should be at error", () => {
-		const escalatedRules = [
-			"obsidianmd/detach-leaves",
-			"obsidianmd/platform",
-			"obsidianmd/sample-names",
-			"obsidianmd/no-sample-code",
-			"obsidianmd/no-static-styles-assignment",
-			"obsidianmd/settings-tab/no-manual-html-headings",
-			"obsidianmd/settings-tab/no-problematic-settings-headings",
-			"obsidianmd/no-forbidden-elements",
-			"obsidianmd/regex-lookbehind",
-		];
-		for (const rule of escalatedRules) {
+		for (const rule of ESCALATED_RULES) {
 			assert.strictEqual(
 				getSeverity(tsRules[rule]),
 				"error",
@@ -444,12 +497,7 @@ describe("scanner-aligned severities", () => {
 	});
 
 	it("scanner-escalated type-checked rules should be at error", () => {
-		const escalatedTypeChecked = [
-			"obsidianmd/no-plugin-as-component",
-			"obsidianmd/no-view-references-in-plugin",
-			"obsidianmd/no-unsupported-api",
-		];
-		for (const rule of escalatedTypeChecked) {
+		for (const rule of ESCALATED_TYPE_CHECKED_RULES) {
 			assert.strictEqual(
 				getSeverity(tsRules[rule]),
 				"error",
@@ -459,25 +507,7 @@ describe("scanner-aligned severities", () => {
 	});
 
 	it("non-escalated obsidianmd rules should be at warn", () => {
-		const warnRules = [
-			"obsidianmd/commands/no-command-in-command-id",
-			"obsidianmd/commands/no-command-in-command-name",
-			"obsidianmd/commands/no-default-hotkeys",
-			"obsidianmd/commands/no-plugin-id-in-command-id",
-			"obsidianmd/commands/no-plugin-name-in-command-name",
-			"obsidianmd/settings-tab/require-display",
-			"obsidianmd/vault/iterate",
-			"obsidianmd/editor-drop-paste",
-			"obsidianmd/hardcoded-config-path",
-			"obsidianmd/no-global-this",
-			"obsidianmd/no-tfile-tfolder-cast",
-			"obsidianmd/object-assign",
-			"obsidianmd/prefer-get-language",
-			"obsidianmd/prefer-abstract-input-suggest",
-			"obsidianmd/prefer-active-doc",
-			"obsidianmd/prefer-window-timers",
-		];
-		for (const rule of warnRules) {
+		for (const rule of WARN_RULES) {
 			assert.strictEqual(
 				getSeverity(jsRules[rule]),
 				"warn",
@@ -501,12 +531,7 @@ describe("scanner-aligned severities", () => {
 	});
 
 	it("non-escalated type-checked rules should be at warn", () => {
-		const warnTypeChecked = [
-			"obsidianmd/prefer-create-el",
-			"obsidianmd/prefer-instanceof",
-			"@typescript-eslint/no-deprecated",
-		];
-		for (const rule of warnTypeChecked) {
+		for (const rule of [...WARN_TYPE_CHECKED_RULES, "@typescript-eslint/no-deprecated"]) {
 			assert.strictEqual(
 				getSeverity(tsRules[rule]),
 				"warn",
@@ -538,6 +563,26 @@ describe("scanner-aligned severities", () => {
 			"rule-custom-message should be 'error'"
 		);
 	});
+
+	it("every obsidianmd rule's severity is asserted here", () => {
+		const asserted = new Set([
+			...ESCALATED_RULES,
+			...ESCALATED_TYPE_CHECKED_RULES,
+			...WARN_RULES,
+			...WARN_TYPE_CHECKED_RULES,
+			...OTHER_SEVERITY_RULES,
+		]);
+		assert.deepStrictEqual(Object.keys(tsRules).filter(rule => rule.startsWith("obsidianmd/") && !asserted.has(rule)), []);
+	});
+
+	it("base rules have the same severity for TS as for JS", () => {
+		for (const rule of WARN_RULES) {
+			assert.strictEqual(getSeverity(tsRules[rule]), "warn", rule);
+		}
+		for (const rule of ESCALATED_RULES) {
+			assert.strictEqual(getSeverity(jsRules[rule]), "error", rule);
+		}
+	});
 });
 
 describe("type-checked rule guard", () => {
@@ -565,6 +610,16 @@ describe("type-checked rule guard", () => {
 				`${rule} requires type info but is missing from TS config — add it to recommendedPluginRulesConfigTypeChecked`
 			);
 		}
+	});
+
+	// eslint-doc-generator reads meta.docs.requiresTypeChecking to mark a rule as
+	// needing type information in the README and the rule's doc.
+	it("type-requiring rules, and only those, set meta.docs.requiresTypeChecking", () => {
+		const marked = Object.entries(plugin.rules)
+			.filter(([, rule]) => (rule.meta?.docs as { requiresTypeChecking?: boolean } | undefined)?.requiresTypeChecking === true)
+			.map(([name]) => `obsidianmd/${name}`)
+			.sort();
+		assert.deepStrictEqual(marked, [...TYPE_CHECKED_RULES].sort());
 	});
 });
 
@@ -811,6 +866,8 @@ describe("a user's own JSON block", () => {
 
 // Lints `code` through the recommended config as `filePath`. TypeScript files
 // get type information from this repo's tsconfig, which includes `file.ts`.
+// With CI=true, typescript-eslint otherwise builds the program once from the
+// files on disk, and type-checks `code` in a program of that file alone.
 async function lintRecommended(filePath: string, code: string) {
 	const eslint = new ESLint({
 		overrideConfigFile: true,
@@ -819,7 +876,11 @@ async function lintRecommended(filePath: string, code: string) {
 			{
 				files: ["**/*.ts"],
 				languageOptions: {
-					parserOptions: { project: "./tsconfig.json", tsconfigRootDir: process.cwd() },
+					parserOptions: {
+						project: "./tsconfig.json",
+						tsconfigRootDir: process.cwd(),
+						disallowAutomaticSingleRunInference: true,
+					},
 				},
 			},
 		],
@@ -1073,4 +1134,292 @@ describe("no-undef", () => {
 			["'__BUILD_ID__' is not defined."]
 		);
 	});
+});
+
+describe("plugin object", () => {
+	it("is named and versioned after package.json", () => {
+		const packageJson = JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { name: string; version: string };
+		assert.deepStrictEqual(plugin.meta, { name: packageJson.name, version: packageJson.version });
+	});
+
+	// depend and noUnsanitizedPlugin run no rule in the JS and TS blocks, but a
+	// user's config that turns one of their rules on for those files finds the
+	// plugin only there.
+	for (const filename of ["src/main.ts", "src/main.js"]) {
+		it(`registers depend and noUnsanitizedPlugin for ${filename}, for a user's config`, async () => {
+			const eslint = new ESLint({
+				overrideConfigFile: true,
+				overrideConfig: [
+					...plugin.configs.recommended,
+					{
+						files: ["**/*.{ts,js}"],
+						rules: { "depend/ban-dependencies": "warn", "noUnsanitizedPlugin/method": "warn" },
+					},
+				],
+			});
+			const rules = (await eslint.calculateConfigForFile(filename)).rules ?? {};
+			assert.deepStrictEqual(
+				["depend/ban-dependencies", "noUnsanitizedPlugin/method"].map(rule => getSeverity(rules[rule])),
+				["warn", "warn"]
+			);
+		});
+	}
+
+	it("contributes the plain-text language", () => {
+		assert.deepStrictEqual(Object.keys(plugin.languages), ["plain-text"]);
+		assert.strictEqual(plugin.languages["plain-text"], PlainTextLanguage);
+	});
+
+	// Each rule's meta.docs.url is built from the name it is written under, so a
+	// rule registered under another rule's name shows here.
+	it("registers every rule under the name of its documentation page", () => {
+		for (const [name, rule] of Object.entries(plugin.rules)) {
+			assert.strictEqual(
+				(rule.meta?.docs as { url?: string } | undefined)?.url,
+				`https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
+				name
+			);
+			assert.ok(fs.existsSync(new URL(`../docs/rules/${name}.md`, import.meta.url)), `docs/rules/${name}.md`);
+		}
+	});
+});
+
+// The rules the recommended config takes from ESLint and the other plugins, with
+// the severity it gives them, for TypeScript and JavaScript alike.
+const GENERAL_RULES: Record<string, string> = {
+	"no-unused-vars": "off",
+	"no-unused-expressions": "off",
+	"no-self-compare": "warn",
+	"no-eval": "error",
+	"no-new-func": "off",
+	"prefer-const": "off",
+	"no-implicit-globals": "warn",
+	"no-console": "off",
+	"no-restricted-globals": "warn",
+	"no-restricted-imports": "off",
+	"@typescript-eslint/no-restricted-imports": "warn",
+	"no-alert": "warn",
+	"@typescript-eslint/ban-ts-comment": "off",
+	"@typescript-eslint/no-require-imports": "off",
+	"@typescript-eslint/no-unused-vars": "warn",
+	"@typescript-eslint/no-unused-expressions": "warn",
+	"@typescript-eslint/require-await": "off",
+	"@typescript-eslint/no-explicit-any": "warn",
+	"@microsoft/sdl/no-document-write": "warn",
+	"@microsoft/sdl/no-inner-html": "warn",
+	"import/no-extraneous-dependencies": "warn",
+	"no-unsanitized/method": "error",
+	"no-unsanitized/property": "error",
+};
+
+describe("rules from ESLint and other plugins", () => {
+	for (const filename of ["src/main.ts", "src/main.js"]) {
+		it(`have their severities for ${filename}`, async () => {
+			const rules = await rulesFor("recommended", filename);
+			for (const [rule, severity] of Object.entries(GENERAL_RULES)) {
+				assert.strictEqual(getSeverity(rules[rule]), severity, rule);
+			}
+		});
+	}
+
+	it("no-restricted-globals reports the global app, fetch and localStorage with the config's messages", async () => {
+		const messages = await lintRecommended("src/main.js", "app.vault.getFiles();\nfetch(\"https://example.com\");\nlocalStorage.getItem(\"k\");\n");
+		assert.deepStrictEqual(
+			messages.filter(m => m.ruleId === "no-restricted-globals").map(m => [m.line, m.message]),
+			[
+				[1, "Unexpected use of 'app'. Avoid using the global app object. Instead use the reference provided by your plugin instance."],
+				[2, "Unexpected use of 'fetch'. Use the built-in `requestUrl` function instead of `fetch` for network requests in Obsidian."],
+				[3, "Unexpected use of 'localStorage'. Prefer `App#saveLocalStorage` / `App#loadLocalStorage` functions to write / read localStorage data that's unique to a vault."],
+			]
+		);
+	});
+
+	// Since 0.1.x the list held a bare "warn", meant as a severity, which
+	// no-restricted-globals reads as one more global name.
+	it("no-restricted-globals names only app, fetch and localStorage", async () => {
+		const rules = await rulesFor("recommended", "src/main.js");
+		const [, ...options] = rules["no-restricted-globals"] as [unknown, ...unknown[]];
+		assert.deepStrictEqual(
+			options.map(o => typeof o === "string" ? o : (o as { name: string }).name),
+			["app", "fetch", "localStorage"]
+		);
+		const messages = await lintRecommended("src/main.js", "warn(\"x\");\n");
+		assert.deepStrictEqual(messages.filter(m => m.ruleId === "no-restricted-globals").map(m => m.message), []);
+	});
+
+	it("no-restricted-imports reports axios and a moment value import, but not a moment type import", async () => {
+		const messages = await lintRecommended(
+			"file.ts",
+			"import axios from \"axios\";\nimport type { Moment } from \"moment\";\nimport moment from \"moment\";\nexport { axios, moment };\nexport type { Moment };\n"
+		);
+		assert.deepStrictEqual(
+			messages.filter(m => m.ruleId === "@typescript-eslint/no-restricted-imports").map(m => m.line),
+			[1, 3]
+		);
+		assert.ok(!messages.some(m => m.ruleId === "no-restricted-imports"));
+	});
+
+	it("no-unused-expressions allows short-circuit and ternary calls", async () => {
+		const messages = await lintRecommended(
+			"src/main.js",
+			"export function run(a, b) {\n\ta && b();\n\ta ? b() : a();\n\ta;\n}\n"
+		);
+		assert.deepStrictEqual(
+			messages.filter(m => m.ruleId === "@typescript-eslint/no-unused-expressions").map(m => m.line),
+			[4]
+		);
+	});
+
+	it("no-explicit-any fixes `any` to `unknown`", async () => {
+		const messages = await lintRecommended("file.ts", "export const a: any = 1;\n");
+		assert.deepStrictEqual(
+			messages.filter(m => m.ruleId === "@typescript-eslint/no-explicit-any").map(m => m.fix?.text),
+			["unknown"]
+		);
+	});
+
+	it("no-console and no-new-func run inside rule-custom-message, with its messages", async () => {
+		const messages = await lintRecommended(
+			"src/main.js",
+			[
+				"console.log(1);",
+				"console.info(1);",
+				"console.warn(1);",
+				"console.error(1);",
+				"console.debug(1);",
+				"export const f = new Function(\"return 1\");",
+				"",
+			].join("\n")
+		);
+		assert.deepStrictEqual(
+			messages.filter(m => m.ruleId === "obsidianmd/rule-custom-message").map(m => [m.line, m.severity, m.message]),
+			[
+				[1, 2, "[no-console] Avoid unnecessary logging to console. See https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#Avoid+unnecessary+logging+to+console"],
+				[2, 2, "[no-console] Avoid unnecessary logging to console. See https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#Avoid+unnecessary+logging+to+console"],
+				[6, 2, "[no-new-func] Using the `Function` constructor is dangerous because it executes arbitrary code, similar to `eval()`"],
+			]
+		);
+	});
+});
+
+describe("disable comments", () => {
+	// The rules a disable comment may not switch off, one obsidianmd rule standing
+	// in for `obsidianmd/*`.
+	const RESTRICTED = [
+		"obsidianmd/sample-names",
+		"obsidianmd/no-nodejs-modules",
+		"no-console",
+		"no-restricted-globals",
+		"@typescript-eslint/no-restricted-imports",
+		"no-alert",
+		"@typescript-eslint/no-deprecated",
+		"@typescript-eslint/no-explicit-any",
+		"@microsoft/sdl/no-document-write",
+		"no-eval",
+		"@microsoft/sdl/no-inner-html",
+	];
+
+	async function lintTs(code: string) {
+		return lintRecommended("file.ts", code);
+	}
+
+	for (const rule of RESTRICTED) {
+		it(`may not disable ${rule}`, async () => {
+			for (const filePath of ["file.ts", "src/main.js"]) {
+				const messages = await lintRecommended(filePath, `// eslint-disable-next-line ${rule} -- reason\nexport const a = 1;\n`);
+				assert.deepStrictEqual(
+					messages.filter(m => m.ruleId === "eslint-comments/no-restricted-disable").map(m => m.line),
+					[1],
+					filePath
+				);
+			}
+		});
+	}
+
+	it("may disable a rule that is not listed, with a description", async () => {
+		const messages = await lintTs("// eslint-disable-next-line no-self-compare -- reason\nexport const a = 1 === 1;\n");
+		assert.deepStrictEqual(messages.filter(m => m.ruleId?.startsWith("eslint-comments/")).map(m => m.ruleId), []);
+	});
+
+	it("must pair a block disable with an enable, even at the top of the file", async () => {
+		const messages = await lintTs("/* eslint-disable no-self-compare -- reason */\nexport const a = 1 === 1;\n");
+		assert.deepStrictEqual(
+			messages.filter(m => m.ruleId === "eslint-comments/disable-enable-pair").map(m => [m.line, m.severity]),
+			[[1, 2]]
+		);
+	});
+
+	it("reports an unused disable directive as an error", async () => {
+		const messages = await lintTs("// eslint-disable-next-line no-self-compare -- reason\nexport const a = 1;\n");
+		assert.deepStrictEqual(
+			messages.filter(m => m.ruleId === null).map(m => [m.line, m.severity, m.message]),
+			[[1, 2, "Unused eslint-disable directive (no problems were reported from 'no-self-compare')."]]
+		);
+	});
+
+	it("reports an unused inline config as an error", async () => {
+		const messages = await lintTs("/* eslint no-self-compare: \"warn\" -- reason */\nexport const a = 1;\n");
+		assert.deepStrictEqual(
+			messages.filter(m => m.ruleId === null).map(m => [m.line, m.severity, m.message]),
+			[[1, 2, "Unused inline config ('no-self-compare' is already configured to 'warn')."]]
+		);
+	});
+});
+
+describe("package.json", () => {
+	it("is checked by depend/ban-dependencies at error, with every preset", async () => {
+		const eslint = new ESLint({ overrideConfigFile: true, overrideConfig: plugin.configs.recommended });
+		const [result] = await eslint.lintText(
+			JSON.stringify({ dependencies: { "is-number": "1.0.0", "array-includes": "1.0.0", axios: "1.0.0" } }),
+			{ filePath: "package.json" }
+		);
+		assert.deepStrictEqual(
+			result.messages.map(m => [m.ruleId, m.severity, m.messageId]),
+			[
+				["depend/ban-dependencies", 2, "simpleReplacement"],
+				["depend/ban-dependencies", 2, "nativeReplacement"],
+				["depend/ban-dependencies", 2, "documentedReplacement"],
+			]
+		);
+	});
+});
+
+// package.json, manifest.json and LICENSE are the plugin's, at the project root.
+describe("files linted by name, only at the root", () => {
+	for (const configName of ["recommended", "recommendedWithLocalesEn"] as const) {
+		for (const filename of ["packages/a/package.json", "packages/a/manifest.json", "packages/a/LICENSE", "docs/LICENSE.md"]) {
+			it(`${filename} is not linted by ${configName}`, async () => {
+				const eslint = new ESLint({ overrideConfigFile: true, overrideConfig: plugin.configs[configName] });
+				// A boolean: on failure, assert would otherwise print the whole
+				// resolved config, every plugin and parser in it, and run out of memory.
+				const linted = (await eslint.calculateConfigForFile(filename)) !== undefined;
+				assert.strictEqual(linted, false, filename);
+			});
+		}
+	}
+});
+
+// A type-checked config spread before the recommended config, without `files`,
+// reaches the files the recommended config lints by name too. Their blocks
+// switch the type-checked rules off again, so the run does not abort.
+describe("a type-checked config before the recommended config", () => {
+	const files: Record<string, string> = {
+		"package.json": "{ \"name\": \"word-tally\" }\n",
+		"manifest.json": "{ \"id\": \"word-tally\" }\n",
+		"LICENSE": "MIT License\n\nCopyright (c) 2026 Jane Doe\n",
+	};
+	for (const [filePath, code] of Object.entries(files)) {
+		it(`does not abort the run on ${filePath}`, async () => {
+			const eslint = new ESLint({
+				overrideConfigFile: true,
+				overrideConfig: [
+					...(tseslint.configs.recommendedTypeChecked as Linter.Config[]),
+					...plugin.configs.recommended,
+					{ languageOptions: { parserOptions: { projectService: true, tsconfigRootDir: process.cwd() } } },
+				],
+			});
+			const [result] = await eslint.lintText(code, { filePath });
+			assert.deepStrictEqual(result.messages.filter(m => m.fatal).map(m => m.message), []);
+		});
+	}
 });

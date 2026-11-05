@@ -132,6 +132,43 @@ describe("plain-text language", () => {
         it("has no comments", () => {
             assert.deepStrictEqual(sourceCodeOf("/* eslint-disable */\n").getAllComments(), []);
         });
+
+        it("gives each line the document as its parent, and the document none", () => {
+            const sourceCode = sourceCodeOf("a\nb");
+            for (const line of sourceCode.ast.lines) {
+                assert.strictEqual(sourceCode.getParent(line), sourceCode.ast);
+            }
+            assert.strictEqual(sourceCode.getParent(sourceCode.ast), undefined);
+        });
+
+        // [node, phase (1 enter, 2 exit), number of visitor arguments]
+        function stepsOf(sourceCode: ReturnType<typeof sourceCodeOf>) {
+            return [...sourceCode.traverse()].map(step => {
+                const { target, phase, args } = step as unknown as {
+                    target: PlainTextDocumentNode | PlainTextLineNode;
+                    phase: number;
+                    args: unknown[];
+                };
+                return [target.type === "Line" ? target.value : target.type, phase, args.length];
+            });
+        }
+
+        it("enters the document, enters and exits each line, then exits the document", () => {
+            assert.deepStrictEqual(stepsOf(sourceCodeOf("a\nb")), [
+                ["Document", 1, 1],
+                ["a", 1, 2],
+                ["a", 2, 2],
+                ["b", 1, 2],
+                ["b", 2, 2],
+                ["Document", 2, 1],
+            ]);
+        });
+
+        it("traverses the same way every time", () => {
+            const sourceCode = sourceCodeOf("a\nb");
+            const first = stepsOf(sourceCode);
+            assert.deepStrictEqual(stepsOf(sourceCode), first);
+        });
     });
 
     // ESLint, not the language, strips a byte order mark and turns the
@@ -166,6 +203,41 @@ describe("plain-text language", () => {
             assert.deepStrictEqual(lint("a\r\nbc"), [
                 [1, 1, 1, 2, '"a"'],
                 [2, 1, 2, 3, '"bc"'],
+            ]);
+        });
+
+        it("calls Line visitors with the document as parent, between Document and Document:exit", () => {
+            const calls: string[] = [];
+            const recordVisits = {
+                meta: { type: "problem", schema: [] },
+                create() {
+                    return {
+                        Document: () => calls.push("Document"),
+                        Line: (node: PlainTextLineNode, parent: PlainTextDocumentNode) =>
+                            calls.push(`Line ${node.value} ${parent.type}`),
+                        "Line:exit": (node: PlainTextLineNode) => calls.push(`Line:exit ${node.value}`),
+                        "Document:exit": () => calls.push("Document:exit"),
+                    };
+                },
+            } as unknown as Rule.RuleModule;
+            new Linter().verify("a\nb", [{
+                files: ["LICENSE"],
+                plugins: {
+                    obsidianmd: {
+                        languages: { "plain-text": PlainTextLanguage },
+                        rules: { "record-visits": recordVisits },
+                    },
+                },
+                language: "obsidianmd/plain-text",
+                rules: { "obsidianmd/record-visits": "error" },
+            }], "LICENSE");
+            assert.deepStrictEqual(calls, [
+                "Document",
+                "Line a Document",
+                "Line:exit a",
+                "Line b Document",
+                "Line:exit b",
+                "Document:exit",
             ]);
         });
 

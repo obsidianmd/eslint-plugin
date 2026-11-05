@@ -38,8 +38,30 @@ ruleTester.run("no-deprecated-text-input-suggest", noDeprecatedSuggestRule, {
             name: "a call through a namespace is not reported",
             code: `Popper.createPopper(inputEl, suggestEl, { modifiers: [{ name: "sameWidth" }] });`,
         },
+        {
+            name: "createPopper() without options, or with modifiers that are not an array literal, is not reported",
+            code: `
+                createPopper(inputEl, suggestEl);
+                createPopper(inputEl, suggestEl, { modifiers: sharedModifiers });
+            `,
+        },
+        {
+            name: "sameWidth under another key, in the modifier or in the options, is not reported",
+            code: `
+                createPopper(inputEl, suggestEl, { modifiers: [{ id: "sameWidth" }] });
+                createPopper(inputEl, suggestEl, { placement: "bottom", extra: [{ name: "sameWidth" }] });
+            `,
+        },
     ],
     invalid: [
+        {
+            name: "a sameWidth modifier after other modifiers is forbidden",
+            code: `
+                createPopper(inputEl, suggestEl, { modifiers: [offsetModifier, { name: "offset" }, { name: "sameWidth" }] });
+                createPopper(inputEl, suggestEl, { modifiers: [, { name: "sameWidth" }] });
+            `,
+            errors: [{ messageId: "preferAbstractInputSuggest" }, { messageId: "preferAbstractInputSuggest" }],
+        },
         {
             name: "deprecated sameWidth modifier pattern is forbidden",
             code: `

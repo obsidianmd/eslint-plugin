@@ -25,14 +25,27 @@ export function isJsProgram(context: { sourceCode: { ast: unknown } }): boolean 
 }
 
 /**
+ * The `meta.docs` fields this plugin's rules may set besides `description` and
+ * `url`.
+ */
+export interface PluginDocs {
+	/**
+	 * The rule calls getParserServices() without a fallback, so it throws on a
+	 * file linted without type information. eslint-doc-generator reads it to
+	 * mark the rule as needing type information in the README and the rule doc.
+	 */
+	requiresTypeChecking?: boolean;
+}
+
+/**
  * Creates a JavaScript/TypeScript rule. Every rule made here returns no
  * visitors for a file in another language, so a type-aware rule does not throw
  * from getParserServices() and abort the whole lint run on LICENSE or
  * manifest.json.
  */
 export function ruleCreator<Options extends readonly unknown[], MessageIds extends string>(
-	rule: Readonly<ESLintUtils.RuleWithMeta<Options, MessageIds>>,
-): TSESLint.RuleModule<MessageIds, Options> {
+	rule: Readonly<ESLintUtils.RuleWithMeta<Options, MessageIds, PluginDocs>>,
+): TSESLint.RuleModule<MessageIds, Options, PluginDocs> {
 	return ESLintUtils.RuleCreator.withoutDocs<Options, MessageIds>({
 		...rule,
 		create(context, optionsWithDefault) {

@@ -10,9 +10,10 @@
 
 ## What is reported
 
-Checks the string values of an English locale JSON file — `en.json`, `en-US.json`, `en_GB.json`, or
-any `.json` under an `en/` directory — and reports those not in sentence case. Keys are not checked,
-and neither are array elements. Values in nested objects are.
+Checks the string values of an English locale JSON file — `en.json`, `en-US.json`, `en_GB.json`,
+`en.messages.json`, or any `.json` under a directory named so, such as `en/` or `en-US/`, with `en`
+in any case — and reports those not in sentence case. Keys are not checked, and neither are array
+elements. Values in nested objects are.
 
 ```json
 {
@@ -23,16 +24,23 @@ and neither are array elements. Values in nested objects are.
 ```
 
 Here `"Open Settings"` is reported; `"Open settings"` would pass. The message gives the expected
-text, and with `allowAutoFix: true`, `--fix` rewrites the value as a valid JSON string. Values are
-judged as in [`ui/sentence-case`](sentence-case.md): URLs, date formats such as `YYYY-MM-DD`, brand
-names and "REST" written in capitals keep their casing, and text with inline code or HTML is not
-checked.
+text, and with `allowAutoFix: true`, `--fix` changes the case of the letters that need it and keeps
+every escape as written; a value where such a letter is written as an escape (`\u0053`) is reported
+without a fix. Values are judged as in [`ui/sentence-case`](sentence-case.md): URLs, date formats
+such as `YYYY-MM-DD`, brand names and "REST" written in capitals keep their casing, a brand that is
+also an ordinary word, such as "Windows", may be written as that word ("Close all windows"), and
+text with inline code, HTML or placeholders (`{{count}}`) is not checked. The options work as in
+[`ui/sentence-case`](sentence-case.md#options).
 
 Not reported: keys, array elements, non-string values, and files that are not English locale files,
-such as `fr.json` or `entries.json`, which only starts with "en".
+such as `fr.json`, or `entries.json` and `english.json`, which only start with "en". Only the part
+of the path inside ESLint's working directory counts, as for the config's globs, so a folder above
+the project named `en`, as in `C:\Users\en\plugin\src\settings.json`, does not make the files
+under it locale files.
 
 The rule reads the file with the `json/json` language from `@eslint/json`, which
-`recommendedWithLocalesEn` sets up for these files. To enable it without that config, do the same:
+`recommendedWithLocalesEn` sets up for these files, the same files the rule takes for English locale
+files. To enable it without that config, do the same:
 
 ```js
 import json from "@eslint/json";
@@ -40,7 +48,12 @@ import obsidianmd from "eslint-plugin-obsidianmd";
 
 export default [
   {
-    files: ["**/en.json", "**/en*.json", "**/en/**/*.json"],
+    files: [
+      "**/[eE][nN].json",
+      "**/[eE][nN][._-]?*.json",
+      "**/[eE][nN]/**/*.json",
+      "**/[eE][nN][._-]?*/**/*.json",
+    ],
     language: "json/json",
     plugins: { json, obsidianmd },
     rules: { "obsidianmd/ui/sentence-case-json": "warn" },

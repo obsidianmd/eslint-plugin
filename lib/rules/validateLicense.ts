@@ -63,12 +63,15 @@ const rule: PlainTextRuleDefinition<{
                     disableUnchangedYear: {
                         type: "boolean",
                         description: "If true, do not report the year of an unedited sample-plugin copyright line.",
-                        default: false,
                     }
                 },
                 additionalProperties: false,
             }
         ],
+        // In meta.defaultOptions rather than as a schema `default`, which
+        // ESLint fills in through Ajv and eslint-plugin forbids
+        // (no-meta-schema-default). currentYear has no fixed default.
+        defaultOptions: [{ disableUnchangedYear: false }],
         messages: {
             unchangedCopyright: "Please change the copyright holder from \"Dynalist Inc.\" to your name.",
             unchangedYear: "Please change the copyright year from {{actual}} to the current year ({{expected}}).",

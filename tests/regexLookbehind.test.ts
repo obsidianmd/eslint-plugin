@@ -12,7 +12,7 @@ ruleTester.run("regex-lookbehind", regexLookbehindRule, {
         },
         {
             name: "lookbehind in desktop-only mode is allowed",
-            code: "const re = /(?<=foo)bar/;",
+            code: "const re = /(?<=foo)bar/; const re2 = new RegExp('(?<!a)b');",
             options: [{ isDesktopOnly: true }],
         },
         {
@@ -59,6 +59,12 @@ ruleTester.run("regex-lookbehind", regexLookbehindRule, {
             name: "negative lookbehind in a RegExp string is forbidden",
             code: "const re = new RegExp('(?<!a)b');",
             options: [{ isDesktopOnly: false }],
+            errors: [{ messageId: "lookbehind" }],
+        },
+        {
+            // The repo's own manifest.json has isDesktopOnly: false.
+            name: "without the option, isDesktopOnly is read from manifest.json",
+            code: "const re = /(?<=foo)bar/;",
             errors: [{ messageId: "lookbehind" }],
         },
         {

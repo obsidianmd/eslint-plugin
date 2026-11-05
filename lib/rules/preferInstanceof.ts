@@ -5,11 +5,28 @@ import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 const INSTANCEABLE_BASE_TYPES = new Set(["Node", "UIEvent"]);
 
+// The names that hold the main or the active window, or the global object.
+const GLOBAL_WINDOW_NAMES = new Set(["window", "activeWindow", "globalThis", "global", "self"]);
+
+const NULLISH_FLAGS = ts.TypeFlags.Null | ts.TypeFlags.Undefined | ts.TypeFlags.Void;
+
+// `T | null` and `T | undefined` as `T`: with strictNullChecks a value that may
+// be null or undefined has a union type, which has no symbol or base types of
+// its own. A union of anything else, such as `Node | string`, stays a union.
+function withoutNullish(type: ts.Type): ts.Type {
+    if (!type.isUnion()) {
+        return type;
+    }
+    const rest = type.types.filter((part) => (part.flags & NULLISH_FLAGS) === 0);
+    return rest.length === 1 ? rest[0] : type;
+}
+
 function isInstanceableType(type: ts.Type, services: ParserServices): boolean {
+    type = withoutNullish(type);
     const constraint = type.getConstraint();
 
     if (constraint) {
-        type = constraint;
+        type = withoutNullish(constraint);
     }
 
     const symbol = type.getSymbol();
@@ -17,7 +34,11 @@ function isInstanceableType(type: ts.Type, services: ParserServices): boolean {
         return true;
     }
 
-    const baseTypes = type.getBaseTypes();
+    // A reference to a generic class, such as `DataEl<string>` or a base class
+    // `DataEl<number>`, has no base types of its own; the class it refers to
+    // has. Before TypeScript 5.1, so is the constraint of `this` inside any class.
+    const target = (type as Partial<ts.TypeReference>).target ?? type;
+    const baseTypes = target.getBaseTypes();
     if (baseTypes) {
         for (const baseType of baseTypes) {
             if (isInstanceableType(baseType, services)) {
@@ -55,6 +76,7 @@ export default ruleCreator({
             description:
                 "Prefer `.instanceOf(T)` over `instanceof T` for cross-window safe type checks on DOM Nodes and UIEvents.",
             url: docsUrl("prefer-instanceof"),
+            requiresTypeChecking: true,
         },
         schema: [],
         fixable: "code" as const,
@@ -81,6 +103,13 @@ export default ruleCreator({
 
                 const leftType = services.getTypeAtLocation(node.left);
                 if (!isInstanceableType(leftType, services)) {
+                    return;
+                }
+
+                // `focus instanceof el.ownerDocument.defaultView!.HTMLElement`
+                // checks against a window of the code's choosing, as
+                // `.instanceOf()` does: already cross-window safe.
+                if (readsFromOwnWindow(node.right)) {
                     return;
                 }
 
@@ -130,6 +159,34 @@ export default ruleCreator({
             },
         };
 
+        // Whether `right` reads the constructor from a window object other than
+        // the global ones: `doc.defaultView!.HTMLElement`, `el.win.MouseEvent`,
+        // `win?.HTMLElement`. `window.HTMLElement` and
+        // `activeWindow.HTMLElement` are the main or the active window's, not
+        // necessarily the value's, so those are still reported.
+        function readsFromOwnWindow(right: TSESTree.Expression): boolean {
+            let member: TSESTree.Node = right;
+            while (
+                member.type === TSESTree.AST_NODE_TYPES.TSNonNullExpression ||
+                member.type === TSESTree.AST_NODE_TYPES.ChainExpression
+            ) {
+                member = member.expression;
+            }
+            if (member.type !== TSESTree.AST_NODE_TYPES.MemberExpression) {
+                return false;
+            }
+            let object: TSESTree.Node = member.object;
+            while (object.type === TSESTree.AST_NODE_TYPES.TSNonNullExpression) {
+                object = object.expression;
+            }
+            if (object.type === TSESTree.AST_NODE_TYPES.Identifier && GLOBAL_WINDOW_NAMES.has(object.name)) {
+                return false;
+            }
+            const type = checker.getNonNullableType(services.getTypeAtLocation(object));
+            const parts = type.isUnionOrIntersection() ? type.types : [type];
+            return parts.some((part) => part.getSymbol()?.name === "Window");
+        }
+
         // Whether the left operand may be null or undefined when the check runs.
         function mayBeNullish(left: TSESTree.Expression, type: ts.Type): boolean {
             const node = services.esTreeNodeToTSNodeMap.get(left);
@@ -138,10 +195,16 @@ export default ruleCreator({
             if (isIndexSignatureAccess(node)) {
                 return true;
             }
+            // Only with strictNullChecks can a type include null or undefined.
+            // This comes before the test below, which a union that already
+            // includes null passes as if strictNullChecks were off.
+            if (typeIncludesNullish(type)) {
+                return true;
+            }
             // Without strictNullChecks TypeScript leaves null and undefined out of
             // every type, so getNullableType() returns the type unchanged.
             if (checker.getNullableType(type, ts.TypeFlags.Null) !== type) {
-                return typeIncludesNullish(type);
+                return false;
             }
             // The types cannot tell then, so read the declarations instead:
             // `const child = el.firstElementChild` is declared `Element | null`.
@@ -151,8 +214,7 @@ export default ruleCreator({
         function typeIncludesNullish(type: ts.Type): boolean {
             const constraint = type.getConstraint() ?? type;
             const parts = constraint.isUnion() ? constraint.types : [constraint];
-            const nullish = ts.TypeFlags.Null | ts.TypeFlags.Undefined | ts.TypeFlags.Void;
-            return parts.some((part) => (part.flags & nullish) !== 0);
+            return parts.some((part) => (part.flags & NULLISH_FLAGS) !== 0);
         }
 
         function isIndexSignatureAccess(node: ts.Node): boolean {

@@ -1,4 +1,5 @@
 import { RuleTester } from "@typescript-eslint/rule-tester";
+import globals from "globals";
 import noGlobalThisRule from "../lib/rules/noGlobalThis.js";
 
 const ruleTester = new RuleTester();
@@ -48,6 +49,14 @@ ruleTester.run("no-global-this", noGlobalThisRule, {
         {
             name: "a class member named global is allowed",
             code: "class Settings { global = true; globalThis() { return 1; } }",
+        },
+        {
+            name: "an accessor or an abstract class member named global is allowed",
+            code: "class Settings { accessor global = true; } abstract class Base { abstract global: boolean; abstract accessor globalThis: string; }",
+        },
+        {
+            name: "globalThis in an ambient module is allowed",
+            code: "declare module 'shim' { export default globalThis; }",
         },
         {
             name: "an enum member named global is allowed",
@@ -128,6 +137,16 @@ ruleTester.run("no-global-this", noGlobalThisRule, {
                 suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "const o = { globalThis: window };" }],
             }],
         },
+        {
+            name: "a property value that is not shorthand is replaced on its own",
+            code: "const o = { scope: globalThis };",
+            output: null,
+            errors: [{
+                messageId: "avoidGlobal",
+                data: { name: "globalThis" },
+                suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "const o = { scope: window };" }],
+            }],
+        },
 
         // Fixed: window.<name> has the type <global>.<name> had.
         {
@@ -140,19 +159,23 @@ ruleTester.run("no-global-this", noGlobalThisRule, {
             ],
         },
         {
-            name: "a global of the project's own, which Window does not redeclare, is fixed",
+            name: "a global of the project's own, which Window does not redeclare, is fixed where it is read, and suggested where it is written",
             code: "declare global { var pluginRegistry: Map<string, number>; } globalThis.pluginRegistry.set('a', 1); globalThis.pluginRegistry = new Map();",
-            output: "declare global { var pluginRegistry: Map<string, number>; } window.pluginRegistry.set('a', 1); window.pluginRegistry = new Map();",
+            output: "declare global { var pluginRegistry: Map<string, number>; } window.pluginRegistry.set('a', 1); globalThis.pluginRegistry = new Map();",
             errors: [
                 { messageId: "avoidGlobal", data: { name: "globalThis" } },
-                { messageId: "avoidGlobal", data: { name: "globalThis" } },
+                { messageId: "avoidGlobal", data: { name: "globalThis" }, suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "declare global { var pluginRegistry: Map<string, number>; } globalThis.pluginRegistry.set('a', 1); window.pluginRegistry = new Map();" }] },
             ],
         },
         {
-            name: "typeof a property is fixed",
+            name: "typeof a property gets a suggestion, as window.x throws where the probe would be false",
             code: "if (typeof globalThis.crypto === 'undefined') {}",
-            output: "if (typeof window.crypto === 'undefined') {}",
-            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" } }],
+            output: null,
+            errors: [{
+                messageId: "avoidGlobal",
+                data: { name: "globalThis" },
+                suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "if (typeof window.crypto === 'undefined') {}" }],
+            }],
         },
         {
             name: "a call whose every signature returns the same type is fixed",
@@ -183,27 +206,31 @@ ruleTester.run("no-global-this", noGlobalThisRule, {
         },
         {
             name: "a cast to any or to a type window is assignable to is fixed",
-            code: "(globalThis as any).createEl = 1; const scope = globalThis as typeof globalThis;",
-            output: "(window as any).createEl = 1; const scope = window as typeof globalThis;",
+            code: "const make = (globalThis as any).createEl; const scope = globalThis as typeof globalThis;",
+            output: "const make = (window as any).createEl; const scope = window as typeof globalThis;",
             errors: [
                 { messageId: "avoidGlobal", data: { name: "globalThis" } },
                 { messageId: "avoidGlobal", data: { name: "globalThis" } },
             ],
         },
         {
-            name: "globalThis passed to a call whose result is unused is fixed",
+            name: "globalThis passed to a call whose result is unused gets a suggestion, as the call may define a global",
             code: "Object.assign(globalThis, { createEl: 1 }); Object.defineProperty(globalThis, 'x', { value: 1 });",
-            output: "Object.assign(window, { createEl: 1 }); Object.defineProperty(window, 'x', { value: 1 });",
+            output: null,
             errors: [
-                { messageId: "avoidGlobal", data: { name: "globalThis" } },
-                { messageId: "avoidGlobal", data: { name: "globalThis" } },
+                { messageId: "avoidGlobal", data: { name: "globalThis" }, suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "Object.assign(window, { createEl: 1 }); Object.defineProperty(globalThis, 'x', { value: 1 });" }] },
+                { messageId: "avoidGlobal", data: { name: "globalThis" }, suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "Object.assign(globalThis, { createEl: 1 }); Object.defineProperty(window, 'x', { value: 1 });" }] },
             ],
         },
         {
-            name: "an in check is fixed",
+            name: "an in check gets a suggestion, as in window throws where the probe would be false",
             code: "if ('requestIdleCallback' in globalThis) {}",
-            output: "if ('requestIdleCallback' in window) {}",
-            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" } }],
+            output: null,
+            errors: [{
+                messageId: "avoidGlobal",
+                data: { name: "globalThis" },
+                suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "if ('requestIdleCallback' in window) {}" }],
+            }],
         },
         {
             name: "after a check that returns when there is no document, it is fixed",
@@ -216,6 +243,27 @@ ruleTester.run("no-global-this", noGlobalThisRule, {
             code: "export const id = typeof window !== 'undefined' ? globalThis.crypto.randomUUID() : '';",
             output: "export const id = typeof window !== 'undefined' ? window.crypto.randomUUID() : '';",
             errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" } }],
+        },
+        {
+            name: "a property read with a string key is fixed like a dotted one",
+            code: "globalThis['document'].body.empty();",
+            output: "window['document'].body.empty();",
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" } }],
+        },
+        {
+            name: "globalThis in a namespace, which is runtime code, is fixed",
+            code: "namespace Plugin { export const random = globalThis.crypto; }",
+            output: "namespace Plugin { export const random = window.crypto; }",
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" } }],
+        },
+        {
+            name: "a read as an assignment's value or in an object literal is fixed",
+            code: "declare let current: Crypto; current = globalThis.crypto; const o = { random: globalThis.crypto };",
+            output: "declare let current: Crypto; current = window.crypto; const o = { random: window.crypto };",
+            errors: [
+                { messageId: "avoidGlobal", data: { name: "globalThis" } },
+                { messageId: "avoidGlobal", data: { name: "globalThis" } },
+            ],
         },
 
         // Suggested: the type changes.
@@ -243,6 +291,22 @@ ruleTester.run("no-global-this", noGlobalThisRule, {
                 suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "window.setTimeout((n) => n, 10, 1);" }],
             }],
         },
+        // window.run() would resolve to Window's overload first, and the
+        // callback's `x` would become a string.
+        {
+            name: "a callback that takes its parameter type from only one of the signatures gets a suggestion",
+            code: "declare global { interface Window { run(cb: (x: string) => void): void; } function run(cb: (x: number) => void): void; } export {}; globalThis.run((x) => x);",
+            output: null,
+            errors: [{
+                messageId: "avoidGlobal",
+                data: { name: "globalThis" },
+                suggestions: [{
+                    messageId: "useWindow",
+                    data: { name: "globalThis" },
+                    output: "declare global { interface Window { run(cb: (x: string) => void): void; } function run(cb: (x: number) => void): void; } export {}; window.run((x) => x);",
+                }],
+            }],
+        },
         {
             name: "a cast window does not fit gets a suggestion",
             code: "const globals = globalThis as Record<string, unknown>;",
@@ -261,6 +325,50 @@ ruleTester.run("no-global-this", noGlobalThisRule, {
                 messageId: "avoidGlobal",
                 data: { name: "globalThis" },
                 suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "const assets = window as typeof globalThis & { TesseractCore: unknown };" }],
+            }],
+        },
+        {
+            name: "a property read with a key that is not written out gets a suggestion",
+            code: "declare const key: 'document'; globalThis[key].body;",
+            output: null,
+            errors: [{
+                messageId: "avoidGlobal",
+                data: { name: "globalThis" },
+                suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "declare const key: 'document'; window[key].body;" }],
+            }],
+        },
+        {
+            name: "a property Window declares but the global scope does not gets a suggestion",
+            code: "declare global { interface Window { myPlugin: { id: string } } } export {}; export const id = globalThis.myPlugin.id;",
+            output: null,
+            errors: [{
+                messageId: "avoidGlobal",
+                data: { name: "globalThis" },
+                suggestions: [{
+                    messageId: "useWindow",
+                    data: { name: "globalThis" },
+                    output: "declare global { interface Window { myPlugin: { id: string } } } export {}; export const id = window.myPlugin.id;",
+                }],
+            }],
+        },
+        {
+            name: "globalThis passed to a call whose result is used gets a suggestion",
+            code: "const merged = Object.assign(globalThis, { a: 1 });",
+            output: null,
+            errors: [{
+                messageId: "avoidGlobal",
+                data: { name: "globalThis" },
+                suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "const merged = Object.assign(window, { a: 1 });" }],
+            }],
+        },
+        {
+            name: "globalThis as the whole branch where window exists gets a suggestion",
+            code: "export const scope = typeof window !== 'undefined' ? globalThis : undefined;",
+            output: null,
+            errors: [{
+                messageId: "avoidGlobal",
+                data: { name: "globalThis" },
+                suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "export const scope = typeof window !== 'undefined' ? window : undefined;" }],
             }],
         },
         {
@@ -293,6 +401,27 @@ ruleTester.run("no-global-this", noGlobalThisRule, {
                 suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "window.onerror = null;" }],
             }],
         },
+        // A write to a global defines it for code that may run without a
+        // window: a suggestion, never a fix, also where Window does not have
+        // the property as read-only.
+        ...[
+            ["an increment of a read-only property", "declare global { var counter: number; } globalThis.scrollX++;"],
+            ["an assignment", "declare global { var counter: number; } globalThis.counter = 1;"],
+            ["a compound assignment", "declare global { var counter: number; } globalThis.counter += 1;"],
+            ["an increment", "declare global { var counter: number; } globalThis.counter++;"],
+            ["a delete", "declare global { var counter: number; } delete (globalThis as any).counter;"],
+            ["an assignment through a cast", "(globalThis as any).createEl = 1;"],
+            ["an object pattern", "declare global { var counter: number; } ({ n: globalThis.counter } = { n: 1 });"],
+        ].map(([form, code]) => ({
+            name: `a write to a global, as ${form}, gets a suggestion`,
+            code,
+            output: null,
+            errors: [{
+                messageId: "avoidGlobal" as const,
+                data: { name: "globalThis" },
+                suggestions: [{ messageId: "useWindow" as const, data: { name: "globalThis" }, output: code.replace("globalThis.", "window.").replace("(globalThis as", "(window as") }],
+            }],
+        })),
 
         // Neither: window.<name> would be wrong.
         {
@@ -335,10 +464,350 @@ ruleTester.run("no-global-this", noGlobalThisRule, {
             ],
         },
         {
+            name: "an in check for the document on its own is reported only, as window it would throw",
+            code: "export const hasDocument = 'document' in globalThis;",
+            output: null,
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" }, suggestions: [] }],
+        },
+        {
+            name: "a typeof check for the document through an optional chain is reported only",
+            code: "export const hasDocument = typeof globalThis?.document !== 'undefined';",
+            output: null,
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" }, suggestions: [] }],
+        },
+        {
             name: "code after a check that does not prove window exists is reported only",
             code: "export function now() { const browser = typeof window !== 'undefined'; return browser ? 0 : globalThis.performance.now(); }",
             output: null,
             errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" }, suggestions: [] }],
+        },
+        // Every other way globalThis can be part of a window check: as
+        // `window`, the check would throw where it is false.
+        ...[
+            ["a string key", "export const hasDocument = typeof globalThis['document'] !== 'undefined';"],
+            ["a template literal key", "export const hasDocument = typeof globalThis[`document`] !== 'undefined';"],
+            ["an optional string key", "export const hasWindow = typeof globalThis?.['window'] !== 'undefined';"],
+            ["parentheses", "export const hasDocument = typeof (globalThis).document !== 'undefined';"],
+            ["a cast", "export const hasDocument = typeof (globalThis as any).document !== 'undefined';"],
+            ["a non-null assertion", "export const hasDocument = typeof globalThis!.document !== 'undefined';"],
+            ["globalThis.window's document", "export const hasDocument = typeof globalThis.window.document !== 'undefined';"],
+            ["an optional chain past window", "export const hasDocument = typeof globalThis.window?.document !== 'undefined';"],
+            ["an optional chain past self", "export const hasDocument = typeof globalThis.self?.document !== 'undefined';"],
+            ["a worker global", "export const inWorker = typeof globalThis.importScripts === 'function';"],
+            ["an in check with a template literal", "export const hasDocument = `document` in globalThis;"],
+            ["an in check without spaces", "export const hasWindow = 'window'in globalThis;"],
+            ["a negated property", "export const noWindow = !globalThis.window;"],
+            ["a property as an if test", "if (globalThis.document) { console.log('dom'); }"],
+            ["a property before &&", "declare function ready(): boolean; export const go = globalThis.document && ready();"],
+            ["a property after && in an if test", "declare const ready: boolean; if (ready && globalThis.window) {}"],
+            ["a property before ??", "export const win = globalThis.window ?? null;"],
+            ["a property compared with undefined", "export const noDocument = globalThis.document === undefined;"],
+            ["a property read with ?.", "export const body = globalThis.document?.body;"],
+            ["a negated property with a string key", "export const noWindow = !globalThis['window'];"],
+        ].map(([form, code]) => ({
+            name: `a window check through globalThis, with ${form}, is reported only`,
+            code,
+            output: null,
+            errors: [{ messageId: "avoidGlobal" as const, data: { name: "globalThis" }, suggestions: [] }],
+        })),
+        {
+            name: "a window check through global, tested on its own, is reported only",
+            code: "export const noWindow = !global.window;",
+            output: null,
+            errors: [{ messageId: "avoidGlobal", data: { name: "global" }, suggestions: [] }],
+        },
+        {
+            name: "a typeof check with a key that is not written out gets a suggestion, not a fix",
+            code: "declare const key: string; export const has = typeof globalThis[key] !== 'undefined';",
+            output: null,
+            errors: [{
+                messageId: "avoidGlobal",
+                data: { name: "globalThis" },
+                suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "declare const key: string; export const has = typeof window[key] !== 'undefined';" }],
+            }],
+        },
+        {
+            name: "a comment inside a typeof window check does not hide it",
+            code: "export const t = typeof /* no DOM */ window === 'undefined' ? globalThis.performance.now() : 0;",
+            output: null,
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" }, suggestions: [] }],
+        },
+        {
+            name: "the branch where a constant says there is no window is reported only",
+            code: "const hasWindow = typeof window !== 'undefined'; export function now() { return hasWindow ? 0 : globalThis.performance.now(); }",
+            output: null,
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" }, suggestions: [] }],
+        },
+        {
+            name: "the branch where a function says there is no window is reported only",
+            code: "function hasWindow() { return typeof window !== 'undefined'; } export function now() { if (!hasWindow()) { return globalThis.performance.now(); } return 0; }",
+            output: null,
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" }, suggestions: [] }],
+        },
+    ],
+});
+
+// A probe of the global object for a property that may be missing is written
+// to work where it is missing, as in a worker or in Node tests, where
+// `window.x` would throw: a suggestion, never a fix.
+ruleTester.run("no-global-this on probes of the global object", noGlobalThisRule, {
+    valid: [],
+    invalid: [
+        ...[
+            ["typeof global.process", "export const node = typeof global.process !== 'undefined';", "global"],
+            ["typeof with ?.", "export const has = typeof globalThis?.crypto !== 'undefined';", "globalThis"],
+            ["typeof with a string key", "export const has = typeof globalThis['crypto'] !== 'undefined';", "globalThis"],
+            ["typeof through a cast", "export const has = typeof (globalThis as any).MathJax !== 'undefined';", "globalThis"],
+            ["typeof a property of a property", "export const has = typeof globalThis.crypto.subtle !== 'undefined';", "globalThis"],
+            ["an in check on global", "export const has = 'crypto' in global;", "global"],
+            ["an in check through a cast", "export const has = 'crypto' in (globalThis as any);", "globalThis"],
+            ["an optional call", "export const id = globalThis.crypto?.randomUUID();", "globalThis"],
+            ["a property before ??", "export const later = globalThis.queueMicrotask ?? null;", "globalThis"],
+        ].map(([form, code, name]) => ({
+            name: `a probe of the global object, as ${form}, gets a suggestion`,
+            code,
+            output: null,
+            errors: [{
+                messageId: "avoidGlobal" as const,
+                data: { name },
+                suggestions: [{ messageId: "useWindow" as const, data: { name }, output: code.replace(name, "window") }],
+            }],
+        })),
+        {
+            name: "typeof a call's result is not a probe, and is fixed",
+            code: "export const kind = typeof globalThis.crypto.randomUUID();",
+            output: "export const kind = typeof window.crypto.randomUUID();",
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" } }],
+        },
+        {
+            name: "a property read for its value where a probe decides it runs gets a suggestion too",
+            code: "export const id = typeof globalThis.crypto !== 'undefined' ? globalThis.crypto.randomUUID() : '';",
+            output: null,
+            errors: [
+                {
+                    messageId: "avoidGlobal",
+                    data: { name: "globalThis" },
+                    suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "export const id = typeof window.crypto !== 'undefined' ? globalThis.crypto.randomUUID() : '';" }],
+                },
+                {
+                    messageId: "avoidGlobal",
+                    data: { name: "globalThis" },
+                    suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "export const id = typeof globalThis.crypto !== 'undefined' ? window.crypto.randomUUID() : '';" }],
+                },
+            ],
+        },
+        // Found in the community-plugin run: with the probe left alone and the
+        // call fixed, TypeScript reported the probe as always true (TS2774).
+        ...[
+            [
+                "an if with ?.",
+                "export function newId(): string { if (globalThis.crypto?.randomUUID) { return globalThis.crypto.randomUUID(); } return ''; }",
+            ],
+            [
+                "an if with ?. and no braces",
+                "export function newId(): string { if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID(); return ''; }",
+            ],
+            [
+                "&& after typeof globalThis",
+                "export function fill(bytes: Uint8Array) { if (typeof globalThis !== 'undefined' && globalThis.crypto?.getRandomValues) { globalThis.crypto.getRandomValues(bytes); } }",
+            ],
+            [
+                "an early return",
+                "export function newId(): string { if (!globalThis.crypto?.randomUUID) return ''; return globalThis.crypto.randomUUID(); }",
+            ],
+            [
+                "an in check",
+                "export function newId(): string { return 'crypto' in globalThis ? globalThis.crypto.randomUUID() : ''; }",
+            ],
+        ].map(([form, code]) => {
+            // Each globalThis but the one in `typeof globalThis`, which is not reported.
+            const at = [...code.matchAll(/globalThis/g)]
+                .map((m) => m.index)
+                .filter((index) => !code.slice(0, index).endsWith("typeof "));
+            return {
+                name: `the code a probe guards, as ${form}, gets a suggestion, as the probe does`,
+                code,
+                output: null,
+                errors: at.map((index) => ({
+                    messageId: "avoidGlobal" as const,
+                    data: { name: "globalThis" },
+                    suggestions: [{
+                        messageId: "useWindow" as const,
+                        data: { name: "globalThis" },
+                        output: code.slice(0, index) + "window" + code.slice(index + "globalThis".length),
+                    }],
+                })),
+            };
+        }),
+        {
+            name: "code after a probe that does not decide whether it runs is still fixed",
+            code: "export function newId(): string { const has = Boolean(globalThis.crypto?.randomUUID); return has ? 'x' : globalThis.performance.now().toString(); }",
+            output: "export function newId(): string { const has = Boolean(globalThis.crypto?.randomUUID); return has ? 'x' : window.performance.now().toString(); }",
+            errors: [
+                {
+                    messageId: "avoidGlobal",
+                    data: { name: "globalThis" },
+                    suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "export function newId(): string { const has = Boolean(window.crypto?.randomUUID); return has ? 'x' : globalThis.performance.now().toString(); }" }],
+                },
+                { messageId: "avoidGlobal", data: { name: "globalThis" } },
+            ],
+        },
+    ],
+});
+
+// A try that reads the window throws without one, so its catch runs without
+// one; a catch that drops the error would hide `window` failing in the try.
+ruleTester.run("no-global-this in try and catch", noGlobalThisRule, {
+    valid: [],
+    invalid: [
+        {
+            name: "globalThis in the catch of a try that reads document is reported only",
+            code: "export function now() { try { return document.timeline.currentTime; } catch { return globalThis.performance.now(); } }",
+            output: null,
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" }, suggestions: [] }],
+        },
+        {
+            name: "globalThis in a try whose catch drops the error gets a suggestion",
+            code: "export function id() { try { return globalThis.crypto.randomUUID(); } catch { return ''; } }",
+            output: null,
+            errors: [{
+                messageId: "avoidGlobal",
+                data: { name: "globalThis" },
+                suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "export function id() { try { return window.crypto.randomUUID(); } catch { return ''; } }" }],
+            }],
+        },
+        {
+            name: "globalThis in a try whose catch reports the error is fixed",
+            code: "export function id() { try { return globalThis.crypto.randomUUID(); } catch (e) { console.error(e); return ''; } }",
+            output: "export function id() { try { return window.crypto.randomUUID(); } catch (e) { console.error(e); return ''; } }",
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" } }],
+        },
+    ],
+});
+
+// A condition that names the environment, from a check that cannot be
+// followed here, may say there is no window: a suggestion, not a fix.
+ruleTester.run("no-global-this under an environment flag", noGlobalThisRule, {
+    valid: [],
+    invalid: [
+        {
+            name: "globalThis decided by an environment flag gets a suggestion",
+            code: "declare const isBrowser: boolean; export function id() { return isBrowser ? globalThis.crypto.randomUUID() : ''; }",
+            output: null,
+            errors: [{
+                messageId: "avoidGlobal",
+                data: { name: "globalThis" },
+                suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "declare const isBrowser: boolean; export function id() { return isBrowser ? window.crypto.randomUUID() : ''; }" }],
+            }],
+        },
+        {
+            name: "globalThis decided by an ordinary setting is fixed",
+            code: "declare const settings: { enabled: boolean }; export function id() { return settings.enabled ? globalThis.crypto.randomUUID() : ''; }",
+            output: "declare const settings: { enabled: boolean }; export function id() { return settings.enabled ? window.crypto.randomUUID() : ''; }",
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" } }],
+        },
+    ],
+});
+
+// Code that defines the window or looks for it, as a jsdom setup does:
+// `window.window` would throw where there is no window yet.
+ruleTester.run("no-global-this where the window is defined or looked for", noGlobalThisRule, {
+    valid: [],
+    invalid: [
+        ...[
+            ["an assignment to global.window", "declare const dom: any; global.window = dom.window as any;", "global"],
+            ["an assignment to globalThis.document", "declare const dom: any; globalThis.document = dom.window.document;", "globalThis"],
+            ["an assignment through a cast", "declare const dom: any; (globalThis as any).window = dom.window;", "globalThis"],
+            ["an assignment to globalThis.self", "declare const scope: any; globalThis.self = scope;", "globalThis"],
+            ["a compound assignment", "declare const dom: any; (global as any).document ??= dom.window.document;", "global"],
+            ["a delete", "delete (globalThis as any).window;", "globalThis"],
+            ["an array pattern", "declare const docs: Document[]; [globalThis.document] = docs;", "globalThis"],
+            ["an object pattern", "declare const dom: any; ({ window: (globalThis as any).window } = dom);", "globalThis"],
+            ["Object.defineProperty", "declare const dom: any; Object.defineProperty(globalThis, 'window', { value: dom.window });", "globalThis"],
+            ["Object.assign", "declare const dom: any; Object.assign(global, { window: dom.window, document: dom.window.document });", "global"],
+            ["Object.assign with a shorthand key", "declare const document: Document; Object.assign(globalThis, { document });", "globalThis"],
+            ["Reflect.set", "declare const dom: any; Reflect.set(globalThis, 'document', dom.window.document);", "globalThis"],
+            ["a read of globalThis.window as a value", "export const win = globalThis.window;", "globalThis"],
+            ["a read of global.document as a value", "export const doc = global.document;", "global"],
+            ["a read of globalThis.document passed on", "declare function use(d: Document): void; use(globalThis.document);", "globalThis"],
+            ["a read of globalThis.self as a value", "export const scope = globalThis.self;", "globalThis"],
+        ].map(([form, code, name]) => ({
+            name: `${form} is reported only`,
+            code,
+            output: null,
+            errors: [{ messageId: "avoidGlobal" as const, data: { name }, suggestions: [] }],
+        })),
+        {
+            name: "a read through globalThis.document is still fixed",
+            code: "export const title = global.document.title; globalThis.window.focus();",
+            output: "export const title = window.document.title; window.window.focus();",
+            errors: [
+                { messageId: "avoidGlobal", data: { name: "global" } },
+                { messageId: "avoidGlobal", data: { name: "globalThis" } },
+            ],
+        },
+        {
+            name: "Object.defineProperty of another property gets a suggestion",
+            code: "Object.defineProperty(globalThis, 'myPlugin', { value: 1 });",
+            output: null,
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" }, suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "Object.defineProperty(window, 'myPlugin', { value: 1 });" }] }],
+        },
+    ],
+});
+
+// Look-alikes of a window check that are not one: still fixed.
+ruleTester.run("no-global-this next to window checks", noGlobalThisRule, {
+    valid: [],
+    invalid: [
+        {
+            name: "a test of a property that is not window or document gets a suggestion, as a probe",
+            code: "if (!globalThis.crypto) { console.log('no crypto'); }",
+            output: null,
+            errors: [{
+                messageId: "avoidGlobal",
+                data: { name: "globalThis" },
+                suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "if (!window.crypto) { console.log('no crypto'); }" }],
+            }],
+        },
+        {
+            name: "the value after a test of globalThis.document is fixed, the test is not",
+            code: "export const body = globalThis.document && globalThis.document.body;",
+            output: "export const body = globalThis.document && window.document.body;",
+            errors: [
+                { messageId: "avoidGlobal", data: { name: "globalThis" }, suggestions: [] },
+                { messageId: "avoidGlobal", data: { name: "globalThis" } },
+            ],
+        },
+        {
+            name: "a property of the document read without a test is fixed",
+            code: "export const title = globalThis['document'].title;",
+            output: "export const title = window['document'].title;",
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" } }],
+        },
+        {
+            name: "an in check for another name with a template literal gets a suggestion, as a probe",
+            code: "if (`requestIdleCallback` in globalThis) {}",
+            output: null,
+            errors: [{
+                messageId: "avoidGlobal",
+                data: { name: "globalThis" },
+                suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "if (`requestIdleCallback` in window) {}" }],
+            }],
+        },
+        {
+            name: "the branch where a constant says the window is there is fixed",
+            code: "const hasWindow = typeof window !== 'undefined'; export function id() { return hasWindow ? globalThis.crypto.randomUUID() : ''; }",
+            output: "const hasWindow = typeof window !== 'undefined'; export function id() { return hasWindow ? window.crypto.randomUUID() : ''; }",
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" } }],
+        },
+        {
+            name: "code after an early return on a missing globalThis.window is fixed",
+            code: "export function id() { if (!globalThis.window) return ''; return globalThis.crypto.randomUUID(); }",
+            output: "export function id() { if (!globalThis.window) return ''; return window.crypto.randomUUID(); }",
+            errors: [
+                { messageId: "avoidGlobal", data: { name: "globalThis" }, suggestions: [] },
+                { messageId: "avoidGlobal", data: { name: "globalThis" } },
+            ],
         },
     ],
 });
@@ -392,19 +861,66 @@ untypedRuleTester.run("no-global-this without type information", noGlobalThisRul
             ],
         },
         {
-            name: "a cast to any and an unused call's argument are fixed without type information",
+            name: "a read through a cast to any is fixed without type information",
+            code: "const x = (globalThis as any).x;",
+            output: "const x = (window as any).x;",
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" } }],
+        },
+        {
+            name: "a read through a cast to unknown is fixed without type information",
+            code: "const x = (globalThis as unknown as { x: number }).x;",
+            output: "const x = (window as unknown as { x: number }).x;",
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" } }],
+        },
+        {
+            name: "a write through a cast and an unused call's argument get a suggestion without type information",
             code: "(globalThis as any).x = 1; Object.assign(globalThis, {});",
-            output: "(window as any).x = 1; Object.assign(window, {});",
+            output: null,
             errors: [
-                { messageId: "avoidGlobal", data: { name: "globalThis" } },
-                { messageId: "avoidGlobal", data: { name: "globalThis" } },
+                { messageId: "avoidGlobal", data: { name: "globalThis" }, suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "(window as any).x = 1; Object.assign(globalThis, {});" }] },
+                { messageId: "avoidGlobal", data: { name: "globalThis" }, suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "(globalThis as any).x = 1; Object.assign(window, {});" }] },
             ],
+        },
+        {
+            name: "a timer function passed on rather than called gets a suggestion without type information",
+            code: "run(globalThis.setTimeout);",
+            output: null,
+            errors: [{
+                messageId: "avoidGlobal",
+                data: { name: "globalThis" },
+                suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "run(window.setTimeout);" }],
+            }],
         },
         {
             name: "a local named window is not the global without type information either",
             code: "function f(window) { globalThis.setTimeout(() => {}, 10); }",
             output: null,
             errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" }, suggestions: [] }],
+        },
+        {
+            name: "an in check gets a suggestion without type information",
+            code: "if ('requestIdleCallback' in globalThis) {}",
+            output: null,
+            errors: [{
+                messageId: "avoidGlobal",
+                data: { name: "globalThis" },
+                suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "if ('requestIdleCallback' in window) {}" }],
+            }],
+        },
+        {
+            name: "an in check for window with a template literal is reported only without type information",
+            code: "export const hasWindow = `window` in globalThis;",
+            output: null,
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" }, suggestions: [] }],
+        },
+        {
+            name: "a discarded timer in the branch without a window is reported only without type information",
+            code: "if (!('window'in globalThis)) { globalThis.setTimeout(() => {}, 10); }",
+            output: null,
+            errors: [
+                { messageId: "avoidGlobal", data: { name: "globalThis" }, suggestions: [] },
+                { messageId: "avoidGlobal", data: { name: "globalThis" }, suggestions: [] },
+            ],
         },
     ],
 });
@@ -424,6 +940,39 @@ noDomRuleTester.run("no-global-this without the DOM lib", noGlobalThisRule, {
             code: "const PILL = Symbol.for('pill'); export const pill = (globalThis as any)[PILL];",
             output: null,
             errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" }, suggestions: [] }],
+        },
+        // `window.process` compiles as `any`, whatever globalThis.process was.
+        {
+            name: "a project that declares window as any gets a suggestion",
+            code: "declare global { var window: any; } export {}; globalThis.process.exit();",
+            output: null,
+            errors: [{
+                messageId: "avoidGlobal",
+                data: { name: "globalThis" },
+                suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "declare global { var window: any; } export {}; window.process.exit();" }],
+            }],
+        },
+    ],
+});
+
+// The recommended config declares the browser's globals, and Node's for a
+// desktop-only plugin. They are variables without a declaration in the file:
+// still the globals.
+const globalsRuleTester = new RuleTester({
+    languageOptions: { globals: { ...globals.browser, ...globals.node } },
+});
+
+globalsRuleTester.run("no-global-this with the recommended config's globals", noGlobalThisRule, {
+    valid: [],
+    invalid: [
+        {
+            name: "globalThis and global are fixed",
+            code: "globalThis.setTimeout(() => {}, 100); global.process;",
+            output: "window.setTimeout(() => {}, 100); window.process;",
+            errors: [
+                { messageId: "avoidGlobal", data: { name: "globalThis" } },
+                { messageId: "avoidGlobal", data: { name: "global" } },
+            ],
         },
     ],
 });

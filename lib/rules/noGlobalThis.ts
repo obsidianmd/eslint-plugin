@@ -1,12 +1,15 @@
 import { type TSESLint, TSESTree } from "@typescript-eslint/utils";
 import ts from "typescript";
 import {
+    followsProbeOfGlobal,
     getGlobalWindowType,
     getTypeInfo,
     isGlobalWindowAt,
+    isInWindowCheck,
+    isProbeOfGlobal,
     isResultDiscarded,
     isTimerCallTypeSafe,
-    isWindowCheck,
+    mayLackWindowAt,
     type TypeInfo,
 } from "../globalWindow.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
@@ -28,6 +31,17 @@ const CAST_KEEPS_TYPE = new Set<TSESTree.AST_NODE_TYPES>([
     TSESTree.AST_NODE_TYPES.TSUnknownKeyword,
     TSESTree.AST_NODE_TYPES.TSNeverKeyword,
 ]);
+
+// The properties of the global object that are the window or its document.
+const WINDOW_PROPERTIES = new Set(["window", "self", "globalThis", "top", "parent", "frames", "document"]);
+
+// The calls that define properties on their first argument, and whether
+// they name them in the second (`Object.defineProperty(globalThis, "x", …)`)
+// or in the keys of the objects that follow (`Object.assign(globalThis, { x })`).
+const DEFINING_CALLS: Record<string, Record<string, "key" | "objects">> = {
+    Object: { defineProperty: "key", defineProperties: "objects", assign: "objects" },
+    Reflect: { defineProperty: "key", set: "key", deleteProperty: "key" },
+};
 
 type Rewrite = "fix" | "suggest" | "none";
 
@@ -75,7 +89,23 @@ export default ruleCreator({
                 }
 
                 const data = { name: node.name };
-                const rewrite = classify(node);
+                let rewrite = classify(node);
+                // `typeof globalThis.crypto`, `"x" in globalThis`: written to work
+                // where the property is missing, which as `window.x` throws
+                // where there is no window. The same goes for a write, which
+                // defines a global for code that may run without a window, and
+                // for code that may run without one, such as the body of
+                // `try { … } catch {}`, or the code a probe guards:
+                // `if (globalThis.crypto?.randomUUID) globalThis.crypto.randomUUID()`.
+                if (
+                    rewrite === "fix" &&
+                    (isProbeOfGlobal(node) ||
+                        writesGlobal(node) ||
+                        mayLackWindowAt(context, node) ||
+                        followsProbeOfGlobal(context.sourceCode, node))
+                ) {
+                    rewrite = "suggest";
+                }
                 if (rewrite === "none") {
                     context.report({ node, messageId: "avoidGlobal", data });
                     return;
@@ -110,22 +140,22 @@ export default ruleCreator({
             if (!isGlobalWindowAt(context, node)) {
                 return "none";
             }
-            const parent = node.parent;
-
-            // `"window" in globalThis`: as `window`, the check would throw
-            // where it is false.
-            if (isWindowCheck(parent)) {
+            // `"window" in globalThis`, `typeof globalThis["document"]`,
+            // `!globalThis.window`: as `window`, the check would throw where
+            // it is false.
+            if (isInWindowCheck(node)) {
                 return "none";
             }
+            // `global.window = dom.window`, `const doc = globalThis.document`,
+            // `Object.assign(global, { document })`: code that defines the
+            // window or looks for it, where `window.window` would throw.
+            if (definesOrReadsWindow(node)) {
+                return "none";
+            }
+            const parent = node.parent;
 
             // globalThis.x, globalThis["x"]
             if (parent.type === TSESTree.AST_NODE_TYPES.MemberExpression && parent.object === node) {
-                // typeof globalThis.document, the same check
-                const outer =
-                    parent.parent.type === TSESTree.AST_NODE_TYPES.ChainExpression ? parent.parent.parent : parent.parent;
-                if (isWindowCheck(outer)) {
-                    return "none";
-                }
                 const name = staticPropertyName(parent);
                 if (name === null) {
                     return "suggest";
@@ -286,6 +316,126 @@ export default ruleCreator({
             return info.checker.isTypeAssignableTo(windowType, target);
         }
 
+        // Whether `node` is the global object in `global.window = …`,
+        // `delete globalThis.document`, `const w = globalThis.window`, or
+        // `Object.defineProperty(globalThis, "window", …)`: a window property
+        // written or read as a value, rather than read through as in
+        // `globalThis.document.body`.
+        function definesOrReadsWindow(node: TSESTree.Identifier): boolean {
+            const member = propertyOf(node);
+            if (member) {
+                const name = staticPropertyName(member);
+                return name !== null && WINDOW_PROPERTIES.has(name) && !isReadThrough(member);
+            }
+            const target = skipCastsUp(node);
+            const call = target.parent;
+            if (call?.type !== TSESTree.AST_NODE_TYPES.CallExpression || call.arguments[0] !== target) {
+                return false;
+            }
+            const how = definingCall(call);
+            if (how === "key") {
+                const key = call.arguments[1];
+                return key !== undefined && WINDOW_PROPERTIES.has(stringValue(key) ?? "");
+            }
+            return how === "objects" && call.arguments.slice(1).some(definesWindowKey);
+        }
+
+        // Whether `node` is the global object in a write: `globalThis.x = 1`,
+        // `globalThis.count++`, `delete globalThis.x`, `[globalThis.x] = list`,
+        // or an argument to a call, such as `Object.assign(globalThis, helpers)`.
+        function writesGlobal(node: TSESTree.Identifier): boolean {
+            const member = propertyOf(node);
+            if (member) {
+                return isWriteTarget(skipCastsUp(member));
+            }
+            const target = skipCastsUp(node);
+            return (
+                (target.parent?.type === TSESTree.AST_NODE_TYPES.CallExpression ||
+                    target.parent?.type === TSESTree.AST_NODE_TYPES.NewExpression) &&
+                target.parent.arguments.includes(target as TSESTree.Expression)
+            );
+        }
+
+        // The member that reads a property of `node`, also through a cast or
+        // `!`: `globalThis.x`, `(globalThis as any).x`, `globalThis!.x`.
+        function propertyOf(node: TSESTree.Node): TSESTree.MemberExpression | null {
+            const target = skipCastsUp(node);
+            const parent = target.parent;
+            return parent?.type === TSESTree.AST_NODE_TYPES.MemberExpression && parent.object === target ? parent : null;
+        }
+
+        // Whether `member` is only read through, so that it throws without a
+        // window either way: `globalThis.document.body`, `globalThis.window.focus()`.
+        function isReadThrough(member: TSESTree.MemberExpression): boolean {
+            const target = skipCastsUp(member);
+            const parent = target.parent;
+            return (
+                (parent?.type === TSESTree.AST_NODE_TYPES.MemberExpression && parent.object === target && !parent.optional) ||
+                (parent?.type === TSESTree.AST_NODE_TYPES.CallExpression && parent.callee === target && !parent.optional)
+            );
+        }
+
+        // `node`, or the cast or `!` around it: `globalThis as any`.
+        function skipCastsUp(node: TSESTree.Node): TSESTree.Node {
+            let current = node;
+            for (let parent = current.parent; parent; parent = current.parent) {
+                if (
+                    (parent.type === TSESTree.AST_NODE_TYPES.TSAsExpression ||
+                        parent.type === TSESTree.AST_NODE_TYPES.TSSatisfiesExpression ||
+                        parent.type === TSESTree.AST_NODE_TYPES.TSTypeAssertion ||
+                        parent.type === TSESTree.AST_NODE_TYPES.TSNonNullExpression) &&
+                    parent.expression === current
+                ) {
+                    current = parent;
+                } else {
+                    break;
+                }
+            }
+            return current;
+        }
+
+        function definingCall(call: TSESTree.CallExpression): "key" | "objects" | undefined {
+            const callee = call.callee;
+            if (
+                callee.type !== TSESTree.AST_NODE_TYPES.MemberExpression ||
+                callee.object.type !== TSESTree.AST_NODE_TYPES.Identifier
+            ) {
+                return undefined;
+            }
+            const name = staticPropertyName(callee);
+            const methods = Object.hasOwn(DEFINING_CALLS, callee.object.name) ? DEFINING_CALLS[callee.object.name] : undefined;
+            return name !== null && methods && Object.hasOwn(methods, name) ? methods[name] : undefined;
+        }
+
+        // Whether `arg` is an object literal with a window property as a key:
+        // `{ window: dom.window }`, `{ document }`.
+        function definesWindowKey(arg: TSESTree.CallExpressionArgument): boolean {
+            return (
+                arg.type === TSESTree.AST_NODE_TYPES.ObjectExpression &&
+                arg.properties.some((property) => {
+                    if (property.type !== TSESTree.AST_NODE_TYPES.Property) {
+                        return false;
+                    }
+                    const key = property.computed
+                        ? stringValue(property.key)
+                        : property.key.type === TSESTree.AST_NODE_TYPES.Identifier
+                          ? property.key.name
+                          : stringValue(property.key);
+                    return key !== undefined && WINDOW_PROPERTIES.has(key);
+                })
+            );
+        }
+
+        function stringValue(node: TSESTree.Node): string | undefined {
+            if (node.type === TSESTree.AST_NODE_TYPES.Literal) {
+                return typeof node.value === "string" ? node.value : undefined;
+            }
+            if (node.type === TSESTree.AST_NODE_TYPES.TemplateLiteral && node.expressions.length === 0) {
+                return node.quasis[0].value.cooked ?? undefined;
+            }
+            return undefined;
+        }
+
         function staticPropertyName(member: TSESTree.MemberExpression): string | null {
             if (!member.computed) {
                 return member.property.type === TSESTree.AST_NODE_TYPES.Identifier ? member.property.name : null;
@@ -385,7 +535,9 @@ export default ruleCreator({
         function findVariable(scope: ReturnType<typeof context.sourceCode.getScope>, name: string): { defs: unknown[] } | null {
             let current: typeof scope | null = scope;
             while (current) {
-                const variable = current.variables.find((v) => v.name === name);
+                // By name, rather than a search of each scope's variables: the
+                // global scope holds every name of TypeScript's lib.
+                const variable = current.set.get(name);
                 if (variable) {
                     return variable;
                 }

@@ -27,6 +27,18 @@ ruleTester.run("prefer-setting-definitions", preferSettingDefinitionsRule, {
             `,
         },
         {
+            name: "getSettingDefinitions() under a quoted or computed string name counts as provided",
+            code: `
+                ${MOCK_CLASS}
+                class QuotedTab extends PluginSettingTab {
+                    "getSettingDefinitions"() { return []; }
+                }
+                class ComputedTab extends PluginSettingTab {
+                    ["getSettingDefinitions"]() { return []; }
+                }
+            `,
+        },
+        {
             name: "abstract base class is skipped",
             code: `
                 ${MOCK_CLASS}
@@ -54,6 +66,19 @@ ruleTester.run("prefer-setting-definitions", preferSettingDefinitionsRule, {
                     display() {}
                 }
             `,
+            // The class name is highlighted, not the whole class.
+            errors: [{ messageId: "missingSettingDefinitions", line: 3, column: 23, endLine: 3, endColumn: 28 }],
+        },
+        {
+            name: "a computed member named by a variable called getSettingDefinitions is not getSettingDefinitions()",
+            code: `
+                ${MOCK_CLASS}
+                const getSettingDefinitions = "definitions";
+                class MyTab extends PluginSettingTab {
+                    [getSettingDefinitions]() { return []; }
+                    display() {}
+                }
+            `,
             errors: [{ messageId: "missingSettingDefinitions" }],
         },
         {
@@ -62,7 +87,8 @@ ruleTester.run("prefer-setting-definitions", preferSettingDefinitionsRule, {
                 ${MOCK_CLASS}
                 const MyTab = class extends PluginSettingTab { display() {} };
             `,
-            errors: [{ messageId: "missingSettingDefinitions" }],
+            // An anonymous class is highlighted at its superclass.
+            errors: [{ messageId: "missingSettingDefinitions", line: 3, column: 45, endColumn: 61 }],
         },
     ],
 });

@@ -4,6 +4,8 @@
 
 💼 This rule is enabled in the following configs: ✅ `recommended`, 🇬🇧 `recommendedWithLocalesEn`.
 
+💭 This rule requires [type information](https://typescript-eslint.io/linting/typed-linting).
+
 <!-- end auto-generated rule header -->
 
 This is typescript-eslint's
@@ -21,7 +23,7 @@ reports ordinary code like these as misused promises:
 // Reported upstream as voidReturnArgument: forEach expects a void callback
 names.forEach((name) => new Setting(containerEl).setName(name));
 
-// Reported upstream as conditional
+// Reported upstream as conditional, where toggle is a ToggleComponent
 if (toggle) toggle.setValue(true);
 ```
 
@@ -37,7 +39,9 @@ reported exactly as upstream reports it:
 - a value that may be a Promise, such as a callback returning `Setting | Promise<void>`.
 
 As upstream, a union in a condition (`if (value)` with `value: Setting | Promise<void>`) is only
-reported with `checksConditionals: { flagUnions: "all" }` or `"strict"`.
+reported with `checksConditionals: { flagUnions: "all" }` or `"strict"`. typescript-eslint added
+`flagUnions` in 8.69; with an older typescript-eslint, such a union is not reported in a condition,
+and the option does not exist.
 
 Not reported: Obsidian's chaining `then` itself, as in the examples above: a `Setting` or component
 returned from a callback, used in a condition, negated, spread or returned from a predicate. The

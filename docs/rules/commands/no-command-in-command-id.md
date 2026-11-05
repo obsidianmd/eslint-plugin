@@ -4,12 +4,14 @@
 
 ⚠️ This rule _warns_ in the following configs: ✅ `recommended`, 🇬🇧 `recommendedWithLocalesEn`.
 
+💡 This rule is manually fixable by [editor suggestions](https://eslint.org/docs/latest/use/core-concepts#rule-suggestions).
+
 <!-- end auto-generated rule header -->
 
 ## What is reported
 
 The `id` of a command passed to `addCommand()` as an object literal, when it is a string literal that
-has "command", in any case, as one of its words:
+has "command", in any case, as one of its words. The key may be quoted (`"id": …`):
 
 ```ts
 this.addCommand({ id: "open-note-command", name: "Open note", callback }); // reported
@@ -26,6 +28,23 @@ literal or a variable, and a command object defined elsewhere and passed to `add
 Changing the ID of a command you already ship resets any hotkey your users assigned to it, so the
 [community scanner](../../configuration.md#community-plugin-scanner-configuration) only checks this
 for the most recently submitted plugins.
+
+## Suggestion
+
+Your editor offers to remove the word "command" from the command ID, never `--fix`, since a user
+who set a hotkey for the command loses it:
+
+```ts
+this.addCommand({ id: "open-note-command", name: "Open note", callback }); // suggests id: "open-note"
+this.addCommand({ id: "commandPalette", name: "Open palette", callback }); // suggests id: "palette"
+```
+
+It goes as the plugin ID does in
+[no-plugin-id-in-command-id](no-plugin-id-in-command-id.md#suggestion): with the separator after
+it, or the one before it at the end of the ID, every time it is there, keeping a camelCase ID
+camelCase and the string's quotes and escapes. Not offered where nothing would be left, as for
+`command`, where "command" is next to something other than a separator or another word, as in
+`command#2`, or where another command in the same file has that ID already.
 
 ## Further reading
 

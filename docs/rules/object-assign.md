@@ -4,6 +4,8 @@
 
 ⚠️ This rule _warns_ in the following configs: ✅ `recommended`, 🇬🇧 `recommendedWithLocalesEn`.
 
+💡 This rule is manually fixable by [editor suggestions](https://eslint.org/docs/latest/use/core-concepts#rule-suggestions).
+
 <!-- end auto-generated rule header -->
 
 ## What is reported
@@ -22,7 +24,7 @@ this.settings = Object.assign(this.defaults, await this.loadData()); // reported
 this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData()); // copy into a new object
 ```
 
-There is no fix. Not reported:
+Not reported:
 
 - a target whose name does not contain `default`, including a property of the defaults such as
   `DEFAULT_SETTINGS.editor`, where only `editor` is matched
@@ -30,3 +32,21 @@ There is no fix. Not reported:
   computed property with a key that is not a string literal, such as `this[key]`
 - an object literal as the second argument, such as `Object.assign(DEFAULT_SETTINGS, { theme: "dark" })`
 - three or more arguments, as in the `{}` form above
+
+## Suggestion
+
+There is no autofix: code may rely on the defaults being changed. A report offers an editor
+suggestion instead, which you review before applying: pass `{}` as the first argument, so that the
+settings are copied into a new object and the defaults are no longer changed. Comments, parentheses
+and `?.` are kept:
+
+```ts
+this.settings = Object.assign(DEFAULT_SETTINGS, await this.loadData());
+// suggests:
+this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+```
+
+Nothing is offered where the result is thrown away, as in `Object.assign(DEFAULT_SETTINGS, data);`
+or `void Object.assign(…)`: such code reads the defaults afterwards, expecting them to hold the
+settings, and with `{}` the call would do nothing. Nor is it offered with type arguments, as in
+`Object.assign<Settings, Partial<Settings>>(…)`, which are for two arguments.

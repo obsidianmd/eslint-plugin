@@ -101,6 +101,69 @@ ruleTester.run("no-view-references-in-plugin", noViewReferencesRule, {
                 }
             `,
         },
+        {
+            name: "registerView() on an object that is not a plugin is not checked",
+            code: `
+                ${MOCK_API}
+                declare const registry: { registerView(type: string, viewCreator: ViewCreator): void };
+                class MyPlugin extends Plugin {
+                    view: MyCustomView;
+                    onload() {
+                        registry.registerView('my-view', (leaf) => this.view = new MyCustomView());
+                    }
+                }
+            `,
+        },
+        {
+            name: "a registerView() without a factory does not crash",
+            code: `
+                ${MOCK_API}
+                class MyPlugin extends Plugin {
+                    onload() {
+                        // @ts-expect-error -- the factory is missing
+                        this.registerView('my-view');
+                    }
+                }
+            `,
+        },
+        {
+            name: "a view stored on something other than the plugin is not reported",
+            code: `
+                ${MOCK_API}
+                class MyPlugin extends Plugin {
+                    app: { view?: MyCustomView } = {};
+                    onload() {
+                        const app = this.app;
+                        let current: MyCustomView;
+                        this.registerView('my-view', (leaf) => {
+                            // @ts-expect-error -- cache is not declared
+                            cache.view = new MyCustomView();
+                            app.view = new MyCustomView();
+                            current = new MyCustomView();
+                            return current;
+                        });
+                    }
+                }
+            `,
+        },
+        {
+            name: "a view that is not created with new, or something stored that is not a view, is not reported",
+            code: `
+                ${MOCK_API}
+                declare function createView(leaf: WorkspaceLeaf): MyCustomView;
+                declare class Helper {}
+                class MyPlugin extends Plugin {
+                    view: MyCustomView;
+                    helper: Helper;
+                    onload() {
+                        this.registerView('my-view', (leaf) => {
+                            this.helper = new Helper();
+                            return this.view = createView(leaf);
+                        });
+                    }
+                }
+            `,
+        },
     ],
     invalid: [
         {
@@ -157,6 +220,60 @@ ruleTester.run("no-view-references-in-plugin", noViewReferencesRule, {
                         const self = this;
                         this.registerView('my-view', (leaf) => self.view = new MyCustomView());
                     }
+                }
+            `,
+            errors: [{ messageId: "avoidViewReference" }],
+        },
+        {
+            name: "an instance of a generic view class is reported",
+            code: `
+                ${MOCK_API}
+                class GenericView<T> extends View { state?: T }
+                class MyPlugin extends Plugin {
+                    view: GenericView<string>;
+                    onload() {
+                        this.registerView('my-view', (leaf) => this.view = new GenericView<string>());
+                    }
+                }
+            `,
+            errors: [{ messageId: "avoidViewReference" }],
+        },
+        {
+            name: "a view whose base class is generic is reported",
+            code: `
+                ${MOCK_API}
+                class StateView<T> extends View { state?: T }
+                class SettingsView extends StateView<{ open: boolean }> { }
+                class MyPlugin extends Plugin {
+                    view: SettingsView;
+                    onload() {
+                        this.registerView('my-view', (leaf) => this.view = new SettingsView());
+                    }
+                }
+            `,
+            errors: [{ messageId: "avoidViewReference" }],
+        },
+        {
+            name: "a plugin whose base class is generic is checked",
+            code: `
+                ${MOCK_API}
+                class SettingsPlugin<T> extends Plugin { settings?: T }
+                class MyPlugin extends SettingsPlugin<{ open: boolean }> {
+                    view: MyCustomView;
+                    onload() {
+                        this.registerView('my-view', (leaf) => this.view = new MyCustomView());
+                    }
+                }
+            `,
+            errors: [{ messageId: "avoidViewReference" }],
+        },
+        {
+            name: "a this typed by a type parameter constrained to Plugin is checked",
+            code: `
+                ${MOCK_API}
+                declare class ViewPlugin extends Plugin { view: MyCustomView }
+                function setup<T extends ViewPlugin>(this: T) {
+                    this.registerView('my-view', (leaf) => this.view = new MyCustomView());
                 }
             `,
             errors: [{ messageId: "avoidViewReference" }],

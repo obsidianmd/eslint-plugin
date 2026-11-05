@@ -10,9 +10,9 @@
 
 ## What is reported
 
-Checks the strings of an English locale module, such as `en.ts`, `en-GB.ts` or a module under an `en/`
-directory, and reports those not in sentence case. The strings checked are those of an exported
-object, including nested objects and arrays:
+Checks the strings of an English locale module, such as `en.ts`, `en-GB.ts`, `en.messages.ts` or a
+module under an `en/` or `en-GB/` directory, and reports those not in sentence case. The strings
+checked are those of an exported object, including nested objects and arrays:
 
 ```ts
 export default { autoReveal: "Enable Auto Reveal" }; // reported
@@ -20,15 +20,27 @@ const strings = { openNote: "Open note" };
 export { strings }; // checked as well, as are `export default strings` and `export const x = { … }`
 ```
 
-The message gives the expected text, and with `allowAutoFix: true`, `--fix` rewrites the string.
-Values are judged as in [`ui/sentence-case`](sentence-case.md): URLs, date formats such as
-`YYYY-MM-DD`, brand names and "REST" written in capitals keep their casing.
+The object may carry `as const`, `satisfies …` or another type assertion, as in
+`export default { … } as const satisfies Record<string, string>`.
 
-Not reported: keys, an object that is not exported, strings in functions, template literals with
-`${…}`, and modules that are not English locale files, such as `fr.ts`.
+The message gives the expected text, and with `allowAutoFix: true`, `--fix` changes the case of the
+letters that need it and keeps the string's quotes or backticks and every escape as written; a
+string where such a letter is written as an escape (`\u0053`) is reported without a fix. A template
+literal is judged on its value, with its escapes decoded. Values are judged as in
+[`ui/sentence-case`](sentence-case.md): URLs, date formats such as `YYYY-MM-DD`, brand names and
+"REST" written in capitals keep their casing, and a brand that is also an ordinary word, such as
+"Windows", may be written as that word ("Close all windows"). The options work as in
+[`ui/sentence-case`](sentence-case.md#options).
 
-`recommendedWithLocalesEn` runs this rule on `.ts`, `.js`, `.cjs` and `.mjs` files named `en`,
-`en-*` or `en_*`, and on those under an `en/` directory.
+Not reported: keys, an object that is not exported, an object assigned to `module.exports`, strings
+in functions, template literals with `${…}`, and modules that are not English locale files, such as
+`fr.ts`. Only the part of the path inside ESLint's working directory counts, as for the config's
+globs, so a folder above the project named `en` or `en-*`, as in `~/en-tools/plugin/src/data.ts`,
+does not make the modules under it locale modules.
+
+`recommendedWithLocalesEn` runs this rule on the same files the rule takes for English locale
+modules: `.ts`, `.js`, `.cjs` and `.mjs` files named `en`, `en-*`, `en_*` or `en.*`, with `en` in
+any case, and those under a directory named so.
 
 ## Options
 

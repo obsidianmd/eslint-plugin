@@ -40,6 +40,38 @@ export function idWords(id: string): string[] {
     return (id.match(ID_WORD) ?? []).map((word) => word.toLowerCase());
 }
 
+/** A word of an ID, lower-cased, and where it is in the ID. */
+export interface IdWordSpan {
+    word: string;
+    start: number;
+    end: number;
+}
+
+/** The words of an ID, as idWords() finds them, with where each one is. */
+export function idWordSpans(id: string): IdWordSpan[] {
+    return Array.from(id.matchAll(ID_WORD), (match) => ({
+        word: match[0].toLowerCase(),
+        start: match.index,
+        end: match.index + match[0].length,
+    }));
+}
+
+/**
+ * Where in `words` all of `wanted` first are, together and in order: the
+ * index of the first of them, or -1.
+ */
+export function indexOfWords(words: readonly string[], wanted: readonly string[]): number {
+    if (wanted.length === 0) {
+        return -1;
+    }
+    for (let start = 0; start + wanted.length <= words.length; start++) {
+        if (wanted.every((word, i) => words[start + i] === word)) {
+            return start;
+        }
+    }
+    return -1;
+}
+
 /** Whether `words` contain all of `wanted`, together and in order. */
 export function containsWords(words: readonly string[], wanted: readonly string[]): boolean {
     for (let start = 0; start + wanted.length <= words.length; start++) {

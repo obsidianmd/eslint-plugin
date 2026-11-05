@@ -3,11 +3,18 @@ import path from "node:path";
 import { RuleTester } from "@typescript-eslint/rule-tester";
 import { type ESLint, Linter } from "eslint";
 import { describe, it } from "mocha";
+import globals from "globals";
 import tseslint from "typescript-eslint";
 import preferActiveDocRule from "../lib/rules/preferActiveDoc.js";
 import preferCreateElRule from "../lib/rules/preferCreateEl.js";
 
-const ruleTester = new RuleTester();
+// A project whose program has the obsidian typings, as a plugin's does, so
+// that activeDocument is declared and the suggestion is offered.
+const ruleTester = new RuleTester({
+    languageOptions: {
+        parserOptions: { project: "./tsconfig.json", tsconfigRootDir: `${process.cwd()}/tests/fixtures/obsidian-project` },
+    },
+});
 
 ruleTester.run("prefer-active-doc", preferActiveDocRule, {
     valid: [
@@ -31,37 +38,39 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
             name: "typeof document check is allowed",
             code: "if (typeof document !== 'undefined') {}",
         },
+        // Object.prototype's members are not replacements. A class member key
+        // is skipped as a key, so each test also has a bare reference.
         {
             name: "constructor is not replaced",
-            code: "class A { constructor() {} }",
+            code: "class A { constructor() {} } constructor;",
         },
         {
             name: "hasOwnProperty is not replaced",
-            code: "class A { hasOwnProperty() {} }",
+            code: "class A { hasOwnProperty() {} } hasOwnProperty;",
         },
         {
             name: "isPrototypeOf is not replaced",
-            code: "class A { isPrototypeOf() {} }",
+            code: "class A { isPrototypeOf() {} } isPrototypeOf;",
         },
         {
             name: "propertyIsEnumerable is not replaced",
-            code: "class A { propertyIsEnumerable() {} }",
+            code: "class A { propertyIsEnumerable() {} } propertyIsEnumerable;",
         },
         {
             name: "toLocaleString is not replaced",
-            code: "class A { toLocaleString() {} }",
+            code: "class A { toLocaleString() {} } toLocaleString;",
         },
         {
             name: "toString is not replaced",
-            code: "class A { toString() {} }",
+            code: "class A { toString() {} } toString;",
         },
         {
             name: "valueOf is not replaced",
-            code: "class A { valueOf() {} }",
+            code: "class A { valueOf() {} } valueOf;",
         },
         {
             name: "__proto__ is not replaced",
-            code: "class A { __proto__() {} }",
+            code: "class A { __proto__() {} } __proto__;",
         },
         {
             name: "window.setTimeout is allowed",
@@ -136,6 +145,10 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
             code: "document: while(true) { break document; }",
         },
         {
+            name: "continue to a label named document is allowed",
+            code: "document: for (;;) { continue document; }",
+        },
+        {
             name: "typeof in type position is allowed",
             code: "type T = typeof document;",
         },
@@ -148,6 +161,14 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
             code: "declare global { interface Window { doc: typeof document } }",
         },
         {
+            name: "document in an ambient module is allowed",
+            code: "declare module 'shim' { export default document; }",
+        },
+        {
+            name: "typeof document in a type assertion is allowed",
+            code: "const doc = getDoc() as typeof document;",
+        },
+        {
             name: "abstract class property named document is allowed",
             code: "abstract class Foo { abstract document: string; }",
         },
@@ -158,6 +179,10 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
         {
             name: "class accessor named document is allowed",
             code: "class Foo { accessor document = ''; }",
+        },
+        {
+            name: "abstract class accessor named document is allowed",
+            code: "abstract class Foo { abstract accessor document: string; }",
         },
         {
             name: "renamed destructured document is allowed",
@@ -194,109 +219,442 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
         {
             name: "bare document reference is forbidden",
             code: "document.getElementById('my-plugin');",
-            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+            errors: [
+                {
+                    messageId: "preferActive",
+                    data: { original: "document", replacement: "activeDocument" },
+                    suggestions: [{ messageId: "useActiveDocument", output: "activeDocument.getElementById('my-plugin');" }],
+                },
+            ],
         },
         // Calls prefer-create-el does not report, or whose replacement keeps `document`.
         {
             name: "document.createElement() with options is still flagged",
             code: "document.createElement('div', { is: 'my-div' });",
-            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+            errors: [
+                {
+                    messageId: "preferActive",
+                    data: { original: "document", replacement: "activeDocument" },
+                    suggestions: [{ messageId: "useActiveDocument", output: "activeDocument.createElement('div', { is: 'my-div' });" }],
+                },
+            ],
         },
         {
             name: "document.createElementNS() for another namespace is still flagged",
             code: "document.createElementNS('http://www.w3.org/1999/xhtml', 'div');",
-            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+            errors: [
+                {
+                    messageId: "preferActive",
+                    data: { original: "document", replacement: "activeDocument" },
+                    suggestions: [{ messageId: "useActiveDocument", output: "activeDocument.createElementNS('http://www.w3.org/1999/xhtml', 'div');" }],
+                },
+            ],
         },
         {
             name: "document.createEl() with a tag other than div or span is still flagged",
             code: "document.createEl('p');",
-            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+            errors: [
+                {
+                    messageId: "preferActive",
+                    data: { original: "document", replacement: "activeDocument" },
+                    suggestions: [{ messageId: "useActiveDocument", output: "activeDocument.createEl('p');" }],
+                },
+            ],
         },
         {
             name: "document.createTextNode() is still flagged",
             code: "document.createTextNode('text');",
-            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+            errors: [
+                {
+                    messageId: "preferActive",
+                    data: { original: "document", replacement: "activeDocument" },
+                    suggestions: [{ messageId: "useActiveDocument", output: "activeDocument.createTextNode('text');" }],
+                },
+            ],
         },
         {
             name: "an asserted document's createElement() is still flagged, as prefer-create-el keeps it in doc.win.createEl()",
             code: "document!.createElement('p'); (document as Document).createElement('p');",
             errors: [
-                { messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } },
-                { messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } },
+                {
+                    messageId: "preferActive",
+                    data: { original: "document", replacement: "activeDocument" },
+                    suggestions: [{ messageId: "useActiveDocument", output: "activeDocument!.createElement('p'); (document as Document).createElement('p');" }],
+                },
+                {
+                    messageId: "preferActive",
+                    data: { original: "document", replacement: "activeDocument" },
+                    suggestions: [{ messageId: "useActiveDocument", output: "document!.createElement('p'); (activeDocument as Document).createElement('p');" }],
+                },
             ],
         },
         {
             name: "document.createElement that is not called is still flagged",
             code: "const create = document.createElement.bind(document);",
             errors: [
-                { messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } },
-                { messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } },
+                {
+                    messageId: "preferActive",
+                    data: { original: "document", replacement: "activeDocument" },
+                    suggestions: [{ messageId: "useActiveDocument", output: "const create = activeDocument.createElement.bind(document);" }],
+                },
+                {
+                    messageId: "preferActive",
+                    data: { original: "document", replacement: "activeDocument" },
+                    suggestions: [{ messageId: "useActiveDocument", output: "const create = document.createElement.bind(activeDocument);" }],
+                },
             ],
         },
         {
             name: "document as an argument to createElement is still flagged",
             code: "el.createElement(document);",
-            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+            errors: [
+                {
+                    messageId: "preferActive",
+                    data: { original: "document", replacement: "activeDocument" },
+                    suggestions: [{ messageId: "useActiveDocument", output: "el.createElement(activeDocument);" }],
+                },
+            ],
+        },
+        {
+            name: "a document member as an argument to createElement is still flagged",
+            code: "el.createElement(document.title);",
+            errors: [
+                {
+                    messageId: "preferActive",
+                    data: { original: "document", replacement: "activeDocument" },
+                    suggestions: [{ messageId: "useActiveDocument", output: "el.createElement(activeDocument.title);" }],
+                },
+            ],
         },
         {
             name: "document.body is forbidden",
             code: "const body = document.body;",
-            errors: [{ messageId: "preferActive" }],
+            errors: [
+                {
+                    messageId: "preferActive",
+                    data: { original: "document", replacement: "activeDocument" },
+                    suggestions: [{ messageId: "useActiveDocument", output: "const body = activeDocument.body;" }],
+                },
+            ],
         },
         {
             name: "document.querySelector is forbidden",
             code: "document.querySelector('.my-class');",
-            errors: [{ messageId: "preferActive" }],
+            errors: [
+                {
+                    messageId: "preferActive",
+                    data: { original: "document", replacement: "activeDocument" },
+                    suggestions: [{ messageId: "useActiveDocument", output: "activeDocument.querySelector('.my-class');" }],
+                },
+            ],
         },
         {
             name: "document.addEventListener is forbidden",
             code: "document.addEventListener('click', handler);",
-            errors: [{ messageId: "preferActive" }],
+            errors: [
+                {
+                    messageId: "preferActive",
+                    data: { original: "document", replacement: "activeDocument" },
+                    suggestions: [{ messageId: "useActiveDocument", output: "activeDocument.addEventListener('click', handler);" }],
+                },
+            ],
         },
         {
             name: "document in as-expression is still flagged",
             code: "const el = (document as any).body;",
-            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+            errors: [
+                {
+                    messageId: "preferActive",
+                    data: { original: "document", replacement: "activeDocument" },
+                    suggestions: [{ messageId: "useActiveDocument", output: "const el = (activeDocument as any).body;" }],
+                },
+            ],
         },
         {
             name: "document in satisfies-expression is still flagged",
             code: "const el = (document satisfies Document).body;",
-            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+            errors: [
+                {
+                    messageId: "preferActive",
+                    data: { original: "document", replacement: "activeDocument" },
+                    suggestions: [{ messageId: "useActiveDocument", output: "const el = (activeDocument satisfies Document).body;" }],
+                },
+            ],
         },
         {
             name: "document in non-null assertion is still flagged",
             code: "const el = document!.body;",
-            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+            errors: [
+                {
+                    messageId: "preferActive",
+                    data: { original: "document", replacement: "activeDocument" },
+                    suggestions: [{ messageId: "useActiveDocument", output: "const el = activeDocument!.body;" }],
+                },
+            ],
         },
         {
             name: "document in enum initializer is still flagged",
             code: "enum Foo { bar = document.title }",
-            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+            errors: [
+                {
+                    messageId: "preferActive",
+                    data: { original: "document", replacement: "activeDocument" },
+                    suggestions: [{ messageId: "useActiveDocument", output: "enum Foo { bar = activeDocument.title }" }],
+                },
+            ],
         },
         {
             name: "document inside a non-ambient namespace is still flagged",
             code: "namespace Foo { export const el = document.body; }",
-            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+            errors: [
+                {
+                    messageId: "preferActive",
+                    data: { original: "document", replacement: "activeDocument" },
+                    suggestions: [{ messageId: "useActiveDocument", output: "namespace Foo { export const el = activeDocument.body; }" }],
+                },
+            ],
         },
         {
             name: "document as a computed member key is still flagged",
             code: "obj[document];",
-            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+            errors: [
+                {
+                    messageId: "preferActive",
+                    data: { original: "document", replacement: "activeDocument" },
+                    suggestions: [{ messageId: "useActiveDocument", output: "obj[activeDocument];" }],
+                },
+            ],
         },
         {
             name: "document as a computed object key is still flagged",
             code: "const x = { [document]: 1 };",
-            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+            errors: [
+                {
+                    messageId: "preferActive",
+                    data: { original: "document", replacement: "activeDocument" },
+                    suggestions: [{ messageId: "useActiveDocument", output: "const x = { [activeDocument]: 1 };" }],
+                },
+            ],
         },
         {
             name: "document as a computed class key is still flagged",
             code: "class Foo { [document] = 1; }",
-            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+            errors: [
+                {
+                    messageId: "preferActive",
+                    data: { original: "document", replacement: "activeDocument" },
+                    suggestions: [{ messageId: "useActiveDocument", output: "class Foo { [activeDocument] = 1; }" }],
+                },
+            ],
         },
         {
             name: "shorthand object property document is still flagged",
             code: "const x = { document };",
-            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+            errors: [
+                {
+                    messageId: "preferActive",
+                    data: { original: "document", replacement: "activeDocument" },
+                    suggestions: [],
+                },
+            ],
+        },
+    ],
+});
+
+// The suggestion, with type information: the project's own obsidian typings
+// declare activeDocument.
+const offered = (output: string) => [{ messageId: "useActiveDocument" as const, output }];
+
+ruleTester.run("prefer-active-doc suggestions", preferActiveDocRule, {
+    valid: [],
+    invalid: [
+        {
+            name: "?. is kept",
+            code: "export function f() { return document?.body; }",
+            errors: [{ messageId: "preferActive", suggestions: offered("export function f() { return activeDocument?.body; }") }],
+        },
+        {
+            name: "parentheses and comments are kept",
+            code: "export function f() { return (/* main */ document).body; }",
+            errors: [{ messageId: "preferActive", suggestions: offered("export function f() { return (/* main */ activeDocument).body; }") }],
+        },
+        {
+            name: "CRLF line endings are kept",
+            code: "export function f() {\r\n    return document.body;\r\n}\r\n",
+            errors: [{ messageId: "preferActive", suggestions: offered("export function f() {\r\n    return activeDocument.body;\r\n}\r\n") }],
+        },
+        {
+            name: "a shorthand property keeps its key",
+            code: "export function f() { return { document }; }",
+            errors: [{ messageId: "preferActive", suggestions: offered("export function f() { return { document: activeDocument }; }") }],
+        },
+        {
+            name: "a variable of a function is set each time it runs",
+            code: "export function f() { const doc = document; return doc; }",
+            errors: [{ messageId: "preferActive", suggestions: offered("export function f() { const doc = activeDocument; return doc; }") }],
+        },
+        {
+            name: "a field of an instance is set each time one is made",
+            code: "export class View { doc = document; constructor() { this.doc = document; } }",
+            errors: [
+                { messageId: "preferActive", suggestions: offered("export class View { doc = activeDocument; constructor() { this.doc = document; } }") },
+                { messageId: "preferActive", suggestions: offered("export class View { doc = document; constructor() { this.doc = activeDocument; } }") },
+            ],
+        },
+        {
+            name: "a typeof check in another function does not count",
+            code: "export function a() { if (typeof document === 'undefined') return; } export function b() { return document.body; }",
+            errors: [{ messageId: "preferActive", suggestions: offered("export function a() { if (typeof document === 'undefined') return; } export function b() { return activeDocument.body; }") }],
+        },
+        {
+            name: "an element compared with document.body is not the document",
+            code: "export function f(el: Element) { return el === document.body; }",
+            errors: [{ messageId: "preferActive", suggestions: offered("export function f(el: Element) { return el === activeDocument.body; }") }],
+        },
+        {
+            name: "the minAppVersion option at 0.15.0 or later",
+            code: "document.body;",
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [{ messageId: "preferActive", suggestions: offered("activeDocument.body;") }],
+        },
+        {
+            name: "a minAppVersion of 0.15, read as 0.15.0",
+            code: "document.body;",
+            options: [{ minAppVersion: "0.15" }],
+            errors: [{ messageId: "preferActive", suggestions: offered("activeDocument.body;") }],
+        },
+        {
+            name: "a minAppVersion that is not a version: the suggestion says what it needs",
+            code: "document.body;",
+            options: [{ minAppVersion: "latest" }],
+            errors: [{
+                messageId: "preferActive",
+                suggestions: [{ messageId: "useActiveDocumentSince", data: { since: "0.15.0" }, output: "activeDocument.body;" }],
+            }],
+        },
+        // Nothing is offered where activeDocument is not the global, or not what the code means.
+        {
+            name: "a parameter named activeDocument",
+            code: "export function f(activeDocument: Document) { return document.body; }",
+            errors: [{ messageId: "preferActive", suggestions: [] }],
+        },
+        {
+            name: "a variable named activeDocument",
+            code: "const activeDocument = 1; export function f() { return document.body; }",
+            errors: [{ messageId: "preferActive", suggestions: [] }],
+        },
+        {
+            name: "a minAppVersion below 0.15.0, which has no activeDocument",
+            code: "document.body;",
+            options: [{ minAppVersion: "0.14.9" }],
+            errors: [{ messageId: "preferActive", suggestions: [] }],
+        },
+        {
+            name: "after a typeof document check",
+            code: "export function f() { if (typeof document === 'undefined') return null; return document.body; }",
+            errors: [{ messageId: "preferActive", suggestions: [] }],
+        },
+        {
+            name: "in a branch a typeof document check decides",
+            code: "export const f = () => typeof document !== 'undefined' ? document.body : null;",
+            errors: [{ messageId: "preferActive", suggestions: [] }],
+        },
+        {
+            name: "where a variable holding a window check decides",
+            code: "const hasDom = typeof window !== 'undefined'; export function f() { if (hasDom) { return document.body; } return null; }",
+            errors: [{ messageId: "preferActive", suggestions: [] }],
+        },
+        {
+            name: "after a check of activeDocument itself",
+            code: "export const f = () => typeof activeDocument !== 'undefined' ? activeDocument : document;",
+            errors: [{ messageId: "preferActive", suggestions: [] }],
+        },
+        {
+            name: "after window.activeDocument is tested",
+            code: "export const f = () => (window as any).activeDocument ?? document;",
+            errors: [{ messageId: "preferActive", suggestions: [] }],
+        },
+        {
+            name: "where an environment check decides",
+            code: "declare const isBrowser: boolean; export function f() { if (isBrowser) { return document.body; } return null; }",
+            errors: [{ messageId: "preferActive", suggestions: [] }],
+        },
+        {
+            name: "document compared with ===",
+            code: "export function f(e: Event) { return e.target === document; }",
+            errors: [{ messageId: "preferActive", suggestions: [] }],
+        },
+        {
+            name: "document compared with !=, through a cast",
+            code: "export function f(el: Element) { return el.ownerDocument != (document as Document); }",
+            errors: [{ messageId: "preferActive", suggestions: [] }],
+        },
+        {
+            name: "document as a switch case",
+            code: "export function f(x: unknown) { switch (x) { case document: return 1; } return 0; }",
+            errors: [{ messageId: "preferActive", suggestions: [] }],
+        },
+        {
+            name: "document kept in a variable of the module",
+            code: "export const doc = document;",
+            errors: [{ messageId: "preferActive", suggestions: [] }],
+        },
+        {
+            name: "document kept in an object in a variable of the module",
+            code: "const ctx = { doc: document, items: [document] }; ctx;",
+            errors: [
+                { messageId: "preferActive", suggestions: [] },
+                { messageId: "preferActive", suggestions: [] },
+            ],
+        },
+        {
+            name: "document assigned to a variable of the module",
+            code: "let doc: Document | undefined; export function init() { doc = document; } doc;",
+            errors: [{ messageId: "preferActive", suggestions: [] }],
+        },
+        {
+            name: "document set on the global object",
+            code: "export function init() { (window as any).pluginDoc = document; globalThis.doc = el?.ownerDocument ?? document; }",
+            errors: [
+                { messageId: "preferActive", suggestions: [] },
+                { messageId: "preferActive", suggestions: [] },
+            ],
+        },
+        {
+            name: "document exported from a CommonJS module",
+            code: "module.exports.doc = document; exports.other = document;",
+            errors: [
+                { messageId: "preferActive", suggestions: [] },
+                { messageId: "preferActive", suggestions: [] },
+            ],
+        },
+        {
+            name: "where a try that reads the document has failed",
+            code: "export function f() { let ok = true; try { document.body; } catch { ok = false; } return ok && document.title; }",
+            errors: [
+                { messageId: "preferActive", suggestions: offered("export function f() { let ok = true; try { activeDocument.body; } catch { ok = false; } return ok && document.title; }") },
+                { messageId: "preferActive", suggestions: [] },
+            ],
+        },
+        {
+            name: "in a try whose catch drops the error",
+            code: "export function f() { try { document.execCommand('copy'); } catch { /* not supported */ } }",
+            errors: [{ messageId: "preferActive", suggestions: [] }],
+        },
+        {
+            name: "document as the default export",
+            code: "export default document;",
+            errors: [{ messageId: "preferActive", suggestions: [] }],
+        },
+        {
+            name: "document in a static field",
+            code: "export class A { static doc = document; }",
+            errors: [{ messageId: "preferActive", suggestions: [] }],
+        },
+        {
+            name: "an assignment to document",
+            code: "export function f(d: Document) { document = d; }",
+            errors: [{ messageId: "preferActive", suggestions: [] }],
         },
     ],
 });
@@ -315,9 +673,62 @@ untypedRuleTester.run("prefer-active-doc without type information", preferActive
             name: "document.createElement() is flagged",
             code: "document.createElement('div'); document.createDocumentFragment();",
             errors: [
-                { messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } },
-                { messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } },
+                {
+                    messageId: "preferActive",
+                    data: { original: "document", replacement: "activeDocument" },
+                    suggestions: [{ messageId: "useActiveDocument", output: "activeDocument.createElement('div'); document.createDocumentFragment();" }],
+                },
+                {
+                    messageId: "preferActive",
+                    data: { original: "document", replacement: "activeDocument" },
+                    suggestions: [{ messageId: "useActiveDocument", output: "document.createElement('div'); activeDocument.createDocumentFragment();" }],
+                },
             ],
+        },
+        {
+            name: "a JavaScript file gets the suggestion",
+            filename: "main.js",
+            code: "function show() {\n    const el = document.querySelector(\".x\");\n}\n",
+            errors: [{
+                messageId: "preferActive",
+                suggestions: [{ messageId: "useActiveDocument", output: "function show() {\n    const el = activeDocument.querySelector(\".x\");\n}\n" }],
+            }],
+        },
+        // The recommended config switches the rule off for worker files, which
+        // have no activeDocument; enabled there by hand, it offers nothing.
+        {
+            name: "nothing is offered in a file under workers/",
+            filename: "src/workers/shims.ts",
+            code: "document.body;",
+            errors: [{ messageId: "preferActive", suggestions: [] }],
+        },
+        {
+            name: "nothing is offered in a .worker file",
+            filename: "src/embedding.worker.js",
+            code: "document.body;",
+            errors: [{ messageId: "preferActive", suggestions: [] }],
+        },
+        {
+            name: "a file that only looks like worker code gets the suggestion",
+            filename: "src/workerManager.ts",
+            code: "document.body;",
+            errors: [{ messageId: "preferActive", suggestions: [{ messageId: "useActiveDocument", output: "activeDocument.body;" }] }],
+        },
+    ],
+});
+
+// A config that turns the global off, as the recommended config does for worker files.
+const activeDocumentOffRuleTester = new RuleTester({
+    languageOptions: { parserOptions: { project: null, projectService: false }, globals: { activeDocument: "off" } },
+});
+
+activeDocumentOffRuleTester.run("prefer-active-doc where the config turns activeDocument off", preferActiveDocRule, {
+    valid: [],
+    invalid: [
+        {
+            name: "nothing is offered",
+            code: "document.body;",
+            errors: [{ messageId: "preferActive", suggestions: [] }],
         },
     ],
 });
@@ -335,10 +746,78 @@ typedJsRuleTester.run("prefer-active-doc in a JavaScript file with type informat
     valid: [],
     invalid: [
         {
-            name: "document.createElement() is flagged",
+            // The fixture project has no obsidian typings, so no activeDocument.
+            name: "document.createElement() is flagged, with nothing offered where the typings have no activeDocument",
             filename: "main.js",
             code: "document.createElement('div');",
-            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" } }],
+            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" }, suggestions: [] }],
+        },
+    ],
+});
+
+// The recommended config runs prefer-create-el on .tsx, .mts and .cts files as
+// well as on .ts ones. The files are stubs in a fixture project: a project
+// service with allowDefaultProject would be shared with the rest of the run.
+const otherExtensionsRuleTester = new RuleTester({
+    languageOptions: {
+        parserOptions: { project: "./tsconfig.json", tsconfigRootDir: `${process.cwd()}/tests/fixtures/ts-extensions` },
+    },
+});
+
+otherExtensionsRuleTester.run("prefer-active-doc in .tsx, .mts and .cts files", preferActiveDocRule, {
+    valid: [
+        {
+            name: "document.createElement() is left to prefer-create-el in a .tsx file",
+            filename: "file.tsx",
+            code: "document.createElement('div');",
+        },
+        {
+            name: "document.createElement() is left to prefer-create-el in a .mts file",
+            filename: "file.mts",
+            code: "document.createElement('div');",
+        },
+        {
+            name: "document.createElement() is left to prefer-create-el in a .cts file",
+            filename: "file.cts",
+            code: "document.createElement('div');",
+        },
+    ],
+    invalid: [
+        {
+            // The fixture project has no obsidian typings, so no activeDocument.
+            name: "document.body is still flagged in a .tsx file",
+            filename: "file.tsx",
+            code: "document.body;",
+            errors: [{ messageId: "preferActive", data: { original: "document", replacement: "activeDocument" }, suggestions: [] }],
+        },
+    ],
+});
+
+// The recommended config declares the browser's and Obsidian's globals. They
+// are variables without a declaration in the file: still the globals.
+const globalsRuleTester = new RuleTester({
+    languageOptions: {
+        globals: { ...globals.browser, activeDocument: "readonly" },
+        parserOptions: { project: "./tsconfig.json", tsconfigRootDir: `${process.cwd()}/tests/fixtures/obsidian-project` },
+    },
+});
+
+globalsRuleTester.run("prefer-active-doc with the recommended config's globals", preferActiveDocRule, {
+    valid: [
+        {
+            name: "document.createElement() is left to prefer-create-el",
+            code: "document.createElement('div');",
+        },
+    ],
+    invalid: [
+        {
+            name: "document.body is forbidden",
+            code: "document.body;",
+            errors: [{
+                messageId: "preferActive",
+                data: { original: "document", replacement: "activeDocument" },
+                suggestions: [{ messageId: "useActiveDocument", output: "activeDocument.body;" }],
+            }],
         },
     ],
 });

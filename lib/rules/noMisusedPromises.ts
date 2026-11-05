@@ -2,7 +2,7 @@ import { ESLintUtils, type TSESLint, type TSESTree } from "@typescript-eslint/ut
 import type ts from "typescript";
 import tseslint from "typescript-eslint";
 import { type DisableDirectives, disableDirectives, isDisabled, problemStart } from "../disableDirectives.js";
-import { docsUrl, isJsProgram } from "../ruleCreator.js";
+import { docsUrl, isJsProgram, type PluginDocs } from "../ruleCreator.js";
 
 type RuleModule = TSESLint.RuleModule<string, readonly unknown[]>;
 type RuleContext = TSESLint.RuleContext<string, readonly unknown[]>;
@@ -31,7 +31,7 @@ const upstream = (tseslint.plugin as unknown as { rules: Record<string, RuleModu
 // in anywhere else (a user class, a subclass override, a `declare module
 // "obsidian"` augmentation) keeps its declaration outside obsidian.d.ts, so those
 // types are reported exactly as before.
-const rule: RuleModule = {
+const rule: TSESLint.RuleModule<string, readonly unknown[], PluginDocs> = {
     defaultOptions: upstream.defaultOptions,
     meta: {
         ...upstream.meta,
@@ -39,6 +39,7 @@ const rule: RuleModule = {
             description:
                 "Disallow Promises in places not designed to handle them, without treating Obsidian's chaining `then` as a Promise",
             url: docsUrl("no-misused-promises"),
+            requiresTypeChecking: true,
         },
     },
     create(context) {
@@ -94,16 +95,7 @@ function withReplacedRuleDisableComments(context: RuleContext): RuleContext {
 function withObsidianChainingIgnored(context: RuleContext): RuleContext {
     // Throws the same "requires type information" error the upstream rule would.
     const services = ESLintUtils.getParserServices(context);
-    const checker = services.program.getTypeChecker();
-    const notCallable = checker.getUndefinedType();
-
-    const typeChecker = forwardTo(checker, {
-        getTypeOfSymbolAtLocation(symbol: ts.Symbol, node: ts.Node): ts.Type {
-            return isObsidianChainingThen(symbol)
-                ? notCallable
-                : checker.getTypeOfSymbolAtLocation(symbol, node);
-        },
-    });
+    const typeChecker = checkerIgnoringObsidianChaining(services.program.getTypeChecker());
     const program = forwardTo(services.program, { getTypeChecker: () => typeChecker });
     const sourceCode = forwardTo(context.sourceCode, {
         parserServices: { ...services, program },
@@ -111,12 +103,42 @@ function withObsidianChainingIgnored(context: RuleContext): RuleContext {
     return forwardTo(context, { sourceCode });
 }
 
+// The checker with getTypeOfSymbolAtLocation() ignoring Obsidian's chaining
+// `then`, one per checker. The upstream rule calls the checker for each node it
+// looks at, so this is not a Proxy, whose trap on every method read added 5 to
+// 10% to the rule's time: it is an object holding the checker's own methods
+// bound to it, and inheriting anything else from the checker.
+const checkersIgnoringObsidianChaining = new WeakMap<ts.TypeChecker, ts.TypeChecker>();
+
+function checkerIgnoringObsidianChaining(checker: ts.TypeChecker): ts.TypeChecker {
+    const cached = checkersIgnoringObsidianChaining.get(checker);
+    if (cached) {
+        return cached;
+    }
+    const methods = checker as unknown as Record<string, unknown>;
+    const copy = Object.create(checker) as Record<string, unknown>;
+    for (const key of Object.keys(checker)) {
+        const value = methods[key];
+        if (typeof value === "function") {
+            copy[key] = (value as (...args: unknown[]) => unknown).bind(checker);
+        }
+    }
+    const notCallable = checker.getUndefinedType();
+    copy.getTypeOfSymbolAtLocation = (symbol: ts.Symbol, node: ts.Node): ts.Type =>
+        isObsidianChainingThen(symbol) ? notCallable : checker.getTypeOfSymbolAtLocation(symbol, node);
+    const typeChecker = copy as unknown as ts.TypeChecker;
+    checkersIgnoringObsidianChaining.set(checker, typeChecker);
+    return typeChecker;
+}
+
 // A `then` whose every declaration is in the obsidian package's obsidian.d.ts.
 // Merged or overriding declarations elsewhere disqualify it.
 function isObsidianChainingThen(symbol: ts.Symbol): boolean {
+    if (symbol.getName() !== "then") {
+        return false;
+    }
     const declarations = symbol.getDeclarations();
     return (
-        symbol.getName() === "then" &&
         declarations !== undefined &&
         declarations.length > 0 &&
         declarations.every((declaration) =>

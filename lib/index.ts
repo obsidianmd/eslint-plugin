@@ -32,6 +32,7 @@ import noMisusedPromises from "./rules/noMisusedPromises.js";
 import { withCustomMessages } from "./customMessages.js";
 import { getManifest, isManifestDesktopOnly } from "./manifest.js";
 import { PlainTextLanguage } from "./plainTextLanguage.js";
+import { readPluginPackageJson } from "./pluginPackageJson.js";
 import { ui } from "./rules/ui/index.js";
 import { browserOnlyGlobalsOff } from "./workerGlobals.js";
 
@@ -43,29 +44,20 @@ import sdl from "@microsoft/eslint-plugin-sdl";
 import * as importPlugin from "eslint-plugin-import";
 import depend from 'eslint-plugin-depend';
 import globals from "globals";
-import fs from "node:fs";
-import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { type Config, defineConfig } from "@eslint/config-helpers";
 import type { RulesConfig } from "@eslint/core";
 import noUnsanitizedPlugin from "eslint-plugin-no-unsanitized";
 import eslintComments from "@eslint-community/eslint-plugin-eslint-comments";
 
-interface PackageJson {
-    name: string;
-    version: string;
-}
-
 const manifest = getManifest();
-// fileURLToPath handles file:// URLs correctly on all platforms (including Windows),
-// unlike new URL().pathname which yields /C:/... on Windows.
-const currentDir = import.meta.dirname ?? path.dirname(fileURLToPath(import.meta.url));
-// Resolve package.json from both possible locations: the path differs between
-// source layout (../package.json) and build output (../../package.json).
-const packageJsonPath = fs.existsSync(path.join(currentDir, "../../package.json"))
-    ? path.join(currentDir, "../../package.json")
-    : path.join(currentDir, "../package.json");
-const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8")) as PackageJson;
+// package.json is ../package.json from lib/ in the source and ../../package.json
+// from dist/lib/ in the build; readPluginPackageJson tells it from a
+// package.json above a checkout by its name.
+const packageJson = readPluginPackageJson(import.meta.url);
+if (!packageJson) {
+    throw new Error(`eslint-plugin-obsidianmd: cannot find its own package.json above ${fileURLToPath(import.meta.url)}`);
+}
 
 // The plugin's public type. The rules and configs are typed with the user's own
 // ESLint (a peer dependency) rather than @eslint/core and
@@ -241,6 +233,11 @@ const recommendedTypeCheckedGeneralRules: RulesConfig = {
     // declared in a `declare global` block or a .d.ts, so typescript-eslint
     // advises turning it off for TypeScript. JavaScript files keep it.
     "no-undef": "off",
+    // @typescript-eslint/no-implied-eval (from recommendedTypeChecked) reports
+    // every call the core rule does, and also strings it knows only by type;
+    // with both on, each implied eval was reported twice. typescript-eslint's
+    // configs turn the core rule off where theirs runs. JavaScript files keep it.
+    "no-implied-eval": "off",
 };
 
 // Combined rules for TypeScript files
@@ -353,9 +350,10 @@ const flatRecommendedGeneralRules: RulesConfig = {
     "no-alert": "warn",
     "no-undef": "warn",
     "@typescript-eslint/ban-ts-comment": "off",
-    // obsidianmd/no-nodejs-modules checks require() calls itself, and its fix
-    // for a Node module is a Platform.isDesktop-guarded require(), which this
-    // blanket ban would report in turn.
+    // obsidianmd/no-nodejs-modules checks require() calls itself, and its
+    // message tells the developer to load a Node module with a dynamic import()
+    // or a require() guarded by Platform.isDesktop; this blanket ban would
+    // report that require() in turn.
     "@typescript-eslint/no-require-imports": "off",
     "@typescript-eslint/no-unused-vars": ["warn", ...noUnusedVarsOptions],
     "@typescript-eslint/no-unused-expressions": ["warn", ...noUnusedExpressionsOptions],
@@ -403,6 +401,14 @@ const flatRecommendedConfig: Config[] = defineConfig([
         plugins: {
             import: importPlugin as ESLint.Plugin,
             "@microsoft/sdl": sdl as ESLint.Plugin,
+            // `depend` (since 0.3.0) and `noUnsanitizedPlugin` (since 0.2.9)
+            // run none of their rules in this block or the TS one, but a user's
+            // config object that turns one of their rules on for JS or TS files
+            // (depend/ban-dependencies also checks imports) finds the plugin
+            // only here, and fails with "Could not find plugin" without it.
+            // no-unsanitized's rules run as no-unsanitized/*, the name its own
+            // config in `extends` registers; `noUnsanitizedPlugin` is the same
+            // plugin under the name these blocks have always given it.
             depend,
             noUnsanitizedPlugin: noUnsanitizedPlugin as ESLint.Plugin,
             "eslint-comments": eslintComments,
@@ -418,6 +424,7 @@ const flatRecommendedConfig: Config[] = defineConfig([
         plugins: {
             import: importPlugin as ESLint.Plugin,
             "@microsoft/sdl": sdl as ESLint.Plugin,
+            // Kept for user configs, as in the JS block.
             depend,
             noUnsanitizedPlugin: noUnsanitizedPlugin as ESLint.Plugin,
             "eslint-comments": eslintComments,
@@ -561,40 +568,28 @@ const recommendedWithLocalesEn: Config[] = defineConfig([
     {
         plugins: { json, obsidianmd: plugin },
         language: "json/json",
+        // The files the rule's own path check (isEnglishLocalePath) accepts:
+        // named "en" in any case, alone or followed by ".", "-" or "_" and
+        // more (en-US, en_GB, en.messages), or anywhere under a directory
+        // named so. Not english.json, entries.json or env.json.
         files: [
-            "**/en.json",
-            "**/en*.json",
-            "**/en/*.json",
-            "**/en/**/*.json",
+            "**/[eE][nN].json",
+            "**/[eE][nN][._-]?*.json",
+            "**/[eE][nN]/**/*.json",
+            "**/[eE][nN][._-]?*/**/*.json",
         ],
         rules: {
             "obsidianmd/ui/sentence-case-json": "warn",
         },
     },
-    // TS/JS English locale modules
+    // TS/JS English locale modules, named as the JSON files above
     {
         plugins: { obsidianmd: plugin },
         files: [
-            "**/en.ts",
-            "**/en.js",
-            "**/en.cjs",
-            "**/en.mjs",
-            "**/en-*.ts",
-            "**/en-*.js",
-            "**/en-*.cjs",
-            "**/en-*.mjs",
-            "**/en_*.ts",
-            "**/en_*.js",
-            "**/en_*.cjs",
-            "**/en_*.mjs",
-            "**/en/*.ts",
-            "**/en/*.js",
-            "**/en/*.cjs",
-            "**/en/*.mjs",
-            "**/en/**/*.ts",
-            "**/en/**/*.js",
-            "**/en/**/*.cjs",
-            "**/en/**/*.mjs",
+            "**/[eE][nN].{ts,js,cjs,mjs}",
+            "**/[eE][nN][._-]?*.{ts,js,cjs,mjs}",
+            "**/[eE][nN]/**/*.{ts,js,cjs,mjs}",
+            "**/[eE][nN][._-]?*/**/*.{ts,js,cjs,mjs}",
         ],
         rules: {
             "obsidianmd/ui/sentence-case-locale-module": "warn",

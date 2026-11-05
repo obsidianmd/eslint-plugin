@@ -3,6 +3,7 @@ import { docsUrl, ruleCreator } from "../../ruleCreator.js";
 import {
     createSentenceCaseReporter,
     getContextFilename,
+    getStaticStringValue,
     isEnglishLocalePath,
     resolveSentenceCaseConfig,
     SentenceCaseRuleOptions,
@@ -20,10 +21,11 @@ function isEnglishLocaleModule(
     context: TSESLint.RuleContext<MessageId, SentenceCaseRuleOptions>,
 ): boolean {
     const file = getContextFilename(context);
-    return file != null && isEnglishLocalePath(file, ["ts", "js", "cjs", "mjs"]);
+    return file != null && isEnglishLocalePath(file, ["ts", "js", "cjs", "mjs"], context.cwd);
 }
 
-// Recursively collects all string literals from nested objects and arrays
+// Recursively collects all string literals, and template literals without
+// `${…}`, from nested objects and arrays, each with its value
 function collectStringLiterals(
     root: TSESTree.Expression,
     cb: (node: TSESTree.Node, value: string) => void,
@@ -34,15 +36,9 @@ function collectStringLiterals(
         if (!popped) continue;
         const current = unwrapExpression(popped);
         if (!current) continue;
-        if (current.type === TSESTree.AST_NODE_TYPES.Literal) {
-            if (typeof current.value === "string") cb(current, current.value);
-            continue;
-        }
-        if (current.type === TSESTree.AST_NODE_TYPES.TemplateLiteral) {
-            if (current.expressions.length === 0) {
-                const raw = current.quasis.map((q) => q.value.raw).join("");
-                cb(current, raw);
-            }
+        if (current.type === TSESTree.AST_NODE_TYPES.Literal || current.type === TSESTree.AST_NODE_TYPES.TemplateLiteral) {
+            const value = getStaticStringValue(current);
+            if (value !== null) cb(current, value);
             continue;
         }
         if (current.type === TSESTree.AST_NODE_TYPES.ObjectExpression) {
@@ -124,12 +120,20 @@ export default ruleCreator({
         if (!isEnglishLocaleModule(context)) return {};
         const { evaluatorOptions, allowAutoFix } = resolveSentenceCaseConfig(context.options);
         const varObjects = new Map<string, TSESTree.ObjectExpression>();
-        const reportIfNeeded = createSentenceCaseReporter({
+        const reportString = createSentenceCaseReporter({
             context,
             evaluatorOptions,
             allowAutoFix,
             messageId: "useSentenceCase"
         });
+        // Each string once: the same object can be reached through several
+        // exports (`export { strings }; export default strings;`).
+        const checked = new Set<TSESTree.Node>();
+        const reportIfNeeded = (node: TSESTree.Node, value: string) => {
+            if (checked.has(node)) return;
+            checked.add(node);
+            reportString(node, value);
+        };
 
         return {
             Program(program: TSESTree.Program) {
@@ -151,11 +155,13 @@ export default ruleCreator({
                 }
             },
             ExportDefaultDeclaration(node: TSESTree.ExportDefaultDeclaration) {
-                if (!node.declaration) return;
-                if (node.declaration.type === TSESTree.AST_NODE_TYPES.ObjectExpression) {
-                    collectStringLiterals(node.declaration, (n, v) => reportIfNeeded(n, v));
-                } else if (node.declaration.type === TSESTree.AST_NODE_TYPES.Identifier) {
-                    const obj = varObjects.get(node.declaration.name);
+                // `export default { … } as const`, `… satisfies T` and `<T>{ … }` too.
+                const declaration = unwrapExpression(node.declaration);
+                if (!declaration) return;
+                if (declaration.type === TSESTree.AST_NODE_TYPES.ObjectExpression) {
+                    collectStringLiterals(declaration, (n, v) => reportIfNeeded(n, v));
+                } else if (declaration.type === TSESTree.AST_NODE_TYPES.Identifier) {
+                    const obj = varObjects.get(declaration.name);
                     if (obj) collectStringLiterals(obj, (n, v) => reportIfNeeded(n, v));
                 }
             },

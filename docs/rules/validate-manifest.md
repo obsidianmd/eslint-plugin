@@ -8,26 +8,34 @@
 
 ## What is reported
 
-The text checks follow the community scanner's review of `manifest.json`, so this rule
-reports nothing the review would accept. Where the review applies a check only to newer
-submissions, this rule applies the current policy.
+The checks on `name` and `description` follow the community scanner's review of
+`manifest.json`, so they report nothing the review would accept. Where the review applies a
+check only to newer submissions, this rule applies the current policy.
 
-- **Fields:** `author`, `minAppVersion`, `name`, `version`, `id`, `description` and
-  `isDesktopOnly` must be present, with the right types. `authorUrl`, `fundingUrl` and
-  `helpUrl` are optional. Any other field, and a field defined twice, is reported.
+- **Fields:** the manifest must be a single JSON object. `author`, `minAppVersion`, `name`,
+  `version`, `id`, `description` and `isDesktopOnly` must be present, with the right types.
+  `authorUrl`, `fundingUrl` and `helpUrl` are optional. Any other field, and a field defined
+  twice, is reported.
 - **`id`:** must not contain "obsidian" or end with "plugin", as the developer docs'
-  [manifest reference](https://docs.obsidian.md/Reference/Manifest) requires.
+  [manifest reference](https://docs.obsidian.md/Reference/Manifest) requires. The review does
+  not check this.
 - **`name`:** must not include "Obsidian", parts of it ("obsi", "sidian", or a leading
   "ob"), or "Plugin".
 - **`description`:** must be 10 to 250 characters and end with `.`, `!` or `?`. It must
-  not include "Obsidian", refer to itself ("this plugin", "a plugin that", "the plugin
-  …"), or repeat or start with the name.
-- **`fundingUrl`:** a URL string, or an object of non-empty URL strings.
+  not include "Obsidian", refer to itself ("this plugin", "this tool", "a plugin that",
+  "the plugin …"), or repeat or start with the name.
+- **`fundingUrl`:** a string, or an object whose values are strings, its keys not repeated.
+  An empty string, an empty object and an empty entry are accepted, as the review accepts
+  them. Whether the values are valid URLs is not checked.
 
 Not reported: "plugin" elsewhere in an `id` or a description ("Automatically reload
 plugins in development."), a description starting with a lowercase letter, and emoji or
 other characters in a description. Whether an `id` or `name` is already taken needs the
-community directory, so only the review checks it.
+community directory, so only the review checks it. The review's other checks are not made
+here either: the `version` format, a placeholder, email address or URL in `author`, the
+`name`'s length and capitals, and whether `authorUrl` and `fundingUrl` are valid, reachable
+HTTPS links that use no raw IP address and do not point to the Obsidian website (nor, for
+`authorUrl`, to a GitHub repository).
 
 There is no fix. The recommended config runs this rule on `manifest.json` next to your ESLint config,
 read with the JSON language; see
