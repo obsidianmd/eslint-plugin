@@ -236,7 +236,7 @@ export default ruleCreator({
             const program = context.sourceCode.parserServices?.program;
             const declarations = property?.declarations ?? [];
             return (
-                program !== undefined &&
+                !!program &&
                 declarations.length > 0 &&
                 declarations.every((declaration) => {
                     const file = declaration.getSourceFile();

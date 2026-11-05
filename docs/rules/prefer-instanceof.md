@@ -13,7 +13,10 @@
 ## What is reported
 
 `value instanceof SomeClass` where `value` is a DOM `Node` or `UIEvent`, or anything extending them,
-such as an `HTMLElement` or a `MouseEvent`, recognised by type. Every window has its own
+such as an `HTMLElement` or a `MouseEvent`, recognised by type. Only the DOM's own `Node` and
+`UIEvent`, from TypeScript's `lib.dom.d.ts`, count: another type of the same name, such as React's
+synthetic `React.MouseEvent` (which extends a `UIEvent` of React's) or a syntax tree's `Node`, has no
+`instanceOf()` and is not reported. Every window has its own
 constructors, so an element from a popout window is not `instanceof HTMLElement` of the main window.
 Obsidian's `instanceOf()` checks across windows:
 
@@ -31,12 +34,25 @@ parentheses, so `(await getEl()) instanceof HTMLElement` becomes
 A value that may be null or undefined, such as `el.parentElement`, is reported too, with a
 suggestion; see [Values that may be null or undefined](#values-that-may-be-null-or-undefined).
 
+An event's target is reported too, without a fix; see [Event targets](#event-targets).
+
 Not reported: `instanceof` on any other type, such as a `TFile` or your own classes, on an `any` or
 `unknown` value, and on a union of more than one type besides `null` and `undefined`, such as
 `Node | string` or `HTMLElement | SVGElement`. Nor is a check against a constructor read from a
 window object, such as `focus instanceof el.ownerDocument.defaultView!.HTMLElement` or
-`evt instanceof win.MouseEvent`: it already checks against the window the code chose. One read from
-`window` or `activeWindow`, the main or the active window, is reported.
+`evt instanceof win.MouseEvent`: it already checks against the window the code chose. That goes for
+a `const` set to one as well, as in
+`const Ctor = el.ownerDocument.defaultView?.HTMLElement; if (Ctor && el instanceof Ctor) {}`, and for
+one with a fallback after `??` or `||`, as in `doc.defaultView?.HTMLElement ?? HTMLElement`. One read
+from `window` or `activeWindow`, the main or the active window, is reported.
+
+Nor is `instanceof` in an implementation of `instanceOf()` itself, such as a polyfill for tests: a
+function or method named `instanceOf`, a function assigned to `….instanceOf`, or the `value` of
+`Object.defineProperty(…, "instanceOf", …)`. There, `this instanceof type` is the check, and
+`this.instanceOf(type)` would call the polyfill again without end.
+
+Code that runs outside Obsidian, such as unit tests under jsdom or happy-dom, has no `instanceOf()`
+unless it adds one, so the fix breaks it there.
 
 The rule needs type information, so the recommended config runs it on TypeScript files only. It
 switches the rule off for worker and test files, which have no popout windows and no `instanceOf()`;
@@ -65,3 +81,39 @@ property or call declared as `null` or `undefined` (`el.parentElement`, `el.quer
 `list.find()`), an optional property or parameter, an optional chain, an index signature, or a
 `const` set from one of them. Everything else, and a value with a non-null assertion
 (`el.parentElement!`), is still fixed.
+
+## Event targets
+
+`e.target instanceof HTMLElement`, where `e.target` is typed `EventTarget`, is reported too: also
+`relatedTarget`, `currentTarget` and `srcElement`, checked against a DOM `Node` class such as
+`Node`, `Element`, `Text`, an `HTML…Element` or an `SVG…Element`. In a popout window the target is
+that window's node, which is never `instanceof` the main window's class, so a handler of a view,
+modal, menu or editor extension takes the wrong branch there.
+
+It is never fixed. An `EventTarget` may not be a node: the target of a `focus`, `blur` or `resize`
+listener on `window` is the window, which has no `instanceOf()`. And the check narrows `e.target`
+for the code after it, as in `if (!(e.target instanceof HTMLElement)) return; e.target.closest(…)`,
+which a rewritten check alone would not.
+
+A suggestion is offered where the result is only tested (the condition of an `if`, loop or `?:`, or
+through `!`, `&&` and `||`), since the rewrite is `undefined` rather than `false` for a null target:
+
+- for `.target` of a mouse, pointer, drag, touch, wheel, keyboard, input or composition event, whose
+  target is always a node, `e.targetNode?.instanceOf(HTMLElement)`. Obsidian's `targetNode` returns
+  the same value as `target`, typed as a `Node | null`, so the suggestion also reads every other
+  `e.target` in the function as `e.targetNode`, and the check narrows it as before:
+
+  ```ts
+  if (!(e.target instanceof HTMLElement)) return; e.target.closest(".icon");
+  // suggestion: if (!(e.targetNode?.instanceOf(HTMLElement))) return; e.targetNode.closest(".icon");
+  ```
+
+  Not when `e` is assigned to, or another `e.target` is compared to a value other than `null` or
+  `undefined`, kept in a `let` without a type, or checked against a class that is not a Node.
+- for `.relatedTarget`, which is a node or `null`, `(e.relatedTarget as Node | null)?.instanceOf(Node)`,
+  when no other read of `e.relatedTarget` relies on the check's narrowing.
+
+Elsewhere, as for a `FocusEvent`, a plain `Event` (`change`, `input`, `scroll`), `currentTarget`, or
+React's synthetic events, which have no `targetNode`, it is reported only. A check that already
+falls back to `instanceOf()`, as in `e.target instanceof Element || (e.target as Node)?.instanceOf?.(Element)`,
+is not reported.
