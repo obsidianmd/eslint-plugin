@@ -108,8 +108,8 @@ document.createDocumentFragment();                                 // createFrag
 document.createEl("div");                                          // createDiv()
 ```
 
-`prefer-create-el` reports them at the same place, and its replacement removes `document`, whereas
-`activeDocument.createElement("p")` would still be reported by it. These are the files the
+`prefer-create-el` reports them at the same place, and its replacement removes `document`. These
+are the files the
 recommended config runs `prefer-create-el` on; anywhere else, such as a JavaScript file, this rule
 still reports them. A call `prefer-create-el` leaves alone, such as
 `document.createElement("div", { is: "my-div" })`, is reported here as before.

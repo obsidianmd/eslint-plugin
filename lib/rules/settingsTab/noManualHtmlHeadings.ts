@@ -114,8 +114,21 @@ export default ruleCreator({
                 ) {
                     return;
                 }
+                // Only a heading on the tab's own containerEl is a heading of the
+                // settings page. One in a container of the plugin's own, a
+                // description, a Notice's fragment or a setting's name element
+                // is part of that element's layout and styling. A parameter
+                // named containerEl is taken for the tab's, but may be a
+                // container of the plugin's own, so it gets a suggestion only.
+                const onTab = isTabContainer(callee.object);
+                if (!onTab && !isContainerElParameter(callee.object)) {
+                    return;
+                }
 
                 const rewrite = planRewrite(node, callee);
+                if (rewrite && !onTab) {
+                    rewrite.offer = "suggest";
+                }
                 if (rewrite?.offer === "fix") {
                     context.report({ node, messageId: "headingEl", fix: rewrite.fix });
                 } else if (rewrite?.offer === "suggest") {
@@ -212,6 +225,12 @@ export default ruleCreator({
             }
             if (target.parent?.type === TSESTree.AST_NODE_TYPES.ChainExpression) {
                 target = target.parent;
+            }
+
+            // A heading without text, such as `containerEl.createEl("h3")` used
+            // as a spacer, would become an empty heading row.
+            if (nameNode === null || isEmptyString(nameNode)) {
+                return null;
             }
 
             // The rewrite yields a Setting, not the element, so it is a fix only
@@ -444,9 +463,42 @@ export default ruleCreator({
             return targets.some((target) => types.checker.isTypeAssignableTo(type, target));
         }
 
+        function isEmptyString(node: TSESTree.Node): boolean {
+            return (
+                (node.type === TSESTree.AST_NODE_TYPES.Literal && node.value === "") ||
+                (node.type === TSESTree.AST_NODE_TYPES.TemplateLiteral &&
+                    node.expressions.length === 0 &&
+                    node.quasis[0].value.cooked === "")
+            );
+        }
+
         // Without type information: `this.containerEl` of the settings tab, a
         // binding taken from it, or one annotated as an HTML element.
         function isKnownHtmlElement(node: TSESTree.Expression): boolean {
+            if (isTabContainer(node)) {
+                return true;
+            }
+            if (node.type !== TSESTree.AST_NODE_TYPES.Identifier) {
+                return false;
+            }
+            const variable = singleDefinition(sourceCode.getScope(node), node.name);
+            return (
+                variable !== null &&
+                isAnnotated(variable.defs[0].name, (type) =>
+                    type.type === TSESTree.AST_NODE_TYPES.TSTypeReference &&
+                    type.typeName.type === TSESTree.AST_NODE_TYPES.Identifier &&
+                    HTML_ELEMENT_TYPE.test(type.typeName.name),
+                )
+            );
+        }
+
+        // The settings tab's own containerEl: `this.containerEl`, or a binding
+        // taken from it that is not reassigned, `const containerEl =
+        // this.containerEl` or `const { containerEl } = this`.
+        function isTabContainer(node: TSESTree.Expression): boolean {
+            if (node.type === TSESTree.AST_NODE_TYPES.TSNonNullExpression) {
+                return isTabContainer(node.expression);
+            }
             if (isTabContainerEl(node)) {
                 return true;
             }
@@ -458,13 +510,6 @@ export default ruleCreator({
                 return false;
             }
             const def = variable.defs[0];
-            if (isAnnotated(def.name, (type) =>
-                type.type === TSESTree.AST_NODE_TYPES.TSTypeReference &&
-                type.typeName.type === TSESTree.AST_NODE_TYPES.Identifier &&
-                HTML_ELEMENT_TYPE.test(type.typeName.name),
-            )) {
-                return true;
-            }
             if (def.type !== DefinitionType.Variable || isReassigned(variable)) {
                 return false;
             }
@@ -484,6 +529,24 @@ export default ruleCreator({
                 propertyName(property.key) === "containerEl" &&
                 declarator.init?.type === TSESTree.AST_NODE_TYPES.ThisExpression &&
                 isTabThis(declarator.init)
+            );
+        }
+
+        // A parameter named `containerEl`, as in `renderSection(containerEl:
+        // HTMLElement)`, that is not reassigned.
+        function isContainerElParameter(node: TSESTree.Expression): boolean {
+            if (node.type === TSESTree.AST_NODE_TYPES.TSNonNullExpression) {
+                return isContainerElParameter(node.expression);
+            }
+            if (node.type !== TSESTree.AST_NODE_TYPES.Identifier || node.name !== "containerEl") {
+                return false;
+            }
+            const variable = singleDefinition(sourceCode.getScope(node), node.name);
+            return (
+                variable !== null &&
+                variable.defs[0].type === DefinitionType.Parameter &&
+                variable.defs[0].name.parent?.type !== TSESTree.AST_NODE_TYPES.Property &&
+                !isReassigned(variable)
             );
         }
 

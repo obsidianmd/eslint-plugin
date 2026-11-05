@@ -10,16 +10,24 @@
 
 ## What is reported
 
-A heading element (`h1` to `h6`) created with `createEl()` on an element, such as
-`containerEl.createEl("h2", { text: "Advanced" })`, inside a class that extends `PluginSettingTab`,
-declared or as a class expression, including in its callbacks and nested functions. Obsidian's
-setting headings keep the settings UI consistent:
+A heading element (`h1` to `h6`) created with `createEl()` directly on the settings tab's
+`containerEl`, such as `containerEl.createEl("h2", { text: "Advanced" })`, inside a class that
+extends `PluginSettingTab`, declared or as a class expression, including in its callbacks and arrow
+functions. The tab's `containerEl` is `this.containerEl`, a `const` holding it
+(`const containerEl = this.containerEl`, `const { containerEl } = this`), or a parameter named
+`containerEl`, as in `renderSection(containerEl: HTMLElement)`. Obsidian's setting headings keep the
+settings UI consistent:
 
 ```ts
 new Setting(containerEl).setName("Advanced").setHeading();
 ```
 
-Headings created outside a settings tab are not reported. The nearest enclosing class decides, so a
+A heading on any other element is not reported: in a container of the plugin's own
+(`containerEl.createDiv({ cls: "banner" }).createEl("h3", …)`), a setting's `nameEl` or `descEl`, a
+description or a `Notice` built with `createFragment()`, or `this.contentEl`. There it is part of that
+element's layout and styling, and a `Setting` row would not fit it.
+
+Headings created outside a settings tab are not reported either. The nearest enclosing class decides, so a
 heading in a class nested in the tab, such as a helper class of its own, is not reported either,
 while the rest of the tab still is. A superclass written as a property access
 (`obsidian.PluginSettingTab`) is not recognised.
@@ -35,10 +43,13 @@ to go. So the rewrite is applied as a fix only where nothing else changes:
 
 - the call is a statement on its own, so its return value is not used;
 - it has no options other than `text`, and no callback;
+- the parent is `this.containerEl` or a `const` holding it; on a parameter named `containerEl`, which
+  may be a container of the plugin's own, the rewrite is a suggestion;
+- the heading has text: `containerEl.createEl("h3")` with no text or an empty one, such as a spacer,
+  is reported without a fix or a suggestion, as an empty heading row would replace it;
 - `new Setting()` accepts the parent element and `setName()` the text. With type information this is
-  checked against Obsidian's declarations. Without it, the parent must be the tab's
-  `this.containerEl`, a `containerEl` taken from it, or a binding typed as an HTML element, and the
-  text a string or template literal, a concatenation with one, or a binding typed as `string`.
+  checked against Obsidian's declarations. Without it, the text must be a string or template literal,
+  a concatenation with one, or a binding typed as `string`.
 
 ```ts
 containerEl.createEl("h2", { text: "Advanced" }); // fixed
