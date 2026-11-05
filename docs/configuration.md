@@ -519,6 +519,36 @@ source, in blocks placed **last**:
 },
 ```
 
+### Rule overrides without `files` reach `manifest.json` and `LICENSE`
+
+The same goes for an ordinary block of rule overrides. A block without `files` applies to every
+file ESLint lints, and the recommended config registers the `@typescript-eslint`, `import` and
+other bundled plugins for JS and TS files only. Where 0.4 linted only `package.json` beyond your
+source, which many configurations ignore, 0.5.0 also lints `manifest.json` and `LICENSE`, so such a
+block now stops the run:
+
+```
+A configuration object specifies rule "@typescript-eslint/no-unused-vars", but could not find plugin "@typescript-eslint".
+```
+
+Give the block your source's `files`, and keep settings that are meant for every file, such as
+`linterOptions`, in a block of their own:
+
+```js
+{
+  linterOptions: { reportUnusedDisableDirectives: "off" },
+},
+{
+  files: ["**/*.{ts,cts,mts,tsx,js,cjs,mjs,jsx}"],
+  rules: {
+    "@typescript-eslint/no-unused-vars": ["error", { args: "after-used" }],
+    "import/no-extraneous-dependencies": "error",
+  },
+},
+```
+
+See [Overriding rules](#overriding-rules).
+
 ### Core JS rules apply only to JS and TS files
 
 ESLint's core rules (`js.configs.recommended`) no longer reach JSON, `LICENSE`, or files you lint
@@ -685,6 +715,18 @@ A type-checked config you added without `files`, such as a top-level
 which TypeScript cannot read. Scope it to your TypeScript files with `files: ["**/*.ts"]`, as
 [Using alongside stricter typescript-eslint configs](#using-alongside-stricter-typescript-eslint-configs)
 shows, or see [Upgrading to 0.5.0](#upgrading-to-050) if you cannot edit that config.
+
+### "Could not find plugin "@typescript-eslint"" or "Could not find plugin "import""
+
+```
+A configuration object specifies rule "@typescript-eslint/no-unused-vars", but could not find plugin "@typescript-eslint".
+```
+
+A block that sets a `@typescript-eslint/*`, `import/*` or other bundled plugin's rule has no `files`,
+so it also reaches `package.json`, `manifest.json` and `LICENSE`, where the recommended config does
+not register those plugins. Give the block `files: ["**/*.{ts,cts,mts,tsx,js,cjs,mjs,jsx}"]`, or
+the globs of your source (see [Overriding rules](#overriding-rules) and
+[Upgrading to 0.5.0](#rule-overrides-without-files-reach-manifestjson-and-license)).
 
 ### "… was not found by the project service"
 
