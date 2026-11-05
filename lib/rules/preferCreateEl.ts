@@ -1,5 +1,6 @@
 import { ASTUtils, ESLintUtils, TSESTree } from "@typescript-eslint/utils";
 import ts from "typescript";
+import { type MinAppVersionOptions, minAppVersionSchema, supportsVersion } from "../minAppVersion.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 const TAG_SHORTHANDS: Record<string, string> = {
@@ -178,7 +179,17 @@ function getStringLiteralValue(
     return undefined;
 }
 
-export default ruleCreator({
+// The first typings that declare what a replacement calls: createSvg() (also
+// as el.createSvg()) 1.1.1, activeWindow 0.15.0, and `doc.win` (Node.win)
+// 0.15.3. createEl(), createDiv(), createSpan() and createFragment() are in
+// the oldest typings, 0.11.13.
+const CREATE_SVG_SINCE = "1.1.1";
+const ACTIVE_WINDOW_SINCE = "0.15.0";
+const NODE_WIN_SINCE = "0.15.3";
+
+type MessageIds = "preferCreateEl" | "preferCreateElSuggestion" | "preferCreateElSuggestionSince";
+
+export default ruleCreator<MinAppVersionOptions, MessageIds>({
     meta: {
         type: "suggestion" as const,
         docs: {
@@ -187,7 +198,7 @@ export default ruleCreator({
             url: docsUrl("prefer-create-el"),
             requiresTypeChecking: true,
         },
-        schema: [],
+        schema: minAppVersionSchema,
         fixable: "code" as const,
         hasSuggestions: true as const,
         messages: {
@@ -195,10 +206,13 @@ export default ruleCreator({
                 "Use '{{replacement}}' instead of '{{original}}'.",
             preferCreateElSuggestion:
                 "Replace '{{original}}' with '{{replacement}}'.",
+            preferCreateElSuggestionSince:
+                "Replace '{{original}}' with '{{replacement}}' (needs Obsidian {{since}} or later).",
         },
     },
-    defaultOptions: [],
+    defaultOptions: [{}],
     create(context) {
+        const minAppVersion = context.options[0]?.minAppVersion;
         const services = ESLintUtils.getParserServices(context);
         const checker = services.program.getTypeChecker();
 
@@ -260,7 +274,7 @@ export default ruleCreator({
         // not declare `helper`: the call is then not reported.
         function classifyDocumentTarget(
             callee: TSESTree.MemberExpression,
-        ): { prefix: string; canAutofix: (helper: string) => boolean | undefined } | null {
+        ): { prefix: string; since?: string; canAutofix: (helper: string) => boolean | undefined } | null {
             const obj = callee.object;
             if (isIframeDocument(obj)) {
                 return null;
@@ -284,6 +298,7 @@ export default ruleCreator({
                 // the native call is the one that does.
                 return {
                     prefix: "activeWindow.",
+                    since: ACTIVE_WINDOW_SINCE,
                     canAutofix: (helper) => winHasHelper(obj, helper) || undefined,
                 };
             }
@@ -292,6 +307,7 @@ export default ruleCreator({
                 // `doc?.createElement()` keeps its `?.`: `doc?.win.createEl()`.
                 return {
                     prefix: `${getObjectText(obj)}${callee.optional ? "?." : "."}win.`,
+                    since: NODE_WIN_SINCE,
                     canAutofix: (helper) => winHasHelper(obj, helper) || undefined,
                 };
             }
@@ -332,7 +348,7 @@ export default ruleCreator({
                 ? `${target.prefix}${shorthand}()`
                 : `${target.prefix}createEl(${getText(tagArg)})`;
             const compiles = shorthand !== undefined || resolvesToTagMapOverload(node, "HTMLElementTagNameMap");
-            report(node, replacement, compiles ? canAutofix : null);
+            report(node, replacement, compiles ? canAutofix : null, target.since);
         }
 
         function checkCreateElementNS(node: TSESTree.CallExpression): void {
@@ -354,7 +370,7 @@ export default ruleCreator({
             const argsText = [getText(tagArg), ...remainingArgs.map((arg) => getText(arg))].join(", ");
             const replacement = `${target.prefix}createSvg(${argsText})`;
             const compiles = resolvesToTagMapOverload(node, "SVGElementTagNameMap");
-            report(node, replacement, compiles ? canAutofix : null);
+            report(node, replacement, compiles ? canAutofix : null, CREATE_SVG_SINCE);
         }
 
         function checkCreateElShorthand(node: TSESTree.CallExpression): void {
@@ -519,7 +535,7 @@ export default ruleCreator({
                 return;
             }
             const replacement = `${target.prefix}createFragment()`;
-            report(node, replacement, canAutofix);
+            report(node, replacement, canAutofix, target.since);
         }
 
         // Whether `name`, called bare at `node`, resolves to a binding of the
@@ -552,7 +568,21 @@ export default ruleCreator({
 
         // `canAutofix` is null when the replacement would not compile at all: the
         // finding is reported without a fix or a suggestion.
-        function report(node: TSESTree.CallExpression, replacement: string, canAutofix: boolean | null): void {
+        //
+        // `since` is the Obsidian version the replacement needs. Below the
+        // plugin's minAppVersion the native call is the right one, so it is
+        // not reported; where no version is known, the replacement is offered
+        // as before, and a suggestion says which version it needs.
+        function report(
+            node: TSESTree.CallExpression,
+            replacement: string,
+            canAutofix: boolean | null,
+            since?: string,
+        ): void {
+            const supported = since === undefined ? true : supportsVersion(minAppVersion, since);
+            if (supported === false) {
+                return;
+            }
             const original = getText(node);
             const bareHelper = BARE_HELPER_CALL.exec(replacement)?.[1];
             if (bareHelper !== undefined && shadowsGlobalHelper(node, bareHelper)) {
@@ -576,8 +606,10 @@ export default ruleCreator({
                     : {
                         suggest: [
                             {
-                                messageId: "preferCreateElSuggestion" as const,
-                                data: { replacement, original },
+                                messageId: supported === undefined
+                                    ? "preferCreateElSuggestionSince" as const
+                                    : "preferCreateElSuggestion" as const,
+                                data: { replacement, original, since: since ?? "" },
                                 fix(fixer) {
                                     return fixer.replaceText(node, replacement);
                                 },

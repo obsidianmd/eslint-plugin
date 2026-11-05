@@ -53,6 +53,7 @@ the new `checkId` option.
   - The suggestions that rename a command ID say that `executeCommandById()` calls, `obsidian://` URIs and other plugins that use the old ID stop working, besides users' hotkeys.
   - `validate-license` no longer reports the sample plugin's `Dynalist Inc.` line in a license that also has another holder's copyright line: it is the upstream notice kept as attribution.
 - `prefer-active-doc` reports `document` in an implementation of a DOM helper, such as a polyfill (`window.createDiv = () => document.createElement("div")`), which `prefer-create-el` leaves alone since #242; before, neither rule reported it ([#247](https://github.com/obsidianmd/eslint-plugin/pull/247)).
+- `prefer-instanceof` and `prefer-create-el` no longer fix or suggest code that needs a newer Obsidian than the plugin's `minAppVersion` (the new `minAppVersion` option, else `manifest.json`), which `no-unsupported-api` would then report. `prefer-instanceof` reports nothing below 0.15.0, which has no popout windows, and reports without a fix or a suggestion below 0.15.3, which first declares `instanceOf()` and `targetNode`. `prefer-create-el` does not report a call whose replacement needs `createSvg()` (1.1.1), `activeWindow` (0.15.0) or a document's `win` (0.15.3) below that version, where the native call is the right one. Where no version is known, the fixes are applied as before, and a suggestion says which version it needs ([#247](https://github.com/obsidianmd/eslint-plugin/pull/247)).
 
 ### Changed
 

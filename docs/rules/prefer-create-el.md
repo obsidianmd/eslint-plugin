@@ -140,3 +140,24 @@ if (doc) doc.head.appendChild(doc.createElement("style"));
 
 A detached element still belongs in the main document, so `document.createElement("canvas")` is
 still reported in favour of `createEl("canvas")`.
+
+### Minimum app version
+
+Some replacements need a newer Obsidian than the plugin may support, by the first typings that
+declare what they call: `createSvg()` (and `el.createSvg()`) 1.1.1, `activeWindow` 0.15.0, and a
+document's `win` 0.15.3. Where the plugin's minimum app version (the `minAppVersion` option, else
+`minAppVersion` in `manifest.json`) is older than that, the native call is the right one there, and
+it is not reported. `createEl()`, `createDiv()`, `createSpan()` and `createFragment()` are in every
+version, so `document.createElement("div")` is reported whatever the version. Where no version is
+known (no option and no `manifest.json` `minAppVersion`, or the one that applies is not a version,
+such as `latest`), the fix is applied as before, and a suggestion says which version it needs.
+
+## Options
+
+<!-- begin auto-generated rule options list -->
+
+| Name            | Description                                                                        | Type   |
+| :-------------- | :--------------------------------------------------------------------------------- | :----- |
+| `minAppVersion` | The minimum app version to check against. Defaults to manifest.json minAppVersion. | String |
+
+<!-- end auto-generated rule options list -->

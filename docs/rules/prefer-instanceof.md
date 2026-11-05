@@ -117,3 +117,26 @@ Elsewhere, as for a `FocusEvent`, a plain `Event` (`change`, `input`, `scroll`),
 React's synthetic events, which have no `targetNode`, it is reported only. A check that already
 falls back to `instanceOf()`, as in `e.target instanceof Element || (e.target as Node)?.instanceOf?.(Element)`,
 is not reported.
+
+## Minimum app version
+
+Popout windows came with Obsidian 0.15.0, and `instanceOf()` and `targetNode` are first declared in
+the 0.15.3 typings. By the plugin's minimum app version (the `minAppVersion` option, else
+`minAppVersion` in `manifest.json`):
+
+- below 0.15.0, there is only one window, so nothing is reported;
+- from 0.15.0 to below 0.15.3, a check is reported without a fix or a suggestion, as the
+  replacement does not exist yet on the oldest versions the plugin supports;
+- where no version is known (no option and no `manifest.json` `minAppVersion`, or the one that
+  applies is not a version, such as `latest`), the fix is applied as before, and a suggestion says
+  that it needs Obsidian 0.15.3.
+
+## Options
+
+<!-- begin auto-generated rule options list -->
+
+| Name            | Description                                                                        | Type   |
+| :-------------- | :--------------------------------------------------------------------------------- | :----- |
+| `minAppVersion` | The minimum app version to check against. Defaults to manifest.json minAppVersion. | String |
+
+<!-- end auto-generated rule options list -->
