@@ -288,6 +288,94 @@ ruleTester.run("no-nodejs-modules", noNodejsModules, {
                 }
             `,
         },
+        // Platform.isDesktopApp, and Platform.isMobile / isMobileApp negated,
+        // are guards like Platform.isDesktop (obsidian-importer, task-board).
+        {
+            name: "Platform.isDesktopApp guards like Platform.isDesktop",
+            code: `
+                import { Platform } from "obsidian";
+                export const os = Platform.isDesktopApp ? window.require("node:os") : null;
+                if (Platform.isDesktopApp) { require("fs"); }
+                Platform.isDesktopApp && import("path");
+                if (!Platform.isDesktopApp) {} else { require("crypto"); }
+                !Platform.isDesktopApp || require("child_process");
+            `,
+        },
+        {
+            name: "Platform.isMobile and Platform.isMobileApp guard the other way",
+            code: `
+                import { Platform } from "obsidian";
+                const cpus = Platform.isMobileApp ? 1 : require("os").cpus().length;
+                const fs = Platform.isMobile ? null : window.require("fs");
+                if (!Platform.isMobile) { require("path"); }
+                if (!Platform.isMobileApp && ready) { require("crypto"); }
+                Platform.isMobile || require("net");
+                if (Platform.isMobileApp) {} else { require("zlib"); }
+                declare const ready: boolean;
+            `,
+        },
+        {
+            name: "an early exit on a mobile check anywhere before the call, also with || on the left (juggl)",
+            code: `
+                import { Platform } from "obsidian";
+                declare const settings: { imageServer: boolean };
+                declare function log(): void;
+                export function start() {
+                    log();
+                    if (Platform.isMobile || !settings.imageServer) {
+                        return;
+                    }
+                    const http = require("http");
+                    if (settings.imageServer) {
+                        const fs = require("fs");
+                    }
+                    return http;
+                }
+                export function other() {
+                    if (Platform.isMobileApp) throw new Error("Desktop only");
+                    return window.require("os");
+                }
+                export function third() {
+                    if (!Platform.isDesktopApp) { log(); return; }
+                    return require("path");
+                }
+                export function fourth() {
+                    log();
+                    if (!Platform.isDesktop) return;
+                    return require("crypto");
+                }
+            `,
+        },
+        {
+            name: "require() and an awaited import() in a try block with a catch are guarded (side-note, douban)",
+            code: `
+                export function load() {
+                    try {
+                        const { exec } = require("child_process");
+                        return exec;
+                    } catch (e) {
+                        return null;
+                    }
+                }
+                export async function read() {
+                    try {
+                        const fs = await import("fs");
+                        const path = (await import("node:path")) as typeof import("node:path");
+                        return [fs, path, window.require("os")];
+                    } catch {
+                        return undefined;
+                    }
+                }
+            `,
+        },
+        {
+            name: "an optional call of require is guarded (remove-empty-assets)",
+            code: `
+                const fs = window.require?.("fs");
+                const path = require?.("path");
+                const os = (window as any).require?.("os");
+            `,
+        },
         {
             name: "a computed Platform key spelled out as a string is the same guard",
             code: `
@@ -528,10 +616,9 @@ ruleTester.run("no-nodejs-modules", noNodejsModules, {
             ],
         },
         {
-            name: "window['require'](), an optional call and a non-null assertion are forbidden",
-            code: "window['require']('fs'); window?.require('fs'); window.require?.('fs'); window!.require('fs');",
+            name: "window['require'](), an optional member access and a non-null assertion are forbidden",
+            code: "window['require']('fs'); window?.require('fs'); window!.require('fs');",
             errors: [
-                { messageId: "noNodejs" },
                 { messageId: "noNodejs" },
                 { messageId: "noNodejs" },
                 { messageId: "noNodejs" },
@@ -598,16 +685,80 @@ ruleTester.run("no-nodejs-modules", noNodejsModules, {
             ],
         },
         {
-            name: "a guard that is not the first statement of the function is not a guard",
+            name: "an early exit after the call, or in another block, is not a guard",
             code: `
-                declare function log(): void;
+                declare const ready: boolean;
                 function load() {
-                    log();
-                    if (!Platform.isDesktop) return;
-                    return require('fs');
+                    const fs = require('fs');
+                    if (Platform.isMobile) return;
+                    return fs;
+                }
+                function other() {
+                    if (ready) {
+                        if (Platform.isMobile) return;
+                    }
+                    return require('path');
+                }
+                async function later() {
+                    for (const name of ["a"]) {
+                        if (Platform.isMobile) { continue; return; }
+                        require('os');
+                    }
+                }
+            `,
+            errors: [
+                { messageId: "noNodejs", data: { module: "fs" } },
+                { messageId: "noNodejs", data: { module: "path" } },
+                { messageId: "noNodejs", data: { module: "os" } },
+            ],
+        },
+        {
+            name: "a function declaration after an early exit that is not the first statement is hoisted above it, so it is not guarded",
+            code: `
+                export function load() {
+                    const early = read();
+                    if (Platform.isMobile) return;
+                    function read() { return require('fs'); }
+                    return early;
                 }
             `,
             errors: [{ messageId: "noNodejs", data: { module: "fs" } }],
+        },
+        {
+            name: "the mobile branch of an isDesktopApp or isMobileApp check is not guarded",
+            code: `
+                if (!Platform.isDesktopApp) { require('fs'); }
+                const a = Platform.isDesktopApp ? null : window.require('os');
+                const b = Platform.isMobileApp ? require('path') : null;
+                Platform.isMobile && require('crypto');
+                Platform.isDesktopApp || require('child_process');
+                if (Platform.isMobile && ready) {} else { require('net'); }
+            `,
+            errors: [
+                { messageId: "noNodejs", data: { module: "fs" } },
+                { messageId: "noNodejs", data: { module: "os" } },
+                { messageId: "noNodejs", data: { module: "path" } },
+                { messageId: "noNodejs", data: { module: "crypto" } },
+                { messageId: "noNodejs", data: { module: "child_process" } },
+                { messageId: "noNodejs", data: { module: "net" } },
+            ],
+        },
+        {
+            name: "try without a catch, a call in a function defined in the try, and an import() not awaited there are not guarded",
+            code: `
+                async function load() {
+                    try { require('fs'); } finally { console.log('done'); }
+                    try { setTimeout(() => require('path'), 0); } catch { console.log('mobile'); }
+                    try { void import('os').then((os) => os.cpus()); } catch { console.log('mobile'); }
+                    try {} catch { require('crypto'); }
+                }
+            `,
+            errors: [
+                { messageId: "noNodejs", data: { module: "fs" } },
+                { messageId: "noNodejs", data: { module: "path" } },
+                { messageId: "noNodejs", data: { module: "os" } },
+                { messageId: "noNodejs", data: { module: "crypto" } },
+            ],
         },
         {
             name: "dynamic import() with Platform check but no early exit is forbidden",
@@ -648,6 +799,42 @@ verbatimRuleTester.run("no-nodejs-modules with verbatimModuleSyntax", noNodejsMo
         {
             name: "a re-export whose specifiers are all inline type-only is forbidden",
             code: "export { type Stats } from 'node:fs';",
+            errors: [{ messageId: "noNodejs" }],
+        },
+    ],
+});
+
+// Untyped: the test files are not in the tsconfig, and the rule needs no types.
+const untypedRuleTester = new RuleTester({ languageOptions: { parserOptions: { project: false } } });
+
+untypedRuleTester.run("no-nodejs-modules in a declaration file", noNodejsModules, {
+    valid: [
+        {
+            name: "an import in a .d.ts file never runs (file-explorer-note-count, code-emitter)",
+            code: 'import { ParsedPath } from "path"; declare module "electron" { import { EventEmitter } from "events"; }',
+            filename: "src/path.d.ts",
+        },
+        {
+            name: "a .d.mts, .d.cts or .d.<ext>.ts file is a declaration file too",
+            code: 'import fs from "fs";',
+            filename: "types/fs.d.mts",
+        },
+        {
+            name: "a .d.cts file",
+            code: 'import fs = require("fs");',
+            filename: "types/fs.d.cts",
+        },
+        {
+            name: "a .d.css.ts file",
+            code: 'import fs from "fs";',
+            filename: "styles/main.d.css.ts",
+        },
+    ],
+    invalid: [
+        {
+            name: "a file whose name only contains .d. is not a declaration file",
+            code: 'import fs from "fs";',
+            filename: "src/a.d.helper.tsx",
             errors: [{ messageId: "noNodejs" }],
         },
     ],

@@ -45,6 +45,11 @@ export default ruleCreator<[NoNodejsModulesOptions?], "noNodejs">({
         if (isDesktopOnly) {
             return {};
         }
+        // A declaration file only describes modules: an import in it, also in
+        // a `declare module`, never runs.
+        if (/\.d\.([^./\\]+\.)?[cm]?ts$/i.test(context.filename)) {
+            return {};
+        }
 
         // TypeScript erases `import type` and `export type`. An import or
         // export whose specifiers are all inline `type` ones is erased too,
@@ -216,98 +221,140 @@ function skipTypeWrappers(node: TSESTree.Expression): TSESTree.Expression {
     return current;
 }
 
-function isPlatformIsDesktop(expr: TSESTree.Expression): boolean {
-    // Platform.isDesktop, or Platform["isDesktop"]
-    return (
-        expr.type === AST_NODE_TYPES.MemberExpression &&
-        expr.object.type === AST_NODE_TYPES.Identifier &&
-        expr.object.name === "Platform" &&
-        getPropertyName(expr) === "isDesktop"
-    );
+// The Platform flags that say whether Obsidian runs as the desktop app, where
+// Node.js is available: Platform.isDesktopApp says exactly that, and
+// Platform.isDesktop, the desktop layout, is only ever true in it. On a phone or
+// tablet, Platform.isMobileApp and Platform.isMobile are always true.
+const DESKTOP_FLAGS = new Set(["isDesktop", "isDesktopApp"]);
+const MOBILE_FLAGS = new Set(["isMobile", "isMobileApp"]);
+
+// Platform.isDesktop, or Platform["isDesktop"], for one of `flags`.
+function isPlatformFlag(expr: TSESTree.Expression, flags: ReadonlySet<string>): boolean {
+    if (
+        expr.type !== AST_NODE_TYPES.MemberExpression ||
+        expr.object.type !== AST_NODE_TYPES.Identifier ||
+        expr.object.name !== "Platform"
+    ) {
+        return false;
+    }
+    const name = getPropertyName(expr);
+    return name !== undefined && flags.has(name);
 }
 
-// !Platform.isDesktop: what follows when it is false runs on desktop only.
-function isNotPlatformIsDesktop(expr: TSESTree.Expression): boolean {
-    return (
-        expr.type === AST_NODE_TYPES.UnaryExpression &&
-        expr.operator === "!" &&
-        isPlatformIsDesktop(expr.argument)
-    );
-}
-
-function extractsPlatformIsDesktop(expr: TSESTree.Expression): boolean {
-    if (isPlatformIsDesktop(expr)) {
+// Where `expr` is true, the code runs in the desktop app: Platform.isDesktop,
+// Platform.isDesktopApp, !Platform.isMobile, !Platform.isMobileApp, and `&&`
+// or `||` of such checks, with `&&` needing only one of them.
+function desktopWhenTrue(expr: TSESTree.Expression): boolean {
+    if (isPlatformFlag(expr, DESKTOP_FLAGS)) {
         return true;
     }
-    // Platform.isDesktop && ...
-    if (
-        expr.type === AST_NODE_TYPES.LogicalExpression &&
-        expr.operator === "&&"
-    ) {
-        return extractsPlatformIsDesktop(expr.left);
+    if (expr.type === AST_NODE_TYPES.UnaryExpression && expr.operator === "!") {
+        return desktopWhenFalse(expr.argument);
+    }
+    if (expr.type === AST_NODE_TYPES.LogicalExpression) {
+        if (expr.operator === "&&") {
+            return desktopWhenTrue(expr.left) || desktopWhenTrue(expr.right);
+        }
+        if (expr.operator === "||") {
+            return desktopWhenTrue(expr.left) && desktopWhenTrue(expr.right);
+        }
     }
     return false;
 }
 
-function isGuardedByPlatformIsDesktop(node: TSESTree.Node): boolean {
+// Where `expr` is false, the code runs in the desktop app: Platform.isMobile,
+// Platform.isMobileApp, !Platform.isDesktop, !Platform.isDesktopApp, and `||`
+// or `&&` of such checks, with `||` needing only one of them.
+function desktopWhenFalse(expr: TSESTree.Expression): boolean {
+    if (isPlatformFlag(expr, MOBILE_FLAGS)) {
+        return true;
+    }
+    if (expr.type === AST_NODE_TYPES.UnaryExpression && expr.operator === "!") {
+        return desktopWhenTrue(expr.argument);
+    }
+    if (expr.type === AST_NODE_TYPES.LogicalExpression) {
+        if (expr.operator === "||") {
+            return desktopWhenFalse(expr.left) || desktopWhenFalse(expr.right);
+        }
+        if (expr.operator === "&&") {
+            return desktopWhenFalse(expr.left) && desktopWhenFalse(expr.right);
+        }
+    }
+    return false;
+}
+
+function isGuardedByPlatformIsDesktop(node: TSESTree.CallExpression | TSESTree.ImportExpression): boolean {
+    // `require?.("fs")` and `window.require?.("fs")` call require() only where
+    // it exists.
+    if (node.type === AST_NODE_TYPES.CallExpression && node.optional) {
+        return true;
+    }
     let current: TSESTree.Node | undefined = node.parent;
     let prevChild: TSESTree.Node = node;
+    // A try block catches what is thrown while it runs, so not from a function
+    // defined in it and called later.
+    let inSameFunction = true;
 
     while (current) {
         if (current.type === AST_NODE_TYPES.IfStatement) {
-            // Must be in the consequent (not the test or alternate)
-            if (prevChild !== current.test && prevChild !== current.alternate) {
-                if (extractsPlatformIsDesktop(current.test)) {
-                    return true;
-                }
+            if (prevChild === current.consequent && desktopWhenTrue(current.test)) {
+                return true;
             }
             // if (!Platform.isDesktop) { ... } else { require(...) }
-            if (prevChild === current.alternate && isNotPlatformIsDesktop(current.test)) {
+            if (prevChild === current.alternate && desktopWhenFalse(current.test)) {
                 return true;
             }
         } else if (current.type === AST_NODE_TYPES.ConditionalExpression) {
-            if (prevChild !== current.test && prevChild !== current.alternate) {
-                if (extractsPlatformIsDesktop(current.test)) {
-                    return true;
-                }
-            }
-            // Check ternary: Platform.isDesktop ? import(...) : ...
-            if (prevChild === current.consequent) {
-                if (isPlatformIsDesktop(current.test)) {
-                    return true;
-                }
+            // Platform.isDesktop ? import(...) : ...
+            if (prevChild === current.consequent && desktopWhenTrue(current.test)) {
+                return true;
             }
             // !Platform.isDesktop ? ... : import(...)
-            if (prevChild === current.alternate && isNotPlatformIsDesktop(current.test)) {
+            if (prevChild === current.alternate && desktopWhenFalse(current.test)) {
                 return true;
             }
-        } else if (
-            current.type === AST_NODE_TYPES.LogicalExpression &&
-            current.operator === "&&" &&
-            prevChild === current.right
-        ) {
-            if (extractsPlatformIsDesktop(current.left)) {
+        } else if (current.type === AST_NODE_TYPES.LogicalExpression && prevChild === current.right) {
+            // Platform.isDesktop && require(...)
+            if (current.operator === "&&" && desktopWhenTrue(current.left)) {
                 return true;
             }
-        } else if (
             // !Platform.isDesktop || require(...)
-            current.type === AST_NODE_TYPES.LogicalExpression &&
-            current.operator === "||" &&
-            prevChild === current.right &&
-            isNotPlatformIsDesktop(current.left)
-        ) {
-            return true;
+            if (current.operator === "||" && desktopWhenFalse(current.left)) {
+                return true;
+            }
+        } else if (current.type === AST_NODE_TYPES.BlockStatement) {
+            // if (!Platform.isDesktop) return; anywhere before the statement.
+            // That covers a block only: default parameter values, also inside a
+            // destructuring pattern, are evaluated before the body runs. A
+            // function declaration is hoisted, so the statements before the
+            // early exit can call it: it is guarded only by an early exit that
+            // is the block's first statement.
+            const index = current.body.indexOf(prevChild as TSESTree.Statement);
+            const before =
+                prevChild.type === AST_NODE_TYPES.FunctionDeclaration
+                    ? current.body.slice(0, Math.min(index, 1))
+                    : current.body.slice(0, index);
+            if (before.some(isEarlyExitGuard)) {
+                return true;
+            }
+        } else if (current.type === AST_NODE_TYPES.TryStatement) {
+            // try { require("fs") } catch { ... }: on mobile the catch runs. An
+            // import() rejects instead of throwing, which the catch sees only
+            // when it is awaited there.
+            if (
+                inSameFunction &&
+                prevChild === current.block &&
+                current.handler !== null &&
+                (node.type === AST_NODE_TYPES.CallExpression || isAwaited(node))
+            ) {
+                return true;
+            }
         } else if (
             current.type === AST_NODE_TYPES.FunctionDeclaration ||
             current.type === AST_NODE_TYPES.FunctionExpression ||
             current.type === AST_NODE_TYPES.ArrowFunctionExpression
         ) {
-            // Check if function body starts with: if (!Platform.isDesktop) { throw/return }
-            // That covers the body only: default parameter values, also inside
-            // a destructuring pattern, are evaluated before the body runs.
-            if (prevChild === current.body && hasGuardAtFunctionStart(current)) {
-                return true;
-            }
+            inSameFunction = false;
         }
         prevChild = current;
         current = current.parent;
@@ -315,70 +362,54 @@ function isGuardedByPlatformIsDesktop(node: TSESTree.Node): boolean {
     return false;
 }
 
-/**
- * Checks if an if-statement is an early exit guard pattern:
- * if (!Platform.isDesktop) { throw ... } or if (!Platform.isDesktop) { return ... }
- */
-function isEarlyExitGuard(ifStmt: TSESTree.IfStatement): boolean {
-    // Must not have an else clause (code after if is what we're protecting)
-    if (ifStmt.alternate) {
-        return false;
-    }
-
-    const test = ifStmt.test;
-
-    // Check for: if (!Platform.isDesktop)
-    if (
-        test.type === AST_NODE_TYPES.UnaryExpression &&
-        test.operator === "!" &&
-        isPlatformIsDesktop(test.argument)
+// `await import("fs")`, also through a type assertion.
+function isAwaited(node: TSESTree.Node): boolean {
+    let child = node;
+    let parent = node.parent;
+    while (
+        parent &&
+        (parent.type === AST_NODE_TYPES.TSAsExpression ||
+            parent.type === AST_NODE_TYPES.TSTypeAssertion ||
+            parent.type === AST_NODE_TYPES.TSNonNullExpression ||
+            parent.type === AST_NODE_TYPES.TSSatisfiesExpression)
     ) {
-        return hasEarlyExit(ifStmt.consequent);
+        child = parent;
+        parent = parent.parent;
     }
-
-    return false;
+    return parent?.type === AST_NODE_TYPES.AwaitExpression && parent.argument === child;
 }
 
 /**
- * Checks if a statement or block contains an early exit (throw or return)
+ * An early exit: `if (!Platform.isDesktop) { throw ... }` or `return`, also
+ * with Platform.isMobile or `Platform.isMobile || ...`, without an else.
  */
-function hasEarlyExit(stmt: TSESTree.Statement): boolean {
-    if (stmt.type === AST_NODE_TYPES.ThrowStatement ||
-        stmt.type === AST_NODE_TYPES.ReturnStatement) {
+function isEarlyExitGuard(statement: TSESTree.Statement): boolean {
+    return (
+        statement.type === AST_NODE_TYPES.IfStatement &&
+        !statement.alternate &&
+        desktopWhenFalse(statement.test) &&
+        alwaysExits(statement.consequent)
+    );
+}
+
+/**
+ * A `throw` or `return`, or a block that reaches one among its own statements
+ * before any `break` or `continue`.
+ */
+function alwaysExits(stmt: TSESTree.Statement): boolean {
+    if (stmt.type === AST_NODE_TYPES.ThrowStatement || stmt.type === AST_NODE_TYPES.ReturnStatement) {
         return true;
     }
-
-    if (stmt.type === AST_NODE_TYPES.BlockStatement) {
-        // Check if first statement is throw or return
-        const firstStmt = stmt.body[0];
-        if (firstStmt && (
-            firstStmt.type === AST_NODE_TYPES.ThrowStatement ||
-            firstStmt.type === AST_NODE_TYPES.ReturnStatement
-        )) {
+    if (stmt.type !== AST_NODE_TYPES.BlockStatement) {
+        return false;
+    }
+    for (const statement of stmt.body) {
+        if (statement.type === AST_NODE_TYPES.ThrowStatement || statement.type === AST_NODE_TYPES.ReturnStatement) {
             return true;
         }
+        if (statement.type === AST_NODE_TYPES.BreakStatement || statement.type === AST_NODE_TYPES.ContinueStatement) {
+            return false;
+        }
     }
-
     return false;
-}
-
-/**
- * Checks if function starts with guard: if (!Platform.isDesktop) { throw/return }
- */
-function hasGuardAtFunctionStart(
-    func: TSESTree.FunctionDeclaration | TSESTree.FunctionExpression | TSESTree.ArrowFunctionExpression
-): boolean {
-    const body = func.body;
-
-    // Arrow functions might have expression bodies
-    if (body.type !== AST_NODE_TYPES.BlockStatement) {
-        return false;
-    }
-
-    const firstStatement = body.body[0];
-    if (!firstStatement || firstStatement.type !== AST_NODE_TYPES.IfStatement) {
-        return false;
-    }
-
-    return isEarlyExitGuard(firstStatement);
 }

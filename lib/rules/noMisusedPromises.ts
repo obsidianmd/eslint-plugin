@@ -49,7 +49,9 @@ const rule: TSESLint.RuleModule<string, readonly unknown[], PluginDocs> = {
             return {};
         }
         return upstream.create(
-            withObsidianChainingIgnored(withReplacedRuleDisableComments(context)),
+            withObsidianChainingIgnored(
+                withAsyncPluginOnloadAllowed(withReplacedRuleDisableComments(context)),
+            ),
         );
     },
 };
@@ -91,6 +93,79 @@ function withReplacedRuleDisableComments(context: RuleContext): RuleContext {
     });
 }
 
+// Typings before 1.7.2 declare no `Plugin.onload`, so a plugin's onload
+// overrides `Component.onload(): void`, and upstream reports the sample
+// plugin's `async onload()` as voidReturnInheritedMethod. Obsidian handles the
+// Promise a plugin's onload returns, as 1.7.2 documents by declaring
+// `onload(): Promise<void> | void`, against which upstream reports nothing. This drops that one report: an
+// `onload` method or property of a class whose reported heritage type is the
+// obsidian package's Plugin, or a class extending it, when that type's `onload`
+// is declared only in the obsidian package. An `onload(): void` declared in a
+// class of your own between them is reported as upstream reports it, and so is
+// every other method, such as `onunload`, which Obsidian does not await.
+function withAsyncPluginOnloadAllowed(context: RuleContext): RuleContext {
+    return forwardTo(context, {
+        report(descriptor: ReportDescriptor): void {
+            if (!isAsyncPluginOnload(context, descriptor)) {
+                context.report(descriptor);
+            }
+        },
+    });
+}
+
+function isAsyncPluginOnload(context: RuleContext, descriptor: ReportDescriptor): boolean {
+    if (!("messageId" in descriptor) || descriptor.messageId !== "voidReturnInheritedMethod" || !("node" in descriptor)) {
+        return false;
+    }
+    const member = descriptor.node as TSESTree.Node;
+    if (
+        (member.type !== "MethodDefinition" && member.type !== "PropertyDefinition") ||
+        member.computed ||
+        member.key.type !== "Identifier" ||
+        member.key.name !== "onload" ||
+        (member.parent.parent.type !== "ClassDeclaration" && member.parent.parent.type !== "ClassExpression")
+    ) {
+        return false;
+    }
+    const services = ESLintUtils.getParserServices(context);
+    const checker = services.program.getTypeChecker();
+    const tsClass = services.esTreeNodeToTSNodeMap.get(member.parent.parent);
+    const heritageTypeName = (descriptor.data as { heritageTypeName?: unknown } | undefined)?.heritageTypeName;
+    // The upstream rule reports once per heritage type, naming it by
+    // typeToString(), so this finds the one reported the same way.
+    const heritageTypes = (tsClass.heritageClauses ?? [])
+        .flatMap((clause) => clause.types)
+        .map((expression) => checker.getTypeAtLocation(expression))
+        .filter((type) => checker.typeToString(type) === heritageTypeName);
+    return (
+        heritageTypes.length > 0 &&
+        heritageTypes.every((type) => {
+            const onload = type.getProperty("onload");
+            return (
+                onload !== undefined &&
+                declaredOnlyInObsidian(onload) &&
+                extendsObsidianPlugin(checker, type, new Set())
+            );
+        })
+    );
+}
+
+function extendsObsidianPlugin(checker: ts.TypeChecker, type: ts.Type, seen: Set<ts.Type>): boolean {
+    const symbol = type.getSymbol();
+    if (seen.has(type) || symbol === undefined) {
+        return false;
+    }
+    seen.add(type);
+    if ((symbol.getName() === "Plugin" || symbol.getName() === "Plugin_2") && declaredInObsidian(symbol)) {
+        return true;
+    }
+    // A class's instance type, or a generic class's reference to it.
+    const target = (type as ts.TypeReference).target ?? type;
+    if (!target.isClassOrInterface()) {
+        return false;
+    }
+    return checker.getBaseTypes(target).some((base) => extendsObsidianPlugin(checker, base, seen));
+}
 
 function withObsidianChainingIgnored(context: RuleContext): RuleContext {
     // Throws the same "requires type information" error the upstream rule would.
@@ -137,15 +212,24 @@ function isObsidianChainingThen(symbol: ts.Symbol): boolean {
     if (symbol.getName() !== "then") {
         return false;
     }
+    return declaredOnlyInObsidian(symbol);
+}
+
+// Every declaration of `symbol` is in the obsidian package's obsidian.d.ts.
+function declaredOnlyInObsidian(symbol: ts.Symbol): boolean {
     const declarations = symbol.getDeclarations();
-    return (
-        declarations !== undefined &&
-        declarations.length > 0 &&
-        declarations.every((declaration) =>
-            /(^|\/)node_modules\/obsidian\/obsidian\.d\.ts$/.test(
-                declaration.getSourceFile().fileName.replace(/\\/g, "/"),
-            ),
-        )
+    return declarations !== undefined && declarations.length > 0 && declarations.every(isInObsidian);
+}
+
+// The obsidian package's obsidian.d.ts declares `symbol`, which a
+// `declare module "obsidian"` augmentation may merge into.
+function declaredInObsidian(symbol: ts.Symbol): boolean {
+    return symbol.getDeclarations()?.some(isInObsidian) ?? false;
+}
+
+function isInObsidian(declaration: ts.Declaration): boolean {
+    return /(^|\/)node_modules\/obsidian\/obsidian\.d\.ts$/.test(
+        declaration.getSourceFile().fileName.replace(/\\/g, "/"),
     );
 }
 
