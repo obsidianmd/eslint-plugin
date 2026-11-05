@@ -281,7 +281,16 @@ describe("linting a test file", () => {
 	});
 
 	it("reports the same code outside a test file", async () => {
-		const [result] = await eslint.lintText(code, { filePath: "src/fixture.js" });
+		// prefer-get-language reports only from the minAppVersion getLanguage() needs; this
+		// repository's own manifest.json says 0.15.0, so the version is given here.
+		const outside = new ESLint({
+			overrideConfigFile: true,
+			overrideConfig: [
+				...plugin.configs.recommended,
+				{ files: ["src/**"], rules: { "obsidianmd/prefer-get-language": ["error", { minAppVersion: "1.8.7" }] } },
+			],
+		});
+		const [result] = await outside.lintText(code, { filePath: "src/fixture.js" });
 		assert.deepStrictEqual(
 			[...new Set(result.messages.map((message) => message.ruleId).filter((id) => id?.startsWith("obsidianmd/")))].sort(),
 			[
