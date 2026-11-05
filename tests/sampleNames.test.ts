@@ -22,6 +22,10 @@ ruleTester.run("sample-names", sampleNamesRule, {
             code: "const DEFAULT_SETTINGS = { mySetting: 'default' }; plugin.settings.mySetting = 'x';",
         },
         {
+            name: "a computed property keyed by a variable called mySetting is allowed",
+            code: "declare const mySetting: unique symbol; interface WordCountSettings { [mySetting]: string }",
+        },
+        {
             name: "a property named like a sample class is allowed",
             code: "interface Plugins { MyPlugin: unknown }",
         },
@@ -65,7 +69,8 @@ ruleTester.run("sample-names", sampleNamesRule, {
         {
             name: "the sample setting is forbidden in any interface",
             code: "interface WordCountSettings { mySetting: string }",
-            errors: [{ messageId: "renameSetting", line: 1, column: 31 }],
+            // Only the key is highlighted, not its type.
+            errors: [{ messageId: "renameSetting", line: 1, column: 31, endColumn: 40 }],
         },
         {
             name: "the sample setting is forbidden in a type literal",

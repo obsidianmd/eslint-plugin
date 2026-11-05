@@ -69,7 +69,10 @@ some files, set this rule's options for those files, as described above.
 The rule takes a single configuration object where:
 - Keys are the names of the core rules you want to wrap
 - Values are objects containing:
-  - `messages`: Map of original error messages to custom messages
+  - `messages`: an object mapping original error messages to custom messages. A `Map` (or a
+    `Date`, or any object that keeps its entries elsewhere than in its own properties) stops
+    ESLint with an error naming the rule, as a `messages` that is not an object does: it would
+    match nothing and drop every report.
   - `options`: (optional) Array of options for the wrapped rule; its defaults fill in the rest
     (see above)
 
@@ -198,9 +201,10 @@ export default defineConfig([
 1:10  error  Avoid `any`: Obsidian's API is typed, so use its types or `unknown`.  custom/no-explicit-any
 ```
 
-The keys of `messages` match as in this rule: a report whose message, with its placeholders filled
-in, equals or contains a key shows that key's value instead, and the first matching key wins. Unlike
-this rule:
+`messages` is an object of strings, as in this rule; anything else, such as a `Map`, throws a
+`TypeError` that says what it was given. Its keys match as in this rule: a report whose message,
+with its placeholders filled in, equals or contains a key shows that key's value instead, and the
+first matching key wins. Unlike this rule:
 
 - A report that matches no key is reported unchanged, not dropped.
 - The new message replaces the whole message, without a `[rule-name]` prefix. It can use the
@@ -214,6 +218,8 @@ original rule off where you enable the wrapped one, or both report.
 
 In an `eslint.config.ts`, take typescript-eslint's rules from `@typescript-eslint/eslint-plugin`
 (`import tsPlugin from "@typescript-eslint/eslint-plugin"`): `tseslint.plugin` is typed without them.
+With pnpm, add `@typescript-eslint/eslint-plugin` to your `devDependencies` first, at your
+`typescript-eslint` version: pnpm does not let your config import a package your project does not list.
 
 ESLint's `--cache` does not see a change to the messages, which are not part of the rule's options:
 delete the cache file (`.eslintcache` by default) after changing them.

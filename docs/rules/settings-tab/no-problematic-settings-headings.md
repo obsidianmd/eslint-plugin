@@ -42,9 +42,12 @@ new Setting(containerEl).setHeading().setName("General"); // fixed to ;
 ```
 
 Removing a heading that also has a description, tooltip or `setDisabled()`, or an argument with a
-side effect such as `new Setting(containerEl.createDiv())`, is a suggestion. There is no fix or
-suggestion when the heading has a control (`addButton()`, `addToggle()`, …) or another call, or when
-its value is used, as in `const heading = new Setting(…)…setHeading()`. Rename the heading instead.
+side effect such as `new Setting(containerEl.createDiv())`, is a suggestion. It removes the whole
+heading setting, its description and tooltip with it, and its description says so ("Remove the
+whole heading setting: the `new Setting(…)` statement and every call in it, including
+`setDesc()`."). There is no fix or suggestion when the heading has a control (`addButton()`,
+`addToggle()`, …) or another call, or when its value is used, as in
+`const heading = new Setting(…)…setHeading()`. Rename the heading instead.
 
 ## Further reading
 

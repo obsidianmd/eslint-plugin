@@ -72,3 +72,18 @@ export const DEFAULT_BRANDS: string[] = [
     "WebDAV",
     "WebStorm"
 ];
+
+// Brands whose name is also an ordinary English word that UI text uses in
+// its own sense: "Close all windows", "Move the cursor", "Leave some slack",
+// "Press x to close", "The notion of", "Views react to changes". Written in
+// lower case they are that word and are left alone; written as the brand they
+// keep the brand's casing; any other casing is corrected to the brand's. This
+// applies to these names in a `brands` option too.
+export const DEFAULT_AMBIGUOUS_BRANDS: string[] = [
+    "Windows",
+    "Cursor",
+    "Slack",
+    "X",
+    "Notion",
+    "React",
+];

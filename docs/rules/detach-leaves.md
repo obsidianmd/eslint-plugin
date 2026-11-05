@@ -22,8 +22,10 @@ onunload() {
 Detaching the leaves here makes them reopen in their default location the next time the plugin
 loads, even if the user had moved them elsewhere.
 
-Not reported: a call nested inside a block such as an `if`, a call made through a helper method, and
-an `onunload` written as an arrow-function property.
+The method may be written `onunload()`, `"onunload"()` or `["onunload"]()`. Not reported: a call
+nested inside a block such as an `if`, a call made through a helper method, an `onunload` written as
+an arrow-function property, and a method whose computed name is not a string literal, such as
+`[name]()`, which is named by whatever `name` holds.
 
 ### Fix
 
@@ -51,9 +53,11 @@ export default class MyPlugin extends Plugin {
 Otherwise the method stays, with an empty body `{}`, or with just the comments its body held: when
 the class extends a class of your own, whose `onunload()` the method overrides; when a comment is
 in, above or after the method, as the fix removes no comment outside the call; for an `async`,
-`static` or decorated `onunload()`, one with parameters, or one with overloads; and for one that
-follows a class field with no semicolon after it, unless it is the class's last member, as the next
-member could then continue the field. `@typescript-eslint/no-empty-function`, if you enable it,
+`static`, computed or decorated `onunload()`, one with parameters, or one with overloads; in a
+class with another member whose computed name may be `onunload` (`[KEY]() {}` with `KEY` imported),
+which would run in its place; and for one that follows a class field with no semicolon after it,
+unless it is the class's last member, as the next member could then continue the field.
+`@typescript-eslint/no-empty-function`, if you enable it,
 reports the empty method: remove it yourself, or say in a comment why it is empty.
 
 ## Further reading

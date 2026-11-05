@@ -1,192 +1,97 @@
-import { RuleTester } from "@typescript-eslint/rule-tester";
-import type { RuleModule } from "@typescript-eslint/utils/ts-eslint";
-import globals from "globals";
-import { builtinRules } from "eslint/use-at-your-own-risk";
+import assert from "node:assert";
+import { ESLint, type Linter } from "eslint";
+import plugin from "../lib/index.js";
 
-const noUndefRule = builtinRules.get("no-undef")! as unknown as RuleModule<string, readonly unknown[]>;
+// The globals the recommended config declares, checked through the config
+// itself: no-undef runs on JavaScript files (it is off for TypeScript, where
+// the compiler reports undefined names). This repo's manifest.json is not
+// desktop-only, so the Node globals are not declared here;
+// manifestFallback.test.ts covers a desktop-only manifest.
 
-const obsidianGlobals = {
-    DomElementInfo: "readonly",
-    activeDocument: "readonly",
-    activeWindow: "readonly",
-    ajax: "readonly",
-    ajaxPromise: "readonly",
-    createDiv: "readonly",
-    createEl: "readonly",
-    createFragment: "readonly",
-    createSpan: "readonly",
-    createSvg: "readonly",
-    fish: "readonly",
-    fishAll: "readonly",
-    isBoolean: "readonly",
-    nextFrame: "readonly",
-    ready: "readonly",
-    sleep: "readonly"
-} as const;
-
-const desktopRuleTester = new RuleTester({
-    languageOptions: {
-        globals: {
-            ...globals.browser,
-            ...globals.node,
-            NodeJS: "readonly",
-            ...obsidianGlobals
-        }
-    }
-});
-
-const browserRuleTester = new RuleTester({
-    languageOptions: {
-        globals: {
-            ...globals.browser,
-            ...obsidianGlobals
-        }
-    }
-});
-
-const obsidianValid = [
-    {
-        name: "DomElementInfo global is defined",
-        code: "let domElementInfo: DomElementInfo;",
-    },
-    {
-        name: "activeDocument global is defined",
-        code: "activeDocument;",
-    },
-    {
-        name: "activeWindow global is defined",
-        code: "activeWindow;",
-    },
-    {
-        name: "ajax global is defined",
-        code: "ajax({ url: 'test' });",
-    },
-    {
-        name: "ajaxPromise global is defined",
-        code: "ajaxPromise({ url: 'test' });",
-    },
-    {
-        name: "createDiv global is defined",
-        code: "createDiv();",
-    },
-    {
-        name: "createEl global is defined",
-        code: "createEl('p');",
-    },
-    {
-        name: "createFragment global is defined",
-        code: "createFragment(() => {});",
-    },
-    {
-        name: "createSpan global is defined",
-        code: "createSpan();",
-    },
-    {
-        name: "createSvg global is defined",
-        code: "createSvg('svg');",
-    },
-    {
-        name: "fish global is defined",
-        code: "fish('.my-selector');",
-    },
-    {
-        name: "fishAll global is defined",
-        code: "fishAll('.my-selector');",
-    },
-    {
-        name: "isBoolean global is defined",
-        code: "isBoolean(true)",
-    },
-    {
-        name: "nextFrame global is defined",
-        code: "nextFrame(() => {});",
-    },
-    {
-        name: "ready global is defined",
-        code: "ready(() => {});",
-    },
-    {
-        name: "sleep global is defined",
-        code: "sleep(1000);",
-    }
+// The globals Obsidian defines on each window, as docs/configuration.md lists them.
+const OBSIDIAN_GLOBALS = [
+    "DomElementInfo",
+    "SvgElementInfo",
+    "activeDocument",
+    "activeWindow",
+    "ajax",
+    "ajaxPromise",
+    "createDiv",
+    "createEl",
+    "createFragment",
+    "createSpan",
+    "createSvg",
+    "fish",
+    "fishAll",
+    "isBoolean",
+    "nextFrame",
+    "ready",
+    "sleep",
 ];
 
-const browserValid = [
-    {
-        name: "console browser global is defined",
-        code: "console",
-    },
-    {
-        name: "document browser global is defined",
-        code: "document",
-    },
-    {
-        name: "window browser global is defined",
-        code: "window",
-    },
-];
+const eslint = new ESLint({ overrideConfigFile: true, overrideConfig: plugin.configs.recommended });
 
-desktopRuleTester.run("no-undef (desktop-only)", noUndefRule, {
-    valid: [
-        ...obsidianValid,
-        ...browserValid,
-        {
-            name: "require is defined in desktop mode",
-            code: "require('path');",
-        },
-        {
-            name: "process is defined in desktop mode",
-            code: "process.env.NODE_ENV;",
-        },
-        {
-            name: "setImmediate is defined in desktop mode",
-            code: "setImmediate(() => {});",
-        }
-    ],
-    invalid: [
-        {
-            name: "undefinedGlobal is not defined",
-            code: "undefinedGlobal;",
-            errors: [{ messageId: "undef" }],
-        },
-        {
-            name: "someUndefinedFunction is not defined",
-            code: "someUndefinedFunction();",
-            errors: [{ messageId: "undef" }],
-        }
-    ],
-});
+async function declaredGlobals(filePath: string): Promise<Linter.Globals> {
+    const config = await eslint.calculateConfigForFile(filePath) as Linter.Config;
+    return (config.languageOptions?.globals ?? {}) as Linter.Globals;
+}
 
-browserRuleTester.run("no-undef (browser)", noUndefRule, {
-    valid: [
-        ...obsidianValid,
-        ...browserValid,
-    ],
-    invalid: [
-        {
-            name: "undefinedGlobal is not defined in browser",
-            code: "undefinedGlobal;",
-            errors: [{ messageId: "undef" }],
-        },
-        {
-            name: "someUndefinedFunction is not defined in browser",
-            code: "someUndefinedFunction();",
-            errors: [{ messageId: "undef" }],
-        },
-        {
-            name: "require is not defined in browser mode",
-            code: "require('path');",
-            errors: [{ messageId: "undef" }],
-        },
-        {
-            name: "process is not defined in browser mode",
-            code: "process.env.NODE_ENV;",
-            errors: [{ messageId: "undef" }],
-        },
-        {
-            name: "setImmediate is not defined in browser mode",
-            code: "setImmediate(() => {});",
-            errors: [{ messageId: "undef" }],
-        }
-    ],
+async function undefinedNames(code: string): Promise<string[]> {
+    const [result] = await eslint.lintText(code, { filePath: "src/main.js" });
+    assert.deepStrictEqual(result.messages.filter((m) => m.fatal).map((m) => m.message), []);
+    return result.messages.filter((m) => m.ruleId === "no-undef").map((m) => m.message);
+}
+
+describe("globals in the recommended config", () => {
+    for (const filePath of ["src/main.ts", "src/main.js"]) {
+        it(`declares Obsidian's globals, read-only, for ${filePath}`, async () => {
+            const declared = await declaredGlobals(filePath);
+            for (const name of OBSIDIAN_GLOBALS) {
+                assert.strictEqual(declared[name], "readonly", name);
+            }
+        });
+
+        it(`declares the browser globals and require for ${filePath}`, async () => {
+            const declared = await declaredGlobals(filePath);
+            for (const name of ["window", "document", "console", "localStorage", "HTMLElement"]) {
+                assert.ok(name in declared, name);
+                assert.notStrictEqual(declared[name], "off", name);
+            }
+            assert.strictEqual(declared.require, "readonly");
+        });
+
+        it(`does not declare the Node globals for ${filePath} when the manifest is not desktop-only`, async () => {
+            const declared = await declaredGlobals(filePath);
+            for (const name of ["process", "setImmediate", "__dirname", "Buffer", "NodeJS"]) {
+                assert.ok(!(name in declared), name);
+            }
+        });
+    }
+
+    it("no-undef reports none of Obsidian's globals", async () => {
+        assert.deepStrictEqual(await undefinedNames(`${OBSIDIAN_GLOBALS.join(";\n")};\n`), []);
+    });
+
+    it("no-undef reports none of the browser globals", async () => {
+        assert.deepStrictEqual(await undefinedNames("console.log(window, document);\n"), []);
+    });
+
+    it("no-global-assign reports an assignment to an Obsidian global", async () => {
+        const [result] = await eslint.lintText("createEl = null;\n", { filePath: "src/main.js" });
+        assert.deepStrictEqual(
+            result.messages.filter((m) => m.ruleId === "no-global-assign").map((m) => m.message),
+            ["Read-only global 'createEl' should not be modified."],
+        );
+    });
+
+    it("no-undef reports the Node globals and undefined names", async () => {
+        assert.deepStrictEqual(
+            await undefinedNames("process.env.NODE_ENV;\nsetImmediate(() => {});\nundefinedGlobal;\n"),
+            [
+                "'process' is not defined.",
+                "'setImmediate' is not defined.",
+                "'undefinedGlobal' is not defined.",
+            ],
+        );
+    });
 });

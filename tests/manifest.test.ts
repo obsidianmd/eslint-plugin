@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { after, afterEach, beforeEach, describe, it } from "mocha";
 import type { PluginManifest } from "../lib/types/manifest.js";
-import { isManifestDesktopOnly, loadManifest } from "../lib/manifest.js";
+import { getManifest, isManifestDesktopOnly, loadManifest } from "../lib/manifest.js";
 
 // A manifest.json is supplied by the repo being linted -- in the community
 // scanner, by whoever submitted the plugin -- and reaches these rules through
@@ -74,6 +74,16 @@ describe("loadManifest", () => {
         assert.deepStrictEqual(errors, []);
     });
 
+    // As a Windows editor or PowerShell 5.1 saves it: a byte order mark and
+    // CRLF line endings. The rules lost isDesktopOnly and minAppVersion, and
+    // the error printed showed the mark as nothing at all.
+    it("reads a manifest saved with a UTF-8 byte order mark", () => {
+        const file = path.join(tmpDir, "bom.json");
+        fs.writeFileSync(file, '﻿{\r\n  "id": "sample",\r\n  "isDesktopOnly": true\r\n}\r\n');
+        assert.deepStrictEqual(loadManifest(file), { id: "sample", isDesktopOnly: true });
+        assert.deepStrictEqual(errors, []);
+    });
+
     it("returns null without reporting when there is no manifest", () => {
         assert.strictEqual(loadManifest(path.join(tmpDir, "missing.json")), null);
         assert.deepStrictEqual(errors, []);
@@ -102,5 +112,22 @@ describe("loadManifest", () => {
         }
         assert.strictEqual(loadManifest(file), null);
         assert.strictEqual(errors.length, 1);
+    });
+});
+
+// The rules read the manifest for every file they lint, so it is read once.
+describe("getManifest", () => {
+    it("is the manifest.json of the working directory", () => {
+        assert.deepStrictEqual(getManifest(), JSON.parse(fs.readFileSync("manifest.json", "utf8")));
+    });
+
+    it("reads it only once", () => {
+        assert.strictEqual(getManifest(), getManifest());
+    });
+
+    it("is what isManifestDesktopOnly reads by default", () => {
+        // This repo's manifest.json is not desktop-only.
+        assert.strictEqual(getManifest()?.isDesktopOnly, false);
+        assert.strictEqual(isManifestDesktopOnly(), false);
     });
 });

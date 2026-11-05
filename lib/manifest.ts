@@ -12,7 +12,12 @@ export function getManifest(): PluginManifest | null {
 
 export function loadManifest(path: string): PluginManifest | null {
     try {
-        return JSON.parse(fs.readFileSync(path, "utf8")) as PluginManifest;
+        // Windows editors and PowerShell 5.1 save UTF-8 with a byte order
+        // mark, which JSON.parse rejects. ESLint drops it before linting the
+        // file, so validate-manifest checks such a manifest as usual, and so
+        // do Node's require() of JSON, npm and TypeScript.
+        const text = fs.readFileSync(path, "utf8").replace(/^﻿/, "");
+        return JSON.parse(text) as PluginManifest;
     } catch (err) {
         // A library, a tooling repo or a standalone CLI legitimately has no
         // manifest, so ENOENT is not an error and must not print anything. A

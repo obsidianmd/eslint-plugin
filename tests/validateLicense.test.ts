@@ -34,18 +34,21 @@ const SAMPLE_LINE = "Copyright (C) 2020-2025 by Dynalist Inc.";
 
 ruleTester.run("validate-license", licenseRule as unknown as Rule.RuleModule, {
     valid: [
+        // A line with a holder other than the sample's is not checked at all,
+        // whatever its year: the year checks are pinned by the invalid cases
+        // with the sample holder.
         {
-            name: "copyright with year range ending at current year is valid",
+            name: "own copyright with a range ending in the current year is valid",
             filename: "LICENSE",
             code: `Copyright (C) 2020-${currentYear} by John Doe`,
         },
         {
-            name: "copyright with current year only is valid",
+            name: "own copyright with the current year is valid",
             filename: "LICENSE",
             code: `Copyright (C) ${currentYear} by John Doe`,
         },
         {
-            name: "copyright with next year is valid",
+            name: "own copyright with next year is valid",
             filename: "LICENSE",
             code: `Copyright (C) ${currentYear + 1} by John Doe`,
         },
@@ -84,7 +87,7 @@ ruleTester.run("validate-license", licenseRule as unknown as Rule.RuleModule, {
             code: LGPL_3_0,
         },
         {
-            name: "copyright with disableUnchangedYear skips year check",
+            name: "own copyright with an old year is valid with disableUnchangedYear too",
             filename: "LICENSE",
             code: `Copyright (C) 2001 by John Doe`,
             options: [{ currentYear: currentYear, disableUnchangedYear: true }],
@@ -109,6 +112,18 @@ ruleTester.run("validate-license", licenseRule as unknown as Rule.RuleModule, {
             filename: "LICENSE",
             code: `foo\nbar\nbaz`,
         },
+        {
+            // "Portions Copyright ..." credits the sample plugin's code, which a
+            // fork may keep; only a line that is itself the notice is checked.
+            name: "a copyright notice that does not start its line is not checked",
+            filename: "LICENSE",
+            code: `Portions Copyright (C) 2020-2025 by Dynalist Inc.`,
+        },
+        {
+            name: "a holder that adds to the sample holder is not checked",
+            filename: "LICENSE",
+            code: `Copyright (c) 2022 Dynalist Inc. and Jane Doe`,
+        },
     ],
     invalid: [
         {
@@ -116,8 +131,8 @@ ruleTester.run("validate-license", licenseRule as unknown as Rule.RuleModule, {
             filename: "LICENSE",
             code: `MIT License\n\n${SAMPLE_LINE}\n`,
             errors: [
-                { messageId: "unchangedYear", data: { expected: currentYear.toString(), actual: "2025" }, line: 3 },
-                { messageId: "unchangedCopyright", line: 3 },
+                { messageId: "unchangedYear", data: { expected: currentYear.toString(), actual: "2025" }, line: 3, column: 1, endLine: 3, endColumn: 41 },
+                { messageId: "unchangedCopyright", line: 3, column: 1, endLine: 3, endColumn: 41 },
             ],
         },
         {
@@ -212,6 +227,42 @@ ruleTester.run("validate-license", licenseRule as unknown as Rule.RuleModule, {
             errors: [
                 { messageId: "unchangedYear", data: { expected: "2000", actual: "1999" } },
                 { messageId: "unchangedCopyright" }
+            ],
+        },
+        {
+            // A centred heading line, as some licence texts lay it out.
+            name: "an indented sample line is checked",
+            filename: "LICENSE",
+            code: `MIT License\n\n      Copyright (c) 2022 Dynalist Inc.\n\t\tCopyright (c) ${currentYear} Dynalist Inc.`,
+            errors: [
+                { messageId: "unchangedYear", data: { expected: currentYear.toString(), actual: "2022" }, line: 3 },
+                { messageId: "unchangedCopyright", line: 3 },
+                { messageId: "unchangedCopyright", line: 4 },
+            ],
+        },
+        {
+            name: "a year range with spaces around the dash is read to its end",
+            filename: "LICENSE",
+            code: `Copyright (C) 2020 - 2022 by Dynalist Inc.`,
+            errors: [
+                { messageId: "unchangedYear", data: { expected: currentYear.toString(), actual: "2022" } },
+                { messageId: "unchangedCopyright" },
+            ],
+        },
+        {
+            name: "sample holder with a future year reports only the holder",
+            filename: "LICENSE",
+            code: `Copyright (C) ${currentYear + 1} by Dynalist Inc.`,
+            errors: [
+                { messageId: "unchangedCopyright" },
+            ],
+        },
+        {
+            name: "trailing whitespace after the sample holder is ignored",
+            filename: "LICENSE",
+            code: `Copyright (c) ${currentYear} Dynalist Inc.   \n`,
+            errors: [
+                { messageId: "unchangedCopyright" },
             ],
         },
         {

@@ -49,6 +49,10 @@ console.log(JSON.stringify({
         ts: declaresGlobal(ts, "process"),
         js: declaresGlobal(js, "process"),
     },
+    nodeNamespace: {
+        ts: declaresGlobal(ts, "NodeJS"),
+        js: declaresGlobal(js, "NodeJS"),
+    },
     noDeprecated: {
         tsEntry: ts.rules?.["@typescript-eslint/no-deprecated"],
     },

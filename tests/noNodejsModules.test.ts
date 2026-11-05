@@ -242,8 +242,111 @@ ruleTester.run("no-nodejs-modules", noNodejsModules, {
             name: "a local binding named window is not the global window",
             code: "function run(window: { require(id: string): unknown }) { window.require('fs'); }",
         },
+        {
+            name: "a function other than require, or a method other than require, is not checked",
+            code: "declare function load(id: string): unknown; load('fs'); window.load('fs'); window['load']('path'); window[0]('os');",
+        },
+        {
+            name: "dynamic import() of a module that is not built into Node.js is allowed",
+            code: "const lodash = await import('lodash'); const local = await import('./fs');",
+        },
+        {
+            name: "require() inside if (Platform.isDesktop && ...) is allowed",
+            code: "declare const ready: boolean; if (Platform.isDesktop && ready) { const fs = require('fs'); }",
+        },
+        {
+            name: "require() without an argument, or with a non-string literal, is not checked",
+            code: "require(); window.require(); require(42); const m = await import(42);",
+        },
+        {
+            name: "an import-equals of a namespace member is not checked",
+            code: "namespace Paths { export const fs = 'fs'; } import fs = Paths.fs;",
+        },
+        {
+            name: "require() after a bare throw guard at the start of a function expression is allowed",
+            code: `
+                const load = function () {
+                    if (!Platform.isDesktop) throw new Error('Desktop only');
+                    return require('fs');
+                };
+            `,
+        },
+        {
+            name: "a default parameter of a function inside a guard is guarded by it",
+            code: `
+                if (Platform.isDesktop) {
+                    const load = (fs = require('fs')) => fs;
+                    function read({ path = require('path') } = {}) { return path; }
+                }
+            `,
+        },
+        {
+            name: "a function in a default parameter is guarded by the guard at its own start",
+            code: `
+                function setup(load = () => { if (!Platform.isDesktop) return; return require('fs'); }) {
+                    return load;
+                }
+            `,
+        },
+        {
+            name: "a computed Platform key spelled out as a string is the same guard",
+            code: `
+                if (Platform["isDesktop"]) { require('fs'); }
+                Platform[\`isDesktop\`] && require('path');
+            `,
+        },
     ],
     invalid: [
+        {
+            name: "a guard at the start of a function does not cover its default parameters",
+            code: `
+                function load(fs = require('fs')) {
+                    if (!Platform.isDesktop) return;
+                    return fs;
+                }
+                const read = (path = require('path')) => {
+                    if (!Platform.isDesktop) throw new Error('Desktop only');
+                    return path;
+                };
+                const open = function ({ os = require('os') } = {}, [cp = require('child_process')] = []) {
+                    if (!Platform.isDesktop) return;
+                    return [os, cp];
+                };
+                class Store {
+                    load(crypto = require('crypto')) {
+                        if (!Platform.isDesktop) return;
+                        return crypto;
+                    }
+                }
+            `,
+            errors: [
+                { messageId: "noNodejs", data: { module: "fs" } },
+                { messageId: "noNodejs", data: { module: "path" } },
+                { messageId: "noNodejs", data: { module: "os" } },
+                { messageId: "noNodejs", data: { module: "child_process" } },
+                { messageId: "noNodejs", data: { module: "crypto" } },
+            ],
+        },
+        {
+            name: "window[`require`]() is forbidden like window['require']()",
+            code: "window[`require`]('fs');",
+            errors: [{ messageId: "noNodejs", data: { module: "fs" } }],
+        },
+        {
+            name: "a computed Platform key named by a variable is not a guard",
+            code: `
+                const isDesktop = "isMobile";
+                if (Platform[isDesktop]) { require('fs'); }
+                function load() {
+                    if (!Platform[isDesktop]) return;
+                    return require('path');
+                }
+            `,
+            errors: [
+                { messageId: "noNodejs", data: { module: "fs" } },
+                { messageId: "noNodejs", data: { module: "path" } },
+            ],
+        },
         {
             name: "the branch where !Platform.isDesktop holds is not guarded",
             code: 'import { Platform } from "obsidian"; if (!Platform.isDesktop) { require("fs"); }',
@@ -438,6 +541,73 @@ ruleTester.run("no-nodejs-modules", noNodejsModules, {
             name: "window.require() inside if (!Platform.isDesktop) is forbidden",
             code: "if (!Platform.isDesktop) { window.require('fs'); }",
             errors: [{ messageId: "noNodejs" }],
+        },
+        {
+            name: "window.require() through satisfies is forbidden",
+            code: "(window satisfies Window).require('fs');",
+            errors: [{ messageId: "noNodejs", data: { module: "fs" } }],
+        },
+        {
+            name: "an import or re-export with an empty specifier list still loads the module",
+            code: "import {} from 'fs'; export {} from 'node:path';",
+            errors: [
+                { messageId: "noNodejs", data: { module: "fs" } },
+                { messageId: "noNodejs", data: { module: "node:path" } },
+            ],
+        },
+        {
+            name: "a default import beside type-only specifiers is forbidden",
+            code: "import fs, { type Stats } from 'node:fs';",
+            errors: [{ messageId: "noNodejs", data: { module: "node:fs" } }],
+        },
+        {
+            name: "require() in an arrow function with an expression body is forbidden",
+            code: "const load = () => require('fs');",
+            errors: [{ messageId: "noNodejs", data: { module: "fs" } }],
+        },
+        {
+            name: "a guard on another Platform flag is not a guard",
+            code: "if (Platform.isMobile) { require('fs'); } Platform.isMacOS && import('os');",
+            errors: [
+                { messageId: "noNodejs", data: { module: "fs" } },
+                { messageId: "noNodejs", data: { module: "os" } },
+            ],
+        },
+        {
+            name: "Platform.isDesktop or another condition is not a guard",
+            code: "if (Platform.isDesktop || ready) { require('fs'); } Platform.isDesktop || require('path');",
+            errors: [
+                { messageId: "noNodejs", data: { module: "fs" } },
+                { messageId: "noNodejs", data: { module: "path" } },
+            ],
+        },
+        {
+            name: "a unary operator other than ! does not negate Platform.isDesktop",
+            code: `
+                if (+Platform.isDesktop) {} else { require('fs'); }
+                -Platform.isDesktop || require('path');
+                function load() {
+                    if (-Platform.isDesktop) return;
+                    return require('os');
+                }
+            `,
+            errors: [
+                { messageId: "noNodejs", data: { module: "fs" } },
+                { messageId: "noNodejs", data: { module: "path" } },
+                { messageId: "noNodejs", data: { module: "os" } },
+            ],
+        },
+        {
+            name: "a guard that is not the first statement of the function is not a guard",
+            code: `
+                declare function log(): void;
+                function load() {
+                    log();
+                    if (!Platform.isDesktop) return;
+                    return require('fs');
+                }
+            `,
+            errors: [{ messageId: "noNodejs", data: { module: "fs" } }],
         },
         {
             name: "dynamic import() with Platform check but no early exit is forbidden",

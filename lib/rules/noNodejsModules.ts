@@ -186,13 +186,20 @@ export default ruleCreator<[NoNodejsModulesOptions?], "noNodejs">({
 // all the same window: activeWindow is the focused one, a popout's own.
 const GLOBAL_OBJECT_NAMES = new Set(["window", "globalThis", "self", "global", "activeWindow"]);
 
+// `x.name`, `x["name"]` or `` x[`name`] ``. A computed key such as `x[key]` names
+// none that can be read.
 function getPropertyName(node: TSESTree.MemberExpression): string | undefined {
+    const property = node.property;
     if (!node.computed) {
-        return node.property.type === AST_NODE_TYPES.Identifier ? node.property.name : undefined;
+        return property.type === AST_NODE_TYPES.Identifier ? property.name : undefined;
     }
-    return node.property.type === AST_NODE_TYPES.Literal && typeof node.property.value === "string"
-        ? node.property.value
-        : undefined;
+    if (property.type === AST_NODE_TYPES.Literal && typeof property.value === "string") {
+        return property.value;
+    }
+    if (property.type === AST_NODE_TYPES.TemplateLiteral && property.expressions.length === 0) {
+        return property.quasis[0].value.cooked ?? undefined;
+    }
+    return undefined;
 }
 
 // `(window as any)`, `(<any>window)`, `window!`, `window satisfies …`
@@ -210,13 +217,12 @@ function skipTypeWrappers(node: TSESTree.Expression): TSESTree.Expression {
 }
 
 function isPlatformIsDesktop(expr: TSESTree.Expression): boolean {
-    // Platform.isDesktop
+    // Platform.isDesktop, or Platform["isDesktop"]
     return (
         expr.type === AST_NODE_TYPES.MemberExpression &&
         expr.object.type === AST_NODE_TYPES.Identifier &&
         expr.object.name === "Platform" &&
-        expr.property.type === AST_NODE_TYPES.Identifier &&
-        expr.property.name === "isDesktop"
+        getPropertyName(expr) === "isDesktop"
     );
 }
 
@@ -297,7 +303,9 @@ function isGuardedByPlatformIsDesktop(node: TSESTree.Node): boolean {
             current.type === AST_NODE_TYPES.ArrowFunctionExpression
         ) {
             // Check if function body starts with: if (!Platform.isDesktop) { throw/return }
-            if (hasGuardAtFunctionStart(current)) {
+            // That covers the body only: default parameter values, also inside
+            // a destructuring pattern, are evaluated before the body runs.
+            if (prevChild === current.body && hasGuardAtFunctionStart(current)) {
                 return true;
             }
         }

@@ -13,10 +13,12 @@ const HEADING_ONLY_METHODS = new Set(["setName", "setHeading", "setClass"]);
 // keeps the statement from being removed at all.
 const REMOVABLE_METHODS = new Set([...HEADING_ONLY_METHODS, "setDesc", "setTooltip", "setDisabled"]);
 
-// How the removal of the heading is offered.
+// How the removal of the heading is offered, and, for the suggestion's
+// description, the calls it removes that are more than the heading.
 interface Removal {
     offer: "fix" | "suggest";
     fix: TSESLint.ReportFixFunction;
+    including: string;
 }
 
 export default ruleCreator<Options, "settings" | "general" | "pluginName" | "removeHeading">({
@@ -30,7 +32,8 @@ export default ruleCreator<Options, "settings" | "general" | "pluginName" | "rem
             settings: 'Avoid using "settings" in settings headings.',
             general: 'Avoid using a "General" heading in settings.',
             pluginName: "Avoid including the plugin name in settings headings.",
-            removeHeading: "Remove this heading.",
+            removeHeading:
+                "Remove the whole heading setting: the `new Setting(…)` statement and every call in it{{including}}.",
         },
         schema: [
             {
@@ -123,7 +126,7 @@ export default ruleCreator<Options, "settings" | "general" | "pluginName" | "rem
                 context.report({
                     node,
                     messageId,
-                    suggest: [{ messageId: "removeHeading", fix: removal.fix }],
+                    suggest: [{ messageId: "removeHeading", data: { including: removal.including }, fix: removal.fix }],
                 });
             } else {
                 context.report({ node, messageId });
@@ -156,9 +159,21 @@ export default ruleCreator<Options, "settings" | "general" | "pluginName" | "rem
                         HEADING_ONLY_METHODS.has(call.name) &&
                         call.node.arguments.every(isPure),
                 ) && settingConstructor.arguments.every(isPure);
+            // The description, tooltip or disabled state that goes with it, in
+            // the order written (`calls` is outermost first).
+            const extra = [...new Set(
+                calls
+                    .map((call) => call.name)
+                    .filter((name): name is string => name !== null && !HEADING_ONLY_METHODS.has(name))
+                    .reverse(),
+            )].map((name) => `\`${name}()\``);
+            const including = extra.length === 0
+                ? ""
+                : `, including ${extra.length === 1 ? extra[0] : `${extra.slice(0, -1).join(", ")} and ${extra.at(-1)}`}`;
             return {
                 offer: headingOnly ? "fix" : "suggest",
                 fix: (fixer) => fixer.replaceText(statement, ";"),
+                including,
             };
         }
     },

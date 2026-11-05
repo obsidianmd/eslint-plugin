@@ -1,6 +1,7 @@
 import { TSESTree, TSESLint } from "@typescript-eslint/utils";
 import { valid as semverValid } from "semver";
 import { getManifest } from "../../manifest.js";
+import { staticMemberName } from "../../memberName.js";
 
 /**
  * The first Obsidian version that supports declarative settings
@@ -28,7 +29,10 @@ export function isPluginSettingTab(node: ClassNode): boolean {
 /**
  * Find a member named `name` on the class body, covering both method
  * definitions (`display() {}`) and class fields holding a function
- * (`display = () => {}`). Returns the member node, or `null` if absent.
+ * (`display = () => {}`), under a name written as is, quoted or computed from
+ * a string (`"display"() {}`, `["display"]() {}`). `[display]() {}` is named
+ * by whatever the variable holds, so it is not the member. Returns the member
+ * node, or `null` if absent.
  */
 export function findClassMember(
     node: ClassNode,
@@ -36,24 +40,9 @@ export function findClassMember(
 ): ClassMember | null {
     for (const member of node.body.body) {
         if (
-            member.type !== TSESTree.AST_NODE_TYPES.MethodDefinition &&
-            member.type !== TSESTree.AST_NODE_TYPES.PropertyDefinition
-        ) {
-            continue;
-        }
-        if (member.computed) {
-            continue;
-        }
-        const key = member.key;
-        if (
-            key.type === TSESTree.AST_NODE_TYPES.Identifier &&
-            key.name === name
-        ) {
-            return member;
-        }
-        if (
-            key.type === TSESTree.AST_NODE_TYPES.Literal &&
-            key.value === name
+            (member.type === TSESTree.AST_NODE_TYPES.MethodDefinition ||
+                member.type === TSESTree.AST_NODE_TYPES.PropertyDefinition) &&
+            staticMemberName(member) === name
         ) {
             return member;
         }

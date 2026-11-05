@@ -1,4 +1,5 @@
 import assert from "node:assert";
+import fs from "node:fs";
 import { ESLint, type Linter } from "eslint";
 import plugin from "../lib/index.js";
 
@@ -30,6 +31,23 @@ function normalize(entry: Linter.RuleEntry): unknown[] {
 	return [level, ...options];
 }
 
+function assertSameRules(presets: Record<string, unknown>, configured: Record<string, Linter.RuleEntry>): void {
+	assert.deepStrictEqual(Object.keys(presets).sort(), Object.keys(configured).sort());
+	for (const [rule, entry] of Object.entries(presets)) {
+		assert.deepStrictEqual(normalize(entry as Linter.RuleEntry), normalize(configured[rule]), rule);
+	}
+}
+
+// The snippet docs/configuration.md gives for switching every obsidianmd rule
+// off, taken from the docs as written.
+function docsTurnEverythingOff(): Linter.Config {
+	const text = fs.readFileSync(new URL("../docs/configuration.md", import.meta.url), "utf8");
+	const section = text.slice(text.indexOf("use `ruleConfigs` to generate the overrides programmatically"));
+	const match = /```js\n(\{[\s\S]*?\})\n```/.exec(section);
+	assert.ok(match, "no ruleConfigs snippet in docs/configuration.md");
+	return new Function("obsidianmd", `return (${match[1]});`)(plugin) as Linter.Config;
+}
+
 describe("ruleConfigs", () => {
 	it("hold only obsidianmd rules", () => {
 		const foreign = [...Object.keys(recommended), ...Object.keys(recommendedTypeChecked)].filter(
@@ -39,38 +57,40 @@ describe("ruleConfigs", () => {
 	});
 
 	it("recommended is exactly the obsidianmd rules the config sets for a JS file", async () => {
-		const configured = obsidianmdRules(await rulesFor("src/main.js"));
-		assert.deepStrictEqual(Object.keys(recommended).sort(), Object.keys(configured).sort());
-		for (const [rule, entry] of Object.entries(recommended)) {
-			assert.deepStrictEqual(normalize(entry as Linter.RuleEntry), normalize(configured[rule]), rule);
-		}
+		assertSameRules(recommended, obsidianmdRules(await rulesFor("src/main.js")));
 	});
 
 	it("recommended and recommendedTypeChecked are exactly the obsidianmd rules the config sets for a TS file", async () => {
-		const configured = obsidianmdRules(await rulesFor("src/main.ts"));
-		const presets = { ...recommended, ...recommendedTypeChecked };
-		assert.deepStrictEqual(Object.keys(presets).sort(), Object.keys(configured).sort());
-		for (const [rule, entry] of Object.entries(presets)) {
-			assert.deepStrictEqual(normalize(entry as Linter.RuleEntry), normalize(configured[rule]), rule);
-		}
+		assertSameRules({ ...recommended, ...recommendedTypeChecked }, obsidianmdRules(await rulesFor("src/main.ts")));
 	});
 
+	for (const extension of ["cts", "mts", "tsx"]) {
+		it(`are the obsidianmd rules for a .${extension} file too`, async () => {
+			assertSameRules({ ...recommended, ...recommendedTypeChecked }, obsidianmdRules(await rulesFor(`src/main.${extension}`)));
+		});
+	}
+
+	for (const extension of ["cjs", "mjs", "jsx"]) {
+		it(`recommended is the obsidianmd rules for a .${extension} file too`, async () => {
+			assertSameRules(recommended, obsidianmdRules(await rulesFor(`src/main.${extension}`)));
+		});
+	}
+
 	it("the docs' turn-everything-off snippet leaves no obsidianmd rule on and every other rule alone", async () => {
-		const off: Linter.Config = {
-			files: ["**/*.ts"],
-			rules: Object.fromEntries(
-				[...Object.keys(recommended), ...Object.keys(recommendedTypeChecked)].map((rule) => [rule, "off"]),
-			),
-		};
-		const before = await rulesFor("src/main.ts");
-		const after = await rulesFor("src/main.ts", [off]);
-		for (const [rule, entry] of Object.entries(after)) {
-			if (rule.startsWith("obsidianmd/")) {
-				assert.strictEqual(normalize(entry)[0], 0, rule);
-			} else {
-				assert.deepStrictEqual(entry, before[rule], rule);
+		const off = docsTurnEverythingOff();
+		assert.deepStrictEqual(off.files, ["scripts/**"]);
+		for (const filename of ["scripts/build.ts", "scripts/build.js"]) {
+			const before = await rulesFor(filename);
+			const after = await rulesFor(filename, [off]);
+			assert.ok(Object.keys(obsidianmdRules(before)).length > 0, filename);
+			for (const [rule, entry] of Object.entries(after)) {
+				if (rule.startsWith("obsidianmd/")) {
+					assert.strictEqual(normalize(entry)[0], 0, `${rule} in ${filename}`);
+				} else {
+					assert.deepStrictEqual(entry, before[rule], `${rule} in ${filename}`);
+				}
 			}
 		}
-		assert.strictEqual(normalize(after["@typescript-eslint/no-deprecated"])[0], 1);
+		assert.strictEqual(normalize((await rulesFor("scripts/build.ts", [off]))["@typescript-eslint/no-deprecated"])[0], 1);
 	});
 });

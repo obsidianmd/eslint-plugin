@@ -69,6 +69,42 @@ ruleTester.run("no-static-styles-assignment", noInlineStylesRule, {
             name: "setAttribute with a static template literal for another attribute is allowed",
             code: "el.setAttribute(`data-id`, `123`);",
         },
+        {
+            name: "a template literal key or attribute name with an expression names no property",
+            code: "el.setCssProps({ [`color${suffix}`]: 'red' }); el.setAttribute(`style${suffix}`, 'color: red;');",
+        },
+        {
+            name: "a numeric key names no CSS property",
+            code: "el.setCssStyles({ 0: 'red' });",
+        },
+        {
+            name: "assigning a literal to a variable is allowed",
+            code: "let color: string; color = 'red';",
+        },
+        {
+            name: "assigning a literal to a property of an object other than style is allowed",
+            code: "this.plugin.settings.color = 'red'; el.dataset.id = '1';",
+        },
+        {
+            name: "a computed member named style is not the style property",
+            code: "el[style].color = 'red';",
+        },
+        {
+            name: "functions named like the methods are not reported when called bare",
+            code: "setProperty('color', 'red'); setAttribute('style', 'color: red;');",
+        },
+        {
+            name: "setProperty on an object other than style is allowed",
+            code: "map.setProperty('color', 'red');",
+        },
+        {
+            name: "setProperty() and setAttribute('style') without a value are not reported",
+            code: "el.style.setProperty('color'); el.setAttribute('style');",
+        },
+        {
+            name: "toggleAttribute('style') is not setting a style",
+            code: "el.toggleAttribute('style', true);",
+        },
     ],
     invalid: [
         {

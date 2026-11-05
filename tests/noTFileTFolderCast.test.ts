@@ -43,6 +43,10 @@ ruleTester.run("no-tfile-tfolder-cast", noTFileTFolderCastRule, {
             code: "const a = v as TFile & { extra: string }; const b = v as [TFile, TFolder];",
         },
         {
+            name: "a type operator other than readonly is not reported",
+            code: "const key = k as keyof TFile;",
+        },
+        {
             name: "null typed as a nullable file is not reported",
             code: "let file = null as TFile | null; let folder = undefined as TFolder | undefined;",
         },
@@ -172,6 +176,16 @@ ruleTester.run("no-tfile-tfolder-cast", noTFileTFolderCastRule, {
             errors: [{ messageId: "avoidCast", data: { typeName: "TFile" } }],
         },
         {
+            // Without the obsidian import, TFile is an error type that a string
+            // is assignable to, which proves nothing about the value.
+            name: "a typed value asserted to be a nullable file without the obsidian types is reported",
+            code: `
+                declare const name: string;
+                const file = name as TFile | null;
+            `,
+            errors: [{ messageId: "avoidCast", data: { typeName: "TFile" } }],
+        },
+        {
             name: "a nullable file asserted to be a file is still reported",
             code: `
                 import { TFile, Vault } from "obsidian";
@@ -201,6 +215,14 @@ untypedRuleTester.run("no-tfile-tfolder-cast without type information", noTFileT
             name: "a union is reported without type information",
             code: "const file = vault.getFileByPath(path) as TFile | null;",
             errors: [{ messageId: "avoidCast", data: { typeName: "TFile" } }],
+        },
+        {
+            name: "a literal other than null, or an identifier other than undefined, typed as a nullable file is reported",
+            code: "const a = 0 as TFile | null; const b = file as TFile | undefined;",
+            errors: [
+                { messageId: "avoidCast", data: { typeName: "TFile" } },
+                { messageId: "avoidCast", data: { typeName: "TFile" } },
+            ],
         },
         {
             name: "an array is reported without type information",

@@ -33,18 +33,14 @@ need to change too.
 
 With type information, these are fixed:
 
-- a property with the same type on `window`: `globalThis.document`, `globalThis.crypto`,
-  `global.process`, or a global the project declares itself. A write to a property that `Window`
-  declares again, such as `globalThis.onerror = null`, gets a suggestion, as `Window` may declare
-  it read-only
+- a read of a property with the same type on `window`: `globalThis.crypto`, `global.process`,
+  `globalThis.document.body`, or a global the project declares itself
 - a call that returns the same type whichever signature it uses, such as
   `globalThis.clearTimeout(timer)` or `globalThis.matchMedia(query)`, and any call whose result is
   not used, such as `globalThis.setTimeout(save, 100);`. Either gets a suggestion instead when it is
   passed a callback with an untyped parameter that the signatures type differently, as in
   `globalThis.setTimeout((n) => n, 10, 1);`
 - a cast to `any`, `unknown`, `never`, or a type `window` is assignable to
-- an argument to a call whose result is not used, such as `Object.assign(globalThis, helpers)`, and
-  `"name" in globalThis`
 
 These get a suggestion:
 
@@ -54,8 +50,22 @@ const globals = globalThis as Record<string, unknown>; // TypeScript rejects thi
 const scope = globalThis; // scope would have window's type
 ```
 
-Without type information, only rewrites that can never change a type are fixed: a cast to `any`,
-`unknown` or `never`, an argument to a call whose result is not used, an `in` check, and the timer
+A write to a global gets a suggestion, never a fix, because it defines the global for code that may
+run without a window: `globalThis.registry = new Map()`, `globalThis.count++`,
+`delete globalThis.cache`, `(globalThis as any).createEl = 1`, and `globalThis` passed to a call,
+such as `Object.assign(globalThis, helpers)` or `Object.defineProperty(globalThis, "x", …)`.
+
+A probe of the global object for a property that may be missing gets a suggestion, whatever the
+types: `typeof globalThis.crypto`, `"requestIdleCallback" in globalThis`, `!globalThis.crypto`,
+`globalThis.crypto?.randomUUID()` or `globalThis.queueMicrotask ?? fallback`. Such code is written
+to work where the property is missing, as in a web worker or in Node tests, and there
+`window.crypto` throws because there is no `window`. So does code that may run without a window: in a
+`try` whose `catch` drops the error, as in `try { … } catch {}`, or decided by a condition that names
+the environment, such as `if (isBrowser)`, `env.isNode ? … : …` or `typeof process !== "undefined"`;
+see [Window checks](prefer-window-timers.md#window-checks).
+
+Without type information, only rewrites that can never change a type are fixed: a read through a cast
+to `any`, `unknown` or `never`, and the timer
 calls that [`prefer-window-timers`](prefer-window-timers.md) fixes. Those are `setTimeout()` or
 `setInterval()` whose result is not used, `clearTimeout()` or `clearInterval()` with a number
 literal, `undefined` or no argument, and `requestAnimationFrame()` and `cancelAnimationFrame()`.
@@ -68,12 +78,21 @@ Neither a fix nor a suggestion is offered where `window` would be wrong:
 - with type information, the project declares no `window` because it has no DOM lib, or `window`
   has no such property. For example, `globalThis.MathJax` compiles without `noImplicitAny`, but
   `window.MathJax` does not
-- an earlier `typeof window` or `typeof document` check shows that the code also runs without a
-  window, as in `typeof window !== "undefined" ? window : globalThis`, or after
+- an earlier [window check](prefer-window-timers.md#window-checks) shows that the code also runs
+  without a window, as in `typeof window !== "undefined" ? window : globalThis`, or after
   `if (typeof window !== "undefined") return window;`. Where the check proves that the window
   exists, such as after `if (typeof document === "undefined") return;`, the rules above apply
-- the reference is such a check itself, as in `typeof globalThis.window` or
-  `"document" in globalThis`, which would throw as `window` where there is no window
+- the reference is such a check itself, as in `typeof globalThis.window`,
+  `typeof globalThis["document"]`, `"document" in globalThis` or `!globalThis.window`, which would
+  throw as `window` where there is no window. A `typeof` with a key that is not written out, such as
+  `typeof globalThis[key]`, gets a suggestion
+- the code defines the window or looks for it, as a jsdom setup for tests does: a write to
+  `window`, `self`, `globalThis`, `top`, `parent`, `frames` or `document` on the global object, such
+  as `global.window = dom.window`, `delete globalThis.document`, `[globalThis.document] = docs`,
+  `Object.defineProperty(globalThis, "window", …)` or `Object.assign(global, { window, document })`,
+  or a read of one as a value, such as `const doc = globalThis.document` or `use(global.window)`. As
+  `window.window`, it would throw where there is no window yet. A read through one, such as
+  `globalThis.document.body`, is fixed as above
 
 ## Web workers
 

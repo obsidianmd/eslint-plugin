@@ -5,24 +5,71 @@ on:
         types: [published]
 
 permissions:
-    id-token: write  # Required for OIDC
     contents: read
 
+# One publish per release, never two racing for the same version.
+concurrency:
+    group: publish-${{ github.event.release.tag_name }}
+    cancel-in-progress: false
+
 jobs:
+    # Builds, tests and packs without the OIDC token, so no install script or
+    # test can mint one and publish.
     build:
         runs-on: ubuntu-latest
         permissions:
             contents: read
-            id-token: write
         steps:
-            - uses: actions/checkout@v4
-            # Setup .npmrc file to publish to npm
-            - uses: actions/setup-node@v6
+            - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+              with:
+                  persist-credentials: false
+            - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
               with:
                   node-version: "24"
-                  registry-url: "https://registry.npmjs.org"
+            # The tag names the version the release promises; npm publishes
+            # package.json's. Stop when they differ, rather than publish a
+            # version nobody tagged.
+            - name: Check the tag matches package.json
+              env:
+                  TAG: ${{ github.event.release.tag_name }}
+              run: |
+                  version="$(node -p 'require("./package.json").version')"
+                  if [ "${TAG#v}" != "$version" ]; then
+                      echo "::error::Release tag $TAG does not match package.json version $version"
+                      exit 1
+                  fi
             - run: npm ci
             - run: npm run build
             - run: npm test
             - run: npm run check:eslint-docs
-            - run: npm publish --provenance --access public
+            - run: npm pack
+            - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+              with:
+                  name: package
+                  path: "*.tgz"
+                  if-no-files-found: error
+
+    publish:
+        needs: build
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            id-token: write # npm trusted publishing and provenance
+        steps:
+            - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+              with:
+                  node-version: "24"
+                  registry-url: "https://registry.npmjs.org"
+            - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+              with:
+                  name: package
+            # A GitHub prerelease goes to `next`, so `latest` keeps the last
+            # stable release. npm itself refuses a prerelease version without a
+            # tag, and `latest` on a version below the highest published.
+            - name: Publish
+              env:
+                  PRERELEASE: ${{ github.event.release.prerelease }}
+              run: |
+                  tag=latest
+                  if [ "$PRERELEASE" = "true" ]; then tag=next; fi
+                  npm publish ./*.tgz --provenance --access public --tag "$tag"

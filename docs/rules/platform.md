@@ -17,8 +17,10 @@ if (navigator.userAgent.includes("Mac")) {} // reported
 if (Platform.isMacOS) {} // use Platform instead
 ```
 
+A computed access that spells the name out, such as `navigator["userAgent"]`, is reported too.
+
 There is no fix. Other `navigator` properties, such as `navigator.clipboard`, are not reported, and
-neither is `navigator.userAgentData`, a computed access such as `navigator["userAgent"]`, or the
+neither is `navigator.userAgentData`, a computed access by a variable such as `navigator[key]`, or the
 navigator of another window, such as `activeWindow.navigator`.
 
 ## Further reading

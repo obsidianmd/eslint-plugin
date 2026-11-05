@@ -1,4 +1,6 @@
+import assert from "node:assert";
 import { RuleTester } from "@typescript-eslint/rule-tester";
+import { Linter } from "eslint";
 import rule from "../../lib/rules/settingsTab/noProblematicSettingsHeadings.js";
 
 const MOCK_CLASS = `
@@ -41,6 +43,25 @@ ruleTester.run("no-problematic-settings-headings", rule, {
                     }
                 }
             `,
+        },
+        {
+            name: "a heading without setName() is not checked, and does not crash",
+            code: tab(`new Setting(this.containerEl).setHeading();`),
+        },
+        {
+            name: "a chain that does not start from new Setting() is not checked",
+            code: `
+                declare class Row { constructor(el: HTMLElement); setName(name: string): this; setHeading(): this; }
+                ${tab(`
+                this.heading.setName("General").setHeading();
+                new Row(this.containerEl).setName("General").setHeading();`)}
+            `,
+        },
+        {
+            // "" is a name, so the manifest's ("Sample Plugin" here) is not used either.
+            name: "an empty pluginName turns the plugin-name check off",
+            code: tab(`new Setting(this.containerEl).setName("Sample Plugin").setHeading();`),
+            options: [{ pluginName: "" }],
         },
         {
             name: "a heading whose name is not a string literal is not checked",
@@ -241,12 +262,12 @@ ruleTester.run("no-problematic-settings-headings", rule, {
             errors: [{ messageId: "pluginName", suggestions: [] }],
         },
         {
-            name: "removing a heading with a description is a suggestion",
+            name: "removing a heading with a description is a suggestion that says the description goes too",
             code: tab(`new Setting(this.containerEl).setName("General").setDesc("Applies everywhere.").setHeading();`),
             output: null,
             errors: [{
                 messageId: "general",
-                suggestions: [{ messageId: "removeHeading", output: tab(`;`) }],
+                suggestions: [{ messageId: "removeHeading", data: { including: ", including `setDesc()`" }, output: tab(`;`) }],
             }],
         },
         {
@@ -255,7 +276,7 @@ ruleTester.run("no-problematic-settings-headings", rule, {
             output: null,
             errors: [{
                 messageId: "general",
-                suggestions: [{ messageId: "removeHeading", output: tab(`;`) }],
+                suggestions: [{ messageId: "removeHeading", data: { including: "" }, output: tab(`;`) }],
             }],
         },
         {
@@ -263,6 +284,77 @@ ruleTester.run("no-problematic-settings-headings", rule, {
             code: tab(`
                 const generalHeading = new Setting(this.containerEl).setName("General").setHeading();
                 generalHeading.setClass("x");`),
+            output: null,
+            errors: [{ messageId: "general", suggestions: [] }],
+        },
+        {
+            name: "removing a heading with a tooltip or a disabled state is a suggestion",
+            code: tab(`
+                new Setting(this.containerEl).setName("General").setTooltip("Applies everywhere.").setHeading();
+                new Setting(this.containerEl).setName("General").setDisabled(true).setHeading();`),
+            output: null,
+            errors: [
+                {
+                    messageId: "general",
+                    suggestions: [{ messageId: "removeHeading", data: { including: ", including `setTooltip()`" }, output: tab(`
+                ;
+                new Setting(this.containerEl).setName("General").setDisabled(true).setHeading();`) }],
+                },
+                {
+                    messageId: "general",
+                    suggestions: [{ messageId: "removeHeading", data: { including: ", including `setDisabled()`" }, output: tab(`
+                new Setting(this.containerEl).setName("General").setTooltip("Applies everywhere.").setHeading();
+                ;`) }],
+                },
+            ],
+        },
+        {
+            name: "a heading on a plain variable, or with a template literal class, is removed",
+            code: tab(`
+                [this.containerEl].forEach((el) => { new Setting(el).setName("General").setHeading(); });
+                new Setting(this.containerEl).setName("General").setHeading().setClass(\`heading-\${this.id}\`);`),
+            output: tab(`
+                [this.containerEl].forEach((el) => { ; });
+                ;`),
+            errors: [{ messageId: "general" }, { messageId: "general" }],
+        },
+        {
+            name: "removing a heading whose class or parent is computed with a side effect is a suggestion",
+            code: tab(`
+                new Setting(this.containerEl).setName("General").setHeading().setClass(this.headingClass());
+                new Setting(this.containerEl).setName("General").setHeading().setClass(\`heading-\${this.nextId()}\`);
+                new Setting(this.sections[this.index++]).setName("General").setHeading();`),
+            output: null,
+            errors: [
+                {
+                    messageId: "general",
+                    suggestions: [{ messageId: "removeHeading", output: tab(`
+                ;
+                new Setting(this.containerEl).setName("General").setHeading().setClass(\`heading-\${this.nextId()}\`);
+                new Setting(this.sections[this.index++]).setName("General").setHeading();`) }],
+                },
+                {
+                    messageId: "general",
+                    suggestions: [{ messageId: "removeHeading", output: tab(`
+                new Setting(this.containerEl).setName("General").setHeading().setClass(this.headingClass());
+                ;
+                new Setting(this.sections[this.index++]).setName("General").setHeading();`) }],
+                },
+                {
+                    messageId: "general",
+                    suggestions: [{ messageId: "removeHeading", output: tab(`
+                new Setting(this.containerEl).setName("General").setHeading().setClass(this.headingClass());
+                new Setting(this.containerEl).setName("General").setHeading().setClass(\`heading-\${this.nextId()}\`);
+                ;`) }],
+                },
+            ],
+        },
+        {
+            name: "a heading whose method is passed on is not removed",
+            code: `
+                declare function register(fn: unknown): void;
+                ${tab(`register(new Setting(this.containerEl).setName("General").setHeading().setClass);`)}
+            `,
             output: null,
             errors: [{ messageId: "general", suggestions: [] }],
         },
@@ -382,3 +474,25 @@ function tab(body: string): string {
         }
     `;
 }
+
+// The removal takes the whole statement, the description and tooltip with it,
+// so the suggestion's description says so.
+describe("no-problematic-settings-headings suggestion description", () => {
+    it("says the whole heading setting goes, naming the calls that go with it", () => {
+        const messages = new Linter().verify(`
+            class MyTab extends PluginSettingTab {
+                display() {
+                    new Setting(this.containerEl).setName("General").setDesc("Applies everywhere.").setTooltip("All").setDesc("Everywhere").setHeading()
+                    new Setting(this.containerEl.createDiv()).setName("General").setHeading()
+                }
+            }
+        `, [{
+            plugins: { obsidianmd: { rules: { "no-problematic-settings-headings": rule as never } } },
+            rules: { "obsidianmd/no-problematic-settings-headings": "error" },
+        }]);
+        assert.deepStrictEqual(messages.map((message) => message.suggestions?.map((suggestion) => suggestion.desc)), [
+            ["Remove the whole heading setting: the `new Setting(…)` statement and every call in it, including `setDesc()` and `setTooltip()`."],
+            ["Remove the whole heading setting: the `new Setting(…)` statement and every call in it."],
+        ]);
+    });
+});

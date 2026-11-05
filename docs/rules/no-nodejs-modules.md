@@ -23,8 +23,8 @@ without the `node:` prefix and including subpaths such as `fs/promises`, loaded 
 A dynamic `import()` or `require()` counts as guarded inside `if (Platform.isDesktop)` (or
 `if (Platform.isDesktop && …)`), in the first branch of `Platform.isDesktop ? … : …`, to the right of
 `Platform.isDesktop && …`, in the `else` of `if (!Platform.isDesktop)`, the second branch of
-`!Platform.isDesktop ? … : …` and to the right of `!Platform.isDesktop || …`, and anywhere in a
-function whose first statement is
+`!Platform.isDesktop ? … : …` and to the right of `!Platform.isDesktop || …`, and anywhere in the
+body of a function whose first statement is
 `if (!Platform.isDesktop) return;` or `throw`, without an `else`:
 
 ```ts
@@ -32,6 +32,11 @@ if (Platform.isDesktop) {
   const { readFile } = await import("node:fs/promises");
 }
 ```
+
+That first statement does not guard the function's default parameter values, also those inside a
+destructuring pattern, as in `function load(fs = require("fs")) { … }`: they are evaluated before the
+body runs. `Platform["isDesktop"]` is the same check as `Platform.isDesktop`, but `Platform[key]` is
+not.
 
 Not reported: modules that are not built into Node.js, such as `window.require("electron")`; a
 dynamic `import()` or `require()` whose module name is not a string literal; `require()` on any

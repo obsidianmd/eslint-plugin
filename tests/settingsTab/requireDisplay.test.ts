@@ -28,6 +28,41 @@ ruleTester.run("require-display", requireDisplayRule, {
             `,
         },
         {
+            name: "display() under a quoted name counts as provided",
+            options: [{ minAppVersion: "1.12.0" }],
+            code: `
+                ${MOCK_CLASS}
+                class MyTab extends PluginSettingTab {
+                    "display"() {}
+                }
+            `,
+        },
+        {
+            name: "display() computed from a string counts as provided",
+            options: [{ minAppVersion: "1.12.0" }],
+            code: `
+                ${MOCK_CLASS}
+                class StringTab extends PluginSettingTab {
+                    ["display"]() {}
+                }
+                class TemplateTab extends PluginSettingTab {
+                    [\`display\`] = () => {};
+                }
+            `,
+        },
+        {
+            name: "a static block or an index signature before display() does not end the search",
+            options: [{ minAppVersion: "1.12.0" }],
+            code: `
+                ${MOCK_CLASS}
+                class MyTab extends PluginSettingTab {
+                    [key: string]: unknown;
+                    static {}
+                    display() {}
+                }
+            `,
+        },
+        {
             name: "minAppVersion 1.13 without display() is allowed",
             options: [{ minAppVersion: "1.13.0" }],
             code: `
@@ -89,8 +124,25 @@ ruleTester.run("require-display", requireDisplayRule, {
                 {
                     messageId: "missingDisplay",
                     data: { minAppVersion: "1.12.0" },
+                    // The class name is highlighted, not the whole class.
+                    line: 3,
+                    column: 23,
+                    endLine: 3,
+                    endColumn: 28,
                 },
             ],
+        },
+        {
+            name: "a computed member named by a variable called display is not display()",
+            options: [{ minAppVersion: "1.12.0" }],
+            code: `
+                ${MOCK_CLASS}
+                const display = "render";
+                class MyTab extends PluginSettingTab {
+                    [display]() {}
+                }
+            `,
+            errors: [{ messageId: "missingDisplay" }],
         },
         {
             name: "minAppVersion defaults to manifest.json (0.15.0 in this repository)",
@@ -98,7 +150,7 @@ ruleTester.run("require-display", requireDisplayRule, {
                 ${MOCK_CLASS}
                 class MyTab extends PluginSettingTab {}
             `,
-            errors: [{ messageId: "missingDisplay" }],
+            errors: [{ messageId: "missingDisplay", data: { minAppVersion: "0.15.0" } }],
         },
         {
             name: "a class expression without display() is an error",
@@ -107,7 +159,17 @@ ruleTester.run("require-display", requireDisplayRule, {
                 ${MOCK_CLASS}
                 const MyTab = class extends PluginSettingTab {};
             `,
-            errors: [{ messageId: "missingDisplay" }],
+            // An anonymous class is highlighted at its superclass.
+            errors: [{ messageId: "missingDisplay", line: 3, column: 45, endColumn: 61 }],
+        },
+        {
+            name: "an anonymous default-exported class is highlighted at its superclass",
+            options: [{ minAppVersion: "1.12.0" }],
+            code: `
+                ${MOCK_CLASS}
+                export default class extends PluginSettingTab {}
+            `,
+            errors: [{ messageId: "missingDisplay", line: 3, column: 46, endColumn: 62 }],
         },
     ],
 });

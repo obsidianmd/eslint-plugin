@@ -20,7 +20,11 @@ function isSubclassOf(
     if (symbol?.name === className) {
         return true;
     }
-    const baseTypes = type.getBaseTypes();
+    // A reference to a generic class, such as `MyView<State>` or a base class
+    // `StateView<State>`, has no base types of its own; the class it refers to
+    // has. Before TypeScript 5.1, so is the constraint of `this` inside any class.
+    const target = (type as Partial<ts.TypeReference>).target ?? type;
+    const baseTypes = target.getBaseTypes();
     if (baseTypes) {
         for (const baseType of baseTypes) {
             if (isSubclassOf(baseType, className, services)) {

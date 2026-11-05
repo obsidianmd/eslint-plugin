@@ -135,6 +135,24 @@ ruleTester.run("rule-custom-message", ruleCustomMessage, {
             errors: [{ messageId: "customMessage", data: { message: "Custom", ruleName: "space-unary-ops" } }],
         },
         {
+            // A given option of its own is not dropped: no default value
+            // replaces it.
+            name: "a given option replaces its schema default",
+            code: "typeof (a);",
+            options: [{ "space-unary-ops": { messages: { "Unexpected space after unary word operator": "Custom" }, options: [{ words: false }] } }],
+            output: "typeof(a);",
+            errors: [{ messageId: "customMessage", data: { message: "Custom", ruleName: "space-unary-ops" } }],
+        },
+        {
+            // curly has meta.defaultOptions ["all"]; its second option has
+            // no default and must still reach the rule.
+            name: "options past meta.defaultOptions are passed on",
+            code: "if (a) b(); else { c(); d(); }",
+            options: [{ curly: { messages: { "Expected { after 'if' condition.": "Custom" }, options: ["multi", "consistent"] } }],
+            output: "if (a) {b();} else { c(); d(); }",
+            errors: [{ messageId: "customMessage", data: { message: "Custom", ruleName: "curly" } }],
+        },
+        {
             name: "a fix of a matched report is forwarded",
             code: "let a = 1; console.log(a);",
             options: [{ "prefer-const": { messages: { "is never reassigned": "Custom" } } }],
@@ -205,8 +223,49 @@ describe("rule-custom-message limitations", () => {
         assert.throws(() => lintWith({ "p/r": { messages: { x: "y" }, rule: pluginRule } }), /could not be cloned/);
     });
 
+    // The schema takes any object for `messages`, and structuredClone keeps a
+    // Map, which has no entries to match: every report of the rule was dropped.
+    it("messages given as a Map or a Date stop ESLint, naming the rule", () => {
+        assert.throws(
+            () => lintWith({ "no-console": { messages: new Map([["Unexpected console", "Custom"]]) } }),
+            /The messages for "no-console" must be an object mapping messages to the messages to show instead, not a Map\./,
+        );
+        assert.throws(() => lintWith({ "no-console": { messages: new Date() } }), /"no-console" [^\n]*, not a Date\./);
+    });
+
+    it("messages without a prototype are read like any other object", () => {
+        const messages = Object.assign(Object.create(null) as Record<string, string>, { "Unexpected console": "Custom" });
+        const result = new Linter().verify("console.log(1);", [{
+            plugins: { o: { rules: { r: ruleCustomMessage as never } } },
+            rules: { "o/r": ["error", { "no-console": { messages } }] },
+        }]);
+        assert.deepStrictEqual(result.map((m) => m.message), ["[no-console] Custom"]);
+    });
+
     it("the options have no `rule` key", () => {
         assert.throws(() => lintWith({ "p/r": { messages: { x: "y" }, rule: {} } }), /Unexpected property "rule"/);
+    });
+
+    it("a wrapped rule that throws while starting logs the error, and the other wrapped rules still run", () => {
+        const errors: unknown[][] = [];
+        const error = console.error;
+        console.error = (...args: unknown[]) => { errors.push(args); };
+        let messages: Linter.LintMessage[];
+        try {
+            // id-match compiles its pattern in create(), and "(" is not a regex.
+            messages = new Linter().verify("console.log(1);", [{
+                plugins: { o: { rules: { r: ruleCustomMessage as never } } },
+                rules: { "o/r": ["error", {
+                    "id-match": { messages: { x: "y" }, options: ["("] },
+                    "no-console": { messages: { "Unexpected console": "Custom" } },
+                }] },
+            }]);
+        } finally {
+            console.error = error;
+        }
+        assert.deepStrictEqual(errors.map((args) => args[0]), ['Error creating rule "id-match":']);
+        assert.ok(errors[0][1] instanceof SyntaxError);
+        assert.deepStrictEqual(messages.map((m) => m.message), ["[no-console] Custom"]);
     });
 
     it("a rule name that is not a core rule logs a warning that points to obsidianmd.withCustomMessages()", () => {

@@ -88,6 +88,94 @@ ruleTester.run("no-sample-code", noSampleCode, {
             name: "an interval with a block body that does its own work is not the sample",
             code: "this.registerInterval(window.setInterval(() => { console.log('setInterval'); this.sync(); }, 5 * 60 * 1000));",
         },
+
+        // --- Look-alikes of the sample that are the plugin's own code: not reported, so never deleted ---
+        {
+            name: "an interval or a click handler that logs another label, or not with console.log(), is not the sample",
+            code: `
+                this.registerInterval(window.setInterval(() => console.log('tick'), 1000));
+                this.registerInterval(window.setInterval(() => console.error('setInterval'), 1000));
+                this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
+                    console.log('clicked', evt);
+                });
+            `,
+        },
+        {
+            name: "registerInterval() and registerDomEvent() called on another object are not the sample",
+            code: `
+                plugin.registerInterval(window.setInterval(() => console.log('setInterval'), 1000));
+                plugin.registerDomEvent(document, 'click', (evt: MouseEvent) => {
+                    console.log('click', evt);
+                });
+            `,
+        },
+        {
+            name: "an interval that is not window.setInterval() is not the sample",
+            code: `
+                this.registerInterval(window.setTimeout(() => console.log('setInterval'), 1000));
+                this.registerInterval(this.clock.setInterval(() => console.log('setInterval'), 1000));
+            `,
+        },
+        {
+            // An id made earlier is the common way to register an interval.
+            name: "registerInterval() of an id, or with nothing to read, is not the sample and does not crash",
+            code: `
+                const id = window.setInterval(() => this.sync(), 1000);
+                this.registerInterval(id);
+                this.registerInterval();
+                this.registerInterval(window.setInterval());
+            `,
+        },
+        {
+            name: "a log in an interval that computes what it logs with a call is not the sample",
+            code: `
+                this.registerInterval(window.setInterval(() => console.log('setInterval', this.items[this.next()]), 1000));
+                this.registerInterval(window.setInterval(() => console.log('setInterval', this.next().value), 1000));
+                this.registerInterval(window.setInterval(() => console.log('setInterval', \`\${this.status()}\`), 1000));
+                this.registerInterval(window.setInterval(() => console.log('setInterval', this.count() + 1), 1000));
+                this.registerInterval(window.setInterval(() => console.log('setInterval', 1 + this.count()), 1000));
+                this.registerInterval(window.setInterval(() => console.log('setInterval', this.ready() ? 1 : 2), 1000));
+                this.registerInterval(window.setInterval(() => console.log('setInterval', ready ? this.a() : 2), 1000));
+                this.registerInterval(window.setInterval(() => console.log('setInterval', ready ? 1 : this.b()), 1000));
+                this.registerInterval(window.setInterval(() => console.log('setInterval', delete this.cache.entry), 1000));
+                this.registerInterval(window.setInterval(() => console.log('setInterval', this.next()!), 1000));
+            `,
+        },
+        {
+            name: "a listener for another event is not the sample",
+            code: `this.registerDomEvent(document, 'dblclick', (evt: MouseEvent) => {
+                new Notice('Click');
+            });`,
+        },
+        {
+            name: "a click handler that is a function expression, or an arrow without a block, is not the sample",
+            code: `
+                this.registerDomEvent(document, 'click', function (evt: MouseEvent) {
+                    console.log('click', evt);
+                });
+                this.registerDomEvent(document, 'click', (evt: MouseEvent) => console.log('click', evt));
+            `,
+        },
+        {
+            name: "a click handler that returns the notice, or a registerDomEvent() without a handler, is not the sample and does not crash",
+            code: `
+                this.registerDomEvent(document, 'click', () => {
+                    return new Notice('Click');
+                });
+                this.registerDomEvent(document, 'click');
+            `,
+        },
+        {
+            name: "a notice with a duration, or another class's, is not the sample",
+            code: `
+                this.registerDomEvent(document, 'click', () => {
+                    new Notice('Click', 2000);
+                });
+                this.registerDomEvent(document, 'click', () => {
+                    new Toast('Click');
+                });
+            `,
+        },
     ],
     invalid: [
         {
@@ -143,6 +231,35 @@ ruleTester.run("no-sample-code", noSampleCode, {
             output: "",
         },
 
+        {
+            name: "a log that only reads values, of any kind, is the sample",
+            code: "this.registerInterval(window.setInterval(() => console.log('setInterval', -1, typeof x, a ? b : c, `t${d}`, e as number, f!, <number>g, h satisfies number, i && j, this.k[l]), 1000));",
+            errors: [{ messageId: "removeSampleInterval" }],
+            output: "",
+        },
+        {
+            name: "a sample click handler with listener options that only read values is fixed",
+            code: `this.registerDomEvent(document, "click", (evt: MouseEvent) => {
+                console.log("click", evt);
+            }, { capture: true, [key]: passive });`,
+            errors: [{ messageId: "removeSampleDomEvent" }],
+            output: "",
+        },
+        {
+            name: "a sample statement in a switch case, a static block or a namespace is removed",
+            code: [
+                "switch (mode) { case 1: this.registerInterval(window.setInterval(() => console.log('setInterval'), 1000)); break; }",
+                "class A { static { this.registerInterval(window.setInterval(() => console.log('setInterval'), 1000)); } }",
+                "namespace B { this.registerInterval(window.setInterval(() => console.log('setInterval'), 1000)); }",
+            ].join("\n"),
+            errors: [{ messageId: "removeSampleInterval" }, { messageId: "removeSampleInterval" }, { messageId: "removeSampleInterval" }],
+            output: [
+                "switch (mode) { case 1:  break; }",
+                "class A { static {  } }",
+                "namespace B {  }",
+            ].join("\n"),
+        },
+
         // --- Deleting the call would drop a call made in its arguments: no fix ---
         {
             name: "a sample interval whose delay is computed by a call is reported without a fix",
@@ -156,6 +273,26 @@ ruleTester.run("no-sample-code", noSampleCode, {
                 console.log("click", evt);
             }, this.listenerOptions());`,
             errors: [{ messageId: "removeSampleDomEvent" }],
+            output: null,
+        },
+
+        {
+            name: "a sample interval with an extra argument computed by a call is reported without a fix",
+            code: "this.registerInterval(window.setInterval(() => console.log('setInterval'), 1000), this.track());",
+            errors: [{ messageId: "removeSampleInterval" }],
+            output: null,
+        },
+        {
+            name: "a sample click handler with listener options that call something is reported without a fix",
+            code: `
+                this.registerDomEvent(document, "click", (evt: MouseEvent) => {
+                    console.log("click", evt);
+                }, { capture: this.useCapture() });
+                this.registerDomEvent(document, "click", (evt: MouseEvent) => {
+                    console.log("click", evt);
+                }, { [this.key()]: true });
+            `,
+            errors: [{ messageId: "removeSampleDomEvent" }, { messageId: "removeSampleDomEvent" }],
             output: null,
         },
 
