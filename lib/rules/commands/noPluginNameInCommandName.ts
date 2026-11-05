@@ -7,6 +7,16 @@ import { phrasePattern } from "./words.js";
 
 type Options = [{ pluginName?: string }?];
 
+/**
+ * Whether the plugin name starts the command name with only whitespace and a
+ * lower-case word after it, as in "Zoom in" or "Git commit": a word of the
+ * sentence then, rather than a label.
+ */
+function startsWithNameAsWord(name: string, pattern: RegExp): boolean {
+    const match = pattern.exec(name);
+    return match !== null && match.index === 0 && /^\s+\p{Ll}/u.test(name.slice(match[0].length));
+}
+
 export default ruleCreator<Options, "pluginName" | "removePluginName">({
     meta: {
         type: "suggestion" as const,
@@ -60,10 +70,14 @@ export default ruleCreator<Options, "pluginName" | "removePluginName">({
                         pluginNamePattern.test(property.value.value)
                     ) {
                         const value = property.value;
-                        const edit = removePhrase(value.value, pluginNamePattern, {
-                            prefixAfterSpace: true,
-                            suffixAfterSpace: false,
-                        });
+                        // "Zoom in" of the plugin "Zoom": the name is the
+                        // verb, and "In" would mean nothing
+                        const edit = startsWithNameAsWord(value.value, pluginNamePattern)
+                            ? null
+                            : removePhrase(value.value, pluginNamePattern, {
+                                prefixAfterSpace: true,
+                                suffixAfterSpace: false,
+                            });
                         const source = edit?.toSource(value.raw);
                         context.report({
                             node: property,

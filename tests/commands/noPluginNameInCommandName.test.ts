@@ -29,7 +29,7 @@ const START_NAMES = [
     "Word Tally > count words",
     "[Word Tally] count words",
     "(Word Tally): count words",
-    "Word Tally count words",
+    "Word Tally Count words",
 ];
 const END_NAMES = [
     "Count words: Word Tally",
@@ -229,6 +229,20 @@ ruleTester.run("no-plugin-name-in-command-name", noPluginNameRule, {
             code: commands(START_NAMES),
             options: [{ pluginName: "Word Tally" }],
             errors: renamedLines(START_NAMES, START_NAMES.map(() => "Count words")),
+        },
+        {
+            // obsidian-zoom: the plugin name is the verb, and "In" would
+            // mean nothing.
+            name: "no suggestion where a lower-case word follows the plugin name after a space",
+            code: commands(["Zoom in", "Zoom out the entire document", "Zoom  into heading"]),
+            options: [{ pluginName: "Zoom" }],
+            errors: renamedLines([], [null, null, null]),
+        },
+        {
+            name: "a capitalised word after the plugin name and a space keeps the suggestion",
+            code: command("Fit Sync"),
+            options: [{ pluginName: "Fit" }],
+            errors: renamedLines(["Fit Sync"], ["Sync"]),
         },
         {
             name: "the suggestion removes the plugin name and the separator before it at the end",

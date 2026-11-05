@@ -1,9 +1,21 @@
 import { TSESTree } from "@typescript-eslint/utils";
 import { docsUrl, ruleCreator } from "../../ruleCreator.js";
+import { COMMAND, isRedundantCommandInId, redundantCommandInName } from "./commandWord.js";
 import { removeIdWords } from "./idRemoval.js";
 import { commandIds, idRewrite } from "./idSuggestion.js";
-import { isCommandProperty } from "./property.js";
-import { idWords } from "./words.js";
+import { isCommandProperty, staticString } from "./property.js";
+
+// Whether the command's name uses "command" as a word it needs, as
+// "Copy URI for command" does: then the ID's "command" is that word too.
+function nameNeedsCommand(command: TSESTree.ObjectExpression): boolean {
+    return command.properties.some((property) => {
+        if (!isCommandProperty(property, "name")) {
+            return false;
+        }
+        const name = staticString(property.value);
+        return name !== null && COMMAND.test(name) && redundantCommandInName(name) === null;
+    });
+}
 
 export default ruleCreator({
     meta: {
@@ -16,7 +28,7 @@ export default ruleCreator({
         messages: {
             commandInId: "Adding `command` to the command ID is not necessary.",
             removeCommand:
-                "Rename the command ID to \"{{id}}\", without `command`. Users lose any hotkey they set for this command.",
+                "Rename the command ID to \"{{id}}\", without `command`. Users lose any hotkey they set for this command, and executeCommandById() calls, obsidian:// URIs and other plugins that run it by its old ID stop working.",
         },
         schema: [],
     },
@@ -44,7 +56,8 @@ export default ruleCreator({
                         isCommandProperty(property, "id") &&
                         property.value.type === TSESTree.AST_NODE_TYPES.Literal &&
                         typeof property.value.value === "string" &&
-                        idWords(property.value.value).includes("command")
+                        isRedundantCommandInId(property.value.value) &&
+                        !nameNeedsCommand(commandObject)
                     ) {
                         reported.push({ property, value: property.value });
                     }

@@ -70,6 +70,23 @@ ruleTester.run("no-plugin-id-in-command-id", noPluginIdRule, {
             options: [{ pluginId: "my-plugin" }],
         },
         {
+            // calendar, homepage, surfing: the plugin ID names what the
+            // command acts on, not a namespace.
+            name: "the plugin ID after the start of the command ID is not reported",
+            code: [
+                "this.addCommand({ id: 'show-calendar-view' });",
+                "this.addCommand({ id: 'open-calendar' });",
+                "this.addCommand({ id: 'pullFromCalendar' });",
+                "this.addCommand({ id: 'open+calendar' });",
+            ].join("\n"),
+            options: [{ pluginId: "calendar" }],
+        },
+        {
+            name: "a multi-word plugin ID in the middle or at the end is not reported",
+            code: "this.addCommand({ id: 'open-note-for-my-plugin' }); this.addCommand({ id: 'open-my-plugin-note' }); this.addCommand({ id: 'openMyPluginNote' });",
+            options: [{ pluginId: "my-plugin" }],
+        },
+        {
             name: "digits are part of a word of the id",
             code: "this.addCommand({ id: 'open-base64-note' }); this.addCommand({ id: 'open-base64Note' });",
             options: [{ pluginId: "base" }],
@@ -81,12 +98,6 @@ ruleTester.run("no-plugin-id-in-command-id", noPluginIdRule, {
             code: "this.addCommand({ id: 'my-plugin-open-note' });",
             options: [{ pluginId: "my-plugin" }],
             errors: [{ messageId: "pluginId", suggestions: [rename("open-note", "this.addCommand({ id: 'open-note' });")] }],
-        },
-        {
-            name: "id ending with plugin id is forbidden",
-            code: "this.addCommand({ id: 'open-note-for-my-plugin' });",
-            options: [{ pluginId: "my-plugin" }],
-            errors: [{ messageId: "pluginId", suggestions: [rename("open-note-for", "this.addCommand({ id: 'open-note-for' });")] }],
         },
         {
             name: "plugin id in another case is forbidden",
@@ -111,21 +122,21 @@ ruleTester.run("no-plugin-id-in-command-id", noPluginIdRule, {
         },
         {
             name: "a one-word plugin id is found as a word",
-            code: "this.addCommand({ id: 'git-commit' }); this.addCommand({ id: 'pullFromGit' });",
+            code: "this.addCommand({ id: 'git-commit' }); this.addCommand({ id: 'gitPull' });",
             options: [{ pluginId: "git" }],
             errors: [
-                { messageId: "pluginId", suggestions: [rename("commit", "this.addCommand({ id: 'commit' }); this.addCommand({ id: 'pullFromGit' });")] },
-                { messageId: "pluginId", suggestions: [rename("pullFrom", "this.addCommand({ id: 'git-commit' }); this.addCommand({ id: 'pullFrom' });")] },
+                { messageId: "pluginId", suggestions: [rename("commit", "this.addCommand({ id: 'commit' }); this.addCommand({ id: 'gitPull' });")] },
+                { messageId: "pluginId", suggestions: [rename("pull", "this.addCommand({ id: 'git-commit' }); this.addCommand({ id: 'pull' });")] },
             ],
         },
         {
             name: "a quoted id key is checked",
-            code: "this.addCommand({ \"id\": \"my-plugin-open\", \"name\": \"Open\" }); this.addCommand({ 'id': 'myPluginOpen' }); this.addCommand({ ['id']: 'open-my-plugin' });",
+            code: "this.addCommand({ \"id\": \"my-plugin-open\", \"name\": \"Open\" }); this.addCommand({ 'id': 'myPluginOpen' }); this.addCommand({ ['id']: 'my-plugin-close' });",
             options: [{ pluginId: "my-plugin" }],
             errors: [
-                { messageId: "pluginId", suggestions: [rename("open", "this.addCommand({ \"id\": \"open\", \"name\": \"Open\" }); this.addCommand({ 'id': 'myPluginOpen' }); this.addCommand({ ['id']: 'open-my-plugin' });")] },
-                { messageId: "pluginId", suggestions: [rename("open", "this.addCommand({ \"id\": \"my-plugin-open\", \"name\": \"Open\" }); this.addCommand({ 'id': 'open' }); this.addCommand({ ['id']: 'open-my-plugin' });")] },
-                { messageId: "pluginId", suggestions: [rename("open", "this.addCommand({ \"id\": \"my-plugin-open\", \"name\": \"Open\" }); this.addCommand({ 'id': 'myPluginOpen' }); this.addCommand({ ['id']: 'open' });")] },
+                { messageId: "pluginId", suggestions: [rename("open", "this.addCommand({ \"id\": \"open\", \"name\": \"Open\" }); this.addCommand({ 'id': 'myPluginOpen' }); this.addCommand({ ['id']: 'my-plugin-close' });")] },
+                { messageId: "pluginId", suggestions: [rename("open", "this.addCommand({ \"id\": \"my-plugin-open\", \"name\": \"Open\" }); this.addCommand({ 'id': 'open' }); this.addCommand({ ['id']: 'my-plugin-close' });")] },
+                { messageId: "pluginId", suggestions: [rename("close", "this.addCommand({ \"id\": \"my-plugin-open\", \"name\": \"Open\" }); this.addCommand({ 'id': 'myPluginOpen' }); this.addCommand({ ['id']: 'close' });")] },
             ],
         },
         {
@@ -156,53 +167,45 @@ ruleTester.run("no-plugin-id-in-command-id", noPluginIdRule, {
         },
         {
             name: "a plugin id in letters outside ASCII is found as a word",
-            code: "this.addCommand({ id: 'open-笔记' });",
+            code: "this.addCommand({ id: '笔记-open' });",
             options: [{ pluginId: "笔记" }],
             errors: [{ messageId: "pluginId", suggestions: [rename("open", "this.addCommand({ id: 'open' });")] }],
         },
         {
             name: "a camelCase hump at a capital outside ASCII ends a word",
             code: "this.addCommand({ id: 'notizenÖffnen' });",
-            options: [{ pluginId: "öffnen" }],
-            errors: [{ messageId: "pluginId", suggestions: [rename("notizen", "this.addCommand({ id: 'notizen' });")] }],
-        },
-        {
-            name: "the suggestion removes the plugin ID from the middle, with one separator",
-            code: "this.addCommand({ id: 'open-my-plugin-note' }); this.addCommand({ id: 'open:my_plugin.note' });",
-            options: [{ pluginId: "my-plugin" }],
-            errors: [
-                { messageId: "pluginId", suggestions: [rename("open-note", "this.addCommand({ id: 'open-note' }); this.addCommand({ id: 'open:my_plugin.note' });")] },
-                { messageId: "pluginId", suggestions: [rename("open:note", "this.addCommand({ id: 'open-my-plugin-note' }); this.addCommand({ id: 'open:note' });")] },
-            ],
+            options: [{ pluginId: "notizen" }],
+            errors: [{ messageId: "pluginId", suggestions: [rename("öffnen", "this.addCommand({ id: 'öffnen' });")] }],
         },
         {
             name: "the suggestion strips every separator next to the plugin ID",
-            code: "this.addCommand({ id: 'my-plugin: open' }); this.addCommand({ id: 'note -- my-plugin' }); this.addCommand({ id: 'my-plugin/close' });",
+            code: "this.addCommand({ id: 'my-plugin: open' }); this.addCommand({ id: 'my-plugin -- note' }); this.addCommand({ id: 'my-plugin/close' });",
             options: [{ pluginId: "my-plugin" }],
             errors: [
-                { messageId: "pluginId", suggestions: [rename("open", "this.addCommand({ id: 'open' }); this.addCommand({ id: 'note -- my-plugin' }); this.addCommand({ id: 'my-plugin/close' });")] },
+                { messageId: "pluginId", suggestions: [rename("open", "this.addCommand({ id: 'open' }); this.addCommand({ id: 'my-plugin -- note' }); this.addCommand({ id: 'my-plugin/close' });")] },
                 { messageId: "pluginId", suggestions: [rename("note", "this.addCommand({ id: 'my-plugin: open' }); this.addCommand({ id: 'note' }); this.addCommand({ id: 'my-plugin/close' });")] },
-                { messageId: "pluginId", suggestions: [rename("close", "this.addCommand({ id: 'my-plugin: open' }); this.addCommand({ id: 'note -- my-plugin' }); this.addCommand({ id: 'close' });")] },
+                { messageId: "pluginId", suggestions: [rename("close", "this.addCommand({ id: 'my-plugin: open' }); this.addCommand({ id: 'my-plugin -- note' }); this.addCommand({ id: 'close' });")] },
             ],
         },
         {
-            // "openMyPluginNote" keeps "Note" as it is; "open-myPluginNote"
-            // and "myPluginNote" lose the camelCase run the plugin ID began.
+            // "myPluginNote" loses the camelCase run the plugin ID began.
             name: "the suggestion keeps a camelCase ID camelCase",
-            code: "this.addCommand({ id: 'openMyPluginNote' }); this.addCommand({ id: 'open-myPluginNote' }); this.addCommand({ id: 'MyPluginNote' }); this.addCommand({ id: 'myPluginPDFExport' });",
+            code: "this.addCommand({ id: 'myPluginNote' }); this.addCommand({ id: 'MyPluginNote' }); this.addCommand({ id: 'myPluginPDFExport' });",
             options: [{ pluginId: "my-plugin" }],
             errors: [
-                { messageId: "pluginId", suggestions: [rename("openNote", "this.addCommand({ id: 'openNote' }); this.addCommand({ id: 'open-myPluginNote' }); this.addCommand({ id: 'MyPluginNote' }); this.addCommand({ id: 'myPluginPDFExport' });")] },
-                { messageId: "pluginId", suggestions: [rename("open-note", "this.addCommand({ id: 'openMyPluginNote' }); this.addCommand({ id: 'open-note' }); this.addCommand({ id: 'MyPluginNote' }); this.addCommand({ id: 'myPluginPDFExport' });")] },
-                { messageId: "pluginId", suggestions: [rename("Note", "this.addCommand({ id: 'openMyPluginNote' }); this.addCommand({ id: 'open-myPluginNote' }); this.addCommand({ id: 'Note' }); this.addCommand({ id: 'myPluginPDFExport' });")] },
-                { messageId: "pluginId", suggestions: [rename("PDFExport", "this.addCommand({ id: 'openMyPluginNote' }); this.addCommand({ id: 'open-myPluginNote' }); this.addCommand({ id: 'MyPluginNote' }); this.addCommand({ id: 'PDFExport' });")] },
+                { messageId: "pluginId", suggestions: [rename("note", "this.addCommand({ id: 'note' }); this.addCommand({ id: 'MyPluginNote' }); this.addCommand({ id: 'myPluginPDFExport' });")] },
+                { messageId: "pluginId", suggestions: [rename("Note", "this.addCommand({ id: 'myPluginNote' }); this.addCommand({ id: 'Note' }); this.addCommand({ id: 'myPluginPDFExport' });")] },
+                { messageId: "pluginId", suggestions: [rename("PDFExport", "this.addCommand({ id: 'myPluginNote' }); this.addCommand({ id: 'MyPluginNote' }); this.addCommand({ id: 'PDFExport' });")] },
             ],
         },
         {
-            name: "the suggestion removes the plugin ID every time it is there",
-            code: "this.addCommand({ id: 'my-plugin-open-my-plugin' });",
+            name: "the suggestion removes the plugin ID only where it starts the command ID, as often as it does",
+            code: "this.addCommand({ id: 'my-plugin-open-my-plugin' }); this.addCommand({ id: 'my-plugin-my-plugin-close' });",
             options: [{ pluginId: "my-plugin" }],
-            errors: [{ messageId: "pluginId", suggestions: [rename("open", "this.addCommand({ id: 'open' });")] }],
+            errors: [
+                { messageId: "pluginId", suggestions: [rename("open-my-plugin", "this.addCommand({ id: 'open-my-plugin' }); this.addCommand({ id: 'my-plugin-my-plugin-close' });")] },
+                { messageId: "pluginId", suggestions: [rename("close", "this.addCommand({ id: 'my-plugin-open-my-plugin' }); this.addCommand({ id: 'close' });")] },
+            ],
         },
         {
             name: "the suggestion keeps the quotes and the escapes",
@@ -240,7 +243,7 @@ ruleTester.run("no-plugin-id-in-command-id", noPluginIdRule, {
         },
         {
             name: "no suggestion where the plugin ID is next to something other than a separator",
-            code: "this.addCommand({ id: 'my-plugin#open' }); this.addCommand({ id: 'open+my-plugin' });",
+            code: "this.addCommand({ id: 'my-plugin#open' }); this.addCommand({ id: 'my-plugin+open' });",
             options: [{ pluginId: "my-plugin" }],
             errors: [{ messageId: "pluginId", suggestions: [] }, { messageId: "pluginId", suggestions: [] }],
         },

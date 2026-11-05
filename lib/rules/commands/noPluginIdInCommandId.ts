@@ -4,7 +4,7 @@ import { docsUrl, ruleCreator } from "../../ruleCreator.js";
 import { removeIdWords } from "./idRemoval.js";
 import { commandIds, idRewrite } from "./idSuggestion.js";
 import { isCommandProperty } from "./property.js";
-import { containsWords, idWords } from "./words.js";
+import { idWords, indexOfWords } from "./words.js";
 
 type Options = [{ pluginId?: string }?];
 
@@ -19,7 +19,7 @@ export default ruleCreator<Options, "pluginId" | "removePluginId">({
         messages: {
             pluginId: "The command ID should not include the plugin ID. Obsidian will make sure that there are no conflicts with other plugins.",
             removePluginId:
-                "Rename the command ID to \"{{id}}\", without the plugin ID. Users lose any hotkey they set for this command.",
+                "Rename the command ID to \"{{id}}\", without the plugin ID. Users lose any hotkey they set for this command, and executeCommandById() calls, obsidian:// URIs and other plugins that run it by its old ID stop working.",
         },
         schema: [
             {
@@ -62,7 +62,10 @@ export default ruleCreator<Options, "pluginId" | "removePluginId">({
                         isCommandProperty(property, "id") &&
                         property.value.type === TSESTree.AST_NODE_TYPES.Literal &&
                         typeof property.value.value === "string" &&
-                        containsWords(idWords(property.value.value), pluginIdWords)
+                        // A namespace in front, as in `my-plugin-open-note`;
+                        // elsewhere the words name what the command acts
+                        // on, as in `show-calendar-view` of "calendar"
+                        indexOfWords(idWords(property.value.value), pluginIdWords) === 0
                     ) {
                         reported.push({ property, value: property.value });
                     }
@@ -72,7 +75,7 @@ export default ruleCreator<Options, "pluginId" | "removePluginId">({
             // suggestion never gives two commands the same ID
             "Program:exit"() {
                 for (const { property, value } of reported) {
-                    const rewrite = idRewrite(value, removeIdWords(value.value, pluginIdWords), ids);
+                    const rewrite = idRewrite(value, removeIdWords(value.value, pluginIdWords, { atStart: true }), ids);
                     context.report({
                         node: property,
                         messageId: "pluginId",
