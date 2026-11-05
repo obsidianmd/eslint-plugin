@@ -59,10 +59,12 @@ A probe of the global object for a property that may be missing gets a suggestio
 types: `typeof globalThis.crypto`, `"requestIdleCallback" in globalThis`, `!globalThis.crypto`,
 `globalThis.crypto?.randomUUID()` or `globalThis.queueMicrotask ?? fallback`. Such code is written
 to work where the property is missing, as in a web worker or in Node tests, and there
-`window.crypto` throws because there is no `window`. So does code that may run without a window: in a
-`try` whose `catch` drops the error, as in `try { … } catch {}`, or decided by a condition that names
-the environment, such as `if (isBrowser)`, `env.isNode ? … : …` or `typeof process !== "undefined"`;
-see [Window checks](prefer-window-timers.md#window-checks).
+`window.crypto` throws because there is no `window`. The code such a probe decides runs gets a
+suggestion too, as in `if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();`:
+with only the call fixed, TypeScript reports the probe as always true (TS2774). So does code that
+may run without a window: in a `try` whose `catch` drops the error, as in `try { … } catch {}`, or
+decided by a condition that names the environment, such as `if (isBrowser)`, `env.isNode ? … : …` or
+`typeof process !== "undefined"`; see [Window checks](prefer-window-timers.md#window-checks).
 
 Without type information, only rewrites that can never change a type are fixed: a read through a cast
 to `any`, `unknown` or `never`, and the timer
@@ -92,7 +94,8 @@ Neither a fix nor a suggestion is offered where `window` would be wrong:
   `Object.defineProperty(globalThis, "window", …)` or `Object.assign(global, { window, document })`,
   or a read of one as a value, such as `const doc = globalThis.document` or `use(global.window)`. As
   `window.window`, it would throw where there is no window yet. A read through one, such as
-  `globalThis.document.body`, is fixed as above
+  `globalThis.document.body`, is fixed as above; with `?.`, as in `globalThis.document?.body`, it is
+  a window check and gets neither
 
 ## Web workers
 

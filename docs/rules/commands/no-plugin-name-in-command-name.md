@@ -63,7 +63,7 @@ Not offered where:
   else: "Open Word Tally settings", "Count with Word Tally", "Word Tally-based count",
   "Word Tally's settings", "Count words (for Word Tally)";
 - the rest would start or end with a separator or a bracket, as for "Word Tally: - count";
-- the letter to capitalize is written as an escape, as in `"Word Tally: count"`.
+- the letter to capitalize is written as an escape, as in `"Word Tally: \u0063ount words"`.
 
 ## Further reading
 

@@ -16,7 +16,7 @@ Next, install `eslint-plugin-obsidianmd`:
 npm install eslint-plugin-obsidianmd --save-dev
 ```
 
-The plugin needs Node.js 20.19+, 22.13+ or 24+, ESLint 9.19 or later, `typescript-eslint` 8.35.1 or later, and a TypeScript version your `typescript-eslint` supports (4.8.4 or later). npm installs `typescript` and `typescript-eslint` alongside the plugin if your project does not already have them. `typescript-eslint` 8.70.1 or later is recommended: it fixes a `no-unnecessary-type-assertion` false positive on an empty object asserted to a `Record` type alias ([typescript-eslint#12856](https://github.com/typescript-eslint/typescript-eslint/issues/12856)). The configuration examples below import `defineConfig` and `globalIgnores` from `eslint/config`, which ESLint added in 9.22. On an older ESLint, write `{ ignores: [...] }` instead of `globalIgnores([...])`, and export the array without `defineConfig`, or, where an example uses `extends`, wrap it in `tseslint.config(...)` instead.
+The plugin needs Node.js 20.19+, 22.13+ or 24+, ESLint 9.19 or later, `typescript-eslint` 8.35.1 or later, and a TypeScript version your `typescript-eslint` supports (4.8.4 or later; `typescript-eslint` 8 supports up to 6.0). npm installs `typescript` and `typescript-eslint` alongside the plugin if your project does not already have them. TypeScript 7, the native compiler, has no JavaScript API yet, so `typescript-eslint` and this plugin cannot use it; npm refuses `typescript@7` next to `typescript-eslint` 8 with an `ERESOLVE` error. Keep TypeScript 5 or 6 in your `devDependencies`. `typescript-eslint` 8.70.1 or later is recommended: it fixes a `no-unnecessary-type-assertion` false positive on an empty object asserted to a `Record` type alias ([typescript-eslint#12856](https://github.com/typescript-eslint/typescript-eslint/issues/12856)). The configuration examples below import `defineConfig` and `globalIgnores` from `eslint/config`, which ESLint added in 9.22. On an older ESLint, write `{ ignores: [...] }` instead of `globalIgnores([...])`, and export the array without `defineConfig`, or, where an example uses `extends`, wrap it in `tseslint.config(...)` instead.
 
 On ESLint 10, npm prints `ERESOLVE overriding peer dependency` warnings when it installs the plugin, and `npm ls --all` and `npm ls eslint` exit with `invalid: eslint@10…`. Three packages the plugin bundles do not declare ESLint 10 support yet: `@microsoft/eslint-plugin-sdl`, `eslint-plugin-import`, and `eslint-plugin-react`, which `@microsoft/eslint-plugin-sdl` installs. Linting works, so you can ignore the warnings. With npm's `strict-peer-deps` setting on, the install fails instead; turn the setting off or use ESLint 9.
 
@@ -61,7 +61,7 @@ export default defineConfig([
 
 The `globalIgnores` entry follows the official sample plugin's layout: `main.js` is the bundled build, and `esbuild.config.mjs` and `version-bump.mjs` are Node scripts. None of them is plugin source or in your `tsconfig.json`, so without it ESLint fails on them with "was not found by the project service". List your own build output and scripts there.
 
-If your plugin has no build step and you write `main.js` yourself, it is your source: leave it out of `globalIgnores`, add it to `allowDefaultProject`, and declare the CommonJS globals Obsidian loads it with. [Ignoring files](docs/configuration.md#ignoring-files) shows the full setup.
+If your plugin has no build step and you write `main.js` yourself, it is your source: leave it out of `globalIgnores`, add it to `allowDefaultProject`, and declare the CommonJS globals Obsidian loads it with. [Ignoring files](docs/configuration.md#ignoring-files) shows the full setup. For a plugin written in JavaScript with its sources in `src/` or elsewhere, see [Plugins written in JavaScript](docs/configuration.md#plugins-written-in-javascript): with the `parserOptions` block above and no `jsconfig.json`, every file fails with "was not found by the project service".
 
 The `parserOptions` block is required because the recommended config includes type-checked rules that need access to your TypeScript project. `allowDefaultProject` ensures files not listed in your `tsconfig.json` (like the ESLint config file itself) are still linted without errors. See the [configuration guide](docs/configuration.md) for details on why this is needed and how to customize it.
 
@@ -78,7 +78,8 @@ For advanced usage, see the [configuration guide](docs/configuration.md):
 - how the recommended config handles [test files](docs/configuration.md#test-files) and [web worker files](docs/configuration.md#web-worker-files)
 - [using only obsidianmd rules](docs/configuration.md#using-only-obsidianmd-rules-without-the-recommended-config) through `ruleConfigs`, without the recommended config
 - the [community plugin scanner's configuration](docs/configuration.md#community-plugin-scanner-configuration)
-- [troubleshooting common errors](docs/configuration.md#common-errors)
+- [plugins written in JavaScript](docs/configuration.md#plugins-written-in-javascript)
+- [troubleshooting common errors](docs/configuration.md#common-errors) and [known issues](docs/configuration.md#known-issues)
 
 To give another plugin's rule a message of your own, wrap it with [`obsidianmd.withCustomMessages()`](docs/rules/rule-custom-message.md#wrapping-a-plugins-rule).
 
@@ -212,4 +213,4 @@ export default defineConfig([
 
 ### Known limitations
 
-Sentence detection may incorrectly split on abbreviations (Dr., Inc., etc.). Use single sentences or adjust rule options when needed.
+Sentence detection splits at the dot of an abbreviation it does not know, such as "Dr." or "Inc.", and expects the next word to start with a capital: "See Acme Inc. products" is reported. After "e.g.", "i.e.", "etc." and similar abbreviations the next word may take either case. Use single sentences or adjust rule options when needed.

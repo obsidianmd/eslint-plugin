@@ -22,8 +22,8 @@ check only to newer submissions, this rule applies the current policy.
 - **`name`:** must not include "Obsidian", parts of it ("obsi", "sidian", or a leading
   "ob"), or "Plugin".
 - **`description`:** must be 10 to 250 characters and end with `.`, `!` or `?`. It must
-  not include "Obsidian", refer to itself ("this plugin", "a plugin that", "the plugin
-  …"), or repeat or start with the name.
+  not include "Obsidian", refer to itself ("this plugin", "this tool", "a plugin that",
+  "the plugin …"), or repeat or start with the name.
 - **`fundingUrl`:** a string, or an object whose values are strings, its keys not repeated.
   An empty string, an empty object and an empty entry are accepted, as the review accepts
   them. Whether the values are valid URLs is not checked.
