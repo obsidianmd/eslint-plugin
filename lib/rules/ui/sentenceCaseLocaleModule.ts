@@ -120,12 +120,20 @@ export default ruleCreator({
         if (!isEnglishLocaleModule(context)) return {};
         const { evaluatorOptions, allowAutoFix } = resolveSentenceCaseConfig(context.options);
         const varObjects = new Map<string, TSESTree.ObjectExpression>();
-        const reportIfNeeded = createSentenceCaseReporter({
+        const reportString = createSentenceCaseReporter({
             context,
             evaluatorOptions,
             allowAutoFix,
             messageId: "useSentenceCase"
         });
+        // Each string once: the same object can be reached through several
+        // exports (`export { strings }; export default strings;`).
+        const checked = new Set<TSESTree.Node>();
+        const reportIfNeeded = (node: TSESTree.Node, value: string) => {
+            if (checked.has(node)) return;
+            checked.add(node);
+            reportString(node, value);
+        };
 
         return {
             Program(program: TSESTree.Program) {

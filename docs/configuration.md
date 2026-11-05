@@ -774,10 +774,6 @@ export default defineConfig([
 - **`ui/sentence-case`** does not know every abbreviation: after "Dr." or "Inc." it treats the next
   word as the start of a sentence, so "Contact Dr. Smith" is reported as "Contact dr. Smith" (see
   the [README](../README.md#ui-sentence-case)).
-- **`prefer-instanceof`** reports `x instanceof el.ownerDocument.defaultView!.HTMLElement`, which
-  already checks against the element's own window. `x?.instanceOf(HTMLElement)` does the same check, so take the rule's suggestion or write that.
-- **`ui/sentence-case-locale-module`** reports a string twice when the module exports the same
-  object twice, as in `export { strings }; export default strings;`.
 
 ## Using only obsidianmd rules (without the recommended config)
 
