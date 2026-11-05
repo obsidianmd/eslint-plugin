@@ -64,6 +64,7 @@ export default ruleCreator({
             const variable = ASTUtils.findVariable(scope, target);
             const def = variable?.defs.length === 1 ? variable.defs[0] : undefined;
             if (
+                !variable ||
                 def?.node.type !== TSESTree.AST_NODE_TYPES.VariableDeclarator ||
                 def.node.id !== def.name ||
                 variable.scope.variableScope.type !== "function" ||
