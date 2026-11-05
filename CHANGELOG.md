@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
-- Upgrading to 0.5.0 and Common errors: a block of rule overrides without `files` now also reaches `manifest.json` and `LICENSE`, where the `@typescript-eslint` and `import` plugins are not registered, and fails with `could not find plugin "@typescript-eslint"`. Scope it to your source ([#233](https://github.com/obsidianmd/eslint-plugin/pull/233)).
+- Upgrading to 0.5.0 and Common errors: a block of rule overrides without `files` now also reaches `manifest.json` and `LICENSE`, where the `@typescript-eslint` and `import` plugins are not registered, and fails with `could not find plugin "@typescript-eslint"`. Scope it to your source ([#238](https://github.com/obsidianmd/eslint-plugin/pull/238)).
 
 ## [0.5.0] - 2026-11-04
 
