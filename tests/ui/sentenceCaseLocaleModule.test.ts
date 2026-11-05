@@ -110,6 +110,19 @@ try {
             },
         ],
         invalid: [
+            // The same object reached through two exports was reported twice.
+            {
+                name: "an object exported by name and as the default is reported once",
+                filename: "en.ts",
+                code: "const strings = { open: \"Open Settings\" };\nexport { strings };\nexport default strings;",
+                errors: [{ messageId: "useSentenceCase", line: 1 }],
+            },
+            {
+                name: "an object exported under two names is reported once",
+                filename: "en.ts",
+                code: "const strings = { open: \"Open Settings\" };\nexport { strings as a, strings as b };",
+                errors: [{ messageId: "useSentenceCase", line: 1 }],
+            },
             {
                 name: "title case in default export is forbidden",
                 filename: "en.ts",

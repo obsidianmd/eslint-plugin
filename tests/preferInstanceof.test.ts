@@ -1390,3 +1390,78 @@ nonStrictRuleTester.run("prefer-instanceof without strictNullChecks", preferInst
         },
     ],
 });
+
+// A constructor read from a window of the code's choosing, such as the value's
+// own `ownerDocument.defaultView`, is what `.instanceOf()` checks against too.
+// Found in the community-plugin run.
+ruleTester.run("prefer-instanceof with a constructor from a window object", preferInstanceofRule, {
+    valid: [
+        {
+            name: "the constructor of the element's own window, through defaultView!, is not reported",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare const el: HTMLElement;
+                const focus = el.ownerDocument.activeElement;
+                if (focus instanceof el.ownerDocument.defaultView!.HTMLElement) {}
+            `,
+        },
+        {
+            name: "the constructor through defaultView?. is not reported",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare const el: HTMLElement;
+                declare const node: Node;
+                if (node instanceof el.ownerDocument.defaultView?.HTMLElement) {}
+                if (el.firstChild instanceof el.ownerDocument.defaultView!.Text) {}
+            `,
+        },
+        {
+            name: "the constructor of a window held in a variable is not reported",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare const win: Window;
+                declare const evt: UIEvent;
+                if (evt instanceof win.MouseEvent) {}
+            `,
+        },
+    ],
+    invalid: [
+        {
+            name: "the main window's constructor is still reported",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare const node: Node;
+                if (node instanceof window.HTMLElement) {}
+            `,
+            output: `${OBSIDIAN_INSTANCEOF}
+                declare const node: Node;
+                if (node.instanceOf(window.HTMLElement)) {}
+            `,
+            errors: [{ messageId: "preferInstanceof", data: { className: "window.HTMLElement" } }],
+        },
+        {
+            name: "the active window's constructor is still reported",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare const activeWindow: Window;
+                declare const node: Node;
+                if (node instanceof activeWindow.HTMLElement) {}
+            `,
+            output: `${OBSIDIAN_INSTANCEOF}
+                declare const activeWindow: Window;
+                declare const node: Node;
+                if (node.instanceOf(activeWindow.HTMLElement)) {}
+            `,
+            errors: [{ messageId: "preferInstanceof", data: { className: "activeWindow.HTMLElement" } }],
+        },
+        {
+            name: "a constructor from an object that is not a window is still reported",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare const dom: { HTMLElement: typeof HTMLElement };
+                declare const node: Node;
+                if (node instanceof dom.HTMLElement) {}
+            `,
+            output: `${OBSIDIAN_INSTANCEOF}
+                declare const dom: { HTMLElement: typeof HTMLElement };
+                declare const node: Node;
+                if (node.instanceOf(dom.HTMLElement)) {}
+            `,
+            errors: [{ messageId: "preferInstanceof", data: { className: "dom.HTMLElement" } }],
+        },
+    ],
+});

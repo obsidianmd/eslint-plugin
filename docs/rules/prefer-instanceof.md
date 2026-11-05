@@ -33,7 +33,10 @@ suggestion; see [Values that may be null or undefined](#values-that-may-be-null-
 
 Not reported: `instanceof` on any other type, such as a `TFile` or your own classes, on an `any` or
 `unknown` value, and on a union of more than one type besides `null` and `undefined`, such as
-`Node | string` or `HTMLElement | SVGElement`.
+`Node | string` or `HTMLElement | SVGElement`. Nor is a check against a constructor read from a
+window object, such as `focus instanceof el.ownerDocument.defaultView!.HTMLElement` or
+`evt instanceof win.MouseEvent`: it already checks against the window the code chose. One read from
+`window` or `activeWindow`, the main or the active window, is reported.
 
 The rule needs type information, so the recommended config runs it on TypeScript files only. It
 switches the rule off for worker and test files, which have no popout windows and no `instanceOf()`;

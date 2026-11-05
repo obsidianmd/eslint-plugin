@@ -5,6 +5,9 @@ import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 const INSTANCEABLE_BASE_TYPES = new Set(["Node", "UIEvent"]);
 
+// The names that hold the main or the active window, or the global object.
+const GLOBAL_WINDOW_NAMES = new Set(["window", "activeWindow", "globalThis", "global", "self"]);
+
 const NULLISH_FLAGS = ts.TypeFlags.Null | ts.TypeFlags.Undefined | ts.TypeFlags.Void;
 
 // `T | null` and `T | undefined` as `T`: with strictNullChecks a value that may
@@ -103,6 +106,13 @@ export default ruleCreator({
                     return;
                 }
 
+                // `focus instanceof el.ownerDocument.defaultView!.HTMLElement`
+                // checks against a window of the code's choosing, as
+                // `.instanceOf()` does: already cross-window safe.
+                if (readsFromOwnWindow(node.right)) {
+                    return;
+                }
+
                 // `null instanceof HTMLElement` is false, but `null.instanceOf()`
                 // throws. A value that may be null or undefined keeps that
                 // check with `?.`, which only a suggestion offers.
@@ -148,6 +158,34 @@ export default ruleCreator({
                 });
             },
         };
+
+        // Whether `right` reads the constructor from a window object other than
+        // the global ones: `doc.defaultView!.HTMLElement`, `el.win.MouseEvent`,
+        // `win?.HTMLElement`. `window.HTMLElement` and
+        // `activeWindow.HTMLElement` are the main or the active window's, not
+        // necessarily the value's, so those are still reported.
+        function readsFromOwnWindow(right: TSESTree.Expression): boolean {
+            let member: TSESTree.Node = right;
+            while (
+                member.type === TSESTree.AST_NODE_TYPES.TSNonNullExpression ||
+                member.type === TSESTree.AST_NODE_TYPES.ChainExpression
+            ) {
+                member = member.expression;
+            }
+            if (member.type !== TSESTree.AST_NODE_TYPES.MemberExpression) {
+                return false;
+            }
+            let object: TSESTree.Node = member.object;
+            while (object.type === TSESTree.AST_NODE_TYPES.TSNonNullExpression) {
+                object = object.expression;
+            }
+            if (object.type === TSESTree.AST_NODE_TYPES.Identifier && GLOBAL_WINDOW_NAMES.has(object.name)) {
+                return false;
+            }
+            const type = checker.getNonNullableType(services.getTypeAtLocation(object));
+            const parts = type.isUnionOrIntersection() ? type.types : [type];
+            return parts.some((part) => part.getSymbol()?.name === "Window");
+        }
 
         // Whether the left operand may be null or undefined when the check runs.
         function mayBeNullish(left: TSESTree.Expression, type: ts.Type): boolean {
