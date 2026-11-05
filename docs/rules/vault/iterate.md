@@ -69,8 +69,9 @@ Nothing is offered:
   as a `TFile | undefined` variable, return type or parameter; where the path is not a `string`;
   and where the vault has no `getFileByPath()`, as with `obsidian` typings older than 1.5.7;
 - with a `minAppVersion` below 1.5.7, which has no `getFileByPath()`. Where no version is known (no
-  `manifest.json` with a valid `minAppVersion`, and no `minAppVersion` option), the suggestion is
-  offered and says it needs Obsidian 1.5.7.
+  `minAppVersion` option and no `manifest.json` `minAppVersion`, or the one that applies, the option
+  before the manifest, is not a version, such as `latest`), the suggestion is offered and says it
+  needs Obsidian 1.5.7.
 
 ## Further reading
 

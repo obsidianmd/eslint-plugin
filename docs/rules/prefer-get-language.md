@@ -59,8 +59,9 @@ Nothing is offered:
 - with type information, where the `obsidian` typings do not export `getLanguage()` (older than
   1.8.7), or are not part of the program;
 - with a `minAppVersion` below 1.8.7, which has no `getLanguage()`. Where no version is known (no
-  `manifest.json` with a valid `minAppVersion`, and no `minAppVersion` option), the suggestion is
-  offered and says it needs Obsidian 1.8.7;
+  `minAppVersion` option and no `manifest.json` `minAppVersion`, or the one that applies, the option
+  before the manifest, is not a version, such as `latest`), the suggestion is offered and says it
+  needs Obsidian 1.8.7;
 - for `i18next-browser-languagedetector`, whose replacement depends on how it is used.
 
 ## Options

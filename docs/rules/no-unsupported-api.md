@@ -106,10 +106,10 @@ not a full `x.y.z`, an exit that only runs inside a nested `if` or loop, `requir
 api` (which reaches `api` when the check fails), and a function declaration after an early exit,
 because a declaration is hoisted and can be called before the check.
 
-A `minAppVersion` without a patch version, such as `0.15`, is read as `0.15.0`. One with no version
-in it at all proves nothing about the app, so every versioned API is reported. With no
-`minAppVersion` at all, neither in the option nor in the `manifest.json` of the directory ESLint runs
-from, the rule reports nothing.
+A `minAppVersion` without a patch version, such as `0.15`, is read as `0.15.0`. Any other value
+that is not a version, such as `latest`, `1.2.x` or `>=1.0`, proves nothing about the app, so every
+versioned API is reported. With no `minAppVersion` at all, neither in the option nor in the
+`manifest.json` of the directory ESLint runs from, the rule reports nothing.
 
 ## Options
 

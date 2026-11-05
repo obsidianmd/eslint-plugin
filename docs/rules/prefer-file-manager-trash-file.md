@@ -53,8 +53,9 @@ Nothing is offered:
 - where the dropped argument is anything but a literal or a variable, such as `useSystemTrash()`, or
   a comment is next to it; and with a spread or more than two arguments;
 - with a `minAppVersion` below 1.6.6, which has no `trashFile()`. Where no version is known (no
-  `manifest.json` with a valid `minAppVersion`, and no `minAppVersion` option), the suggestion is
-  offered and says it needs Obsidian 1.6.6.
+  `minAppVersion` option and no `manifest.json` `minAppVersion`, or the one that applies, the option
+  before the manifest, is not a version, such as `latest`), the suggestion is offered and says it
+  needs Obsidian 1.6.6.
 
 ## Options
 

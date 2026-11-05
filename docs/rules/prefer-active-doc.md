@@ -120,8 +120,9 @@ Nothing is offered where `activeDocument` would not exist, or would not be what 
   at the time;
 - an assignment to `document`, and `export { document }`;
 - a `minAppVersion` below 0.15.0, which has no `activeDocument`. Where no version is known (no
-  `manifest.json` with a valid `minAppVersion`, and no `minAppVersion` option), the suggestion is
-  offered and says it needs Obsidian 0.15.0.
+  `minAppVersion` option and no `manifest.json` `minAppVersion`, or the one that applies, the option
+  before the manifest, is not a version, such as `latest`), the suggestion is offered and says it
+  needs Obsidian 0.15.0.
 
 ## Options
 
