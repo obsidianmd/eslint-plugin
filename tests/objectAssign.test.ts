@@ -62,6 +62,26 @@ ruleTester.run("object-assign", objectAssignRule, {
             code: "Settings.assign(DEFAULT_SETTINGS, data); Object.defineProperties(DEFAULT_SETTINGS, descriptors);",
         },
         {
+            // obsidian-linter's rule-builder: the object is made for the call.
+            name: "a variable of the same function holding a new object is not reported",
+            code: `
+                class RuleBuilder {
+                    OptionsClass: new () => object;
+                    getOptions(options: object) {
+                        const defaultOptions = new this.OptionsClass();
+                        const ruleOptions = Object.assign(defaultOptions, options);
+                        return ruleOptions;
+                    }
+                }
+                function build(data: object) {
+                    const defaults = { a: 1 };
+                    const defaultList: unknown[] = [];
+                    const defaultCopy = structuredClone(DEFAULT_SETTINGS);
+                    return [Object.assign(defaults, data), Object.assign(defaultList, data), Object.assign(defaultCopy, data)];
+                }
+            `,
+        },
+        {
             name: "a target that is a call or a numeric index has no name to match",
             code: "Object.assign(getDefaults(), data); Object.assign(this[0], data);",
         },
@@ -149,6 +169,31 @@ ruleTester.run("object-assign", objectAssignRule, {
                 suggestions: [{ messageId: "copyIntoNewObject", data: { target: "this.#defaults" }, output: "class Store { #defaults = {}; load(data: object) { return Object.assign({}, this.#defaults, data); } }" }],
             }],
         },
+        {
+            name: "a variable of the module, of an outer function, or set by another call is still reported",
+            code: `
+                const defaults = { a: 1 };
+                Object.assign(defaults, data);
+                export function outer() {
+                    const defaultOptions = { a: 1 };
+                    return (data: object) => { Object.assign(defaultOptions, data); };
+                }
+                export function load(plugin: { getDefaults(): object }, data: object) {
+                    const defaultSettings = plugin.getDefaults();
+                    let defaultLater;
+                    defaultLater = {};
+                    Object.assign(defaultSettings, data);
+                    Object.assign(defaultLater, data);
+                }
+            `,
+            // The results are thrown away, so no suggestion is offered.
+            errors: [
+                { messageId: "twoArgumentsDefault", line: 3, suggestions: [] },
+                { messageId: "twoArgumentsDefault", line: 6, suggestions: [] },
+                { messageId: "twoArgumentsDefault", line: 12, suggestions: [] },
+                { messageId: "twoArgumentsDefault", line: 13, suggestions: [] },
+            ],
+        },
     ],
 });
 
@@ -184,6 +229,14 @@ ruleTester.run("object-assign suggestions", objectAssignRule, {
         {
             name: "where the result is thrown away with void, or by a chain",
             code: "void Object.assign(DEFAULT_SETTINGS, data); Object.assign?.(DEFAULT_SETTINGS, data);",
+            errors: [
+                { messageId: "twoArgumentsDefault", suggestions: [] },
+                { messageId: "twoArgumentsDefault", suggestions: [] },
+            ],
+        },
+        {
+            name: "where the target is an instance of a class, whose prototype the copy would lose",
+            code: "class Options { get x() { return 1; } } declare const defaultOptions: Options | undefined; export const s = Object.assign(defaultOptions, data); export class P { defaults = new Options(); load() { return Object.assign(this.defaults, data); } }",
             errors: [
                 { messageId: "twoArgumentsDefault", suggestions: [] },
                 { messageId: "twoArgumentsDefault", suggestions: [] },
