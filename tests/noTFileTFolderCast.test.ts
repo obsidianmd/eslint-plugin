@@ -68,6 +68,38 @@ ruleTester.run("no-tfile-tfolder-cast", noTFileTFolderCastRule, {
                 const d = file as TFile;
             `,
         },
+        {
+            // better-export-pdf, digitalgarden, editor-width-slider,
+            // obsidian42-strange-new-worlds: the value is a TFile already,
+            // and only null is removed.
+            name: "a value that only loses null or undefined is not reported",
+            code: `
+                import { App, MarkdownView, TFile, TFolder, Vault } from "obsidian";
+                declare const app: App;
+                declare const vault: Vault;
+                declare const mdView: MarkdownView;
+                declare const paths: string[];
+                declare const maybeFolder: TFolder | undefined;
+                const a = app.metadataCache.getFirstLinkpathDest("a", "b.md") as TFile;
+                const b = app.workspace.getActiveFile() as TFile;
+                const c = mdView.file as TFile;
+                const d = <TFolder>maybeFolder;
+                const e = paths.map((p) => vault.getFileByPath(p)).filter((f) => f) as TFile[];
+                const f = paths.map((p) => vault.getFileByPath(p)) as readonly TFile[] | undefined;
+            `,
+        },
+        {
+            // inventtasks, pinax, quick-explorer, gemini-scribe.
+            name: "the result of a find or filter whose callback tests instanceof of the asserted type is not reported",
+            code: `
+                import { TFile, TFolder } from "obsidian";
+                declare const folder: TFolder;
+                const a = folder.children.find((x) => x instanceof TFile && x.name === "a.md") as TFile | undefined;
+                const b = folder.children.filter((c) => c instanceof TFile && c.extension === "md") as TFile[];
+                const c = folder.children.findLast(function (c) { return c.name !== "" && (c instanceof TFolder); }) as TFolder;
+                const d = folder?.children?.find((c) => c instanceof TFile) as TFile;
+            `,
+        },
     ],
     invalid: [
         {
@@ -186,13 +218,39 @@ ruleTester.run("no-tfile-tfolder-cast", noTFileTFolderCastRule, {
             errors: [{ messageId: "avoidCast", data: { typeName: "TFile" } }],
         },
         {
-            name: "a nullable file asserted to be a file is still reported",
+            name: "an abstract file that may be null asserted to be a file is reported",
             code: `
-                import { TFile, Vault } from "obsidian";
+                import { TAbstractFile, TFile, TFolder, Vault } from "obsidian";
                 declare const vault: Vault;
-                const file = vault.getFileByPath("a.md") as TFile;
+                declare const items: (TAbstractFile | null)[];
+                const file = vault.getAbstractFileByPath("a.md") as TFile;
+                const files = items.filter((i) => i) as TFile[];
             `,
-            errors: [{ messageId: "avoidCast", data: { typeName: "TFile" } }],
+            errors: [
+                { messageId: "avoidCast", data: { typeName: "TFile" } },
+                { messageId: "avoidCast", data: { typeName: "TFile" } },
+            ],
+        },
+        {
+            name: "a find or filter whose callback does not prove the asserted type is reported",
+            code: `
+                import { TFile, TFolder } from "obsidian";
+                declare const folder: TFolder;
+                const a = folder.children.find((c) => c instanceof TFolder) as TFile | undefined;
+                const b = folder.children.find((c) => c instanceof TFile || c.name === "x") as TFile | undefined;
+                const c = folder.children.filter((c) => c.name.endsWith(".md")) as TFile[];
+                const d = folder.children.filter((c) => other instanceof TFile) as TFile[];
+                const e = folder.children.filter((c) => { log(c); return c instanceof TFile; }) as TFile[];
+                const f = folder.children.some((c) => c instanceof TFile) as unknown as TFile;
+            `,
+            errors: [
+                { messageId: "avoidCast", line: 4 },
+                { messageId: "avoidCast", line: 5 },
+                { messageId: "avoidCast", line: 6 },
+                { messageId: "avoidCast", line: 7 },
+                { messageId: "avoidCast", line: 8 },
+                { messageId: "avoidCast", line: 9 },
+            ],
         },
     ],
 });
@@ -208,6 +266,10 @@ untypedRuleTester.run("no-tfile-tfolder-cast without type information", noTFileT
         {
             name: "null, undefined and [] typed as files are not reported",
             code: "let a = null as TFile | null; let b = undefined as TFolder | undefined; const c = [] as TFile[];",
+        },
+        {
+            name: "the result of a find or filter proved by instanceof is not reported",
+            code: "const a = children.filter((c) => c instanceof TFile && c.extension === 'md') as TFile[];",
         },
     ],
     invalid: [

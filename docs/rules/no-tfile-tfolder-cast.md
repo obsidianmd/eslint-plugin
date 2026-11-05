@@ -37,6 +37,16 @@ Not reported:
   and `[] as TFile[]`, and, with type information, a value that has the asserted type already, such as
   `vault.getFileByPath(path) as TFile | null` or `file as TFile` where `file` is a `TFile`. A value of
   type `any` or `unknown` is still reported
+- with type information, an assertion that only removes `null` or `undefined`, such as
+  `vault.getFileByPath(path) as TFile`, `this.app.workspace.getActiveFile() as TFile`, or
+  `files.filter((f) => f) as TFile[]` for a `(TFile | null)[]`: the value is a `TFile` already, so an
+  `instanceof` check is not what it needs. `vault.getAbstractFileByPath(path) as TFile`, whose value
+  may be a folder, is still reported
+- the result of `find()`, `findLast()` or `filter()` whose callback returns
+  `<its parameter> instanceof TFile` (or `TFolder`, as asserted), on its own or as one of the operands
+  of an `&&` chain, as in
+  `folder.children.find((c) => c instanceof TFile && c.extension === "md") as TFile | undefined`:
+  the callback has checked the type, but TypeScript infers no type predicate from such a callback
 
 The recommended config switches this rule off for test files, where mocks are routinely asserted to
 `TFile`; see [Test files](../configuration.md#test-files).
