@@ -140,10 +140,11 @@ for (const [file, heading, linted] of [
 // jsconfig.json for the second example. The first example has no parserOptions,
 // so no file can fail with "was not found by the project service"; the second
 // turns the type-aware rules on, which the JSDoc type below lets
-// prefer-file-manager-trash-file see.
+// prefer-file-manager-trash-file see. That rule reports nothing below
+// minAppVersion 1.6.6, which added trashFile().
 const JS_PLUGIN: Record<string, string> = {
 	"package.json": JSON.stringify({ name: "js-plugin", version: "1.0.0", main: "main.js", type: "module" }),
-	"manifest.json": SAMPLE_PLUGIN["manifest.json"],
+	"manifest.json": JSON.stringify({ ...JSON.parse(SAMPLE_PLUGIN["manifest.json"]) as object, minAppVersion: "1.6.6" }),
 	"jsconfig.json": JSON.stringify({
 		compilerOptions: { module: "ESNext", target: "ES2021", moduleResolution: "bundler", lib: ["ES2021", "DOM"] },
 		include: ["src/**/*.js"],
