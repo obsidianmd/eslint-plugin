@@ -28,6 +28,12 @@ function targetName(target: TSESTree.Node): string | null {
         : null;
 }
 
+const FUNCTION_NODES = new Set<TSESTree.Node["type"]>([
+    TSESTree.AST_NODE_TYPES.ArrowFunctionExpression,
+    TSESTree.AST_NODE_TYPES.FunctionDeclaration,
+    TSESTree.AST_NODE_TYPES.FunctionExpression,
+]);
+
 function isDefaultsName(name: string | null): boolean {
     return name !== null && !NOT_DEFAULTS.has(name) && name.toLowerCase().includes("default");
 }
@@ -67,7 +73,7 @@ export default ruleCreator({
                 !variable ||
                 def?.node.type !== TSESTree.AST_NODE_TYPES.VariableDeclarator ||
                 def.node.id !== def.name ||
-                variable.scope.variableScope.type !== "function" ||
+                !FUNCTION_NODES.has(variable.scope.variableScope.block.type) ||
                 variable.scope.variableScope !== scope.variableScope
             ) {
                 return false;
