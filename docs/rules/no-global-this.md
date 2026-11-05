@@ -33,8 +33,8 @@ need to change too.
 
 With type information, these are fixed:
 
-- a read of a property with the same type on `window`: `globalThis.crypto`, `global.process`,
-  `globalThis.document.body`, or a global the project declares itself
+- a read of a property with the same type on `window`: `globalThis.crypto`, `global.process` or
+  `globalThis.document.body`. Not a global only the project declares; see below
 - a call that returns the same type whichever signature it uses, such as
   `globalThis.clearTimeout(timer)` or `globalThis.matchMedia(query)`, and any call whose result is
   not used, such as `globalThis.setTimeout(save, 100);`. Either gets a suggestion instead when it is
@@ -80,6 +80,13 @@ Neither a fix nor a suggestion is offered where `window` would be wrong:
 - with type information, the project declares no `window` because it has no DOM lib, or `window`
   has no such property. For example, `globalThis.MathJax` compiles without `noImplicitAny`, but
   `window.MathJax` does not
+- a read of a global that only the project declares, with `declare global { var X: … }` or
+  `declare var X`, and not TypeScript's lib or a package such as `@types/node`. Such a global is
+  often a bundler's `define` key, which esbuild or webpack replaces by its exact text:
+  `global.DEFAULT_APP_KEY` is replaced, but `window.DEFAULT_APP_KEY` is not, and is `undefined` at
+  runtime. Without type information, only the declarations in the same file are seen. A write, such
+  as `globalThis.registry = new Map()`, still gets a suggestion. A read through a cast, such as
+  `(globalThis as any).DEFAULT_APP_KEY`, which a bundler does not replace, is rewritten as above
 - an earlier [window check](prefer-window-timers.md#window-checks) shows that the code also runs
   without a window, as in `typeof window !== "undefined" ? window : globalThis`, or after
   `if (typeof window !== "undefined") return window;`. Where the check proves that the window
@@ -100,6 +107,6 @@ Neither a fix nor a suggestion is offered where `window` would be wrong:
 ## Web workers
 
 A web worker has no `window`, so `globalThis` and the bare timer functions are correct there. The
-recommended config switches this rule off for files matching `**/*.worker.*` and anything under a
-`workers/` directory; see [Web worker files](../configuration.md#web-worker-files). It is off for
+recommended config switches this rule off for files matching `**/*.worker.*`, `**/*-worker.*` or
+`**/*_worker.*` and anything under a `workers/` directory; see [Web worker files](../configuration.md#web-worker-files). It is off for
 test files as well, which run outside Obsidian; see [Test files](../configuration.md#test-files).

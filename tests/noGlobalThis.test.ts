@@ -159,11 +159,11 @@ ruleTester.run("no-global-this", noGlobalThisRule, {
             ],
         },
         {
-            name: "a global of the project's own, which Window does not redeclare, is fixed where it is read, and suggested where it is written",
+            name: "a global of the project's own is reported only where it is read, and suggested where it is written",
             code: "declare global { var pluginRegistry: Map<string, number>; } globalThis.pluginRegistry.set('a', 1); globalThis.pluginRegistry = new Map();",
-            output: "declare global { var pluginRegistry: Map<string, number>; } window.pluginRegistry.set('a', 1); globalThis.pluginRegistry = new Map();",
+            output: null,
             errors: [
-                { messageId: "avoidGlobal", data: { name: "globalThis" } },
+                { messageId: "avoidGlobal", data: { name: "globalThis" }, suggestions: [] },
                 { messageId: "avoidGlobal", data: { name: "globalThis" }, suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "declare global { var pluginRegistry: Map<string, number>; } globalThis.pluginRegistry.set('a', 1); window.pluginRegistry = new Map();" }] },
             ],
         },
@@ -550,6 +550,53 @@ ruleTester.run("no-global-this", noGlobalThisRule, {
 // A probe of the global object for a property that may be missing is written
 // to work where it is missing, as in a worker or in Node tests, where
 // `window.x` would throw: a suggestion, never a fix.
+// A global that only the project declares is often a bundler's `define` key,
+// which the bundler replaces by its exact text: esbuild and webpack replace
+// `global.DEFAULT_DROPBOX_APP_KEY`, but not `window.DEFAULT_DROPBOX_APP_KEY`,
+// which is undefined at runtime (remotely-save src/baseTypes.ts).
+ruleTester.run("no-global-this on globals the project declares", noGlobalThisRule, {
+    valid: [],
+    invalid: [
+        {
+            name: "a define key read through global is reported only",
+            code: "declare global { var DEFAULT_DROPBOX_APP_KEY: string; } export const DROPBOX_APP_KEY = global.DEFAULT_DROPBOX_APP_KEY;",
+            output: null,
+            errors: [{ messageId: "avoidGlobal", data: { name: "global" }, suggestions: [] }],
+        },
+        {
+            name: "a define key read through globalThis with brackets is reported only",
+            code: "declare global { var BUILD_TIME: number; } export const t = globalThis[\"BUILD_TIME\"];",
+            output: null,
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" }, suggestions: [] }],
+        },
+        // A bundler replaces only the dotted name it was given, never a cast.
+        {
+            name: "a project's global read through a cast is still fixed",
+            code: "declare global { var BUILD_TIME: number; } export const t = (globalThis as any).BUILD_TIME;",
+            output: "declare global { var BUILD_TIME: number; } export const t = (window as any).BUILD_TIME;",
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" } }],
+        },
+        {
+            name: "a global declared in a module's declare global is reported only",
+            code: "declare global { var DEFAULT_DROPBOX_APP_SECRET: string; } export {}; export const secret = globalThis.DEFAULT_DROPBOX_APP_SECRET;",
+            output: null,
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" }, suggestions: [] }],
+        },
+        {
+            name: "a global from @types/node is still fixed",
+            code: "export const argv = global.process.argv;",
+            output: "export const argv = window.process.argv;",
+            errors: [{ messageId: "avoidGlobal", data: { name: "global" } }],
+        },
+        {
+            name: "a global from TypeScript's lib is still fixed",
+            code: "export const c = globalThis.crypto.randomUUID();",
+            output: "export const c = window.crypto.randomUUID();",
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" } }],
+        },
+    ],
+});
+
 ruleTester.run("no-global-this on probes of the global object", noGlobalThisRule, {
     valid: [],
     invalid: [
@@ -822,6 +869,27 @@ const untypedRuleTester = new RuleTester({
 untypedRuleTester.run("no-global-this without type information", noGlobalThisRule, {
     valid: [],
     invalid: [
+        {
+            name: "a global this file declares is reported only without type information",
+            code: "declare global { var DEFAULT_DROPBOX_APP_KEY: string; } declare var BUILD_TIME: number; export const k = [global.DEFAULT_DROPBOX_APP_KEY, globalThis.BUILD_TIME];",
+            output: null,
+            errors: [
+                { messageId: "avoidGlobal", data: { name: "global" }, suggestions: [] },
+                { messageId: "avoidGlobal", data: { name: "globalThis" }, suggestions: [] },
+            ],
+        },
+        {
+            name: "a write to a global this file declares keeps its suggestion without type information",
+            code: "declare global { var registry: Map<string, number>; } globalThis.registry = new Map();",
+            output: null,
+            errors: [
+                {
+                    messageId: "avoidGlobal",
+                    data: { name: "globalThis" },
+                    suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "declare global { var registry: Map<string, number>; } window.registry = new Map();" }],
+                },
+            ],
+        },
         {
             name: "a property gets a suggestion without type information",
             code: "globalThis.document.body;",

@@ -11,6 +11,8 @@ const TIMER_FUNCTIONS = new Set([
     "setTimeout",
 ]);
 
+const ANIMATION_FRAME_FUNCTIONS = new Set(["cancelAnimationFrame", "requestAnimationFrame"]);
+
 export default ruleCreator({
     meta: {
         type: "suggestion" as const,
@@ -90,6 +92,14 @@ export default ruleCreator({
                     TIMER_FUNCTIONS.has(callee.property.name)
                 ) {
                     const name = callee.property.name;
+                    // A frame callback belongs to the window it paints, so
+                    // the active window's is the right one: the main window's
+                    // stops while that window is hidden or minimized, as a
+                    // popout's user may keep it. Its frame IDs are that
+                    // window's too, so cancelAnimationFrame() stays with it.
+                    if (ANIMATION_FRAME_FUNCTIONS.has(name)) {
+                        return;
+                    }
                     const object = callee.object;
                     const fix = (fixer: TSESLint.RuleFixer) => fixer.replaceText(object, "window");
                     if (!isGlobalWindowAt(context, object)) {

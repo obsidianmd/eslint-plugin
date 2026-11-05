@@ -58,6 +58,17 @@ ruleTester.run("prefer-window-timers", preferWindowTimersRule, {
             name: "other functions on activeWindow are not reported",
             code: "activeWindow.requestIdleCallback(() => {}); activeWindow.open('https://obsidian.md');",
         },
+        // A frame callback runs when its window paints. The main window's
+        // stops while that window is minimized, so `window.` in their place
+        // would hold up a popout's frame (iconic IconPicker.ts:403).
+        {
+            name: "activeWindow.requestAnimationFrame is not reported",
+            code: "activeWindow.requestAnimationFrame(() => this.searchField.inputEl.select());",
+        },
+        {
+            name: "activeWindow.cancelAnimationFrame is not reported, as its frame is the active window's",
+            code: "const frame = activeWindow.requestAnimationFrame(() => {}); activeWindow.cancelAnimationFrame(frame);",
+        },
     ],
     invalid: [
         {
@@ -115,22 +126,10 @@ ruleTester.run("prefer-window-timers", preferWindowTimersRule, {
             errors: [{ messageId: "preferWindowTimer", data: { name: "requestAnimationFrame" } }],
         },
         {
-            name: "activeWindow.requestAnimationFrame is forbidden",
-            code: "activeWindow.requestAnimationFrame(() => {});",
-            output: "window.requestAnimationFrame(() => {});",
-            errors: [{ messageId: "noActiveWindowTimer", data: { name: "requestAnimationFrame" } }],
-        },
-        {
             name: "bare cancelAnimationFrame is forbidden",
             code: "cancelAnimationFrame(handle);",
             output: "window.cancelAnimationFrame(handle);",
             errors: [{ messageId: "preferWindowTimer", data: { name: "cancelAnimationFrame" } }],
-        },
-        {
-            name: "activeWindow.cancelAnimationFrame is forbidden",
-            code: "activeWindow.cancelAnimationFrame(handle);",
-            output: "window.cancelAnimationFrame(handle);",
-            errors: [{ messageId: "noActiveWindowTimer", data: { name: "cancelAnimationFrame" } }],
         },
         {
             name: "cancelAnimationFrame with a number handle is fixed, it takes a number either way",
@@ -139,21 +138,12 @@ ruleTester.run("prefer-window-timers", preferWindowTimersRule, {
             errors: [{ messageId: "preferWindowTimer", data: { name: "cancelAnimationFrame" } }],
         },
         {
-            name: "a frame requested and cancelled on activeWindow is moved to window together",
-            code: "const id = activeWindow.requestAnimationFrame(() => {}); activeWindow.cancelAnimationFrame(id);",
-            output: "const id = window.requestAnimationFrame(() => {}); window.cancelAnimationFrame(id);",
-            errors: [
-                { messageId: "noActiveWindowTimer", data: { name: "requestAnimationFrame" } },
-                { messageId: "noActiveWindowTimer", data: { name: "cancelAnimationFrame" } },
-            ],
-        },
-        {
             name: "cancelAnimationFrame is not rewritten to a local named window",
-            code: "export function stop(window: { id: number }) { cancelAnimationFrame(window.id); activeWindow.cancelAnimationFrame(window.id); }",
+            code: "export function stop(window: { id: number }) { cancelAnimationFrame(window.id); activeWindow.clearTimeout(window.id); }",
             output: null,
             errors: [
                 { messageId: "preferWindowTimer", data: { name: "cancelAnimationFrame" }, suggestions: [] },
-                { messageId: "noActiveWindowTimer", data: { name: "cancelAnimationFrame" } },
+                { messageId: "noActiveWindowTimer", data: { name: "clearTimeout" } },
             ],
         },
         {
@@ -828,6 +818,64 @@ globalsRuleTester.run("prefer-window-timers with the recommended config's global
             code: "activeWindow.setTimeout(() => {}, 100);",
             output: "window.setTimeout(() => {}, 100);",
             errors: [{ messageId: "noActiveWindowTimer", data: { name: "setTimeout" } }],
+        },
+    ],
+});
+
+// Emscripten output runs in a web worker or in Node as well as in a window,
+// and calls the bare timers outside its `ENVIRONMENT_IS_WORKER` checks, where
+// `window.setTimeout` would throw. From the translate plugin's
+// fasttext_wasm.js, which is not named as a worker.
+ruleTester.run("prefer-window-timers in Emscripten output", preferWindowTimersRule, {
+    valid: [],
+    invalid: [
+        {
+            name: "a bare timer in a file that reads ENVIRONMENT_IS_WORKER gets a suggestion, not a fix",
+            code: `var ENVIRONMENT_IS_WEB = typeof window == "object";
+var ENVIRONMENT_IS_WORKER = typeof importScripts == "function";
+declare const Module: Record<string, (status: string) => void>;
+function run() {
+    if (Module["setStatus"]) {
+        setTimeout(function () { Module["setStatus"](""); }, 1);
+    }
+}`,
+            output: null,
+            errors: [
+                {
+                    messageId: "preferWindowTimer",
+                    suggestions: [
+                        {
+                            messageId: "useWindowTimer",
+                            output: `var ENVIRONMENT_IS_WEB = typeof window == "object";
+var ENVIRONMENT_IS_WORKER = typeof importScripts == "function";
+declare const Module: Record<string, (status: string) => void>;
+function run() {
+    if (Module["setStatus"]) {
+        window.setTimeout(function () { Module["setStatus"](""); }, 1);
+    }
+}`,
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "activeWindow.setTimeout in a file that reads ENVIRONMENT_IS_NODE gets a suggestion, not a fix",
+            code: `declare const ENVIRONMENT_IS_NODE: boolean;
+activeWindow.setTimeout(() => {}, 1);`,
+            output: null,
+            errors: [
+                {
+                    messageId: "noActiveWindowTimer",
+                    suggestions: [
+                        {
+                            messageId: "useWindowTimer",
+                            output: `declare const ENVIRONMENT_IS_NODE: boolean;
+window.setTimeout(() => {}, 1);`,
+                        },
+                    ],
+                },
+            ],
         },
     ],
 });

@@ -15,7 +15,8 @@ A call to `setTimeout`, `setInterval`, `clearTimeout`, `clearInterval`, `request
 
 - called bare, as the global function. The fix prefixes `window.`
 - called on `activeWindow`, which may be a popout window that the user closes, taking its timers with
-  it. The fix replaces `activeWindow` with `window`
+  it. The fix replaces `activeWindow` with `window`. Not `activeWindow.requestAnimationFrame()` and
+  `activeWindow.cancelAnimationFrame()`; see below
 
 ```ts
 setTimeout(save, 1000); // reported, fixed to window.setTimeout(save, 1000)
@@ -36,6 +37,17 @@ change with it:
 - `requestAnimationFrame()` and `cancelAnimationFrame()` are DOM functions either way and are always
   fixed.
 - Calls on `activeWindow` are fixed: both are a `Window`.
+
+`activeWindow.requestAnimationFrame()` and `activeWindow.cancelAnimationFrame()` are not reported. A
+frame callback runs when its own window paints, and a closed popout has nothing left to paint. The
+main window's stop while it is hidden or minimized (Obsidian leaves Electron's background
+throttling on), so `window.requestAnimationFrame()` would hold up a popout's callback until the user
+shows the main window again. A frame ID belongs to the window that gave it, so the cancel stays on
+`activeWindow` as well.
+
+The same throttling applies to the other timers: on a hidden or minimized main window,
+`window.setTimeout()` waits at least about a second. A short debounce in a popout may be slower
+while the main window is minimized.
 
 ```ts
 this.timer = setTimeout(save, 1000); // reported, suggestion only: timer may be a NodeJS.Timeout
@@ -107,13 +119,19 @@ if (settings.enabled) { setTimeout(fn, 0); } // fixed
 ```
 
 A `const` in the same file set to one check, as in `const isBrowser = typeof window !== "undefined";`,
-is followed instead. Code that still runs without
+is followed instead.
+
+A file that reads `ENVIRONMENT_IS_WORKER` or `ENVIRONMENT_IS_NODE` is taken as Emscripten output,
+which also runs in a web worker or in Node and calls the timers outside those checks: every call in
+it gets a suggestion instead of a fix.
+
+Code that still runs without
 a window where none of this shows can be fixed, so keep it in a web worker or test file, where the
 recommended config switches this rule off, or disable the rule for it.
 
 ## Web workers and tests
 
 A web worker has no `window`, so `globalThis` and the bare timer functions are correct there. The
-recommended config switches this rule off for files matching `**/*.worker.*` and anything under a
-`workers/` directory, and for test files; see [Web worker files](../configuration.md#web-worker-files)
+recommended config switches this rule off for files matching `**/*.worker.*`, `**/*-worker.*` or
+`**/*_worker.*` and anything under a `workers/` directory, and for test files; see [Web worker files](../configuration.md#web-worker-files)
 and [Test files](../configuration.md#test-files).
