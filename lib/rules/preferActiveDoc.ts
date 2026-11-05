@@ -24,6 +24,13 @@ const ACTIVE_DOCUMENT_SINCE = "0.15.0";
 // object, and a CommonJS module's exports.
 const GLOBAL_OBJECTS = new Set(["window", "globalThis", "global", "self", "activeWindow", "module", "exports"]);
 const EQUALITY_OPERATORS = new Set(["===", "!==", "==", "!="]);
+// The calls that attach a listener to their target: `target.addEventListener()`
+// and its removal, and Obsidian's `registerDomEvent(target, …)`.
+const LISTENER_METHODS = new Set(["addEventListener", "removeEventListener"]);
+const REGISTER_DOM_EVENT = "registerDomEvent";
+// The globals a listener can be registered on whose events come from the main
+// window, so that `document` in the listener is that window's document.
+const MAIN_WINDOW_TARGETS = new Set(["document", "window"]);
 // The scopes whose variables live as long as the plugin: the module, the
 // script, and a `namespace`.
 const MODULE_SCOPES = new Set<string>(["module", "global", "tsModule"]);
@@ -169,6 +176,14 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
                     return;
                 }
 
+                // In a listener on the main window, `document.visibilityState`
+                // or `document.querySelector()` reads the document of the window
+                // whose event it handles: correct as written. The registration
+                // itself is reported (see isListenerTarget).
+                if (isInMainWindowListener(node)) {
+                    return;
+                }
+
                 // Leave `document.createElement("p")` and the other calls
                 // prefer-create-el reports to it: its createEl("p") drops
                 // `document`, while activeDocument.createElement("p") would
@@ -232,7 +247,179 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
             if (mayRunOutsideObsidianAt(context, node)) {
                 return false;
             }
-            return !isComparedOrStored(node);
+            return !isComparedOrStored(node) && !isListenerTarget(node);
+        }
+
+        // `node` under casts and `!`, as the value it stands for.
+        function outerValue(node: TSESTree.Node): TSESTree.Node {
+            let value = node;
+            while (
+                value.parent &&
+                (value.parent.type === TSESTree.AST_NODE_TYPES.TSAsExpression ||
+                    value.parent.type === TSESTree.AST_NODE_TYPES.TSNonNullExpression ||
+                    value.parent.type === TSESTree.AST_NODE_TYPES.TSSatisfiesExpression ||
+                    value.parent.type === TSESTree.AST_NODE_TYPES.TSTypeAssertion)
+            ) {
+                value = value.parent;
+            }
+            return value;
+        }
+
+        // The call that makes `value` a listener's target, if any:
+        // `value.addEventListener(…)`, `value.removeEventListener(…)` or
+        // `registerDomEvent(value, …)`, also as a method (`this.registerDomEvent`).
+        function listenerCallOn(node: TSESTree.Node): TSESTree.CallExpression | null {
+            const value = outerValue(node);
+            const parent = value.parent;
+            if (
+                parent?.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
+                parent.object === value &&
+                !parent.computed &&
+                parent.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
+                LISTENER_METHODS.has(parent.property.name) &&
+                parent.parent.type === TSESTree.AST_NODE_TYPES.CallExpression &&
+                parent.parent.callee === parent
+            ) {
+                return parent.parent;
+            }
+            if (parent?.type === TSESTree.AST_NODE_TYPES.CallExpression && parent.arguments[0] === value) {
+                const callee = parent.callee;
+                const name =
+                    callee.type === TSESTree.AST_NODE_TYPES.Identifier
+                        ? callee.name
+                        : callee.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
+                            !callee.computed &&
+                            callee.property.type === TSESTree.AST_NODE_TYPES.Identifier
+                          ? callee.property.name
+                          : undefined;
+                if (name === REGISTER_DOM_EVENT) {
+                    return parent;
+                }
+            }
+            return null;
+        }
+
+        // Whether the document is a listener's target, directly or through a
+        // local variable: `this.registerDomEvent(document, "keydown", …)`,
+        // `document.removeEventListener(…)`, or `const doc = document;` then
+        // `doc.addEventListener(…)`. The listener stays on that document for as
+        // long as it lives, and a removal has to name the document it was added
+        // to; `activeDocument` would pick whichever window had focus.
+        function isListenerTarget(node: TSESTree.Identifier): boolean {
+            if (listenerCallOn(node)) {
+                return true;
+            }
+            const value = outerValue(node);
+            const declarator = value.parent;
+            if (
+                declarator?.type !== TSESTree.AST_NODE_TYPES.VariableDeclarator ||
+                declarator.init !== value ||
+                declarator.id.type !== TSESTree.AST_NODE_TYPES.Identifier
+            ) {
+                return false;
+            }
+            return context.sourceCode
+                .getDeclaredVariables(declarator)
+                .some((variable) => variable.references.some((reference) =>
+                    !reference.init && listenerCallOn(reference.identifier) !== null));
+        }
+
+        // Whether `node` is in a listener registered on the main window's
+        // `document` or `window`, given inline: `this.registerDomEvent(document,
+        // "visibilitychange", () => { … document.visibilityState … })` or
+        // `window.addEventListener("keydown", (e) => { … })`.
+        function isInMainWindowListener(node: TSESTree.Node): boolean {
+            for (let current = node.parent; current; current = current.parent) {
+                if (
+                    current.type !== TSESTree.AST_NODE_TYPES.ArrowFunctionExpression &&
+                    current.type !== TSESTree.AST_NODE_TYPES.FunctionExpression
+                ) {
+                    continue;
+                }
+                const call = current.parent;
+                if (call?.type === TSESTree.AST_NODE_TYPES.CallExpression && call.arguments.includes(current)) {
+                    if (mainWindowTargetOf(call) !== null) {
+                        return true;
+                    }
+                    continue;
+                }
+                if (isMainWindowListenerOnly(current)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // Whether `fn`, declared as `const onKey = (e) => { … }`, is only ever
+        // added or removed as a listener on the main window's `document` or
+        // `window`. Passed anywhere else, also to a pop-out's window, or
+        // called, it may run for another window's events.
+        function isMainWindowListenerOnly(
+            fn: TSESTree.ArrowFunctionExpression | TSESTree.FunctionExpression,
+        ): boolean {
+            const declarator = fn.parent;
+            if (
+                declarator?.type !== TSESTree.AST_NODE_TYPES.VariableDeclarator ||
+                declarator.init !== fn ||
+                declarator.id.type !== TSESTree.AST_NODE_TYPES.Identifier
+            ) {
+                return false;
+            }
+            const references = context.sourceCode
+                .getDeclaredVariables(declarator)
+                .flatMap((variable) => variable.references)
+                .filter((reference) => !reference.init);
+            return (
+                references.length > 0 &&
+                references.every((reference) => {
+                    const identifier = reference.identifier;
+                    const call = identifier.parent;
+                    return (
+                        identifier.type === TSESTree.AST_NODE_TYPES.Identifier &&
+                        call?.type === TSESTree.AST_NODE_TYPES.CallExpression &&
+                        call.arguments.includes(identifier) &&
+                        mainWindowTargetOf(call, true) !== null
+                    );
+                })
+            );
+        }
+
+        // The global `document` or `window` that `call` registers a listener
+        // on, if it does; with `orRemoval`, also one it removes a listener from.
+        function mainWindowTargetOf(call: TSESTree.CallExpression, orRemoval = false): TSESTree.Identifier | null {
+            let target: TSESTree.Node | undefined;
+            const callee = call.callee;
+            if (
+                callee.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
+                !callee.computed &&
+                callee.property.type === TSESTree.AST_NODE_TYPES.Identifier
+            ) {
+                if (
+                    callee.property.name === "addEventListener" ||
+                    (orRemoval && callee.property.name === "removeEventListener")
+                ) {
+                    target = callee.object;
+                } else if (callee.property.name === REGISTER_DOM_EVENT) {
+                    target = call.arguments[0];
+                }
+            } else if (callee.type === TSESTree.AST_NODE_TYPES.Identifier && callee.name === REGISTER_DOM_EVENT) {
+                target = call.arguments[0];
+            }
+            while (
+                target &&
+                (target.type === TSESTree.AST_NODE_TYPES.TSAsExpression ||
+                    target.type === TSESTree.AST_NODE_TYPES.TSNonNullExpression)
+            ) {
+                target = target.expression;
+            }
+            if (
+                target?.type !== TSESTree.AST_NODE_TYPES.Identifier ||
+                !MAIN_WINDOW_TARGETS.has(target.name) ||
+                hasLocalBinding(context.sourceCode.getScope(target), target.name)
+            ) {
+                return null;
+            }
+            return target;
         }
 
         // The reference `node` makes, from the scope it is in. Each scope's

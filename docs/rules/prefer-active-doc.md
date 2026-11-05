@@ -42,7 +42,21 @@ const { document } = hit;
 
 // Environment checks
 if (typeof document === "undefined") { /* in a worker */ }
+
+// In a listener on the main window's `document` or `window`, which handles that
+// window's events, so its `document` is the right one (the registration is reported)
+this.registerDomEvent(document, "visibilitychange", () => {
+  if (document.visibilityState === "visible") refresh();
+});
+window.addEventListener("keydown", () => { if (document.querySelector(".modal")) return; });
 ```
+
+A listener given inline to `registerDomEvent(document, …)`, `registerDomEvent(window, …)`,
+`document.addEventListener()` or `window.addEventListener()` on the global `document` or `window`
+is left alone, at any depth, and so is one declared as `const onKey = (e) => { … }` that is only
+ever added to or removed from them. A listener on `activeWindow`, on an element or on another
+window, one also registered on a pop-out's window, or one the code also calls, still has its
+`document` reported.
 
 Only the bare global `document` is reported; `window.document` and
 `globalThis.document` are not. Runtime code inside a plain `namespace` is still
@@ -114,6 +128,11 @@ Nothing is offered where `activeDocument` would not exist, or would not be what 
   on. A browser or a DOM emulation such as jsdom has a `document` but no `activeDocument`;
 - the document itself compared, as in `e.target === document`, `el.ownerDocument !== document` or
   `case document:`;
+- the document a listener is attached to or removed from: `registerDomEvent(document, …)`,
+  `document.addEventListener()` or `document.removeEventListener()`, also through a local
+  variable (`const doc = document; doc.addEventListener(…)`). The listener stays on that document,
+  and a removal has to name the one it was added to; for popout windows, register the listener on
+  each window instead, for example from `workspace.on("window-open", …)`;
 - the document kept for later: in a variable of the module (`const doc = document;` at the top
   level, or assigned to one), in a property of the global object (`window.doc = document`) or of
   `module.exports`, as the default export or in a `static` field. `activeDocument` there keeps whichever document had focus

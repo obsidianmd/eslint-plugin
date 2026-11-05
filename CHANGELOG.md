@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `prefer-active-doc` no longer reports `document` in a listener on the main window's `document` or `window`, such as `this.registerDomEvent(document, "visibilitychange", () => document.visibilityState …)` or a `const` handler only ever added to and removed from `window`, where it is the document of the window whose event is handled. It offers no suggestion where `document` is a listener's target, as in `registerDomEvent(document, …)` or `document.removeEventListener()`: `activeDocument` there attached the listener to whichever window had focus, and a removal could name another document than the addition ([#239](https://github.com/obsidianmd/eslint-plugin/pull/239)).
+
 ### Documentation
 
 - Upgrading to 0.5.0 and Common errors: a block of rule overrides without `files` now also reaches `manifest.json` and `LICENSE`, where the `@typescript-eslint` and `import` plugins are not registered, and fails with `could not find plugin "@typescript-eslint"`. Scope it to your source ([#238](https://github.com/obsidianmd/eslint-plugin/pull/238)).

@@ -349,13 +349,13 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
             ],
         },
         {
-            name: "document.addEventListener is forbidden",
+            name: "document.addEventListener is reported, without a suggestion",
             code: "document.addEventListener('click', handler);",
             errors: [
                 {
                     messageId: "preferActive",
                     data: { original: "document", replacement: "activeDocument" },
-                    suggestions: [{ messageId: "useActiveDocument", output: "activeDocument.addEventListener('click', handler);" }],
+                    suggestions: [],
                 },
             ],
         },
@@ -913,4 +913,77 @@ describe("prefer-active-doc where a comment turns prefer-create-el off", () => {
             ["1:(directive)", "2:obsidianmd/prefer-create-el"],
         );
     });
+});
+
+// Listeners, found in a plugin upgraded to 0.5.0. A listener stays on the
+// document it was added to, so `activeDocument` there would pick whichever
+// window had focus at the time; the registration is still reported, since it
+// only covers the main window. In a listener on the main window, `document` is
+// the document of the window whose event it handles.
+ruleTester.run("prefer-active-doc and listeners", preferActiveDocRule, {
+    valid: [
+        {
+            name: "document read in a registerDomEvent listener on window",
+            code: "declare const plugin: { registerDomEvent(t: unknown, e: string, f: () => void): void };\nexport function f() { plugin.registerDomEvent(window, 'focus', () => { if (document.visibilityState === 'visible') {} }); }",
+        },
+        {
+            name: "document read in a window keydown listener, at any depth",
+            code: "export function f() { window.addEventListener('keydown', (e) => { if (document.querySelector('.x')) return; setTimeout(() => document.body, 0); }, true); }",
+        },
+        {
+            name: "document read in a named listener only added to and removed from window",
+            code: "declare const plugin: { register(f: () => void): void };\nexport function f() { const onKey = (e: KeyboardEvent) => { if (document.querySelector('.x')) return; }; window.addEventListener('keydown', onKey, true); plugin.register(() => window.removeEventListener('keydown', onKey, true)); }",
+        },
+        {
+            name: "document read in a function-expression listener on window",
+            code: "export function f() { window.addEventListener('visibilitychange', function () { return document.hidden; }); }",
+        },
+    ],
+    invalid: [
+        {
+            name: "registerDomEvent on document is reported without a suggestion, and the listener's own read is not reported",
+            code: "declare const plugin: { registerDomEvent(t: unknown, e: string, f: () => void): void };\nexport function f() { plugin.registerDomEvent(document, 'visibilitychange', () => { if (document.visibilityState === 'visible') {} }); }",
+            errors: [{ messageId: "preferActive", line: 2, column: 47, suggestions: [] }],
+        },
+        {
+            name: "removeEventListener on document is reported without a suggestion",
+            code: "declare const handler: () => void;\nexport function f() { document.removeEventListener('visibilitychange', handler); }",
+            errors: [{ messageId: "preferActive", suggestions: [] }],
+        },
+        {
+            name: "a local variable that a listener is added to gets no suggestion",
+            code: "declare const handler: () => void;\nexport function f() { const doc = document; doc.body.addClass('x'); doc.addEventListener('visibilitychange', handler); }",
+            errors: [{ messageId: "preferActive", suggestions: [] }],
+        },
+        {
+            name: "a local variable used only to read gets the suggestion",
+            code: "export function f() { const doc = document; return doc.body; }",
+            errors: [{ messageId: "preferActive", suggestions: [{ messageId: "useActiveDocument", output: "export function f() { const doc = activeDocument; return doc.body; }" }] }],
+        },
+        {
+            name: "document read in a named listener also added to a pop-out's window is reported",
+            code: "declare const win: Window;\nexport function f() { const onKey = () => document.body; window.addEventListener('keydown', onKey); win.addEventListener('keydown', onKey); }",
+            errors: [{ messageId: "preferActive", suggestions: [{ messageId: "useActiveDocument", output: "declare const win: Window;\nexport function f() { const onKey = () => activeDocument.body; window.addEventListener('keydown', onKey); win.addEventListener('keydown', onKey); }" }] }],
+        },
+        {
+            name: "document read in a named listener that is also called is reported",
+            code: "export function f() { const onKey = () => document.body; window.addEventListener('keydown', onKey); onKey(); }",
+            errors: [{ messageId: "preferActive", suggestions: [{ messageId: "useActiveDocument", output: "export function f() { const onKey = () => activeDocument.body; window.addEventListener('keydown', onKey); onKey(); }" }] }],
+        },
+        {
+            name: "document read in a listener on activeWindow is reported: the listener follows focus, document does not",
+            code: "export function f() { activeWindow.addEventListener('keydown', () => document.body); }",
+            errors: [{ messageId: "preferActive", suggestions: [{ messageId: "useActiveDocument", output: "export function f() { activeWindow.addEventListener('keydown', () => activeDocument.body); }" }] }],
+        },
+        {
+            name: "document read in a listener on a local window is reported",
+            code: "export function f(window: Window) { window.addEventListener('keydown', () => document.body); }",
+            errors: [{ messageId: "preferActive", suggestions: [{ messageId: "useActiveDocument", output: "export function f(window: Window) { window.addEventListener('keydown', () => activeDocument.body); }" }] }],
+        },
+        {
+            name: "document read in an element's listener is reported",
+            code: "export function f(el: HTMLElement) { el.addEventListener('click', () => document.body); }",
+            errors: [{ messageId: "preferActive", suggestions: [{ messageId: "useActiveDocument", output: "export function f(el: HTMLElement) { el.addEventListener('click', () => activeDocument.body); }" }] }],
+        },
+    ],
 });
