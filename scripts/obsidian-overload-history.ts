@@ -178,7 +178,9 @@ function main(): void {
         console.log("| :-- | :-- | :-- | :-- | :-- |");
         for (const { member, key, since, firstPublished } of rows) {
             const required = since && firstPublished && valid(since) && lt(firstPublished, since) ? firstPublished : since;
-            console.log(`| ${member} | \`${key.replace(/\|/g, "\\|")}\` | ${since ?? "none"} | ${firstPublished ?? "not found"} | ${required ?? "none"} |`);
+            // Backslashes first, so the one put before a | is not escaped again.
+            const cell = key.replace(/\\/g, "\\\\").replace(/\|/g, "\\|");
+            console.log(`| ${member} | \`${cell}\` | ${since ?? "none"} | ${firstPublished ?? "not found"} | ${required ?? "none"} |`);
         }
     }
 }
