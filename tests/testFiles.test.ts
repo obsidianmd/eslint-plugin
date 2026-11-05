@@ -270,9 +270,10 @@ describe("linting a test file", () => {
 			const [result] = await eslint.lintText("eval(\"1\");\nexport const f = new Function(\"return 1\");\n", { filePath });
 			assert.deepStrictEqual(
 				result.messages.filter((message) => message.ruleId === "no-eval" || message.ruleId === "obsidianmd/rule-custom-message")
-					.map((message) => `${message.line}: ${message.message}`),
+					// no-eval's own wording differs between ESLint 9 and 10, so only its rule is compared.
+					.map((message) => `${message.line}: ${message.ruleId === "no-eval" ? "no-eval" : message.message}`),
 				[
-					"1: eval can be harmful.",
+					"1: no-eval",
 					"2: [no-new-func] Using the `Function` constructor is dangerous because it executes arbitrary code, similar to `eval()`",
 				],
 				filePath,
