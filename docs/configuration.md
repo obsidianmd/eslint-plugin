@@ -624,9 +624,11 @@ A few of these are worth knowing in advance:
 
 - Test files are exempt from `prefer-active-doc` and the other rules about code that runs in
   Obsidian (see [Test files](#test-files)), so its findings come from your plugin's own code.
-- A published plugin id that contains "obsidian" cannot change. Accept it with
-  `"obsidianmd/validate-manifest": ["warn", { allowedWords: { id: ["obsidian"] } }]` in a block with
-  `files: ["manifest.json"]` (see [`validate-manifest`](rules/validate-manifest.md)).
+- A published plugin id cannot change. In 0.5.0, `validate-manifest` reported an id that contains
+  "obsidian" or ends with "plugin", which you could accept with
+  `"obsidianmd/validate-manifest": ["warn", { allowedWords: { id: ["obsidian"] } }]`. From 0.5.1 the
+  id is checked only with `checkId: true`, for a plugin not yet published, so the `allowedWords`
+  entry for the `id` can go (see [`validate-manifest`](rules/validate-manifest.md)).
 - `no-static-styles-assignment`, an `error`, now checks `setCssStyles()` and `setCssProps()` with
   unquoted keys as well, such as `el.setCssStyles({ color: "red" })`. In a run over the community
   plugins this was the largest new source of errors: the plugins it reports went from 775 to 1,946.
