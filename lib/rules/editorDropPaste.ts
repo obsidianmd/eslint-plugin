@@ -3,6 +3,20 @@ import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 const EVENTS = new Set(["editor-drop", "editor-paste"]);
 
+// Editor methods that change the document. A handler that calls one of them
+// on its editor parameter inserts the content itself, so it must stop
+// Obsidian's own insertion. `dispatch` is CodeMirror's, reached through
+// `editor.cm`.
+const EDITOR_WRITES = new Set([
+    "replaceSelection",
+    "replaceRange",
+    "setValue",
+    "setLine",
+    "processLines",
+    "transaction",
+    "dispatch",
+]);
+
 export default ruleCreator({
     meta: {
         type: "problem" as const,
@@ -44,7 +58,25 @@ export default ruleCreator({
                     return;
                 }
 
-                const { readsDefaultPrevented, callsPreventDefault } = findEventUses(callback, evtParam, body);
+                const { readsDefaultPrevented, callsPreventDefault, passesEvent } = findEventUses(
+                    callback,
+                    evtParam,
+                    body,
+                );
+
+                // The event is handed to another function, which may check or
+                // cancel it: that cannot be seen here.
+                if (passesEvent) {
+                    return;
+                }
+
+                // A handler that neither cancels the event nor writes to its
+                // editor only observes the paste or drop and lets Obsidian
+                // insert it. preventDefault() would cancel that insertion.
+                const writesToEditor = handlerWritesToEditor(callback, body);
+                if (!callsPreventDefault && !writesToEditor) {
+                    return;
+                }
 
                 if (!readsDefaultPrevented) {
                     context.report({
@@ -105,18 +137,11 @@ export default ruleCreator({
             callback: TSESTree.ArrowFunctionExpression | TSESTree.FunctionExpression,
             evtParam: TSESTree.Identifier,
             body: TSESTree.BlockStatement,
-        ): { readsDefaultPrevented: boolean; callsPreventDefault: boolean } {
+        ): { readsDefaultPrevented: boolean; callsPreventDefault: boolean; passesEvent: boolean } {
             let readsDefaultPrevented = false;
             let callsPreventDefault = false;
-            const variable = context.sourceCode
-                .getDeclaredVariables(callback)
-                .find((v) => v.identifiers.includes(evtParam));
-            for (const reference of variable?.references ?? []) {
-                const identifier = reference.identifier;
-                // Only the body, not a default value of a later parameter.
-                if (identifier.range[0] < body.range[0] || identifier.range[1] > body.range[1]) {
-                    continue;
-                }
+            let passesEvent = false;
+            for (const identifier of bodyReferences(callback, evtParam, body)) {
                 // `evt!`, `evt as ClipboardEvent` and `<ClipboardEvent>evt` are the event too.
                 const target = skipTypeAssertions(identifier);
                 const parent = target.parent;
@@ -136,9 +161,67 @@ export default ruleCreator({
                     }
                 } else if (destructuresDefaultPrevented(parent, target)) {
                     readsDefaultPrevented = true;
+                } else if (
+                    (parent.type === TSESTree.AST_NODE_TYPES.CallExpression ||
+                        parent.type === TSESTree.AST_NODE_TYPES.NewExpression) &&
+                    parent.arguments.includes(target as TSESTree.CallExpressionArgument)
+                ) {
+                    passesEvent = true;
                 }
             }
-            return { readsDefaultPrevented, callsPreventDefault };
+            return { readsDefaultPrevented, callsPreventDefault, passesEvent };
+        }
+
+        // The references to a parameter inside the handler's body, from scope
+        // analysis, so a variable of the same name declared inside the handler
+        // does not count. A default value of a later parameter is not the body.
+        function bodyReferences(
+            callback: TSESTree.ArrowFunctionExpression | TSESTree.FunctionExpression,
+            param: TSESTree.Identifier,
+            body: TSESTree.BlockStatement,
+        ): TSESTree.Identifier[] {
+            const variable = context.sourceCode
+                .getDeclaredVariables(callback)
+                .find((v) => v.identifiers.includes(param));
+            return (variable?.references ?? [])
+                .map((reference) => reference.identifier)
+                .filter((identifier): identifier is TSESTree.Identifier =>
+                    identifier.type === TSESTree.AST_NODE_TYPES.Identifier &&
+                    identifier.range[0] >= body.range[0] &&
+                    identifier.range[1] <= body.range[1],
+                );
+        }
+
+        // Whether the handler calls a method that changes the document on its
+        // second parameter, the editor: `editor.replaceSelection(…)`,
+        // `editor.transaction(…)` or `editor.cm.dispatch(…)`, also with
+        // optional chaining or a type assertion.
+        function handlerWritesToEditor(
+            callback: TSESTree.ArrowFunctionExpression | TSESTree.FunctionExpression,
+            body: TSESTree.BlockStatement,
+        ): boolean {
+            const editorParam = callback.params[1];
+            if (editorParam?.type !== TSESTree.AST_NODE_TYPES.Identifier) {
+                return false;
+            }
+            return bodyReferences(callback, editorParam, body).some((identifier) => {
+                let current = skipTypeAssertions(identifier);
+                while (
+                    current.parent?.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
+                    current.parent.object === current
+                ) {
+                    const member = current.parent;
+                    const call = member.parent;
+                    if (
+                        call.type === TSESTree.AST_NODE_TYPES.CallExpression &&
+                        call.callee === member
+                    ) {
+                        return EDITOR_WRITES.has(memberPropertyName(member) ?? "");
+                    }
+                    current = skipTypeAssertions(member);
+                }
+                return false;
+            });
         }
 
         function skipTypeAssertions(node: TSESTree.Node): TSESTree.Node {
