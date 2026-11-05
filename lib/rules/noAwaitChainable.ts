@@ -1,9 +1,6 @@
 import { ESLintUtils, TSESTree } from "@typescript-eslint/utils";
-import ts from "typescript";
+import { isObsidianChainingThen } from "../obsidianChaining.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
-
-// Classes whose `then(cb)` calls `cb(this)` and returns `this`, for chaining.
-const CHAINABLE_CLASSES = new Set(["Setting", "BaseComponent"]);
 
 type FunctionNode =
     | TSESTree.ArrowFunctionExpression
@@ -33,12 +30,9 @@ export default ruleCreator({
         function getChainableClass(node: TSESTree.Node): string | undefined {
             const type = services.getTypeAtLocation(node);
             for (const part of type.isUnion() ? type.types : [type]) {
-                const declarations = part.getProperty("then")?.getDeclarations() ?? [];
-                for (const declaration of declarations) {
-                    const parent = declaration.parent;
-                    if (ts.isClassLike(parent) && parent.name && CHAINABLE_CLASSES.has(parent.name.text)) {
-                        return part.getSymbol()?.name ?? parent.name.text;
-                    }
+                const then = part.getProperty("then");
+                if (then && isObsidianChainingThen(then)) {
+                    return part.getSymbol()?.name ?? services.program.getTypeChecker().typeToString(part);
                 }
             }
             return undefined;

@@ -4,18 +4,7 @@ import noAwaitChainableRule from "../lib/rules/noAwaitChainable.js";
 const ruleTester = new RuleTester();
 
 const MOCK_OBSIDIAN = `
-    declare abstract class BaseComponent {
-        then(cb: (component: this) => any): this;
-    }
-    declare class ButtonComponent extends BaseComponent {
-        setButtonText(name: string): this;
-    }
-    declare class Setting {
-        constructor(containerEl: HTMLElement);
-        setName(name: string): this;
-        addButton(cb: (component: ButtonComponent) => any): this;
-        then(cb: (setting: this) => any): this;
-    }
+    import { ButtonComponent, Setting } from "obsidian";
     declare const containerEl: HTMLElement;
 `;
 
@@ -50,6 +39,19 @@ ruleTester.run("no-await-chainable", noAwaitChainableRule, {
                 }
                 async function run() {
                     await new Deferred();
+                }
+            `,
+        },
+        {
+            name: "awaiting a class of the same name declared outside obsidian is allowed",
+            code: `
+                class Setting {
+                    then(resolve: (value: number) => void) {
+                        resolve(1);
+                    }
+                }
+                async function run() {
+                    await new Setting();
                 }
             `,
         },
