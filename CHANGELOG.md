@@ -179,6 +179,7 @@ rules that only reported, `prefer-active-doc` among them, now offer one.
 
 ### Documentation
 
+- Plugins written in JavaScript: why the TypeScript `parserOptions` block fails on them, the config without it, and how to turn the type-aware rules on with a `jsconfig.json`. Upgrading to 0.5.0 covers the sample plugin's config, the rules that add the most new errors, and the ESLint 10 install, and a new Known issues section lists what is not fixed in 0.5.0, including TypeScript 7, which `typescript-eslint` cannot use yet, and TypeScript 6's empty default `types` ([#230](https://github.com/obsidianmd/eslint-plugin/pull/230)).
 - Common errors: "Cannot redefine plugin", including the second copy of `typescript-eslint` or `@eslint/json` that Yarn 1 installs next to an exact version pin ([#227](https://github.com/obsidianmd/eslint-plugin/pull/227)).
 - `rule-custom-message`: with pnpm, add `@typescript-eslint/eslint-plugin` to your devDependencies before importing it ([#227](https://github.com/obsidianmd/eslint-plugin/pull/227)).
 - `prefer-window-timers` lists the window checks it and `no-global-this` recognise, and `configuration.md` says that `files` globs match by case on every system, so `License` and `Manifest.json` are not linted, also on Windows and macOS ([#227](https://github.com/obsidianmd/eslint-plugin/pull/227)).
