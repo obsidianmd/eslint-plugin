@@ -167,6 +167,10 @@ export interface DeclarationHistory {
     // Each interface, type alias and enum those shapes refer to, with the hash
     // of its meaning in each version that declares it.
     types: [string, [string, string][]][];
+    // The declarations of the latest typings without any @since that the
+    // oldest typings did not have, except members of the obsidian module's own
+    // interfaces; their shapes are in `declarations` too.
+    undated: string[];
 }
 
 export function buildDeclarationHistory(typings: Typings[]): DeclarationHistory {
@@ -178,6 +182,7 @@ export function buildDeclarationHistory(typings: Typings[]): DeclarationHistory 
     const versions = parsed.map(({ version }) => version);
     const latest = parsed[parsed.length - 1];
     const declarations: [string, [string, string][]][] = [];
+    const undated: string[] = [];
     const referenced = new Set<string>();
     for (const [name, latestShapes] of latest.shapes) {
         let since: string | undefined;
@@ -188,7 +193,17 @@ export function buildDeclarationHistory(typings: Typings[]): DeclarationHistory 
             }
         }
         const first = parsed.find((entry) => entry.shapes.has(name));
-        if (!since || !first || !lt(first.version, since)) {
+        const isUndated = latestShapes.every(({ since: raw }) => raw === undefined || !valid(raw));
+        // A member of an interface of the obsidian module, such as
+        // RequestUrlParam.url or CachedMetadata.sections, describes data the
+        // plugin or the app supplies, not an API: only dated ones count.
+        const owner = name.includes(".") ? name.slice(0, name.indexOf(".")) : undefined;
+        if (isUndated && owner !== undefined && latest.index.has(owner)) {
+            continue;
+        }
+        if (isUndated && first && first !== parsed[0]) {
+            undated.push(name);
+        } else if (!since || !first || !lt(first.version, since)) {
             continue;
         }
         const shapes = new Map<string, boolean[]>();
@@ -222,7 +237,7 @@ export function buildDeclarationHistory(typings: Typings[]): DeclarationHistory 
             types.push([name, [...hashes].map(([hash, present]) => [rangesOf(present), hash])]);
         }
     }
-    return { versions, declarations, types };
+    return { versions, declarations, types, undated };
 }
 
 export function renderDeclarationHistoryModule(history: DeclarationHistory): string {
@@ -239,6 +254,8 @@ export function renderDeclarationHistoryModule(history: DeclarationHistory): str
 // ranges into DECLARATION_HISTORY_VERSIONS. TYPE_HISTORY has the hash of each
 // interface, type alias and enum those shapes refer to, by version, so the rule
 // can tell that a name meant the same then as in the plugin's typings.
+// UNDATED_DECLARATIONS are the declarations of the ${versions[versions.length - 1]} typings without any @since
+// that the oldest typings did not have; DECLARATION_HISTORY has their shapes too.
 
 export const DECLARATION_HISTORY_VERSIONS: readonly string[] = ${JSON.stringify(versions)};
 
@@ -249,6 +266,10 @@ ${rows(history.declarations)}
 export const TYPE_HISTORY: Readonly<Record<string, readonly (readonly [versions: string, hash: string])[]>> = {
 ${rows(history.types)}
 };
+
+export const UNDATED_DECLARATIONS: readonly string[] = [
+${history.undated.map((name) => `    ${JSON.stringify(name)},`).join("\n")}
+];
 `;
 }
 
@@ -310,7 +331,7 @@ function main(): void {
     const declarations = buildDeclarationHistory(typings);
     const declarationsOut = fileURLToPath(new URL("../lib/rules/obsidianDeclarationHistory.ts", import.meta.url));
     fs.writeFileSync(declarationsOut, renderDeclarationHistoryModule(declarations));
-    console.log(`Wrote ${path.relative(process.cwd(), declarationsOut)}: ${declarations.declarations.length} declarations, ${declarations.types.length} types.`);
+    console.log(`Wrote ${path.relative(process.cwd(), declarationsOut)}: ${declarations.declarations.length} declarations (${declarations.undated.length} without @since), ${declarations.types.length} types.`);
     if (args.includes("--report")) {
         console.log("\n| Member | Overload | @since | First published | Required |");
         console.log("| :-- | :-- | :-- | :-- | :-- |");

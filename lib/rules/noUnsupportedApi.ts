@@ -8,7 +8,12 @@ import ts from "typescript";
 import { getManifest } from "../manifest.js";
 import { toVersion } from "../minAppVersion.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
-import { DECLARATION_HISTORY, DECLARATION_HISTORY_VERSIONS, TYPE_HISTORY } from "./obsidianDeclarationHistory.js";
+import {
+    DECLARATION_HISTORY,
+    DECLARATION_HISTORY_VERSIONS,
+    TYPE_HISTORY,
+    UNDATED_DECLARATIONS,
+} from "./obsidianDeclarationHistory.js";
 import {
     classShape,
     indexTypeDeclarations,
@@ -156,6 +161,17 @@ export default ruleCreator<Options, "apiNotAvailable">({
             // `const Suggest = class extends AbstractInputSuggest<string> {}`
             ClassExpression: checkSuperClass,
 
+            // A global or module variable without @since, such as activeDocument.
+            Identifier(node: TSESTree.Identifier) {
+                if (!UNDATED_VARIABLES.has(node.name) || !isValueReference(node)) {
+                    return;
+                }
+                const symbol = checker.getSymbolAtLocation(services.esTreeNodeToTSNodeMap.get(node));
+                if (symbol && resolveSymbol(symbol).getDeclarations()?.every(ts.isVariableDeclaration)) {
+                    checkSymbol(node, symbol);
+                }
+            },
+
             CallExpression(node: TSESTree.CallExpression) {
                 if (node.callee.type !== AST_NODE_TYPES.Identifier) {
                     return;
@@ -222,7 +238,9 @@ export default ruleCreator<Options, "apiNotAvailable">({
 
             for (const [qualifiedName, overloads] of members) {
                 const entry = sinceMap.get(qualifiedName);
-                const required = entry && requiredVersion(qualifiedName, entry, overloads, call);
+                const required = entry
+                    ? requiredVersion(qualifiedName, entry, overloads, call)
+                    : undatedVersion(node, qualifiedName, declarations, overloads, call);
                 let sinceVersion = required?.version;
 
                 if (!required || !sinceVersion) {
@@ -276,6 +294,53 @@ export default ruleCreator<Options, "apiNotAvailable">({
                     return;
                 }
             }
+        }
+
+        // The version a use of a declaration without @since needs: the first
+        // published typings from which on every release declared it in a form
+        // the use fits, or else declared it at all. Only for the declarations
+        // the history lists (see UNDATED_DECLARATIONS), that obsidian.d.ts
+        // alone declares: a member that lib.dom or the plugin declares too,
+        // such as a plugin's own `innerWidth` on a union, exists anyway. A
+        // member of an interface only obsidian.d.ts declares, such as
+        // DomElementInfo.placeholder, is the plugin's own option, and a write
+        // to a property, such as `this.navigation = true`, works on any release.
+        function undatedVersion(
+            node: TSESTree.Node,
+            qualifiedName: QualifiedName,
+            declarations: ts.Declaration[],
+            overloads: ts.Declaration[],
+            call: TSESTree.CallExpression | undefined,
+        ): { version: Version | undefined; called: ts.Declaration | undefined } | undefined {
+            if (
+                !UNDATED_NAMES.has(qualifiedName) ||
+                !declarations.every(isObsidianDeclaration) ||
+                !overloads.every(isCheckedUndated) ||
+                isPropertyWrite(node, overloads)
+            ) {
+                return undefined;
+            }
+            const called = call ? resolvedOverload(call, overloads) : undefined;
+            const used = called ? [called] : overloads;
+            const version =
+                history.firstDeclared(qualifiedName, (shape, at) => fitsShape(shape, at, used, called && call)) ??
+                history.firstDeclared(qualifiedName, () => true);
+            return { version, called };
+        }
+
+        // A declaration of a class, a function, a variable, or a member of a
+        // class or of a lib.dom type obsidian.d.ts adds to, such as
+        // HTMLElement.setCssProps or Array.unique.
+        function isCheckedUndated(declaration: ts.Declaration): boolean {
+            const parent = declaration.parent;
+            if (ts.isClassDeclaration(parent)) {
+                return true;
+            }
+            if (!ts.isInterfaceDeclaration(parent)) {
+                return true;
+            }
+            const owner = checker.getSymbolAtLocation(parent.name);
+            return owner?.getDeclarations()?.some((other) => !isObsidianDeclaration(other)) ?? false;
         }
 
         // Whether a use of one of `declarations` fits a shape an older
@@ -351,7 +416,11 @@ export default ruleCreator<Options, "apiNotAvailable">({
                     return false;
                 }
             }
-            return same(old.type, declaration.type) || isResultUnused(call);
+            return (
+                same(old.type, declaration.type) ||
+                isResultUnused(call) ||
+                awaitedResultFits(old.type, call, at, sourceFile)
+            );
         }
 
         // Whether a function the plugin passes for a parameter typed `is`, which
@@ -533,6 +602,40 @@ export default ruleCreator<Options, "apiNotAvailable">({
                 return !was && !is;
             }
             return normalize(was) === normalize(is) && history.sameTypes(was, at, sourceFile);
+        }
+
+        // Whether an awaited call gets what the plugin reads from the older
+        // release too: that returned a Promise of a type, declared then as in
+        // the plugin's typings, that the awaited value's type takes, as the
+        // `Promise<RequestUrlResponse>` of `requestUrl()` before 0.16.0 for
+        // `await requestUrl({ url })`.
+        function awaitedResultFits(
+            type: ts.TypeNode | undefined,
+            call: TSESTree.CallExpression,
+            at: number,
+            sourceFile: ts.SourceFile,
+        ): boolean {
+            const awaited = call.parent?.type === AST_NODE_TYPES.AwaitExpression ? call.parent : undefined;
+            const value = type && ts.isTypeReferenceNode(type) ? type.typeArguments?.[0] : undefined;
+            if (
+                !awaited ||
+                !type ||
+                !ts.isTypeReferenceNode(type) ||
+                !ts.isIdentifier(type.typeName) ||
+                type.typeName.text !== "Promise" ||
+                type.typeArguments?.length !== 1 ||
+                !value ||
+                !ts.isTypeReferenceNode(value) ||
+                !ts.isIdentifier(value.typeName) ||
+                value.typeArguments ||
+                typeof checker.isTypeAssignableTo !== "function" ||
+                !history.sameTypes(value, at, sourceFile)
+            ) {
+                return false;
+            }
+            const old = getDeclaredType(sourceFile, value.typeName.text);
+            const read = checker.getTypeAtLocation(services.esTreeNodeToTSNodeMap.get(awaited));
+            return old !== undefined && !(read.flags & ts.TypeFlags.Any) && checker.isTypeAssignableTo(old, read);
         }
 
         // Whether nothing reads what the call returns, so a release where it
@@ -1312,6 +1415,65 @@ function findTypeDeclaration(
         }
     }
     return undefined;
+}
+
+// The variables the history lists without @since, such as activeDocument
+// and apiVersion, and every declaration it lists without one.
+const UNDATED_NAMES = new Set(UNDATED_DECLARATIONS);
+const UNDATED_VARIABLES = new Set(
+    UNDATED_DECLARATIONS.filter(
+        (name) =>
+            !name.includes(".") &&
+            DECLARATION_HISTORY[name]?.every(([, shape]) => shape.startsWith(":") || shape.startsWith("?:")),
+    ),
+);
+
+// Whether an identifier reads a value: not a property name, a declaration, an
+// import or export name, or a name in a type.
+function isValueReference(node: TSESTree.Identifier): boolean {
+    const parent = node.parent;
+    switch (parent?.type) {
+        case AST_NODE_TYPES.MemberExpression:
+            return parent.object === node || parent.computed;
+        case AST_NODE_TYPES.Property:
+            return parent.value === node || parent.shorthand || (parent.computed && parent.key === node);
+        case AST_NODE_TYPES.PropertyDefinition:
+            return parent.value === node || (parent.computed && parent.key === node);
+        case AST_NODE_TYPES.MethodDefinition:
+        case AST_NODE_TYPES.TSPropertySignature:
+            return parent.computed && parent.key === node;
+        case AST_NODE_TYPES.VariableDeclarator:
+            return parent.init === node;
+        case AST_NODE_TYPES.CallExpression:
+            return parent.callee !== node;
+        case AST_NODE_TYPES.ImportSpecifier:
+        case AST_NODE_TYPES.ImportDefaultSpecifier:
+        case AST_NODE_TYPES.ImportNamespaceSpecifier:
+        case AST_NODE_TYPES.ExportSpecifier:
+        case AST_NODE_TYPES.TSTypeReference:
+        case AST_NODE_TYPES.TSTypeQuery:
+        case AST_NODE_TYPES.TSQualifiedName:
+        case AST_NODE_TYPES.FunctionDeclaration:
+        case AST_NODE_TYPES.FunctionExpression:
+        case AST_NODE_TYPES.ArrowFunctionExpression:
+        case AST_NODE_TYPES.ClassDeclaration:
+        case AST_NODE_TYPES.LabeledStatement:
+        case AST_NODE_TYPES.BreakStatement:
+        case AST_NODE_TYPES.ContinueStatement:
+            return false;
+        default:
+            return true;
+    }
+}
+
+// Whether `node` is the target of an assignment to a property, which sets it
+// whether or not the release has it.
+function isPropertyWrite(node: TSESTree.Node, declarations: ts.Declaration[]): boolean {
+    return (
+        node.parent?.type === AST_NODE_TYPES.AssignmentExpression &&
+        node.parent.left === node &&
+        declarations.every((declaration) => ts.isPropertyDeclaration(declaration) || ts.isPropertySignature(declaration))
+    );
 }
 
 // Whether `node` is only tested, which works where it is missing too: `typeof

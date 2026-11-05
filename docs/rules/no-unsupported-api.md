@@ -19,6 +19,7 @@ The uses checked are:
 
 - reading a property or calling a method, such as `this.app.renderContext`
 - calling a function or creating an instance, such as `displayTooltip()` or `new SecretComponent(app, el)`
+- reading a global or an exported variable, such as `activeDocument` or `apiVersion`
 - extending a class, such as `class MySuggest extends AbstractInputSuggest`, also in a class
   expression such as `const MySuggest = class extends AbstractInputSuggest {}`, and calling methods
   inherited from it through `super`
@@ -100,6 +101,46 @@ the table can make the rule ask for a later version than the app needed, never o
 typings show. For the same reason, a member that is in the 0.11.13 typings before its `@since` is not
 reported at all: those typings only show that the app had it by then, not since when, so a plugin
 with a lower `minAppVersion` is not told that it needs 0.11.13.
+
+### Declarations without `@since`
+
+About 600 declarations of the 1.14.4 typings have no `@since`. Those the oldest typings on npm,
+0.11.13, already declare are not reported. The others, 115 in 1.14.4, need the first published
+typings that declare them, by the same table: a use needs the first release from which on every
+release, up to your `obsidian` version, declared it in a form the use fits (as above), or else
+declared it at all. They include:
+
+| API | Needs |
+| :-- | :-- |
+| `activeWindow`, `activeDocument`, `window.activeDocument`, `HTMLElement.innerWidth` / `innerHeight` | 0.15.0 |
+| `UIEvent.targetNode`, `.win`, `.doc`, `Node.instanceOf()`, `Node.doc`, `Node.win` | 0.15.3 |
+| `createSvg()`, `el.createSvg()`, `Array.combine()` | 1.1.1 |
+| `el.setCssStyles()`, `el.setCssProps()`, `nextFrame()` | 1.2.3 |
+| `sleep()`, `DocumentFragment.find()` | 0.14.3 |
+| `Array.prototype.unique()` | 0.14.4 |
+| `apiVersion`, `requireApiVersion()` | 0.13.21 |
+| `requestUrl()` (with today's `RequestUrlParam`: 0.14.4; with a URL string: 0.16.0) | 0.13.26 |
+| `Modal.setTitle()`, `Modal.setContent()` | 1.5.7 |
+
+The first typings that declare an API are only an upper bound of when the app had it: the app may
+have had it undeclared before. Here that bound is the version reported, so a plugin that relies on
+the app having had the API earlier can be told it needs a later version than it does.
+
+Not reported, as they exist on every version or are the plugin's own:
+
+- a declaration in the 0.11.13 typings, such as `el.createDiv()` or `el.empty()`;
+- a name the plugin declares itself, such as its own `sleep()` function or a property of its own
+  type named `innerWidth`, and a member lib.dom declares too;
+- a member of an interface of the obsidian module, such as `RequestUrlParam.url` or
+  `CachedMetadata.sections`, or of a global interface only `obsidian.d.ts` declares, such as the
+  `DomElementInfo` options of `createEl()`: the plugin or the app supplies that data;
+- a write to a property, such as `this.navigation = true` in a `FileView`;
+- a use in a type, such as `typeof activeDocument`;
+- a use behind a `requireApiVersion()` check or a feature check, as described below:
+  `typeof activeDocument !== "undefined" ? activeDocument : document` or `el.setCssStyles?.(…)`.
+
+With a `minAppVersion` below 0.15.0, [`prefer-active-doc`](prefer-active-doc.md) does not report
+`document`, so the two rules do not ask for opposite changes.
 
 ## Guarding with `requireApiVersion`
 

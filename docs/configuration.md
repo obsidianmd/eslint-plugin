@@ -503,6 +503,11 @@ to expect:
   false for an element of a popout window, whose `HTMLElement` is another window's. They are never
   fixed; where it is safe, the editor suggests `e.targetNode?.instanceOf(HTMLElement)` (see
   [`prefer-instanceof`](rules/prefer-instanceof.md)).
+- **New errors from `no-unsupported-api`** for APIs without a `@since` in `obsidian.d.ts`, which
+  it now checks against the first published typings that declare them: `activeDocument` and
+  `activeWindow` need 0.15.0, `e.targetNode` and `el.instanceOf()` 0.15.3, `createSvg()` 1.1.1,
+  `el.setCssStyles()`, `el.setCssProps()` and `nextFrame()` 1.2.3. Guard them, or raise
+  `minAppVersion` (see [`no-unsupported-api`](rules/no-unsupported-api.md#declarations-without-since)).
 - **`validate-manifest` checks the `id` only with `checkId: true`.** A published plugin id cannot
   change, so an `allowedWords: { id: [...] }` entry added for 0.5.0 can go (see
   [`validate-manifest`](rules/validate-manifest.md)).

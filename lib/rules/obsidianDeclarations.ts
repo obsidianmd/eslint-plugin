@@ -17,11 +17,33 @@ import { getSinceTag } from "./obsidianOverloads.js";
 //   `class _ extends Component{constructor(_0:App);}`
 
 // The declarations that have a version: each member of each class and
-// interface, each function and each class, by qualified name.
+// interface, each function, each variable and each class, by qualified name.
 export type DeclarationShapes = Map<string, { shape: string; since: string | undefined }[]>;
 
 export function collectDeclarationShapes(sourceFile: ts.SourceFile): DeclarationShapes {
     const shapes: DeclarationShapes = new Map();
+    // Some releases declare a name under another one and export it renamed:
+    // `export const moment_2: typeof Moment; export { moment_2 as moment }`,
+    // and `Plugin_2` the same way. A declaration counts by the exported name.
+    const renamed = new Map<string, string>();
+    const collectRenames = (node: ts.Node): void => {
+        if (
+            ts.isExportDeclaration(node) &&
+            !node.moduleSpecifier &&
+            node.exportClause &&
+            ts.isNamedExports(node.exportClause)
+        ) {
+            for (const specifier of node.exportClause.elements) {
+                if (specifier.propertyName) {
+                    renamed.set(specifier.propertyName.text, specifier.name.text);
+                }
+            }
+        } else if (ts.isSourceFile(node) || ts.isModuleDeclaration(node) || ts.isModuleBlock(node)) {
+            ts.forEachChild(node, collectRenames);
+        }
+    };
+    collectRenames(sourceFile);
+    const exported = (name: string) => renamed.get(name) ?? name;
     const add = (name: string, node: ts.Node, shape: string | undefined) => {
         if (shape === undefined) {
             return;
@@ -32,7 +54,7 @@ export function collectDeclarationShapes(sourceFile: ts.SourceFile): Declaration
     };
     const visit = (node: ts.Node): void => {
         if ((ts.isClassDeclaration(node) || ts.isInterfaceDeclaration(node)) && node.name) {
-            const parent = node.name.text;
+            const parent = exported(node.name.text);
             if (ts.isClassDeclaration(node)) {
                 add(parent, node, classShape(node));
             }
@@ -42,7 +64,13 @@ export function collectDeclarationShapes(sourceFile: ts.SourceFile): Declaration
                 }
             }
         } else if (ts.isFunctionDeclaration(node) && node.name) {
-            add(node.name.text, node, signatureShape(node));
+            add(exported(node.name.text), node, signatureShape(node));
+        } else if (ts.isVariableStatement(node)) {
+            for (const declaration of node.declarationList.declarations) {
+                if (ts.isIdentifier(declaration.name)) {
+                    add(exported(declaration.name.text), declaration, `:${typeText(declaration.type)}`);
+                }
+            }
         } else if (ts.isSourceFile(node) || ts.isModuleDeclaration(node) || ts.isModuleBlock(node)) {
             ts.forEachChild(node, visit);
         }
