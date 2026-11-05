@@ -24,14 +24,59 @@ const ACTIVE_DOCUMENT_SINCE = "0.15.0";
 // object, and a CommonJS module's exports.
 const GLOBAL_OBJECTS = new Set(["window", "globalThis", "global", "self", "activeWindow", "module", "exports"]);
 const EQUALITY_OPERATORS = new Set(["===", "!==", "==", "!="]);
+// The calls that attach a listener to their target: `target.addEventListener()`
+// and its removal, and Obsidian's `registerDomEvent(target, …)`.
+// `dispatchEvent` too: an event dispatched on a document reaches the listeners
+// on that document, which stay on the main one.
+const LISTENER_METHODS = new Set(["addEventListener", "removeEventListener", "dispatchEvent"]);
+const REGISTER_DOM_EVENT = "registerDomEvent";
+// The globals a listener can be registered on whose events come from the main
+// window, so that `document` in the listener is that window's document.
+const MAIN_WINDOW_TARGETS = new Set(["document", "window"]);
 // The scopes whose variables live as long as the plugin: the module, the
 // script, and a `namespace`.
 const MODULE_SCOPES = new Set<string>(["module", "global", "tsModule"]);
 
-type MessageIds = "preferActive" | "useActiveDocument" | "useActiveDocumentSince";
+// The elements of a document whose classes, attributes, style and children
+// apply to the whole window.
+const WINDOW_ELEMENTS = new Set(["body", "documentElement", "head"]);
+// The methods that change such an element: its classes, attributes or style,
+// or the elements in it.
+const WINDOW_ELEMENT_MUTATORS = new Set([
+    "addClass", "addClasses", "removeClass", "removeClasses", "toggleClass",
+    "setAttribute", "removeAttribute", "toggleAttribute", "setAttr",
+    "setCssProps", "setCssStyles",
+    "appendChild", "append", "prepend", "insertBefore", "removeChild", "replaceChild", "replaceChildren",
+    "insertAdjacentElement", "insertAdjacentHTML", "insertAdjacentText",
+]);
+// Obsidian's helpers that create an element in `<head>`, such as a `<style>`.
+const CREATE_METHODS = new Set(["createEl", "createDiv", "createSpan", "createSvg"]);
+const CLASS_LIST_MUTATORS = new Set(["add", "remove", "toggle", "replace"]);
+const STYLE_MUTATORS = new Set(["setProperty", "removeProperty"]);
+// The calls that look an element up in a document, or in its body.
+const LOOKUP_METHODS = new Set([
+    "querySelector", "querySelectorAll", "getElementById", "getElementsByClassName", "find", "findAll",
+]);
+// The lookups of a single element, which code removes as `?.remove()`.
+const SINGLE_LOOKUP_METHODS = new Set(["querySelector", "getElementById", "find"]);
+const REMOVE_METHODS = new Set(["remove", "detach"]);
+// The classes of Obsidian's UI that only the main window has: a popout
+// window has a workspace (`app-container`, `mod-root`, its own `titlebar`),
+// but no status bar, no ribbons and no side docks.
+const MAIN_WINDOW_CLASS = /^(?:status-bar(?:-[\w-]+)?|workspace-ribbon|side-dock-[\w-]+|mod-(?:left|right)-split|mod-sidedock)$/;
+const MAIN_WINDOW_CLASS_IN_SELECTOR =
+    /\.(?:status-bar(?:-[\w-]+)?|workspace-ribbon|side-dock-[\w-]+|mod-(?:left|right)-split|mod-sidedock)(?![\w-])/;
+// The globals `activeDocument` can be read from.
+const GLOBAL_HOSTS = new Set(["window", "globalThis", "self"]);
+// The document properties that hold a document, for `[document, win.document]`.
+const DOCUMENT_PROPERTIES = new Set(["doc", "document", "ownerDocument", "activeDocument"]);
+
+type MessageIds = "preferActive" | "perWindowState" | "useActiveDocument" | "useActiveDocumentSince" | "useIsConnected";
 
 // Each scope's references by the identifier that makes them.
 const referencesByScope = new WeakMap<object, Map<TSESTree.Node, TSESLint.Scope.Reference>>();
+// Each function by whether it compares a document with the global `document`.
+const comparesDocument = new WeakMap<TSESTree.Node, boolean>();
 
 export default ruleCreator<MinAppVersionOptions, MessageIds>({
     meta: {
@@ -47,9 +92,13 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
         messages: {
             preferActive:
                 "Use '{{replacement}}' instead of '{{original}}' for popout window compatibility.",
+            perWindowState:
+                "'document.{{element}}' is the main window's, so this change does not reach popout windows. Make it, and undo it, in each window's document, for example from `workspace.on(\"window-open\")`.",
             useActiveDocument: "Replace with `activeDocument`, the document of the window that has focus.",
             useActiveDocumentSince:
                 "Replace with `activeDocument`, the document of the window that has focus (needs Obsidian {{since}} or later).",
+            useIsConnected:
+                "Replace with `.isConnected` on the node, which is true when it is in its own window's document.",
         },
     },
     defaultOptions: [{}],
@@ -169,6 +218,20 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
                     return;
                 }
 
+                // In a listener on the main window, `document.visibilityState`
+                // or `document.querySelector()` reads the document of the window
+                // whose event it handles: correct as written. The registration
+                // itself is reported (see isListenerTarget).
+                if (isInMainWindowListener(node)) {
+                    return;
+                }
+
+                // Code that already handles popout windows, or UI only the
+                // main window has: correct as written.
+                if (isActiveDocumentFallback(node) || isListedWithOtherDocuments(node) || isMainWindowUiLookup(node)) {
+                    return;
+                }
+
                 // Leave `document.createElement("p")` and the other calls
                 // prefer-create-el reports to it: its createEl("p") drops
                 // `document`, while activeDocument.createElement("p") would
@@ -186,6 +249,16 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
                     return;
                 }
 
+                // `document.body.classList.add(…)` and the like: the change
+                // has to reach each window, and be undone in each. With
+                // `activeDocument`, a class added in one window could be
+                // removed from another, so nothing is suggested.
+                const windowElement = mutatedWindowElement(node);
+                if (windowElement !== null) {
+                    context.report({ node, messageId: "perWindowState", data: { element: windowElement }, suggest: [] });
+                    return;
+                }
+
                 context.report({
                     node,
                     messageId: "preferActive",
@@ -193,18 +266,383 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
                         original: node.name,
                         replacement,
                     },
-                    suggest: offerable && canSuggestAt(node) ? [suggestion(node)] : [],
+                    suggest: suggestionsFor(node),
                 });
             },
         };
 
+        function suggestionsFor(node: TSESTree.Identifier): TSESLint.SuggestionReportDescriptor<MessageIds>[] {
+            const contains = containsCallOn(node);
+            if (contains) {
+                const isConnected = isConnectedSuggestion(contains);
+                return isConnected ? [isConnected] : [];
+            }
+            if (isElementContainsCall(node) || isLookupToRemove(node) || isHandedOn(node) || isInFunctionComparingDocument(node)) {
+                return [];
+            }
+            return offerable && canSuggestAt(node) ? [suggestion(node)] : [];
+        }
+
+        // Whether `node` is in a function that compares a document with the
+        // global `document`, as in `if (newDoc !== document) { for (const cls
+        // of document.body.classList) … }`: code that tells the main window
+        // from the others, where `document` means the main window's.
+        function isInFunctionComparingDocument(node: TSESTree.Identifier): boolean {
+            let fn: TSESTree.Node | undefined = node.parent;
+            while (
+                fn &&
+                fn.type !== TSESTree.AST_NODE_TYPES.FunctionDeclaration &&
+                fn.type !== TSESTree.AST_NODE_TYPES.FunctionExpression &&
+                fn.type !== TSESTree.AST_NODE_TYPES.ArrowFunctionExpression
+            ) {
+                fn = fn.parent;
+            }
+            if (!fn) {
+                return false;
+            }
+            let compares = comparesDocument.get(fn);
+            if (compares === undefined) {
+                compares = context.sourceCode
+                    .getScope(fn)
+                    .through.some(
+                        (reference) =>
+                            reference.identifier.name === "document" &&
+                            (reference.resolved?.defs.length ?? 0) === 0 &&
+                            isComparison(reference.identifier),
+                    );
+                comparesDocument.set(fn, compares);
+            }
+            return compares;
+        }
+
+        // Whether `node`, under casts only, is an operand of `===`, `!==`,
+        // `==` or `!=`.
+        function isComparison(node: TSESTree.Node): boolean {
+            const value = outerValue(node);
+            return (
+                value.parent?.type === TSESTree.AST_NODE_TYPES.BinaryExpression &&
+                EQUALITY_OPERATORS.has(value.parent.operator)
+            );
+        }
+
+        // The property read from `value`, as in `value.name`: the member
+        // expression and the name. With `computed`, also `value[key]`.
+        function propertyOf(
+            value: TSESTree.Node,
+            computed = false,
+        ): { member: TSESTree.MemberExpression; name: string | null } | null {
+            const parent = value.parent;
+            if (parent?.type !== TSESTree.AST_NODE_TYPES.MemberExpression || parent.object !== value) {
+                return null;
+            }
+            if (!parent.computed && parent.property.type === TSESTree.AST_NODE_TYPES.Identifier) {
+                return { member: parent, name: parent.property.name };
+            }
+            return computed ? { member: parent, name: null } : null;
+        }
+
+        function isCalled(member: TSESTree.MemberExpression): member is TSESTree.MemberExpression & { parent: TSESTree.CallExpression } {
+            return member.parent.type === TSESTree.AST_NODE_TYPES.CallExpression && member.parent.callee === member;
+        }
+
+        // Whether `member` is written: assigned, updated or deleted.
+        function isWritten(member: TSESTree.MemberExpression): boolean {
+            const parent = member.parent;
+            return (
+                (parent.type === TSESTree.AST_NODE_TYPES.AssignmentExpression && parent.left === member) ||
+                (parent.type === TSESTree.AST_NODE_TYPES.UpdateExpression && parent.argument === member) ||
+                (parent.type === TSESTree.AST_NODE_TYPES.UnaryExpression && parent.operator === "delete" && parent.argument === member)
+            );
+        }
+
+        // The element, `body`, `documentElement` or `head`, whose state for
+        // the whole window `document` changes there, if it does:
+        // `document.body.classList.add(…)`, `document.body.toggleClass(…)`,
+        // `document.documentElement.style.setProperty(…)`,
+        // `document.body.style.color = …`, `document.head.appendChild(style)`.
+        function mutatedWindowElement(node: TSESTree.Identifier): string | null {
+            const element = propertyOf(outerValue(node));
+            if (!element?.name || !WINDOW_ELEMENTS.has(element.name)) {
+                return null;
+            }
+            const inner = propertyOf(element.member);
+            if (!inner?.name) {
+                return null;
+            }
+            let mutates = false;
+            if (isCalled(inner.member)) {
+                mutates =
+                    WINDOW_ELEMENT_MUTATORS.has(inner.name) || (element.name === "head" && CREATE_METHODS.has(inner.name));
+            } else if (isWritten(inner.member)) {
+                mutates = true;
+            } else {
+                const last = propertyOf(inner.member, true);
+                if (last) {
+                    switch (inner.name) {
+                        case "classList":
+                            mutates = isCalled(last.member) && CLASS_LIST_MUTATORS.has(last.name ?? "");
+                            break;
+                        case "style":
+                            mutates = isWritten(last.member) || (isCalled(last.member) && STYLE_MUTATORS.has(last.name ?? ""));
+                            break;
+                        case "dataset":
+                            mutates = isWritten(last.member);
+                            break;
+                        default:
+                            break;
+                    }
+                }
+            }
+            return mutates ? element.name : null;
+        }
+
+        // Whether `document` finds an element there to remove it, as in
+        // `document.getElementById("my-style")?.remove()`: what is removed
+        // was put in the main window, and in a popout window
+        // `activeDocument` would find nothing.
+        function isLookupToRemove(node: TSESTree.Identifier): boolean {
+            const lookup = lookupCallOf(node);
+            if (!lookup || !SINGLE_LOOKUP_METHODS.has(lookup.method)) {
+                return false;
+            }
+            const removal = propertyOf(lookup.call);
+            return Boolean(removal?.name && REMOVE_METHODS.has(removal.name) && isCalled(removal.member));
+        }
+
+        // Whether `document.body` or `document.documentElement` checks there
+        // whether it contains a node, as in `document.body.contains(el) &&
+        // document.body.removeChild(el)`. `activeDocument` would check
+        // another window than the one the node was put in.
+        function isElementContainsCall(node: TSESTree.Identifier): boolean {
+            const element = propertyOf(outerValue(node));
+            if (element?.name !== "body" && element?.name !== "documentElement") {
+                return false;
+            }
+            const contains = propertyOf(element.member);
+            return contains?.name === "contains" && isCalled(contains.member);
+        }
+
+        // The lookup `document` makes there, if any: `document.querySelector(…)`,
+        // `document.body.getElementsByClassName(…)`, `document.head.querySelector(…)`
+        // and the like.
+        function lookupCallOf(node: TSESTree.Identifier): { call: TSESTree.CallExpression; method: string } | null {
+            let member = propertyOf(outerValue(node));
+            if (member?.name && WINDOW_ELEMENTS.has(member.name)) {
+                member = propertyOf(member.member);
+            }
+            if (!member?.name || !LOOKUP_METHODS.has(member.name) || !isCalled(member.member)) {
+                return null;
+            }
+            return { call: member.member.parent, method: member.name };
+        }
+
+        // Whether `document` looks up UI that only the main window has, such as
+        // `document.querySelector(".status-bar")` or
+        // `document.getElementsByClassName("mod-left-split")[0]`. A popout
+        // window has none, so `activeDocument` there would find nothing.
+        function isMainWindowUiLookup(node: TSESTree.Identifier): boolean {
+            const lookup = lookupCallOf(node);
+            const argument = lookup?.call.arguments[0];
+            let text: string | undefined;
+            if (argument?.type === TSESTree.AST_NODE_TYPES.Literal && typeof argument.value === "string") {
+                text = argument.value;
+            } else if (argument?.type === TSESTree.AST_NODE_TYPES.TemplateLiteral && argument.expressions.length === 0) {
+                text = argument.quasis[0]?.value.cooked ?? undefined;
+            }
+            if (!lookup || text === undefined) {
+                return false;
+            }
+            switch (lookup.method) {
+                case "getElementsByClassName":
+                    return text.split(/\s+/).some((name) => MAIN_WINDOW_CLASS.test(name));
+                case "getElementById":
+                    return false;
+                default:
+                    // Each selector of a list names such UI, outside a `:not()`.
+                    return (
+                        !text.includes(":not(") &&
+                        text.split(",").every((selector) => MAIN_WINDOW_CLASS_IN_SELECTOR.test(selector))
+                    );
+            }
+        }
+
+        // Whether `node` is the global `activeDocument`, also read from the
+        // global object (`window.activeDocument`), under casts.
+        function isActiveDocument(node: TSESTree.Node | null | undefined): boolean {
+            let value = node;
+            while (
+                value &&
+                (value.type === TSESTree.AST_NODE_TYPES.TSAsExpression ||
+                    value.type === TSESTree.AST_NODE_TYPES.TSNonNullExpression ||
+                    value.type === TSESTree.AST_NODE_TYPES.TSSatisfiesExpression ||
+                    value.type === TSESTree.AST_NODE_TYPES.TSTypeAssertion ||
+                    value.type === TSESTree.AST_NODE_TYPES.ChainExpression)
+            ) {
+                value = value.expression;
+            }
+            if (value?.type === TSESTree.AST_NODE_TYPES.Identifier) {
+                return value.name === "activeDocument" && !hasLocalBinding(context.sourceCode.getScope(value), value.name);
+            }
+            if (
+                value?.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
+                !value.computed &&
+                value.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
+                value.property.name === "activeDocument"
+            ) {
+                let object: TSESTree.Node = value.object;
+                while (
+                    object.type === TSESTree.AST_NODE_TYPES.TSAsExpression ||
+                    object.type === TSESTree.AST_NODE_TYPES.TSNonNullExpression
+                ) {
+                    object = object.expression;
+                }
+                return (
+                    object.type === TSESTree.AST_NODE_TYPES.Identifier &&
+                    GLOBAL_HOSTS.has(object.name) &&
+                    !hasLocalBinding(context.sourceCode.getScope(object), object.name)
+                );
+            }
+            return false;
+        }
+
+        // Whether `document` is the other choice to `activeDocument`, as in
+        // `requireApiVersion("0.15.0") ? activeDocument : document` or
+        // `activeDocument ?? document`: code for an Obsidian, or an
+        // environment, without popout windows.
+        function isActiveDocumentFallback(node: TSESTree.Identifier): boolean {
+            const value = outerValue(node);
+            const parent = value.parent;
+            if (parent?.type === TSESTree.AST_NODE_TYPES.ConditionalExpression && parent.test !== value) {
+                return isActiveDocument(parent.consequent === value ? parent.alternate : parent.consequent);
+            }
+            return (
+                parent?.type === TSESTree.AST_NODE_TYPES.LogicalExpression &&
+                (parent.operator === "??" || parent.operator === "||") &&
+                parent.right === value &&
+                isActiveDocument(parent.left)
+            );
+        }
+
+        // Whether `document` is listed with other documents, as in
+        // `[document, ...this.getPopoutDocuments()]` or
+        // `new Set([document, activeDocument])`: code that goes over each
+        // window's document, the main one among them.
+        function isListedWithOtherDocuments(node: TSESTree.Identifier): boolean {
+            const value = outerValue(node);
+            const list = value.parent;
+            if (list?.type !== TSESTree.AST_NODE_TYPES.ArrayExpression) {
+                return false;
+            }
+            return list.elements.some((element) => {
+                if (!element || element === value) {
+                    return false;
+                }
+                if (element.type === TSESTree.AST_NODE_TYPES.SpreadElement || isActiveDocument(element)) {
+                    return true;
+                }
+                let other: TSESTree.Node = element;
+                while (other.type === TSESTree.AST_NODE_TYPES.TSAsExpression || other.type === TSESTree.AST_NODE_TYPES.TSNonNullExpression) {
+                    other = other.expression;
+                }
+                if (other.type === TSESTree.AST_NODE_TYPES.ChainExpression) {
+                    other = other.expression;
+                }
+                return (
+                    other.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
+                    !other.computed &&
+                    other.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
+                    DOCUMENT_PROPERTIES.has(other.property.name)
+                );
+            });
+        }
+
+        // Whether the document itself is handed on as a value: an argument
+        // (`this.registerDocument(document)`), an element of a list
+        // (`new Set([document])`), a property's value (`{ doc: document }`),
+        // assigned, a default (`doc: Document = document`), a field's value or
+        // returned. The code that gets it may handle each window's document
+        // on its own; `activeDocument` would hand on whichever had focus.
+        function isHandedOn(node: TSESTree.Identifier): boolean {
+            let value = outerValue(node);
+            while (
+                value.parent?.type === TSESTree.AST_NODE_TYPES.ConditionalExpression &&
+                value.parent.test !== value
+            ) {
+                value = outerValue(value.parent);
+            }
+            const parent = value.parent;
+            switch (parent?.type) {
+                case TSESTree.AST_NODE_TYPES.CallExpression:
+                case TSESTree.AST_NODE_TYPES.NewExpression:
+                    return parent.arguments.includes(value as TSESTree.Expression);
+                case TSESTree.AST_NODE_TYPES.ArrayExpression:
+                case TSESTree.AST_NODE_TYPES.ReturnStatement:
+                    return true;
+                case TSESTree.AST_NODE_TYPES.Property:
+                    return parent.value === value && parent.parent.type === TSESTree.AST_NODE_TYPES.ObjectExpression;
+                case TSESTree.AST_NODE_TYPES.AssignmentExpression:
+                case TSESTree.AST_NODE_TYPES.AssignmentPattern:
+                    return parent.right === value;
+                case TSESTree.AST_NODE_TYPES.PropertyDefinition:
+                    return parent.value === value;
+                case TSESTree.AST_NODE_TYPES.ArrowFunctionExpression:
+                    return parent.body === value;
+                default:
+                    return false;
+            }
+        }
+
+        // `document.contains(node)`, as a call, if `document` is checked there.
+        function containsCallOn(node: TSESTree.Identifier): TSESTree.CallExpression | null {
+            const member = propertyOf(outerValue(node));
+            if (member?.name !== "contains" || !isCalled(member.member)) {
+                return null;
+            }
+            return member.member.parent;
+        }
+
+        // `node.isConnected` for `document.contains(node)`: whether `node` is
+        // in a document, its own window's. It is only offered where both are
+        // the same check, but for that window: with type information, `node`
+        // is a `Node` and never `null` or `undefined`; the call has one
+        // argument and no comments. A node in a shadow root, which Obsidian
+        // does not use, is connected but not contained.
+        function isConnectedSuggestion(call: TSESTree.CallExpression): TSESLint.SuggestionReportDescriptor<MessageIds> | null {
+            const argument = call.arguments[0];
+            if (
+                !types ||
+                call.optional ||
+                (call.callee.type === TSESTree.AST_NODE_TYPES.MemberExpression && call.callee.optional) ||
+                call.arguments.length !== 1 ||
+                !argument ||
+                argument.type === TSESTree.AST_NODE_TYPES.SpreadElement ||
+                context.sourceCode.getCommentsInside(call).length > 0
+            ) {
+                return null;
+            }
+            const tsNode = types.toTs(argument);
+            const type = types.checker.getTypeAtLocation(tsNode);
+            const parts = type.isUnion() ? type.types : [type];
+            const loose = ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.Null | ts.TypeFlags.Undefined | ts.TypeFlags.Void;
+            if (parts.some((part) => (part.flags & loose) !== 0) || !types.checker.getPropertyOfType(type, "isConnected")) {
+                return null;
+            }
+            const text = context.sourceCode.getText(argument);
+            const simple =
+                argument.type === TSESTree.AST_NODE_TYPES.Identifier ||
+                argument.type === TSESTree.AST_NODE_TYPES.ThisExpression ||
+                argument.type === TSESTree.AST_NODE_TYPES.MemberExpression ||
+                argument.type === TSESTree.AST_NODE_TYPES.CallExpression ||
+                argument.type === TSESTree.AST_NODE_TYPES.TSNonNullExpression;
+            return {
+                messageId: "useIsConnected",
+                fix: (fixer) => fixer.replaceText(call, `${simple ? text : `(${text})`}.isConnected`),
+            };
+        }
+
         function suggestion(node: TSESTree.Identifier): TSESLint.SuggestionReportDescriptor<MessageIds> {
-            // `{ document }` keeps its key.
-            const text =
-                node.parent.type === TSESTree.AST_NODE_TYPES.Property && node.parent.shorthand
-                    ? "document: activeDocument"
-                    : "activeDocument";
-            const fix = (fixer: TSESLint.RuleFixer) => fixer.replaceText(node, text);
+            // `{ document }` is handed on (isHandedOn), so it is never offered.
+            const fix = (fixer: TSESLint.RuleFixer) => fixer.replaceText(node, "activeDocument");
             return supported === undefined
                 ? { messageId: "useActiveDocumentSince", data: { since: ACTIVE_DOCUMENT_SINCE }, fix }
                 : { messageId: "useActiveDocument", fix };
@@ -232,7 +670,179 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
             if (mayRunOutsideObsidianAt(context, node)) {
                 return false;
             }
-            return !isComparedOrStored(node);
+            return !isComparedOrStored(node) && !isListenerTarget(node);
+        }
+
+        // `node` under casts and `!`, as the value it stands for.
+        function outerValue(node: TSESTree.Node): TSESTree.Node {
+            let value = node;
+            while (
+                value.parent &&
+                (value.parent.type === TSESTree.AST_NODE_TYPES.TSAsExpression ||
+                    value.parent.type === TSESTree.AST_NODE_TYPES.TSNonNullExpression ||
+                    value.parent.type === TSESTree.AST_NODE_TYPES.TSSatisfiesExpression ||
+                    value.parent.type === TSESTree.AST_NODE_TYPES.TSTypeAssertion)
+            ) {
+                value = value.parent;
+            }
+            return value;
+        }
+
+        // The call that makes `value` a listener's target, if any:
+        // `value.addEventListener(…)`, `value.removeEventListener(…)` or
+        // `registerDomEvent(value, …)`, also as a method (`this.registerDomEvent`).
+        function listenerCallOn(node: TSESTree.Node): TSESTree.CallExpression | null {
+            const value = outerValue(node);
+            const parent = value.parent;
+            if (
+                parent?.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
+                parent.object === value &&
+                !parent.computed &&
+                parent.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
+                LISTENER_METHODS.has(parent.property.name) &&
+                parent.parent.type === TSESTree.AST_NODE_TYPES.CallExpression &&
+                parent.parent.callee === parent
+            ) {
+                return parent.parent;
+            }
+            if (parent?.type === TSESTree.AST_NODE_TYPES.CallExpression && parent.arguments[0] === value) {
+                const callee = parent.callee;
+                const name =
+                    callee.type === TSESTree.AST_NODE_TYPES.Identifier
+                        ? callee.name
+                        : callee.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
+                            !callee.computed &&
+                            callee.property.type === TSESTree.AST_NODE_TYPES.Identifier
+                          ? callee.property.name
+                          : undefined;
+                if (name === REGISTER_DOM_EVENT) {
+                    return parent;
+                }
+            }
+            return null;
+        }
+
+        // Whether the document is a listener's target, directly or through a
+        // local variable: `this.registerDomEvent(document, "keydown", …)`,
+        // `document.removeEventListener(…)`, or `const doc = document;` then
+        // `doc.addEventListener(…)`. The listener stays on that document for as
+        // long as it lives, and a removal has to name the document it was added
+        // to; `activeDocument` would pick whichever window had focus.
+        function isListenerTarget(node: TSESTree.Identifier): boolean {
+            if (listenerCallOn(node)) {
+                return true;
+            }
+            const value = outerValue(node);
+            const declarator = value.parent;
+            if (
+                declarator?.type !== TSESTree.AST_NODE_TYPES.VariableDeclarator ||
+                declarator.init !== value ||
+                declarator.id.type !== TSESTree.AST_NODE_TYPES.Identifier
+            ) {
+                return false;
+            }
+            return context.sourceCode
+                .getDeclaredVariables(declarator)
+                .some((variable) => variable.references.some((reference) =>
+                    !reference.init && listenerCallOn(reference.identifier) !== null));
+        }
+
+        // Whether `node` is in a listener registered on the main window's
+        // `document` or `window`, given inline: `this.registerDomEvent(document,
+        // "visibilitychange", () => { … document.visibilityState … })` or
+        // `window.addEventListener("keydown", (e) => { … })`.
+        function isInMainWindowListener(node: TSESTree.Node): boolean {
+            for (let current = node.parent; current; current = current.parent) {
+                if (
+                    current.type !== TSESTree.AST_NODE_TYPES.ArrowFunctionExpression &&
+                    current.type !== TSESTree.AST_NODE_TYPES.FunctionExpression
+                ) {
+                    continue;
+                }
+                const call = current.parent;
+                if (call?.type === TSESTree.AST_NODE_TYPES.CallExpression && call.arguments.includes(current)) {
+                    if (mainWindowTargetOf(call) !== null) {
+                        return true;
+                    }
+                    continue;
+                }
+                if (isMainWindowListenerOnly(current)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // Whether `fn`, declared as `const onKey = (e) => { … }`, is only ever
+        // added or removed as a listener on the main window's `document` or
+        // `window`. Passed anywhere else, also to a pop-out's window, or
+        // called, it may run for another window's events.
+        function isMainWindowListenerOnly(
+            fn: TSESTree.ArrowFunctionExpression | TSESTree.FunctionExpression,
+        ): boolean {
+            const declarator = fn.parent;
+            if (
+                declarator?.type !== TSESTree.AST_NODE_TYPES.VariableDeclarator ||
+                declarator.init !== fn ||
+                declarator.id.type !== TSESTree.AST_NODE_TYPES.Identifier
+            ) {
+                return false;
+            }
+            const references = context.sourceCode
+                .getDeclaredVariables(declarator)
+                .flatMap((variable) => variable.references)
+                .filter((reference) => !reference.init);
+            return (
+                references.length > 0 &&
+                references.every((reference) => {
+                    const identifier = reference.identifier;
+                    const call = identifier.parent;
+                    return (
+                        identifier.type === TSESTree.AST_NODE_TYPES.Identifier &&
+                        call?.type === TSESTree.AST_NODE_TYPES.CallExpression &&
+                        call.arguments.includes(identifier) &&
+                        mainWindowTargetOf(call, true) !== null
+                    );
+                })
+            );
+        }
+
+        // The global `document` or `window` that `call` registers a listener
+        // on, if it does; with `orRemoval`, also one it removes a listener from.
+        function mainWindowTargetOf(call: TSESTree.CallExpression, orRemoval = false): TSESTree.Identifier | null {
+            let target: TSESTree.Node | undefined;
+            const callee = call.callee;
+            if (
+                callee.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
+                !callee.computed &&
+                callee.property.type === TSESTree.AST_NODE_TYPES.Identifier
+            ) {
+                if (
+                    callee.property.name === "addEventListener" ||
+                    (orRemoval && callee.property.name === "removeEventListener")
+                ) {
+                    target = callee.object;
+                } else if (callee.property.name === REGISTER_DOM_EVENT) {
+                    target = call.arguments[0];
+                }
+            } else if (callee.type === TSESTree.AST_NODE_TYPES.Identifier && callee.name === REGISTER_DOM_EVENT) {
+                target = call.arguments[0];
+            }
+            while (
+                target &&
+                (target.type === TSESTree.AST_NODE_TYPES.TSAsExpression ||
+                    target.type === TSESTree.AST_NODE_TYPES.TSNonNullExpression)
+            ) {
+                target = target.expression;
+            }
+            if (
+                target?.type !== TSESTree.AST_NODE_TYPES.Identifier ||
+                !MAIN_WINDOW_TARGETS.has(target.name) ||
+                hasLocalBinding(context.sourceCode.getScope(target), target.name)
+            ) {
+                return null;
+            }
+            return target;
         }
 
         // The reference `node` makes, from the scope it is in. Each scope's
