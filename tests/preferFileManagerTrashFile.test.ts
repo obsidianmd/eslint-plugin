@@ -3,6 +3,11 @@ import preferFileManagerTrashRule from "../lib/rules/preferFileManagerTrashFile.
 
 const ruleTester = new RuleTester();
 
+// FileManager.trashFile() came with Obsidian 1.6.6. This repo's manifest.json
+// says 0.15.0, below which nothing is reported, so the version is given as an
+// option.
+const since = [{ minAppVersion: "1.6.6" }] as const;
+
 ruleTester.run("prefer-file-manager-trash-file", preferFileManagerTrashRule, {
     valid: [
         {
@@ -64,10 +69,84 @@ ruleTester.run("prefer-file-manager-trash-file", preferFileManagerTrashRule, {
                 seen?.delete('file.md');
             `,
         },
+        {
+            name: "below 1.6.6, as this repo's manifest.json (0.15.0) is, there is no trashFile() and nothing is reported",
+            code: `
+                import { TFile, Vault } from "obsidian";
+                declare const vault: Vault;
+                declare const file: TFile;
+                void vault.trash(file, true);
+                void vault.delete(file);
+            `,
+        },
+        {
+            name: "below 1.6.6 by the option",
+            code: "declare class Vault { delete(file: unknown): void; } declare const vault: Vault; vault.delete(someFile);",
+            options: [{ minAppVersion: "1.6.5" }],
+        },
+        {
+            // obsidian-local-images-plus, obsidian-full-calendar, links.
+            name: "a second argument that is not a literal: the caller chooses where the file goes",
+            code: `
+                declare class Vault { trash(file: unknown, system: boolean): void; delete(file: unknown, force?: boolean): void; }
+                declare const vault: Vault;
+                declare function useSystem(): boolean;
+                vault.trash(someFile, useSysTrash);
+                vault.trash(someFile, this.settings.systemTrash);
+                vault.trash(someFile, useSystem());
+                vault.delete(someFile, force);
+            `,
+            options: since,
+        },
+        {
+            // file-cleaner-redux, folder-notes, oz-clear-unused-images, make-md.
+            name: "a switch whose cases delete in different ways is the plugin's own deletion setting",
+            code: `
+                declare class Vault { trash(file: unknown, system: boolean): Promise<void>; delete(file: unknown, force?: boolean): Promise<void>; }
+                declare const app: { vault: Vault; fileManager: { trashFile(file: unknown): Promise<void> } };
+                async function remove(file: unknown, option: string) {
+                    switch (option) {
+                        case "permanent":
+                            await app.vault.delete(file, true);
+                            break;
+                        case "system-trash":
+                            await app.vault.trash(file, true);
+                            break;
+                        case "trash":
+                            await app.vault.trash(file, false);
+                            break;
+                        case "obsidian":
+                            await app.fileManager.trashFile(file);
+                            break;
+                    }
+                }
+            `,
+            options: since,
+        },
+        {
+            // file-tree-alternative, remove-empty-assets.
+            name: "an if/else if chain or a ?: that deletes in different ways is the plugin's own deletion setting",
+            code: `
+                declare class Vault { trash(file: unknown, system: boolean): Promise<void>; delete(file: unknown, force?: boolean): Promise<void>; }
+                declare const vault: Vault;
+                async function remove(file: unknown, mode: string) {
+                    if (mode === "permanent") {
+                        await vault.delete(file, true);
+                    } else if (mode === "system") {
+                        if (file) { await vault.trash(file, true); }
+                    } else {
+                        await vault.trash(file, false);
+                    }
+                    await (mode === "system" ? vault.trash(file, true) : vault.trash(file, false));
+                }
+            `,
+            options: since,
+        },
     ],
     invalid: [
         {
             name: "vault.trash is forbidden",
+            options: since,
             code: `
                 declare class Vault { trash(file: unknown): void; }
                 declare const vault: Vault;
@@ -86,6 +165,7 @@ ruleTester.run("prefer-file-manager-trash-file", preferFileManagerTrashRule, {
         },
         {
             name: "Obsidian's own Vault.trash and Vault.delete are forbidden",
+            options: since,
             code: `
                 import { TFile, Vault } from "obsidian";
                 declare const vault: Vault;
@@ -100,6 +180,7 @@ ruleTester.run("prefer-file-manager-trash-file", preferFileManagerTrashRule, {
         },
         {
             name: "a computed method with the name spelled out is forbidden",
+            options: since,
             code: `
                 declare class Vault { trash(file: unknown): void; delete(file: unknown): void; }
                 declare const vault: Vault;
@@ -113,6 +194,7 @@ ruleTester.run("prefer-file-manager-trash-file", preferFileManagerTrashRule, {
         },
         {
             name: "vault.delete is forbidden",
+            options: since,
             code: `
                 declare class Vault { delete(file: unknown): void; }
                 declare const vault: Vault;
@@ -127,6 +209,7 @@ ruleTester.run("prefer-file-manager-trash-file", preferFileManagerTrashRule, {
         },
         {
             name: "app.vault.trash is forbidden",
+            options: since,
             code: `
                 declare class Vault { trash(file: unknown): void; }
                 declare class App { vault: Vault; }
@@ -142,6 +225,7 @@ ruleTester.run("prefer-file-manager-trash-file", preferFileManagerTrashRule, {
         },
         {
             name: "intermediate variable holding vault with delete is forbidden",
+            options: since,
             code: `
                 declare class Vault { delete(file: unknown): void; }
                 declare const myVault: Vault;
@@ -157,6 +241,7 @@ ruleTester.run("prefer-file-manager-trash-file", preferFileManagerTrashRule, {
         },
         {
             name: "a Vault parameter is found by type",
+            options: since,
             code: `
                 declare class Vault { delete(file: unknown): Promise<void>; }
                 async function remove(v: Vault, file: unknown) {
@@ -169,6 +254,7 @@ ruleTester.run("prefer-file-manager-trash-file", preferFileManagerTrashRule, {
         // were never reported.
         {
             name: "a vault that may be null is found by type",
+            options: since,
             code: `
                 declare class Vault { delete(file: unknown): Promise<void>; }
                 declare const mv: Vault | null;
@@ -178,6 +264,7 @@ ruleTester.run("prefer-file-manager-trash-file", preferFileManagerTrashRule, {
         },
         {
             name: "an optional vault property is found by type",
+            options: since,
             code: `
                 declare class Vault { trash(file: unknown, system: boolean): Promise<void>; }
                 declare const app: { vault?: Vault };
@@ -187,6 +274,7 @@ ruleTester.run("prefer-file-manager-trash-file", preferFileManagerTrashRule, {
         },
         {
             name: "a vault read through an optional chain is found by type",
+            options: since,
             code: `
                 declare class Vault { delete(file: unknown): Promise<void>; }
                 declare const plugin: { app: { vault: Vault } } | undefined;
@@ -197,22 +285,19 @@ ruleTester.run("prefer-file-manager-trash-file", preferFileManagerTrashRule, {
     ],
 });
 
-// The suggestion, with Obsidian's own typings. FileManager.trashFile() came
-// with Obsidian 1.6.6; this repo's manifest.json says 0.15.0, so the version
-// is given as an option.
+// The suggestion, with Obsidian's own typings.
 const header = `import { App, Plugin, TFile, Vault } from "obsidian";
 declare const app: App;
 declare const file: TFile;
 `;
-const since = [{ minAppVersion: "1.6.6" }] as const;
 const offered = (output: string) => [{ messageId: "useTrashFile" as const, output: header + output }];
 
 ruleTester.run("prefer-file-manager-trash-file suggestions", preferFileManagerTrashRule, {
     valid: [],
     invalid: [
         {
-            name: "app.vault.delete(file) becomes app.fileManager.trashFile(file)",
-            code: header + "void app.vault.delete(file);",
+            name: "app.vault.trash(file) becomes app.fileManager.trashFile(file)",
+            code: header + "void app.vault.trash(file);",
             options: since,
             errors: [{ messageId: "preferTrashFile", suggestions: offered("void app.fileManager.trashFile(file);") }],
         },
@@ -226,30 +311,21 @@ ruleTester.run("prefer-file-manager-trash-file suggestions", preferFileManagerTr
             }],
         },
         {
-            name: "a variable as the second argument is dropped, as is delete()'s force",
-            code: header + "declare const view: { plugin: Plugin }; declare const system: boolean; void view.plugin.app.vault.trash(file, system); void app.vault.delete(file, false);",
-            options: since,
-            errors: [
-                { messageId: "preferTrashFile", suggestions: offered("declare const view: { plugin: Plugin }; declare const system: boolean; void view.plugin.app.fileManager.trashFile(file); void app.vault.delete(file, false);") },
-                { messageId: "preferTrashFile", suggestions: offered("declare const view: { plugin: Plugin }; declare const system: boolean; void view.plugin.app.vault.trash(file, system); void app.fileManager.trashFile(file);") },
-            ],
-        },
-        {
             name: "?. is kept",
-            code: header + "declare const plugin: Plugin | undefined; void plugin?.app.vault.delete(file); void app.vault?.trash?.(file, true);",
+            code: header + "declare const plugin: Plugin | undefined; void plugin?.app.vault.trash(file, false); void app.vault?.trash?.(file, true);",
             options: since,
             errors: [
                 { messageId: "preferTrashFile", suggestions: offered("declare const plugin: Plugin | undefined; void plugin?.app.fileManager.trashFile(file); void app.vault?.trash?.(file, true);") },
-                { messageId: "preferTrashFile", suggestions: offered("declare const plugin: Plugin | undefined; void plugin?.app.vault.delete(file); void app.fileManager?.trashFile?.(file);") },
+                { messageId: "preferTrashFile", suggestions: offered("declare const plugin: Plugin | undefined; void plugin?.app.vault.trash(file, false); void app.fileManager?.trashFile?.(file);") },
             ],
         },
         {
             name: "a computed method keeps its quotes",
-            code: header + "void app.vault[\"delete\"](file); void app.vault[`trash`](file, false);",
+            code: header + "void app.vault[\"trash\"](file); void app.vault[`trash`](file, false);",
             options: since,
             errors: [
                 { messageId: "preferTrashFile", suggestions: offered("void app.fileManager[\"trashFile\"](file); void app.vault[`trash`](file, false);") },
-                { messageId: "preferTrashFile", suggestions: offered("void app.vault[\"delete\"](file); void app.fileManager[`trashFile`](file);") },
+                { messageId: "preferTrashFile", suggestions: offered("void app.vault[\"trash\"](file); void app.fileManager[`trashFile`](file);") },
             ],
         },
         {
@@ -269,7 +345,7 @@ ruleTester.run("prefer-file-manager-trash-file suggestions", preferFileManagerTr
         },
         {
             name: "a minAppVersion that is not a version: the suggestion says what it needs",
-            code: header + "void app.vault.delete(file);",
+            code: header + "void app.vault.trash(file);",
             options: [{ minAppVersion: "latest" }],
             errors: [{
                 messageId: "preferTrashFile",
@@ -278,19 +354,27 @@ ruleTester.run("prefer-file-manager-trash-file suggestions", preferFileManagerTr
         },
         // Nothing is offered:
         {
-            name: "below 1.6.6, as this repo's manifest.json (0.15.0) is",
-            code: header + "void app.vault.delete(file);",
-            errors: [{ messageId: "preferTrashFile", suggestions: [] }],
+            // inventtasks, templater, obsidian-custom-attachment-location:
+            // deliberate permanent deletes of the plugin's own files.
+            name: "for vault.delete(), a permanent delete that may be deliberate",
+            code: header + "void app.vault.delete(file); void app.vault.delete(file, true); void app.vault[\"delete\"](file); export class P extends Plugin { async rollback(f: TFile) { await this.app.vault.delete(f); } }",
+            options: since,
+            errors: [
+                { messageId: "preferTrashFile", data: { methodName: "delete" }, suggestions: [] },
+                { messageId: "preferTrashFile", data: { methodName: "delete" }, suggestions: [] },
+                { messageId: "preferTrashFile", data: { methodName: "delete" }, suggestions: [] },
+                { messageId: "preferTrashFile", data: { methodName: "delete" }, suggestions: [] },
+            ],
         },
         {
-            name: "with a minAppVersion option below 1.6.6",
+            name: "with no minAppVersion that is a version, for vault.delete() either",
             code: header + "void app.vault.delete(file);",
-            options: [{ minAppVersion: "1.6.5" }],
+            options: [{ minAppVersion: "latest" }],
             errors: [{ messageId: "preferTrashFile", suggestions: [] }],
         },
         {
             name: "on a vault that is not <expr>.vault, which has no fileManager next to it",
-            code: header + "declare const vault: Vault; void vault.delete(file); void app[\"vault\"].delete(file);",
+            code: header + "declare const vault: Vault; void vault.trash(file, true); void app[\"vault\"].trash(file, true);",
             options: since,
             errors: [
                 { messageId: "preferTrashFile", suggestions: [] },
@@ -299,7 +383,7 @@ ruleTester.run("prefer-file-manager-trash-file suggestions", preferFileManagerTr
         },
         {
             name: "where the receiver's type has no fileManager.trashFile",
-            code: header + "declare const a: { vault: Vault }; declare const b: { vault: Vault; fileManager: { promptForDeletion(f: TFile): Promise<boolean> } }; void a.vault.delete(file); void b.vault.delete(file);",
+            code: header + "declare const a: { vault: Vault }; declare const b: { vault: Vault; fileManager: { promptForDeletion(f: TFile): Promise<boolean> } }; void a.vault.trash(file, false); void b.vault.trash(file, false);",
             options: since,
             errors: [
                 { messageId: "preferTrashFile", suggestions: [] },
@@ -307,12 +391,19 @@ ruleTester.run("prefer-file-manager-trash-file suggestions", preferFileManagerTr
             ],
         },
         {
-            name: "where the dropped argument may have a side effect, or has a comment",
-            code: header + "declare function useSystem(): boolean; void app.vault.trash(file, useSystem()); void app.vault.trash(file, /* system */ true);",
+            name: "where the dropped argument has a comment",
+            code: header + "void app.vault.trash(file, /* system */ true);",
             options: since,
             errors: [
                 { messageId: "preferTrashFile", suggestions: [] },
-                { messageId: "preferTrashFile", suggestions: [] },
+            ],
+        },
+        {
+            name: "a single kind of delete in a branch is still reported",
+            code: header + "declare const confirmed: boolean; if (confirmed) { void app.vault.trash(file, true); } else { void app.vault.read(file); }",
+            options: since,
+            errors: [
+                { messageId: "preferTrashFile", suggestions: offered("declare const confirmed: boolean; if (confirmed) { void app.fileManager.trashFile(file); } else { void app.vault.read(file); }") },
             ],
         },
         {
