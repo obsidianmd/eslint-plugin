@@ -31,7 +31,8 @@ log may print other values, such as `evt.target`, but not compute them with a ca
 
 Not reported, because the code is the plugin's own: a click handler with statements of its own,
 before or after the log or notice (`console.log("click", evt); this.handleClick(evt);`), a notice
-with other text, an interval callback that does more than log, a log through another `log()` such as
+with other text, an interval callback other than the arrow `() => console.log("setInterval")`
+(a block body, as in `() => { console.log("setInterval"); }`, included), a log through another `log()` such as
 `this.logger.log("click", evt)`, and other `registerInterval()` and `registerDomEvent()` calls.
 
 The fix deletes the statement. When the call is not a statement of its own, such as

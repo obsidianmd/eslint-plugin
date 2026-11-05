@@ -213,4 +213,4 @@ export default defineConfig([
 
 ### Known limitations
 
-Sentence detection may incorrectly split on abbreviations (Dr., Inc., etc.). Use single sentences or adjust rule options when needed.
+Sentence detection splits at the dot of an abbreviation it does not know, such as "Dr." or "Inc.", and expects the next word to start with a capital: "See Acme Inc. products" is reported. After "e.g.", "i.e.", "etc." and similar abbreviations the next word may take either case. Use single sentences or adjust rule options when needed.
