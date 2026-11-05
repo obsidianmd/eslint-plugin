@@ -49,6 +49,18 @@ this.registerDomEvent(document, "visibilitychange", () => {
   if (document.visibilityState === "visible") refresh();
 });
 window.addEventListener("keydown", () => { if (document.querySelector(".modal")) return; });
+
+// The other choice to `activeDocument`, for an Obsidian or an environment without popout windows
+const doc = requireApiVersion("0.15.0") ? activeDocument : document;
+const body = (activeDocument ?? document).body;
+
+// The main window's document listed with the others, by code that goes over each window
+const docs = [document, ...this.getPopoutDocuments()];
+for (const doc of new Set([document, activeDocument])) { /* … */ }
+
+// UI that only the main window has
+const statusBar = document.getElementsByClassName("status-bar")[0];
+document.querySelector(".workspace-ribbon.mod-left");
 ```
 
 A listener given inline to `registerDomEvent(document, …)`, `registerDomEvent(window, …)`,
@@ -57,6 +69,21 @@ is left alone, at any depth, and so is one declared as `const onKey = (e) => { �
 ever added to or removed from them. A listener on `activeWindow`, on an element or on another
 window, one also registered on a pop-out's window, or one the code also calls, still has its
 `document` reported.
+
+`document` as either branch of a condition (`? :`) whose other branch is `activeDocument`, or as
+the right operand of `??` or `||` whose left operand is, is left alone; so is `window.activeDocument`
+there. So is `document` in an array literal that also has a spread element, `activeDocument`, or a
+property named `doc`, `document`, `ownerDocument` or `activeDocument`, such as `win.document`.
+
+A lookup of UI that only the main window has is left alone: a popout window has its own workspace
+and title bar, but no status bar, ribbons or side docks, so `activeDocument` there would find
+nothing. These are `querySelector()`, `querySelectorAll()`, `getElementsByClassName()`, `find()`
+and `findAll()` on `document`, `document.body` or `document.documentElement`, with a string whose
+classes include `status-bar` (or `status-bar-…`), `workspace-ribbon`, `side-dock-…` (as in
+`side-dock-ribbon`), `mod-left-split`, `mod-right-split` or `mod-sidedock`. In a selector, each of a
+list's selectors (`a, b`) has to name one of them, and one with `:not(` is still reported. A
+selector built at runtime, or one naming a view, such as the file explorer's, which can be moved
+to a popout window, is still reported.
 
 Only the bare global `document` is reported; `window.document` and
 `globalThis.document` are not. Runtime code inside a plain `namespace` is still
@@ -107,10 +134,45 @@ review before applying: replace `document` with `activeDocument`, the document o
 has focus. Where an element is at hand, its own document, `el.doc`, is often the better choice.
 
 ```ts
-document.body.addClass("my-plugin");       // suggests activeDocument.body.addClass("my-plugin")
 const hit = document?.querySelector(".x"); // suggests activeDocument?.querySelector(".x")
-render({ document });                      // suggests render({ document: activeDocument })
+const dark = document.body.hasClass("theme-dark"); // suggests activeDocument.body.hasClass(…)
+document.contains(el);                     // suggests el.isConnected
 ```
+
+`document.contains(node)` suggests `node.isConnected` instead, which is true when the node is in a
+document, that of its own window: the same check, for every window. It is offered with type
+information only, where `node` is a `Node` that cannot be `null` or `undefined` (`contains(null)`
+is `false`, while `null.isConnected` throws), and the call has one argument and no comments. The
+two differ for a node in a shadow root, which is connected but not contained.
+
+### State of the whole window
+
+A change to the main window's `<body>`, `<html>` or `<head>` is reported with its own message, and
+nothing is suggested:
+
+```ts
+onload() { document.body.classList.add("my-plugin-on"); }
+onunload() { document.body.classList.remove("my-plugin-on"); }
+document.documentElement.style.setProperty("--my-plugin-width", "10px");
+document.head.appendChild(styleEl);
+```
+
+The report is right: the change does not reach popout windows. But with `activeDocument` each line
+would change whichever window has focus when it runs, so a class added in one window could be
+removed from another, and the plugin would leave classes, CSS variables or `<style>` elements
+behind. Make the change in each window's document instead, for example from
+`workspace.on("window-open", …)` and for the windows already open, and undo it in each.
+
+These are, on `document.body`, `document.documentElement` or `document.head`: `classList.add()`,
+`remove()`, `toggle()` and `replace()`; Obsidian's `addClass()`, `addClasses()`, `removeClass()`,
+`removeClasses()`, `toggleClass()`, `setAttr()`, `setCssProps()` and `setCssStyles()`;
+`setAttribute()`, `removeAttribute()` and `toggleAttribute()`; `style.setProperty()`,
+`style.removeProperty()`, and an assignment to a `style` or `dataset` property or to a property
+of the element itself (`className`); `appendChild()`, `append()`, `prepend()`, `insertBefore()`,
+`removeChild()`, `replaceChild()`, `replaceChildren()` and `insertAdjacent…()`; and, on
+`document.head`, `createEl()`, `createDiv()`, `createSpan()` and `createSvg()`. A read, such as
+`document.body.hasClass()` or `classList.contains()`, and `document.body.createDiv()`, whose element
+the code removes itself, keep the suggestion.
 
 Nothing is offered where `activeDocument` would not exist, or would not be what the code means:
 
@@ -122,17 +184,34 @@ Nothing is offered where `activeDocument` would not exist, or would not be what 
 - code that also runs outside Obsidian, as a check before it in the same function, or one that
   decides whether it runs, shows: `typeof document`, `typeof window`, `"window" in globalThis`, a
   check of `activeDocument` or `activeWindow` themselves, such as
-  `typeof activeDocument !== "undefined" ? activeDocument : document`, or a name such as
+  `typeof activeDocument !== "undefined" ? activeDocument.body : document.body`, or a name such as
   `isBrowser`; the body of a `try` whose `catch` drops the error; or code that runs once a `try`
   that reads the document has failed: its `catch` or `finally`, or what follows a `catch` that goes
   on. A browser or a DOM emulation such as jsdom has a `document` but no `activeDocument`;
 - the document itself compared, as in `e.target === document`, `el.ownerDocument !== document` or
-  `case document:`;
+  `case document:`, and any `document` in a function that compares a document with it, as in
+  `if (newDoc !== document) { for (const cls of document.body.classList) … }`: code that tells the
+  main window from the others;
+- the document handed on as a value: an argument (`this.registerDocumentEvents(document)`), an
+  element of an array (`new Set([document])`), a property's value (`{ document }`,
+  `{ doc: document }`), assigned (`this.doc = document`), a default (`doc: Document = document`),
+  a field's value, or returned (`() => document`), also as a branch of a condition. The code that
+  gets it may handle each window's document on its own, and `activeDocument` would hand on
+  whichever had focus. A fallback such as `const doc = el?.doc ?? document` keeps the suggestion;
+- `document.body.contains(node)` and `document.documentElement.contains(node)`, as in
+  `document.body.contains(el) && document.body.removeChild(el)`: the node was put in a given
+  window, and `activeDocument` would check another one;
+- an element looked up to be removed, as in `document.getElementById("my-style")?.remove()` or
+  `document.head.querySelector("style.x")?.detach()`: it was put in the main window, where the
+  removal has to look for it;
 - the document a listener is attached to or removed from: `registerDomEvent(document, …)`,
   `document.addEventListener()` or `document.removeEventListener()`, also through a local
   variable (`const doc = document; doc.addEventListener(…)`). The listener stays on that document,
   and a removal has to name the one it was added to; for popout windows, register the listener on
   each window instead, for example from `workspace.on("window-open", …)`;
+- the document an event is dispatched on, `document.dispatchEvent(…)`, also through a local
+  variable: a plugin's own events, as an event bus, reach the listeners on that document, which
+  stay on the main one;
 - the document kept for later: in a variable of the module (`const doc = document;` at the top
   level, or assigned to one), in a property of the global object (`window.doc = document`) or of
   `module.exports`, as the default export or in a `static` field. `activeDocument` there keeps whichever document had focus
