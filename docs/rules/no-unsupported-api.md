@@ -12,7 +12,9 @@
 
 Using an Obsidian API that is newer than the oldest app version the plugin supports, its
 `minAppVersion` from `manifest.json` or the `minAppVersion` option below. When each API arrived is
-read from the `@since` tags in your project's own `obsidian.d.ts`; see [Requirements](#requirements).
+read from the `@since` tags in your project's own `obsidian.d.ts`, lowered where older typings already
+had the API (see [Members older than their `@since`](#members-older-than-their-since)); see
+[Requirements](#requirements).
 The uses checked are:
 
 - reading a property or calling a method, such as `this.app.renderContext`
@@ -49,14 +51,13 @@ release on npm:
 | `Workspace.duplicateLeaf(leaf, direction?)` | 0.13.8 | 0.11.13 |
 
 The table only lowers a version; an overload it does not list keeps its `@since`. It matches an
-overload by its string literal parameters, or else by its parameter types, so an overload whose
-parameters changed counts as new: `setActiveLeaf(leaf)` needs 0.16.3, although the typings before
-0.16.3 had `setActiveLeaf(leaf, pushHistory?, focus?)`.
+overload by its string literal parameters, or else by its parameter types.
 
 A use is allowed where a `requireApiVersion()` check proves the app is new enough, as described below.
 There is no fix: either guard the call, or raise `minAppVersion` if the plugin needs the API anyway.
 
-Not reported: members of the settings-definition types (`SettingDefinitionItem`, `SettingDefinitionGroup`,
+Not reported: `Plugin.settings` (`@since 1.13.0`), which is the plugin's own field, assigned in
+`onload`, and members of the settings-definition types (`SettingDefinitionItem`, `SettingDefinitionGroup`,
 `SettingDefinitionControl`, the `Setting*Control` types and the rest reachable from what
 `getSettingDefinitions()` returns). Those objects are the plugin's own data, so reading `item.items` or
 `definition.control.key`, for instance to render the definitions on an older Obsidian, works on every
@@ -66,6 +67,37 @@ runtime exports, and extending one on an older Obsidian fails when the plugin lo
 The rule needs type information, so the recommended config runs it on TypeScript files only. It does
 not apply the rule to [test files](../configuration.md#test-files), which never run in an older
 Obsidian.
+
+### Members older than their `@since`
+
+The `@since` of a whole member can name a later release than the one that added it too, as for the
+overloads above, most often for a member with a single signature. `setDisabled(disabled: boolean)` is
+`@since 1.2.3` and `Menu.addItem(cb)` `@since 0.15.3`, but both are in the 0.11.13 typings, the oldest
+on npm, written as they are today. So for each member, function and class whose name the published
+typings had before its `@since`, the rule has a second table built from the same releases: each signature the member had, and the releases that had it. A use needs the lower of
+its `@since` and the first release from which on every release, up to your `obsidian` version, had a
+signature the use fits:
+
+- any use fits a signature written the same as today's, with each interface, type alias and enum it
+  names declared the same as in your typings;
+- a call also fits an older signature it can make the same way: it passes at least the arguments
+  that one requires and no more than it takes, and each argument is one the older parameter takes
+  too. That is the same type; or a parameter of `string`, `number`, `boolean`, `null`, `undefined`,
+  literals and types declared then as in your typings, which the argument's type fits, as
+  `getLeaf(false)` fits `getLeaf(newLeaf?: boolean)` of 0.11.13 and `showAtPosition({ x, y })` fits
+  `showAtPosition(position: Point)`; or a callback the older release calls with the parameters it
+  declares, of types the callback takes, and whose result that release ignores. The call's result must be typed the same, or unused:
+  `revealLeaf(leaf);` and `await revealLeaf(leaf);` fit the 0.11.13 `revealLeaf(leaf): void`, but
+  `revealLeaf(leaf).then(…)` needs the Promise of 1.7.2.
+
+Anything the rule cannot tell keeps the `@since`: a call that needs a newer signature, such as
+`getLeaf("tab")` (the PaneType overload of 0.16.0) or `setTooltip(text, { placement })` (the options
+of 1.1.1), a spread argument, a generic or rest parameter, and passing a method as a value, which
+needs today's signature. The first typings that declare a member are an upper bound of when the app
+had it: a typings release describes the app release of the same version and is published with it or
+later, the app may have had the member undeclared before, and there are no typings before 0.11.13. So
+the table can make the rule ask for a later version than the app needed, never one older than the
+typings show.
 
 ## Guarding with `requireApiVersion`
 
@@ -77,7 +109,13 @@ running app is new enough. That holds:
   `throw`, `break` or `continue` that always runs, directly or at the top of a `{ ... }` block;
 - in the `else` branch or ternary alternate of a negated check, or to the right of `||` after one;
 - wherever a `const` holding the check's result is used the same way;
-- when several checks are combined: `a && b` proves the higher version, and `a || b` the lower.
+- when several checks are combined: `a && b` proves the higher version, and `a || b` the lower;
+- inside an override of a method only Obsidian calls, from the release that added it on:
+  `getSettingDefinitions()`, `getControlValue()` and `setControlValue()` (1.13.0),
+  `onExternalSettingsChange()` (1.5.7) and `onPaneMenu()` (0.15.3), so `this.refreshDomState()` in
+  `getSettingDefinitions()` is allowed. Not in a file that also names the method other than as
+  `super.name`, such as `this.getSettingDefinitions()`, since the plugin may then call it on an
+  older Obsidian itself.
 
 ```ts
 import { requireApiVersion } from "obsidian";
@@ -94,6 +132,21 @@ const SUPPORTS_RENDER_CONTEXT = requireApiVersion("1.10.0");
 if (SUPPORTS_RENDER_CONTEXT) {
     this.app.renderContext;
 }
+```
+
+A check that the API exists works the same way where the API is newer as a whole: `typeof
+x.member === "function"`, `typeof x.member !== "undefined"`, `x.member != null`, `x.member !==
+undefined`, `"member" in x` and `x.member` itself as a condition, for that same `x.member` (or
+function), and an optional call `x.member?.()`. The check itself, which reads a missing member as
+`undefined`, is not reported either. It does not prove a newer signature of a member older releases
+had: `typeof workspace.getLeaf === "function"` exists on every version, so `getLeaf("tab")` after it
+still needs 0.16.0.
+
+```ts
+if (typeof this.app.isDarkMode === "function") {
+    dark = this.app.isDarkMode();
+}
+const language = typeof getLanguage === "function" ? getLanguage() : "en";
 ```
 
 The version can be a string literal, or any expression whose type is a string literal: a `const`
@@ -125,7 +178,8 @@ versioned API is reported. With no `minAppVersion` at all, neither in the option
 
 This rule determines when each API was introduced by reading the `@since` JSDoc
 tags in **your project's own** `obsidian.d.ts`. It does not bundle a copy of the
-Obsidian typings.
+Obsidian typings, only the tables of older signatures described above, which can
+only lower the version an API needs.
 
 For the rule to report anything, both of the following must hold:
 

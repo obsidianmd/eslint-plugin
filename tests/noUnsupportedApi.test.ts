@@ -901,15 +901,13 @@ ruleTester.run("no-unsupported-api", rule, {
                 declare const leaf: WorkspaceLeaf;
                 app.workspace.setActiveLeaf(leaf, { focus: true });
                 // Until 0.16.3 the typings had (leaf, pushHistory?, focus?),
-                // which took this call too, but under another key than the
-                // deprecated (leaf, pushHistory, focus) of today: it is
-                // reported at 0.16.3, as before.
+                // which takes this call too: it needs only the first typings
+                // with that signature, 0.11.13.
                 app.workspace.setActiveLeaf(leaf);
             `,
             options: [{ minAppVersion: "0.15.0" }],
             errors: [
                 { messageId: "apiNotAvailable", line: 5, data: { qualifiedName: "Workspace.setActiveLeaf", sinceVersion: "0.16.3", minAppVersion: "0.15.0" } },
-                { messageId: "apiNotAvailable", line: 10, data: { qualifiedName: "Workspace.setActiveLeaf", sinceVersion: "0.16.3", minAppVersion: "0.15.0" } },
             ],
         },
         {
@@ -1001,14 +999,16 @@ ruleTester.run("no-unsupported-api", rule, {
             errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "displayTooltip", sinceVersion: "1.8.7", minAppVersion: "1.0.0" } }],
         },
         {
-            name: "BaseComponent has no @since but setDisabled requires 1.2.3",
+            // setDisabled is @since 1.2.3, but the 0.11.13 typings, the first on
+            // npm, have it with the same signature.
+            name: "BaseComponent has no @since but setDisabled requires the first typings that have it",
             code: `
                 import { BaseComponent } from 'obsidian';
                 declare const component: BaseComponent;
                 component.setDisabled(true);
             `,
-            options: [{ minAppVersion: "1.0.0" }],
-            errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "BaseComponent.setDisabled", sinceVersion: "1.2.3", minAppVersion: "1.0.0" } }],
+            options: [{ minAppVersion: "0.11.0" }],
+            errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "BaseComponent.setDisabled", sinceVersion: "0.11.13", minAppVersion: "0.11.0" } }],
         },
         {
             name: "Global augmentation: Array.findLastIndex requires 1.4.4",
