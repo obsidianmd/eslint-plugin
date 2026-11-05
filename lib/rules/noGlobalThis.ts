@@ -65,6 +65,8 @@ export default ruleCreator({
     defaultOptions: [],
     create(context) {
         const types = getTypeInfo(context);
+        // The globals this file declares, found once when needed (see declaredInFile).
+        let fileGlobals: Set<string> | undefined;
 
         return {
             Identifier(node: TSESTree.Identifier) {
@@ -160,6 +162,19 @@ export default ruleCreator({
                 if (name === null) {
                     return "suggest";
                 }
+                // `global.DEFAULT_APP_KEY` with `declare global { var DEFAULT_APP_KEY: string }`:
+                // a global only the project declares is often a bundler's
+                // `define` key, which the bundler replaces by its exact text,
+                // so `window.DEFAULT_APP_KEY` would be undefined at runtime.
+                // A write defines the global rather than reading a define.
+                if (!isWriteTarget(skipCastsUp(parent))) {
+                    const projectOnly = types
+                        ? isDeclaredOnlyByProject(types.checker.getTypeAtLocation(types.toTs(node)).getProperty(name))
+                        : declaredInFile().has(name);
+                    if (projectOnly) {
+                        return "none";
+                    }
+                }
                 if (types) {
                     return classifyMember(node, parent, name, types);
                 }
@@ -213,6 +228,60 @@ export default ruleCreator({
             // Anything else, such as `const g = globalThis` or `{ globalThis }`,
             // takes on window's type.
             return "suggest";
+        }
+
+        // Whether every declaration of `property` is in the project's own
+        // files: not in TypeScript's lib, nor in a package such as @types/node.
+        function isDeclaredOnlyByProject(property: ts.Symbol | undefined): boolean {
+            const program = context.sourceCode.parserServices?.program;
+            const declarations = property?.declarations ?? [];
+            return (
+                !!program &&
+                declarations.length > 0 &&
+                declarations.every((declaration) => {
+                    const file = declaration.getSourceFile();
+                    return (
+                        !program.isSourceFileDefaultLibrary(file) &&
+                        !program.isSourceFileFromExternalLibrary(file) &&
+                        !/[\\/]node_modules[\\/]/.test(file.fileName)
+                    );
+                })
+            );
+        }
+
+        // Without type information: the globals this file declares,
+        // `declare var X` at its top or `var X` in `declare global { … }`.
+        function declaredInFile(): Set<string> {
+            if (fileGlobals) {
+                return fileGlobals;
+            }
+            const names = new Set<string>();
+            const addAll = (statements: readonly TSESTree.Node[], ambient: boolean) => {
+                for (let statement of statements) {
+                    if (statement.type === TSESTree.AST_NODE_TYPES.ExportNamedDeclaration && statement.declaration) {
+                        statement = statement.declaration;
+                    }
+                    if (
+                        statement.type === TSESTree.AST_NODE_TYPES.VariableDeclaration &&
+                        (ambient || statement.declare)
+                    ) {
+                        for (const declarator of statement.declarations) {
+                            if (declarator.id.type === TSESTree.AST_NODE_TYPES.Identifier) {
+                                names.add(declarator.id.name);
+                            }
+                        }
+                    } else if (
+                        statement.type === TSESTree.AST_NODE_TYPES.TSModuleDeclaration &&
+                        statement.kind === "global" &&
+                        statement.body
+                    ) {
+                        addAll(statement.body.body, true);
+                    }
+                }
+            };
+            addAll(context.sourceCode.ast.body, false);
+            fileGlobals = names;
+            return names;
         }
 
         // Fixed when `window.<name>` has the type `<global>.<name>` had. Window

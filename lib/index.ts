@@ -261,6 +261,8 @@ const WINDOW_ONLY_RULES = new Set([
 ]);
 const WORKER_FILES = [
     '**/*.worker.{ts,cts,mts,tsx,js,cjs,mjs,jsx}',
+    '**/*-worker.{ts,cts,mts,tsx,js,cjs,mjs,jsx}',
+    '**/*_worker.{ts,cts,mts,tsx,js,cjs,mjs,jsx}',
     '**/workers/**/*.{ts,cts,mts,tsx,js,cjs,mjs,jsx}',
 ];
 

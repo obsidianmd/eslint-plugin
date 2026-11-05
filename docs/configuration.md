@@ -399,8 +399,9 @@ the severity alone; `"obsidianmd/no-nodejs-modules": "error"` still reports noth
 
 A web worker has no `window`: `window`, `activeWindow`, `activeDocument` and Obsidian's DOM helpers
 do not exist there, and `globalThis` is the right way to reach the worker's own scope. The
-recommended config therefore treats files matching `**/*.worker.*` and anything under a `workers/`
-directory as worker code. It switches off the rules whose fix needs a window — `no-global-this`,
+recommended config therefore treats files matching `**/*.worker.*`, `**/*-worker.*` or `**/*_worker.*`
+(such as `search.worker.ts`, `bergamot-translator-worker.js` or `index_worker.ts`) and anything under
+a `workers/` directory as worker code. It switches off the rules whose fix needs a window — `no-global-this`,
 `prefer-active-doc`, `prefer-create-el`, `prefer-instanceof` and `prefer-window-timers` — and gives
 these files the worker globals (`self`, `importScripts`, `postMessage`, …) in place of the browser
 and Obsidian ones. In JavaScript, `no-undef` then reports `window`, `document`, `localStorage`,

@@ -59,17 +59,35 @@ export function isGlobalWindowAt(context: Context, node: TSESTree.Node): boolean
  *   or `typeof process`, from a check that cannot be followed here;
  * - it is in a `try` whose `catch` drops the error, as in
  *   `try { setTimeout(fn, 0); } catch {}`, where `window` failing would go
- *   unseen.
+ *   unseen;
+ * - the file is Emscripten output, which reads `ENVIRONMENT_IS_WORKER` or
+ *   `ENVIRONMENT_IS_NODE` to run in a web worker or in Node as well, and
+ *   calls the bare timers outside those checks.
  *
  * A rule offers its rewrite there as a suggestion, not a fix.
  */
 export function mayLackWindowAt(context: Context, node: TSESTree.Node): boolean {
     const sourceCode = context.sourceCode;
+    if (isEmscriptenOutput(sourceCode)) {
+        return true;
+    }
     const { knownChecks } = getWindowFacts(sourceCode);
     return (
         decidingConditions(node).some((condition) => readsEnvironmentName(sourceCode, condition, knownChecks)) ||
         isInSilentTry(sourceCode, node)
     );
+}
+
+const EMSCRIPTEN_ENVIRONMENT = /\bENVIRONMENT_IS_(?:WORKER|NODE)\b/;
+const emscriptenCache = new WeakMap<TSESTree.Program, boolean>();
+
+function isEmscriptenOutput(sourceCode: Context["sourceCode"]): boolean {
+    let found = emscriptenCache.get(sourceCode.ast);
+    if (found === undefined) {
+        found = EMSCRIPTEN_ENVIRONMENT.test(sourceCode.text);
+        emscriptenCache.set(sourceCode.ast, found);
+    }
+    return found;
 }
 
 /**

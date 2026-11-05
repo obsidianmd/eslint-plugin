@@ -179,8 +179,8 @@ Nothing is offered where `activeDocument` would not exist, or would not be what 
 - a local binding named `activeDocument` shadows the global, such as a parameter;
 - with type information, the program does not declare `activeDocument`, because the `obsidian`
   typings are not part of it;
-- a web worker file, by the paths the recommended config uses (`*.worker.*`, or any file under a
-  `workers` directory), or a file whose config turns the `activeDocument` global `"off"`;
+- a web worker file, by the paths the recommended config uses (`*.worker.*`, `*-worker.*`, `*_worker.*`, or any
+  file under a `workers` directory), or a file whose config turns the `activeDocument` global `"off"`;
 - code that also runs outside Obsidian, as a check before it in the same function, or one that
   decides whether it runs, shows: `typeof document`, `typeof window`, `"window" in globalThis`, a
   check of `activeDocument` or `activeWindow` themselves, such as
