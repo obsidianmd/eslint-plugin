@@ -1,5 +1,6 @@
-// Regenerates lib/rules/obsidianOverloadHistory.ts from every obsidian typings
-// package published on npm. A development tool: it is not part of the published
+// Regenerates lib/rules/obsidianOverloadHistory.ts and
+// lib/rules/obsidianDeclarationHistory.ts from every obsidian typings package
+// published on npm. A development tool: it is not part of the published
 // plugin.
 //
 //     npx tsx scripts/obsidian-overload-history.ts [--cache <dir>] [--report]
@@ -16,6 +17,21 @@
 // written for the new signature still runs on older versions, so for each such
 // overload the table records the first published typings that have it, and
 // no-unsupported-api requires the lower of the two.
+//
+// The same holds for whole members, most often ones with a single signature:
+// `ButtonComponent.setDisabled(disabled: boolean): this` is in the 0.11.13
+// typings, written as it is today, and its @since is 1.2.3. So for each
+// declaration whose name the typings had before its @since, the second table
+// records each shape it had (see obsidianDeclarations.ts) and the typings that
+// have that shape, and the rule finds the oldest typings from which on every
+// release has a shape the use fits.
+//
+// A typings release describes the app release of the same version, and is
+// published with or after it. So the first typings that declare a member are
+// an upper bound of the first app that had it: the app can have had it
+// earlier, undeclared, or in a release with no typings on npm (there are none
+// before 0.11.13), and the rule then asks for a later version than needed,
+// never an earlier one.
 
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -25,6 +41,13 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import zlib from "node:zlib";
 import { compare, lt, prerelease, valid } from "semver";
 import ts from "typescript";
+import {
+    collectDeclarationShapes,
+    indexTypeDeclarations,
+    parseShape,
+    referencedTypeNames,
+    typeHashes,
+} from "../lib/rules/obsidianDeclarations.js";
 import { getOverloadKey, getSinceTag } from "../lib/rules/obsidianOverloads.js";
 
 export interface Typings {
@@ -118,6 +141,117 @@ ${entries}
 `;
 }
 
+// The versions that have each value, as index ranges into the version list:
+// "0-5,7-48".
+function rangesOf(present: boolean[]): string {
+    const ranges: string[] = [];
+    for (let start = 0; start < present.length; start++) {
+        if (!present[start]) {
+            continue;
+        }
+        let end = start;
+        while (end + 1 < present.length && present[end + 1]) {
+            end++;
+        }
+        ranges.push(start === end ? `${start}` : `${start}-${end}`);
+        start = end;
+    }
+    return ranges.join(",");
+}
+
+export interface DeclarationHistory {
+    versions: string[];
+    // Each declaration the typings had before the version its @since names in
+    // the latest typings, with each shape it had and the versions that had it.
+    declarations: [string, [string, string][]][];
+    // Each interface, type alias and enum those shapes refer to, with the hash
+    // of its meaning in each version that declares it.
+    types: [string, [string, string][]][];
+}
+
+export function buildDeclarationHistory(typings: Typings[]): DeclarationHistory {
+    const parsed = typings.map(({ version, text }) => {
+        const sourceFile = ts.createSourceFile("obsidian.d.ts", text, ts.ScriptTarget.Latest, true);
+        const index = indexTypeDeclarations(sourceFile);
+        return { version, shapes: collectDeclarationShapes(sourceFile), index, hash: typeHashes(index) };
+    });
+    const versions = parsed.map(({ version }) => version);
+    const latest = parsed[parsed.length - 1];
+    const declarations: [string, [string, string][]][] = [];
+    const referenced = new Set<string>();
+    for (const [name, latestShapes] of latest.shapes) {
+        let since: string | undefined;
+        for (const { since: raw } of latestShapes) {
+            const version = raw === undefined ? null : valid(raw);
+            if (version && (!since || lt(since, version))) {
+                since = version;
+            }
+        }
+        const first = parsed.find((entry) => entry.shapes.has(name));
+        if (!since || !first || !lt(first.version, since)) {
+            continue;
+        }
+        const shapes = new Map<string, boolean[]>();
+        parsed.forEach((entry, i) => {
+            for (const { shape } of entry.shapes.get(name) ?? []) {
+                const present = shapes.get(shape) ?? versions.map(() => false);
+                present[i] = true;
+                shapes.set(shape, present);
+            }
+        });
+        declarations.push([name, [...shapes].map(([shape, present]) => [rangesOf(present), shape])]);
+        for (const shape of shapes.keys()) {
+            const node = parseShape(shape);
+            for (const type of node ? referencedTypeNames(node) : []) {
+                referenced.add(type);
+            }
+        }
+    }
+    const types: [string, [string, string][]][] = [];
+    for (const name of [...referenced].sort()) {
+        const hashes = new Map<string, boolean[]>();
+        parsed.forEach((entry, i) => {
+            const hash = entry.hash(name);
+            if (hash !== undefined) {
+                const present = hashes.get(hash) ?? versions.map(() => false);
+                present[i] = true;
+                hashes.set(hash, present);
+            }
+        });
+        if (hashes.size > 0) {
+            types.push([name, [...hashes].map(([hash, present]) => [rangesOf(present), hash])]);
+        }
+    }
+    return { versions, declarations, types };
+}
+
+export function renderDeclarationHistoryModule(history: DeclarationHistory): string {
+    const { versions } = history;
+    const rows = (entries: [string, [string, string][]][]) =>
+        entries.map(([name, values]) => `    ${JSON.stringify(name)}: ${JSON.stringify(values)},`).join("\n");
+    return `// Generated by scripts/obsidian-overload-history.ts from the obsidian typings
+// published on npm, ${versions[0]} to ${versions[versions.length - 1]} (${versions.length} versions). Do not edit:
+// regenerate with \`npx tsx scripts/obsidian-overload-history.ts\`.
+//
+// The declarations of the ${versions[versions.length - 1]} typings that earlier typings had before the
+// version their @since names, by qualified name, with each shape the declaration
+// had (see obsidianDeclarations.ts) and the versions that have it, as index
+// ranges into DECLARATION_HISTORY_VERSIONS. TYPE_HISTORY has the hash of each
+// interface, type alias and enum those shapes refer to, by version, so the rule
+// can tell that a name meant the same then as in the plugin's typings.
+
+export const DECLARATION_HISTORY_VERSIONS: readonly string[] = ${JSON.stringify(versions)};
+
+export const DECLARATION_HISTORY: Readonly<Record<string, readonly (readonly [versions: string, shape: string])[]>> = {
+${rows(history.declarations)}
+};
+
+export const TYPE_HISTORY: Readonly<Record<string, readonly (readonly [versions: string, hash: string])[]>> = {
+${rows(history.types)}
+};
+`;
+}
+
 // One file of an npm package tarball.
 function readFromTarball(tarball: Buffer, wanted: string): string | undefined {
     const tar = zlib.gunzipSync(tarball);
@@ -173,6 +307,10 @@ function main(): void {
     const out = fileURLToPath(new URL("../lib/rules/obsidianOverloadHistory.ts", import.meta.url));
     fs.writeFileSync(out, renderHistoryModule(source, versions, rows));
     console.log(`Wrote ${path.relative(process.cwd(), out)}: ${historyEntries(rows).length} entries from ${versions.length} versions (${versions[0]} to ${source}).`);
+    const declarations = buildDeclarationHistory(typings);
+    const declarationsOut = fileURLToPath(new URL("../lib/rules/obsidianDeclarationHistory.ts", import.meta.url));
+    fs.writeFileSync(declarationsOut, renderDeclarationHistoryModule(declarations));
+    console.log(`Wrote ${path.relative(process.cwd(), declarationsOut)}: ${declarations.declarations.length} declarations, ${declarations.types.length} types.`);
     if (args.includes("--report")) {
         console.log("\n| Member | Overload | @since | First published | Required |");
         console.log("| :-- | :-- | :-- | :-- | :-- |");

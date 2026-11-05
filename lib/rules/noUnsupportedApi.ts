@@ -8,6 +8,17 @@ import ts from "typescript";
 import { getManifest } from "../manifest.js";
 import { toVersion } from "../minAppVersion.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
+import { DECLARATION_HISTORY, DECLARATION_HISTORY_VERSIONS, TYPE_HISTORY } from "./obsidianDeclarationHistory.js";
+import {
+    classShape,
+    indexTypeDeclarations,
+    memberShape,
+    normalize,
+    parseShape,
+    referencedTypeNames,
+    signatureShape,
+    typeHashes,
+} from "./obsidianDeclarations.js";
 import { OVERLOAD_HISTORY } from "./obsidianOverloadHistory.js";
 import { getLiteralParameters, getOverloadKey, getSinceTag } from "./obsidianOverloads.js";
 
@@ -109,7 +120,9 @@ export default ruleCreator<Options, "apiNotAvailable">({
             return {};
         }
         const sinceMap = buildSinceMap(dtsPath);
+        const history = getDeclarationHistory(dtsPath);
         const reported = new WeakSet<TSESTree.Node>();
+        const declaredTypes = new WeakMap<ts.SourceFile, Map<string, ts.Type | undefined>>();
         const earlyExits = new WeakMap<TSESTree.Node, EarlyExit[]>();
 
         return {
@@ -181,7 +194,7 @@ export default ruleCreator<Options, "apiNotAvailable">({
             symbol?: ts.Symbol,
             call?: TSESTree.CallExpression,
         ): void {
-            if (!symbol || reported.has(node)) {
+            if (!symbol || reported.has(node) || isFeatureTest(node)) {
                 return;
             }
             const resolved = resolveSymbol(symbol);
@@ -209,13 +222,45 @@ export default ruleCreator<Options, "apiNotAvailable">({
 
             for (const [qualifiedName, overloads] of members) {
                 const entry = sinceMap.get(qualifiedName);
-                const sinceVersion = entry && requiredVersion(qualifiedName, entry, overloads, call);
+                const required = entry && requiredVersion(qualifiedName, entry, overloads, call);
+                let sinceVersion = required?.version;
 
-                if (!sinceVersion) {
+                if (!required || !sinceVersion) {
                     continue;
                 }
                 if (gt(sinceVersion, minVersion)) {
-                    if (isGuardedByRequireApiVersion(node, sinceVersion)) {
+                    const used = required.called ? [required.called] : overloads;
+                    const declared = history.firstDeclared(qualifiedName, (shape, at) =>
+                        fitsShape(shape, at, used, required.called && call),
+                    );
+                    if (declared && lt(declared, sinceVersion)) {
+                        sinceVersion = declared;
+                    }
+                }
+                const oldest = DECLARATION_HISTORY_VERSIONS[0];
+                if (
+                    sinceVersion === oldest &&
+                    entry?.some(([, value]) => {
+                        const since = toSince(value);
+                        return since !== null && gt(since, oldest);
+                    })
+                ) {
+                    // Older than its @since, the member is in the oldest typings on
+                    // npm, which tell only that the app had it by then, not since
+                    // when. A plugin with a lower minAppVersion is not told that it
+                    // needs that release.
+                    continue;
+                }
+                if (gt(sinceVersion, minVersion)) {
+                    // A check that the member exists proves enough only when
+                    // existing is all the use needs: not for a call that needs a
+                    // newer signature of a member older typings had.
+                    const existence = history.firstDeclared(qualifiedName, () => true) ?? sinceVersion;
+                    const feature = existence === sinceVersion ? featureKey(node) : undefined;
+                    if (
+                        (feature !== undefined && call?.optional === true && call.callee === node) ||
+                        isGuardedByRequireApiVersion(node, sinceVersion, feature)
+                    ) {
                         return;
                     }
                     reported.add(node);
@@ -233,6 +278,280 @@ export default ruleCreator<Options, "apiNotAvailable">({
             }
         }
 
+        // Whether a use of one of `declarations` fits a shape an older
+        // release declared the member with, that release's types being those
+        // at index `at` of the history. A use fits the shape a declaration has
+        // now. A call to a single declaration, `call` being given, also fits a
+        // shape it can make with the same effect: see callFits.
+        function fitsShape(
+            shape: ShapeEntry,
+            at: number,
+            declarations: ts.Declaration[],
+            call: TSESTree.CallExpression | undefined,
+        ): boolean {
+            const sameAsNow = declarations.some((declaration) => shapeOf(declaration) === shape.text);
+            if (sameAsNow && history.sameTypes(shape.node, at, declarations[0].getSourceFile())) {
+                return true;
+            }
+            const [declaration] = declarations;
+            return (
+                call !== undefined &&
+                shape.node !== undefined &&
+                ts.isFunctionTypeNode(shape.node) &&
+                (ts.isMethodDeclaration(declaration) ||
+                    ts.isMethodSignature(declaration) ||
+                    ts.isFunctionDeclaration(declaration)) &&
+                callFits(shape.node, declaration, call, at)
+            );
+        }
+
+        // Whether a call to `declaration` would do the same with the older
+        // signature `old`: it passes no more arguments than that takes and at
+        // least those it requires, each argument is one the old parameter takes
+        // too, and the result is either typed the same or unused. When that
+        // cannot be told, as for a spread argument, a rest or generic
+        // parameter, or a parameter type that changed beyond what the checks
+        // below follow, it does not fit.
+        function callFits(
+            old: ts.FunctionTypeNode,
+            declaration: ts.SignatureDeclaration,
+            call: TSESTree.CallExpression,
+            at: number,
+        ): boolean {
+            const sourceFile = declaration.getSourceFile();
+            const same = (a: ts.TypeNode | undefined, b: ts.TypeNode | undefined) =>
+                sameType(a, b, at, sourceFile);
+            const oldParameters = callerParameters(old);
+            const parameters = callerParameters(declaration);
+            if (
+                old.typeParameters?.length ||
+                declaration.typeParameters?.length ||
+                [...oldParameters, ...parameters].some((parameter) => parameter.dotDotDotToken) ||
+                call.arguments.some((argument) => argument.type === AST_NODE_TYPES.SpreadElement)
+            ) {
+                return false;
+            }
+            const required = oldParameters.filter((parameter) => !parameter.questionToken && !parameter.initializer).length;
+            if (
+                call.arguments.length < required ||
+                call.arguments.length > oldParameters.length ||
+                call.arguments.length > parameters.length
+            ) {
+                return false;
+            }
+            for (const [index, argument] of call.arguments.entries()) {
+                const was = oldParameters[index].type;
+                const is = parameters[index].type;
+                if (
+                    !same(was, is) &&
+                    !acceptsAll(was) &&
+                    !olderTypeAccepts(was, argument, at, sourceFile) &&
+                    !callbackFits(was, is, argument, at, sourceFile)
+                ) {
+                    return false;
+                }
+            }
+            return same(old.type, declaration.type) || isResultUnused(call);
+        }
+
+        // Whether a function the plugin passes for a parameter typed `is`, which
+        // the older release typed `was`, works when that release calls it: each
+        // parameter the function declares, the release passes, with a type the
+        // function's parameter takes, and the release accepts whatever it
+        // returns.
+        function callbackFits(
+            was: ts.TypeNode | undefined,
+            is: ts.TypeNode | undefined,
+            argument: TSESTree.CallExpressionArgument,
+            at: number,
+            sourceFile: ts.SourceFile,
+        ): boolean {
+            if (
+                !was ||
+                !is ||
+                !ts.isFunctionTypeNode(was) ||
+                !ts.isFunctionTypeNode(is) ||
+                was.typeParameters?.length ||
+                is.typeParameters?.length ||
+                thisParameterText(was) !== thisParameterText(is)
+            ) {
+                return false;
+            }
+            const oldParameters = callerParameters(was);
+            const parameters = callerParameters(is);
+            const declared =
+                argument.type === AST_NODE_TYPES.ArrowFunctionExpression ||
+                argument.type === AST_NODE_TYPES.FunctionExpression
+                    ? argument.params.some((param) => param.type === AST_NODE_TYPES.RestElement)
+                        ? Infinity
+                        : argument.params.filter(
+                              (param) => !(param.type === AST_NODE_TYPES.Identifier && param.name === "this"),
+                          ).length
+                    : parameters.length;
+            for (let index = 0; index < Math.min(declared, parameters.length); index++) {
+                const oldParameter = oldParameters[index] as ts.ParameterDeclaration | undefined;
+                const parameter = parameters[index];
+                if (
+                    !oldParameter ||
+                    oldParameter.dotDotDotToken ||
+                    parameter.dotDotDotToken ||
+                    (oldParameter.questionToken && !parameter.questionToken) ||
+                    !isNarrowerType(oldParameter.type, parameter.type, at, sourceFile)
+                ) {
+                    return false;
+                }
+            }
+            return ignoresResult(was.type) || sameType(was.type, is.type, at, sourceFile);
+        }
+
+        // Whether `was` is `is`, or each type of its union is one of `is`'s.
+        function isNarrowerType(
+            was: ts.TypeNode | undefined,
+            is: ts.TypeNode | undefined,
+            at: number,
+            sourceFile: ts.SourceFile,
+        ): boolean {
+            if (sameType(was, is, at, sourceFile) || acceptsAll(is)) {
+                return true;
+            }
+            if (!was || !is) {
+                return false;
+            }
+            const members = unionMembers(is);
+            return unionMembers(was).every((member) =>
+                members.some((candidate) => sameType(member, candidate, at, sourceFile)),
+            );
+        }
+
+        // Whether every value the argument can have is of an older parameter
+        // type made of `string`, `number`, `boolean`, `null`, `undefined`,
+        // literals and names of types that meant then what they mean in the
+        // plugin's typings: the `boolean` of `getLeaf(newLeaf?: boolean)` before
+        // it took a PaneType, the `Point` of `showAtPosition(position: Point)`
+        // before it took a MenuPositionDef.
+        function olderTypeAccepts(
+            type: ts.TypeNode | undefined,
+            argument: TSESTree.CallExpressionArgument,
+            at: number,
+            sourceFile: ts.SourceFile,
+        ): boolean {
+            if (!type) {
+                return false;
+            }
+            const simple: ts.TypeNode[] = [];
+            const named: ts.Type[] = [];
+            for (const member of unionMembers(type)) {
+                if (isSimpleType(member)) {
+                    simple.push(member);
+                    continue;
+                }
+                const declared =
+                    ts.isTypeReferenceNode(member) &&
+                    ts.isIdentifier(member.typeName) &&
+                    !member.typeArguments &&
+                    typeof checker.isTypeAssignableTo === "function" &&
+                    history.sameTypes(member, at, sourceFile)
+                        ? getDeclaredType(sourceFile, member.typeName.text)
+                        : undefined;
+                if (!declared) {
+                    return false;
+                }
+                named.push(declared);
+            }
+            const argumentType = checker.getTypeAtLocation(services.esTreeNodeToTSNodeMap.get(argument));
+            const values = argumentType.isUnion() ? argumentType.types : [argumentType];
+            return values.every(
+                (value) =>
+                    !(value.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) &&
+                    (simple.some((member) => simpleTypeHolds(member, value)) ||
+                        named.some((target) => checker.isTypeAssignableTo(value, target))),
+            );
+        }
+
+        // The type a class, interface, type alias or enum of the plugin's
+        // obsidian.d.ts declares, by name.
+        function getDeclaredType(sourceFile: ts.SourceFile, name: string): ts.Type | undefined {
+            let types = declaredTypes.get(sourceFile);
+            if (!types) {
+                types = new Map();
+                declaredTypes.set(sourceFile, types);
+            }
+            if (!types.has(name)) {
+                const declaration = findTypeDeclaration(sourceFile.statements, name);
+                const symbol = declaration?.name && checker.getSymbolAtLocation(declaration.name);
+                types.set(name, symbol ? checker.getDeclaredTypeOfSymbol(symbol) : undefined);
+            }
+            return types.get(name);
+        }
+
+        function simpleTypeHolds(member: ts.TypeNode, value: ts.Type): boolean {
+            if (value.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) {
+                return false;
+            }
+            switch (member.kind) {
+                case ts.SyntaxKind.StringKeyword:
+                    return (value.flags & ts.TypeFlags.StringLike) !== 0;
+                case ts.SyntaxKind.NumberKeyword:
+                    return (value.flags & ts.TypeFlags.NumberLike) !== 0;
+                case ts.SyntaxKind.BooleanKeyword:
+                    return (value.flags & ts.TypeFlags.BooleanLike) !== 0;
+                case ts.SyntaxKind.UndefinedKeyword:
+                    return (value.flags & (ts.TypeFlags.Undefined | ts.TypeFlags.Void)) !== 0;
+            }
+            if (!ts.isLiteralTypeNode(member)) {
+                return false;
+            }
+            const literal = member.literal;
+            if (literal.kind === ts.SyntaxKind.NullKeyword) {
+                return (value.flags & ts.TypeFlags.Null) !== 0;
+            }
+            if (literal.kind === ts.SyntaxKind.TrueKeyword || literal.kind === ts.SyntaxKind.FalseKeyword) {
+                return (
+                    (value.flags & ts.TypeFlags.BooleanLiteral) !== 0 &&
+                    checker.typeToString(value) === (literal.kind === ts.SyntaxKind.TrueKeyword ? "true" : "false")
+                );
+            }
+            if (ts.isStringLiteral(literal)) {
+                return value.isStringLiteral() && value.value === literal.text;
+            }
+            if (ts.isNumericLiteral(literal)) {
+                return value.isNumberLiteral() && value.value === Number(literal.text);
+            }
+            return false;
+        }
+
+        // Whether two types are written the same, and each interface, type
+        // alias and enum they name meant the same in the older release as in
+        // the plugin's typings.
+        function sameType(
+            was: ts.TypeNode | undefined,
+            is: ts.TypeNode | undefined,
+            at: number,
+            sourceFile: ts.SourceFile,
+        ): boolean {
+            if (!was || !is) {
+                return !was && !is;
+            }
+            return normalize(was) === normalize(is) && history.sameTypes(was, at, sourceFile);
+        }
+
+        // Whether nothing reads what the call returns, so a release where it
+        // returned something else, as `revealLeaf()` returned void before 1.7.2
+        // and a Promise since, behaves the same: a statement of its own, also
+        // awaited or after `void`.
+        function isResultUnused(call: TSESTree.CallExpression): boolean {
+            let node: TSESTree.Node = call;
+            if (node.parent?.type === AST_NODE_TYPES.ChainExpression) {
+                node = node.parent;
+            }
+            if (node.parent?.type === AST_NODE_TYPES.AwaitExpression) {
+                node = node.parent;
+            } else if (node.parent?.type === AST_NODE_TYPES.UnaryExpression && node.parent.operator === "void") {
+                return true;
+            }
+            return node.parent?.type === AST_NODE_TYPES.ExpressionStatement;
+        }
+
         // The version a use of a member needs, from the @since of its
         // declarations. A call needs the version of the overload it calls,
         // when the checker can tell which one that is. Any other use, such as
@@ -240,13 +559,14 @@ export default ruleCreator<Options, "apiNotAvailable">({
         // or none, needs the member to exist, which it does from its earliest
         // overload on. An overload without @since needs no version, and one
         // published before its @since (see obsidianOverloadHistory.ts) needs
-        // only the version that first had it.
+        // only the version that first had it. `called` is the overload a call
+        // calls, where that is known.
         function requiredVersion(
             qualifiedName: QualifiedName,
             entry: SinceEntry,
             overloads: ts.Declaration[],
             call: TSESTree.CallExpression | undefined,
-        ): Version | undefined {
+        ): { version: Version | undefined; called: ts.Declaration | undefined } {
             // A declaration the entry does not list, as when the cache was built
             // from another copy of the file, counts as the entry's earliest.
             const sinceOf = (declaration: ts.Declaration): Version | null => {
@@ -256,11 +576,35 @@ export default ruleCreator<Options, "apiNotAvailable">({
             };
             const versions = overloads.map(sinceOf);
             const earliest = earliestOf(versions);
-            if (!call || versions.every((version) => version === earliest)) {
-                return earliest ?? undefined;
+            if (!call) {
+                return { version: earliest ?? undefined, called: undefined };
+            }
+            if (versions.every((version) => version === earliest)) {
+                return { version: earliest ?? undefined, called: resolvedOverload(call, overloads) };
             }
             const called = calledOverload(call, overloads, sinceOf);
-            return (called ? sinceOf(called) : earliest) ?? undefined;
+            return { version: (called ? sinceOf(called) : earliest) ?? undefined, called };
+        }
+
+        // The overload the checker resolves `call` to, if the call's arguments
+        // fit it: the only one, or one of several.
+        function resolvedOverload(
+            call: TSESTree.CallExpression,
+            overloads: ts.Declaration[],
+        ): ts.Declaration | undefined {
+            const tsCall = services.esTreeNodeToTSNodeMap.get(call);
+            const resolved = checker.getResolvedSignature(tsCall)?.declaration;
+            if (!resolved || !overloads.includes(resolved)) {
+                return undefined;
+            }
+            if (overloads.length === 1) {
+                return resolved;
+            }
+            const signature = checker
+                .getNonNullableType(checker.getTypeAtLocation(tsCall.expression))
+                .getCallSignatures()
+                .find((candidate) => candidate.declaration === resolved);
+            return signature && fits(signature, call, tsCall, false) === true ? resolved : undefined;
         }
 
         // The overload `call` calls: the one a string literal argument picks
@@ -474,11 +818,152 @@ export default ruleCreator<Options, "apiNotAvailable">({
             }
         }
 
-        // Whether `node` can only run once a `requireApiVersion` check has proven
-        // `sinceVersion` available.
-        function isGuardedByRequireApiVersion(node: TSESTree.Node, sinceVersion: string): boolean {
+        // The members a test proves to exist when it evaluates truthy (or
+        // falsy), by featureKey: `typeof x.m === "function"`, `typeof x.m !==
+        // "undefined"`, `x.m != null`, `"m" in x` and `x.m` itself, also negated
+        // and combined with `&&` and `||`.
+        function featuresWhen(expr: TSESTree.Expression, truthy: boolean): Set<string> {
+            switch (expr.type) {
+                case AST_NODE_TYPES.UnaryExpression:
+                    return expr.operator === "!" ? featuresWhen(expr.argument, !truthy) : new Set();
+                case AST_NODE_TYPES.LogicalExpression: {
+                    if (expr.operator === "??") {
+                        return new Set();
+                    }
+                    const left = featuresWhen(expr.left, truthy);
+                    const right = featuresWhen(expr.right, truthy);
+                    // As in versionWhen: both sides held, or only one of them.
+                    return (expr.operator === "&&") === truthy
+                        ? new Set([...left, ...right])
+                        : new Set([...left].filter((key) => right.has(key)));
+                }
+                case AST_NODE_TYPES.BinaryExpression: {
+                    if (expr.operator === "in") {
+                        const object = featureKey(expr.right);
+                        return truthy &&
+                            object !== undefined &&
+                            expr.left.type === AST_NODE_TYPES.Literal &&
+                            typeof expr.left.value === "string"
+                            ? new Set([`${object}.${expr.left.value}`])
+                            : new Set();
+                    }
+                    const negated = expr.operator === "!==" || expr.operator === "!=";
+                    if (!negated && expr.operator !== "===" && expr.operator !== "==") {
+                        return new Set();
+                    }
+                    const sides: [TSESTree.Node, TSESTree.Node][] = [
+                        [expr.left, expr.right],
+                        [expr.right, expr.left],
+                    ];
+                    for (const [subject, other] of sides) {
+                        const typeOf =
+                            subject.type === AST_NODE_TYPES.UnaryExpression && subject.operator === "typeof"
+                                ? featureKey(subject.argument)
+                                : undefined;
+                        const literal = other.type === AST_NODE_TYPES.Literal ? other.value : undefined;
+                        // `typeof x.m === "function"` and `typeof x.m !== "undefined"`.
+                        if (typeOf !== undefined && (literal === "function" || literal === "undefined")) {
+                            const exists = literal === "function" ? !negated : negated;
+                            return exists === truthy ? new Set([typeOf]) : new Set();
+                        }
+                        // `x.m != null`, `x.m != undefined` and `x.m !== undefined`,
+                        // but not `x.m !== null`, which holds for a missing member.
+                        const key = featureKey(subject);
+                        const loose = expr.operator === "==" || expr.operator === "!=";
+                        const isUndefined = other.type === AST_NODE_TYPES.Identifier && other.name === "undefined";
+                        const isNull = other.type === AST_NODE_TYPES.Literal && other.raw === "null";
+                        if (
+                            key !== undefined &&
+                            typeOf === undefined &&
+                            negated === truthy &&
+                            (isUndefined || (loose && isNull))
+                        ) {
+                            return new Set([key]);
+                        }
+                    }
+                    return new Set();
+                }
+                case AST_NODE_TYPES.MemberExpression:
+                case AST_NODE_TYPES.ChainExpression:
+                case AST_NODE_TYPES.TSNonNullExpression: {
+                    const key = featureKey(expr);
+                    return truthy && key !== undefined ? new Set([key]) : new Set();
+                }
+                default:
+                    return new Set();
+            }
+        }
+
+        // The version an override of one of the OBSIDIAN_CALLED_HOOKS proves
+        // for its own body: Obsidian calls the override only from the release
+        // that added the method on. `getSettingDefinitions()` in a SettingTab
+        // subclass runs on 1.13.0 and later, and `onPaneMenu()` in a View on
+        // 0.15.3 and later. The release that added it is the first that
+        // declares it, or its @since when that is lower. A file that names the
+        // method other than as `super.name`, as `this.getSettingDefinitions()`,
+        // may call it itself on an earlier release, so there it proves nothing.
+        function versionOfOverride(method: TSESTree.MethodDefinition): Version | undefined {
+            if (
+                method.static ||
+                method.kind !== "method" ||
+                method.computed ||
+                method.key.type !== AST_NODE_TYPES.Identifier ||
+                !OBSIDIAN_CALLED_HOOKS.has(method.key.name)
+            ) {
+                return undefined;
+            }
+            const name = method.key.name;
+            if (new RegExp(`(?<!\\bsuper\\s*)\\.\\s*${name}\\b`).test(context.sourceCode.text)) {
+                return undefined;
+            }
+            const tsClass = services.esTreeNodeToTSNodeMap.get(method.parent.parent) as ts.ClassLikeDeclaration;
+            const classSymbol = tsClass.name
+                ? checker.getSymbolAtLocation(tsClass.name)
+                : checker.getTypeAtLocation(tsClass).getSymbol();
+            if (!classSymbol) {
+                return undefined;
+            }
+            const instance = checker.getDeclaredTypeOfSymbol(classSymbol);
+            if (!instance.isClassOrInterface()) {
+                return undefined;
+            }
+            let proven: Version | undefined;
+            for (const base of checker.getBaseTypes(instance)) {
+                for (const declaration of base.getProperty(name)?.getDeclarations() ?? []) {
+                    const parentName = getParentTypeName(declaration);
+                    if (!parentName || !isObsidianDeclaration(declaration) || isPluginSuppliedMember(declaration)) {
+                        continue;
+                    }
+                    const qualifiedName = `${parentName}.${name}`;
+                    const entry = sinceMap.get(qualifiedName);
+                    const since = entry && earliestOf(entry.map(([, value]) => toSince(value)));
+                    if (!since) {
+                        continue;
+                    }
+                    const declared = history.firstDeclared(qualifiedName, () => true);
+                    const version = declared && lt(declared, since) ? declared : since;
+                    if (!proven || gt(version, proven)) {
+                        proven = version;
+                    }
+                }
+            }
+            return proven;
+        }
+
+        // Whether `node` can only run once a check has proven `sinceVersion`
+        // available: a `requireApiVersion` check, being in an override of a
+        // method only that version calls, or, where the member existing is
+        // all the use needs, a check that `feature` exists.
+        function isGuardedByRequireApiVersion(
+            node: TSESTree.Node,
+            sinceVersion: string,
+            feature: string | undefined,
+        ): boolean {
             const covers = (version: Version | undefined) =>
                 version !== undefined && !gt(sinceVersion, version);
+            const proves = (test: TSESTree.Expression, truthy: boolean) =>
+                covers(versionWhen(test, truthy)) ||
+                (feature !== undefined && provesFeature(featuresWhen(test, truthy), feature));
 
             let current: TSESTree.Node | undefined = node.parent;
             let prevChild: TSESTree.Node = node;
@@ -488,24 +973,32 @@ export default ruleCreator<Options, "apiNotAvailable">({
                     current.type === AST_NODE_TYPES.IfStatement ||
                     current.type === AST_NODE_TYPES.ConditionalExpression
                 ) {
-                    if (prevChild === current.consequent && covers(versionWhen(current.test, true))) {
+                    if (prevChild === current.consequent && proves(current.test, true)) {
                         return true;
                     }
-                    if (prevChild === current.alternate && covers(versionWhen(current.test, false))) {
+                    if (prevChild === current.alternate && proves(current.test, false)) {
                         return true;
                     }
                 } else if (current.type === AST_NODE_TYPES.LogicalExpression) {
                     if (
                         prevChild === current.right &&
                         current.operator !== "??" &&
-                        covers(versionWhen(current.left, current.operator === "&&"))
+                        proves(current.left, current.operator === "&&")
                     ) {
                         return true;
                     }
                 } else if (
+                    current.type === AST_NODE_TYPES.MethodDefinition &&
+                    prevChild === current.value &&
+                    covers(versionOfOverride(current))
+                ) {
+                    return true;
+                } else if (
                     !isHoistedFunction(prevChild) &&
                     getEarlyExits(current).some(
-                        (exit) => exit.end <= prevChild.range[0] && covers(exit.version),
+                        (exit) =>
+                            exit.end <= prevChild.range[0] &&
+                            (covers(exit.version) || (feature !== undefined && provesFeature(exit.features, feature))),
                     )
                 ) {
                     return true;
@@ -525,9 +1018,9 @@ export default ruleCreator<Options, "apiNotAvailable">({
             if (!exits) {
                 exits = [];
                 for (const statement of getStatements(container)) {
-                    const version = versionAfterEarlyExit(statement);
-                    if (version !== undefined) {
-                        exits.push({ end: statement.range[1], version });
+                    const exit = afterEarlyExit(statement);
+                    if (exit && (exit.version !== undefined || exit.features.size > 0)) {
+                        exits.push({ end: statement.range[1], ...exit });
                     }
                 }
                 earlyExits.set(container, exits);
@@ -535,21 +1028,22 @@ export default ruleCreator<Options, "apiNotAvailable">({
             return exits;
         }
 
-        // The version proven for the statements after `if (test) <exit>`, which
-        // only run when `test` was falsy (or truthy, for `if (test) {} else <exit>`).
-        function versionAfterEarlyExit(statement: TSESTree.Statement): Version | undefined {
+        // The version and the members proven for the statements after `if
+        // (test) <exit>`, which only run when `test` was falsy (or truthy, for
+        // `if (test) {} else <exit>`).
+        function afterEarlyExit(
+            statement: TSESTree.Statement,
+        ): { version: Version | undefined; features: Set<string> } | undefined {
             if (statement.type !== AST_NODE_TYPES.IfStatement) {
                 return undefined;
             }
             const consequentExits = alwaysExits(statement.consequent);
             const alternateExits = statement.alternate !== null && alwaysExits(statement.alternate);
-            if (consequentExits && !alternateExits) {
-                return versionWhen(statement.test, false);
+            if (consequentExits === alternateExits) {
+                return undefined;
             }
-            if (alternateExits && !consequentExits) {
-                return versionWhen(statement.test, true);
-            }
-            return undefined;
+            const truthy = alternateExits;
+            return { version: versionWhen(statement.test, truthy), features: featuresWhen(statement.test, truthy) };
         }
     }
 });
@@ -577,6 +1071,334 @@ function isContextSensitive(node: TSESTree.Node): boolean {
         default:
             return false;
     }
+}
+
+// Methods only Obsidian calls, which a plugin overrides: settings definitions
+// and their values (1.13), the external change to data.json (1.5.7) and the
+// pane menu (0.15.3).
+const OBSIDIAN_CALLED_HOOKS = new Set([
+    "getSettingDefinitions",
+    "getControlValue",
+    "setControlValue",
+    "onExternalSettingsChange",
+    "onPaneMenu",
+]);
+
+// A shape an older release declared a member with, from
+// obsidianDeclarationHistory.ts: its text, parsed, and whether each release of
+// DECLARATION_HISTORY_VERSIONS had it.
+interface ShapeEntry {
+    text: string;
+    node: ts.Node | undefined;
+    present: boolean[];
+    // The types it names that TYPE_HISTORY follows.
+    types: string[];
+}
+
+function parseRanges(ranges: string): boolean[] {
+    const present = DECLARATION_HISTORY_VERSIONS.map(() => false);
+    for (const range of ranges.split(",")) {
+        const [start, end = start] = range.split("-").map(Number);
+        for (let i = start; i <= end; i++) {
+            present[i] = true;
+        }
+    }
+    return present;
+}
+
+const shapeEntries = new Map<QualifiedName, ShapeEntry[] | undefined>();
+
+function getShapeEntries(qualifiedName: QualifiedName): ShapeEntry[] | undefined {
+    if (!shapeEntries.has(qualifiedName)) {
+        const listed = Object.hasOwn(DECLARATION_HISTORY, qualifiedName) ? DECLARATION_HISTORY[qualifiedName] : undefined;
+        shapeEntries.set(
+            qualifiedName,
+            listed?.map(([ranges, text]) => {
+                const node = parseShape(text);
+                return {
+                    text,
+                    node,
+                    present: parseRanges(ranges),
+                    types: node ? [...referencedTypeNames(node)].filter((name) => Object.hasOwn(TYPE_HISTORY, name)) : [],
+                };
+            }),
+        );
+    }
+    return shapeEntries.get(qualifiedName);
+}
+
+const typeHashesAt = new Map<string, (string | undefined)[]>();
+
+// The hash TYPE_HISTORY gives a type in each release, undefined where the
+// release does not declare it as an interface, type alias or enum.
+function getTypeHashes(name: string): (string | undefined)[] {
+    let hashes = typeHashesAt.get(name);
+    if (!hashes) {
+        hashes = DECLARATION_HISTORY_VERSIONS.map(() => undefined);
+        for (const [ranges, hash] of Object.hasOwn(TYPE_HISTORY, name) ? TYPE_HISTORY[name] : []) {
+            parseRanges(ranges).forEach((present, i) => {
+                if (present) {
+                    hashes![i] = hash;
+                }
+            });
+        }
+        typeHashesAt.set(name, hashes);
+    }
+    return hashes;
+}
+
+const installedTypeHashes = new WeakMap<ts.SourceFile, (name: string) => string | undefined>();
+
+function getInstalledTypeHash(sourceFile: ts.SourceFile, name: string): string | undefined {
+    let hash = installedTypeHashes.get(sourceFile);
+    if (!hash) {
+        hash = typeHashes(indexTypeDeclarations(sourceFile));
+        installedTypeHashes.set(sourceFile, hash);
+    }
+    return hash(name);
+}
+
+interface DeclarationHistory {
+    // The release from which on, up to the plugin's typings, every release
+    // declared the member with a shape `fits` accepts, or undefined where the
+    // history has no such release or does not list the member.
+    firstDeclared(
+        qualifiedName: QualifiedName,
+        fits: (shape: ShapeEntry, at: number) => boolean,
+    ): Version | undefined;
+    // Whether every type `node` names that TYPE_HISTORY follows meant in the
+    // release at index `at` what it means in the plugin's typings.
+    sameTypes(node: ts.Node | undefined, at: number, sourceFile: ts.SourceFile): boolean;
+}
+
+const histories = new Map<string, DeclarationHistory>();
+
+function getDeclarationHistory(dtsPath: string): DeclarationHistory {
+    let history = histories.get(dtsPath);
+    if (!history) {
+        history = declarationHistoryFor(getObsidianVersion(dtsPath));
+        histories.set(dtsPath, history);
+    }
+    return history;
+}
+
+// The history up to the plugin's own typings: a release after those says
+// nothing about what the plugin's typings declare.
+function declarationHistoryFor(installedVersion: string | undefined): DeclarationHistory {
+    const installed = installedVersion && valid(installedVersion);
+    let last = DECLARATION_HISTORY_VERSIONS.length - 1;
+    while (installed && last >= 0 && gt(DECLARATION_HISTORY_VERSIONS[last], installed)) {
+        last--;
+    }
+    const sameTypes = (node: ts.Node | undefined, at: number, sourceFile: ts.SourceFile) =>
+        node !== undefined &&
+        [...referencedTypeNames(node)].every(
+            (name) => getTypeHashes(name)[at] === getInstalledTypeHash(sourceFile, name),
+        );
+    return {
+        firstDeclared(qualifiedName, fits) {
+            const entries = getShapeEntries(qualifiedName);
+            if (!entries) {
+                return undefined;
+            }
+            // Whether a shape fits depends on the release only through the
+            // types it names, which change in few releases.
+            const decided = new Map<string, boolean>();
+            const fitsAt = (entry: ShapeEntry, at: number) => {
+                const key = `${entries.indexOf(entry)}:${entry.types.map((name) => getTypeHashes(name)[at]).join(",")}`;
+                let result = decided.get(key);
+                if (result === undefined) {
+                    result = fits(entry, at);
+                    decided.set(key, result);
+                }
+                return result;
+            };
+            let first: number | undefined;
+            for (let at = last; at >= 0; at--) {
+                if (!entries.some((entry) => entry.present[at] && fitsAt(entry, at))) {
+                    break;
+                }
+                first = at;
+            }
+            return first === undefined ? undefined : DECLARATION_HISTORY_VERSIONS[first];
+        },
+        sameTypes,
+    };
+}
+
+const shapes = new WeakMap<ts.Declaration, string | undefined>();
+
+// A declaration of the plugin's typings written as the history writes it.
+function shapeOf(declaration: ts.Declaration): string | undefined {
+    if (!shapes.has(declaration)) {
+        shapes.set(
+            declaration,
+            ts.isClassDeclaration(declaration)
+                ? classShape(declaration)
+                : ts.isFunctionDeclaration(declaration)
+                  ? signatureShape(declaration)
+                  : memberShape(declaration),
+        );
+    }
+    return shapes.get(declaration);
+}
+
+// The parameters a caller passes, without a `this: …` one.
+function callerParameters(declaration: ts.SignatureDeclaration): ts.ParameterDeclaration[] {
+    return declaration.parameters.filter(
+        (parameter) => !(ts.isIdentifier(parameter.name) && parameter.name.text === "this"),
+    );
+}
+
+function thisParameterText(declaration: ts.SignatureDeclaration): string {
+    const parameter = declaration.parameters.find(
+        (candidate) => ts.isIdentifier(candidate.name) && candidate.name.text === "this",
+    );
+    return parameter?.type ? normalize(parameter.type) : "";
+}
+
+function unionMembers(type: ts.TypeNode): ts.TypeNode[] {
+    if (ts.isParenthesizedTypeNode(type)) {
+        return unionMembers(type.type);
+    }
+    return ts.isUnionTypeNode(type) ? type.types.flatMap(unionMembers) : [type];
+}
+
+// `any` or `unknown`, or no type, which is `any`.
+function acceptsAll(type: ts.TypeNode | undefined): boolean {
+    return !type || type.kind === ts.SyntaxKind.AnyKeyword || type.kind === ts.SyntaxKind.UnknownKeyword;
+}
+
+// A callback's return type with which the caller takes whatever it returns.
+function ignoresResult(type: ts.TypeNode | undefined): boolean {
+    return acceptsAll(type) || type?.kind === ts.SyntaxKind.VoidKeyword;
+}
+
+function isSimpleType(type: ts.TypeNode): boolean {
+    switch (type.kind) {
+        case ts.SyntaxKind.StringKeyword:
+        case ts.SyntaxKind.NumberKeyword:
+        case ts.SyntaxKind.BooleanKeyword:
+        case ts.SyntaxKind.UndefinedKeyword:
+            return true;
+    }
+    return ts.isLiteralTypeNode(type);
+}
+
+function findTypeDeclaration(
+    statements: ts.NodeArray<ts.Statement>,
+    name: string,
+): ts.ClassDeclaration | ts.InterfaceDeclaration | ts.TypeAliasDeclaration | ts.EnumDeclaration | undefined {
+    for (const statement of statements) {
+        if (
+            (ts.isClassDeclaration(statement) ||
+                ts.isInterfaceDeclaration(statement) ||
+                ts.isTypeAliasDeclaration(statement) ||
+                ts.isEnumDeclaration(statement)) &&
+            statement.name?.text === name
+        ) {
+            return statement;
+        }
+        if (
+            ts.isModuleDeclaration(statement) &&
+            (statement.flags & ts.NodeFlags.GlobalAugmentation) === 0 &&
+            statement.body &&
+            ts.isModuleBlock(statement.body)
+        ) {
+            const found = findTypeDeclaration(statement.body.statements, name);
+            if (found) {
+                return found;
+            }
+        }
+    }
+    return undefined;
+}
+
+// Whether `node` is only tested, which works where it is missing too: `typeof
+// x.m`, `x.m == null`, `!x.m`, and `x.m` as the condition of an `if`, a loop or
+// a ternary, or as an operand of `&&` or `||` there or on its left; also as the
+// object of an optional access that is tested, the `x.m` of `typeof x.m?.n`.
+function isFeatureTest(node: TSESTree.Node): boolean {
+    let current = node;
+    while (
+        current.parent?.type === AST_NODE_TYPES.ChainExpression ||
+        current.parent?.type === AST_NODE_TYPES.TSNonNullExpression ||
+        (current.parent?.type === AST_NODE_TYPES.MemberExpression &&
+            current.parent.object === current &&
+            current.parent.optional)
+    ) {
+        current = current.parent;
+    }
+    const parent = current.parent;
+    if (!parent) {
+        return false;
+    }
+    switch (parent.type) {
+        case AST_NODE_TYPES.UnaryExpression:
+            return parent.operator === "typeof" || parent.operator === "!";
+        case AST_NODE_TYPES.BinaryExpression: {
+            if (!["==", "!=", "===", "!=="].includes(parent.operator)) {
+                return false;
+            }
+            const other = parent.left === current ? parent.right : parent.left;
+            return (
+                (other.type === AST_NODE_TYPES.Literal && other.raw === "null") ||
+                (other.type === AST_NODE_TYPES.Identifier && other.name === "undefined")
+            );
+        }
+        case AST_NODE_TYPES.IfStatement:
+        case AST_NODE_TYPES.ConditionalExpression:
+        case AST_NODE_TYPES.WhileStatement:
+        case AST_NODE_TYPES.DoWhileStatement:
+        case AST_NODE_TYPES.ForStatement:
+            return parent.test === current;
+        case AST_NODE_TYPES.LogicalExpression:
+            return parent.operator !== "??" && (parent.left === current || isFeatureTest(parent));
+        default:
+            return false;
+    }
+}
+
+// What a feature check names, written the same way wherever it appears:
+// `this.editor.transaction` for `this.editor?.transaction` and
+// `this.editor!.transaction`. Undefined for anything else, such as a computed
+// access with a variable.
+function featureKey(node: TSESTree.Node): string | undefined {
+    switch (node.type) {
+        case AST_NODE_TYPES.Identifier:
+            return node.name;
+        case AST_NODE_TYPES.ThisExpression:
+            return "this";
+        case AST_NODE_TYPES.Super:
+            return "super";
+        case AST_NODE_TYPES.ChainExpression:
+        case AST_NODE_TYPES.TSNonNullExpression:
+            return featureKey(node.expression);
+        case AST_NODE_TYPES.NewExpression:
+            return featureKey(node.callee);
+        case AST_NODE_TYPES.MemberExpression: {
+            const name = memberName(node);
+            const object = featureKey(node.object);
+            return name !== undefined && object !== undefined ? `${object}.${name}` : undefined;
+        }
+        default:
+            return undefined;
+    }
+}
+
+// Whether members proven to exist include `feature`: `x.m.n` existing proves
+// `x.m` too.
+function provesFeature(features: Set<string>, feature: string): boolean {
+    return [...features].some((key) => key === feature || key.startsWith(`${feature}.`));
+}
+
+function memberName(node: TSESTree.MemberExpression): string | undefined {
+    if (!node.computed) {
+        return node.property.type === AST_NODE_TYPES.Identifier ? node.property.name : undefined;
+    }
+    return node.property.type === AST_NODE_TYPES.Literal && typeof node.property.value === "string"
+        ? node.property.value
+        : undefined;
 }
 
 // The members obsidianOverloadHistory.ts has an overload of.
@@ -643,7 +1465,9 @@ function isHoistedFunction(node: TSESTree.Node): boolean {
 // it, those that start at or after `end`, run only with `version` proven.
 interface EarlyExit {
     end: number;
-    version: Version;
+    version: Version | undefined;
+    // The members, by featureKey, the exit proves to exist.
+    features: Set<string>;
 }
 
 // The statements of a statement list, in order. Those that run before a child
@@ -884,10 +1708,27 @@ const pluginSuppliedTypes = new WeakMap<ts.SourceFile, Set<string>>();
 
 function isPluginSuppliedMember(declaration: ts.Declaration): boolean {
     const parent = declaration.parent;
+    if (isPluginAssignedMember(declaration)) {
+        return true;
+    }
     if (!ts.isInterfaceDeclaration(parent)) {
         return false;
     }
     return getPluginSuppliedTypes(declaration.getSourceFile()).has(parent.name.text);
+}
+
+// `Plugin.settings` (1.13) is a field the plugin assigns itself, "Assign loaded
+// data here in onload", as plugins did long before Obsidian declared it, so
+// reading it works on every version.
+function isPluginAssignedMember(declaration: ts.Declaration): boolean {
+    const parent = declaration.parent;
+    return (
+        (ts.isPropertyDeclaration(declaration) || ts.isPropertySignature(declaration)) &&
+        ts.isIdentifier(declaration.name) &&
+        declaration.name.text === "settings" &&
+        (ts.isClassDeclaration(parent) || ts.isInterfaceDeclaration(parent)) &&
+        parent.name?.text === "Plugin"
+    );
 }
 
 export function getPluginSuppliedTypes(sourceFile: ts.SourceFile): Set<string> {
