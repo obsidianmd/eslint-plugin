@@ -14,31 +14,53 @@ without the `node:` prefix and including subpaths such as `fs/promises`, loaded 
 - a static `import`, including a side-effect `import "fs"` and TypeScript's
   `import fs = require("fs")`, or a re-export (`export … from "fs"`), since these load the module
   wherever the file runs and cannot be guarded;
-- a dynamic `import()` or a `require()` that `Platform.isDesktop` does not guard, including
+- a dynamic `import()` or a `require()` that a platform check does not guard, including
   `require()` read from the global object: `window.require()`, `globalThis.require()`,
   `self.require()`, `global.require()` and `activeWindow.require()`, also through a type assertion
   or `!`, such as `(window as any).require("fs")`. On desktop, Electron puts Node's `require()` on
   the window, so these load the module just as a bare `require()` does.
 
-A dynamic `import()` or `require()` counts as guarded inside `if (Platform.isDesktop)` (or
-`if (Platform.isDesktop && …)`), in the first branch of `Platform.isDesktop ? … : …`, to the right of
-`Platform.isDesktop && …`, in the `else` of `if (!Platform.isDesktop)`, the second branch of
-`!Platform.isDesktop ? … : …` and to the right of `!Platform.isDesktop || …`, and anywhere in the
-body of a function whose first statement is
-`if (!Platform.isDesktop) return;` or `throw`, without an `else`:
+A platform check is one that is true only in the desktop app, where Node.js is available:
+`Platform.isDesktop`, `Platform.isDesktopApp`, `!Platform.isMobile` or `!Platform.isMobileApp`.
+A dynamic `import()` or `require()` counts as guarded where such a check holds: inside
+`if (Platform.isDesktopApp)` (or `if (Platform.isDesktopApp && …)`), in the first branch of
+`Platform.isDesktopApp ? … : …`, and to the right of `Platform.isDesktopApp && …`. The negation
+works the other way: in the `else` of `if (Platform.isMobile)` or `if (!Platform.isDesktop)`, in the
+second branch of `Platform.isMobileApp ? … : …`, and to the right of `Platform.isMobile || …`. It
+also counts as guarded after an early exit in the same block or an enclosing one, at any position
+before it: an `if` without an `else` whose test is such a negated check, also on one side of `||`,
+and whose branch is a `return` or `throw` or reaches one:
 
 ```ts
-if (Platform.isDesktop) {
+if (Platform.isDesktopApp) {
   const { readFile } = await import("node:fs/promises");
+}
+
+const cpus = Platform.isMobileApp ? 1 : require("os").cpus().length;
+
+function startServer() {
+  if (Platform.isMobile || !settings.enabled) return;
+  const http = require("http");
 }
 ```
 
-That first statement does not guard the function's default parameter values, also those inside a
+An early exit does not guard the function's default parameter values, also those inside a
 destructuring pattern, as in `function load(fs = require("fs")) { … }`: they are evaluated before the
-body runs. `Platform["isDesktop"]` is the same check as `Platform.isDesktop`, but `Platform[key]` is
-not.
+body runs. Nor does it guard a function declaration after it unless it is the block's first statement,
+since the declaration is hoisted and the statements before the early exit can call it.
+`Platform["isDesktop"]` is the same check as `Platform.isDesktop`, but `Platform[key]` is not.
 
-Not reported: modules that are not built into Node.js, such as `window.require("electron")`; a
+Also guarded, since they cannot fail on mobile:
+
+- a `require()` inside the block of a `try` that has a `catch`, outside any function defined in that
+  block, and an `import()` there that is awaited, as in `try { fs = await import("fs"); } catch { … }`:
+  where Node.js is missing, the `catch` runs. An `import()` that is not awaited rejects after the
+  `try` has finished, so it is still reported;
+- an optional call, `require?.("fs")` or `window.require?.("fs")`, which calls `require()` only
+  where it exists.
+
+Not reported: imports in a declaration file (`.d.ts`, `.d.mts`, `.d.cts`), which only describe
+types and never run; modules that are not built into Node.js, such as `window.require("electron")`; a
 dynamic `import()` or `require()` whose module name is not a string literal; `require()` on any
 other object, such as Electron's `remote.require()` or a library's module loader, and on a local
 variable or parameter named `window`; and imports and re-exports that TypeScript erases when
