@@ -41,7 +41,8 @@ Not reported:
   on anything that is not a `Vault`, such as a `Map` or a `Set`, and the lower-level adapter, such
   as `this.app.vault.adapter.remove()`.
 
-The rule needs type information, so the recommended config runs it on TypeScript files only.
+The rule needs type information, so the recommended config runs it on TypeScript files only, and not
+on [test files and tool configs](../configuration.md#test-files), which never run in Obsidian.
 
 ## Suggestion
 

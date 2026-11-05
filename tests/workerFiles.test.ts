@@ -13,6 +13,8 @@ import { isWorkerFile } from "../lib/workerGlobals.js";
 
 const WINDOW_ONLY_RULES = [
 	"obsidianmd/no-global-this",
+	// Obsidian's Platform API, which it asks for, cannot be imported in a worker.
+	"obsidianmd/platform",
 	"obsidianmd/prefer-active-doc",
 	"obsidianmd/prefer-create-el",
 	"obsidianmd/prefer-instanceof",

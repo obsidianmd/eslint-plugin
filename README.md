@@ -75,7 +75,7 @@ The recommended config also lints files that are not source, matching `package.j
 For advanced usage, see the [configuration guide](docs/configuration.md):
 
 - [layering stricter typescript-eslint configs](docs/configuration.md#using-alongside-stricter-typescript-eslint-configs), [ignoring files](docs/configuration.md#ignoring-files) and [disabling rules for non-plugin code](docs/configuration.md#disabling-rules-for-specific-files)
-- how the recommended config handles [test files](docs/configuration.md#test-files) and [web worker files](docs/configuration.md#web-worker-files)
+- how the recommended config handles [test files and tool configs](docs/configuration.md#test-files) and [web worker files](docs/configuration.md#web-worker-files)
 - [using only obsidianmd rules](docs/configuration.md#using-only-obsidianmd-rules-without-the-recommended-config) through `ruleConfigs`, without the recommended config
 - the [community plugin scanner's configuration](docs/configuration.md#community-plugin-scanner-configuration)
 - [plugins written in JavaScript](docs/configuration.md#plugins-written-in-javascript)

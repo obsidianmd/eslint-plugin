@@ -35,6 +35,9 @@ Not reported either: other keys, `getItem("language")` on any other object, such
 variable holding the storage, a computed access by a variable, such as `localStorage[method]`, a
 dynamic `import()` of the detector, and other i18n packages, such as `i18next` itself.
 
+The recommended config does not apply this rule to [test files and tool configs](../configuration.md#test-files),
+which never run in Obsidian.
+
 ## Suggestion
 
 There is no autofix: `getLanguage()` returns `"en"` where `localStorage.getItem("language")` returns

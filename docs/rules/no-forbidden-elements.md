@@ -45,3 +45,6 @@ A shadow root held in a class property (`this.shadowHead.createEl("style")`) is 
 
 Put the plugin's CSS in `styles.css` instead, which Obsidian loads for you. The [community scanner](../configuration.md#community-plugin-scanner-configuration)
 keeps this rule at `error`.
+
+The recommended config does not apply this rule to [test files and tool configs](../configuration.md#test-files),
+which never run in Obsidian.
