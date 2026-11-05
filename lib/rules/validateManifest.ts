@@ -25,7 +25,9 @@ const OPTIONAL_SCHEMA = {
 // (obsidianmd/community-workers, src/worker/pluginManifest.ts), which decides
 // whether a submission passes, so this rule is never stricter than the review.
 // The id checks follow the developer docs' manifest reference, which the
-// scanner does not check itself.
+// scanner does not check itself. They are opt-in (`checkId`): a published
+// plugin's id can never change, as that would orphan every user's install,
+// settings and hotkeys, so for most plugins they could never be acted on.
 
 // The words the text checks single out: "obsidian" is the Obsidian trademark,
 // and "plugin" is redundant in the plugin directory. `allowedWords` can drop
@@ -59,6 +61,11 @@ const DESCRIPTION_MIN_LENGTH = 10;
 const DESCRIPTION_MAX_LENGTH = 250;
 
 interface ValidateManifestOptions {
+    /**
+     * Whether to check the id, which must not contain "obsidian" or end with
+     * "plugin". Off by default: only a plugin not yet published can act on it.
+     */
+    checkId?: boolean;
     /**
      * Words to drop from the forbidden list, per field. Some findings can never
      * be acted on -- a published plugin id can never change, so a plugin whose
@@ -217,10 +224,15 @@ const rule: ValidateManifestRuleDefinition = {
             {
                 type: "object",
                 properties: {
+                    checkId: {
+                        type: "boolean",
+                        description:
+                            "Also check that the plugin id does not contain 'obsidian' or end with 'plugin', as the developer docs ask of a new plugin. Off by default: a published plugin's id can never change, and the community scanner does not check it.",
+                    },
                     allowedWords: {
                         type: "object",
                         description:
-                            "Words ('obsidian', 'plugin') to stop checking for, per field, matched case-insensitively. Use this for findings that can never be acted on, such as a published plugin id that will always contain 'obsidian'.",
+                            "Words ('obsidian', 'plugin') to stop checking for, per field, matched case-insensitively. The id is checked only with checkId.",
                         properties: Object.fromEntries(
                             CHECKED_WORD_FIELDS.map((field) => [
                                 field,
@@ -255,8 +267,10 @@ const rule: ValidateManifestRuleDefinition = {
             invalidFundingUrl:
                 "The 'fundingUrl' object must only contain string values.",
             mustBeRootObject: "The manifest must be a single JSON object.",
-            idObsidian: "The plugin id must not contain \"obsidian\".",
-            idEndsWithPlugin: "The plugin id must not end with \"plugin\".",
+            idObsidian:
+                "The plugin id must not contain \"obsidian\". Only a plugin that is not yet published can still change its id.",
+            idEndsWithPlugin:
+                "The plugin id must not end with \"plugin\". Only a plugin that is not yet published can still change its id.",
             nameObsidian: "Plugin name must not include the word \"Obsidian\".",
             nameObsidianFragment:
                 "Plugin name must not include parts of the name \"Obsidian\" (\"obsi\", \"sidian\" or a leading \"ob\").",
@@ -365,7 +379,8 @@ const rule: ValidateManifestRuleDefinition = {
                         if (
                             valueNode.type === "String" &&
                             !ignored.has("noForbiddenWords") &&
-                            isCheckedWordField(key)
+                            isCheckedWordField(key) &&
+                            (key !== "id" || options.checkId === true)
                         ) {
                             for (const messageId of findWordProblems(
                                 key,

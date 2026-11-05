@@ -32,6 +32,12 @@ Not reported:
   computed property with a key that is not a string literal, such as `this[key]`
 - an object literal as the second argument, such as `Object.assign(DEFAULT_SETTINGS, { theme: "dark" })`
 - three or more arguments, as in the `{}` form above
+- a variable declared in the same function as the call that holds an object made there with `new`,
+  an object or array literal, or `structuredClone()`, as in
+  `const defaultOptions = new OptionsClass(); return Object.assign(defaultOptions, options);`: the
+  object is made for the call and shared with nothing, so filling it in is intended. A variable of
+  the module or of an outer function, or one set by any other call, which may return the shared
+  defaults, is still reported
 
 ## Suggestion
 
@@ -49,4 +55,6 @@ this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
 Nothing is offered where the result is thrown away, as in `Object.assign(DEFAULT_SETTINGS, data);`
 or `void Object.assign(…)`: such code reads the defaults afterwards, expecting them to hold the
 settings, and with `{}` the call would do nothing. Nor is it offered with type arguments, as in
-`Object.assign<Settings, Partial<Settings>>(…)`, which are for two arguments.
+`Object.assign<Settings, Partial<Settings>>(…)`, which are for two arguments, or where, with type
+information, the target is an instance of a class: the copy would be a plain object without the
+class's methods, getters and `instanceof`.

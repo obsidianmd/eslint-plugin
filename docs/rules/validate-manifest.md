@@ -16,9 +16,11 @@ check only to newer submissions, this rule applies the current policy.
   `version`, `id`, `description` and `isDesktopOnly` must be present, with the right types.
   `authorUrl`, `fundingUrl` and `helpUrl` are optional. Any other field, and a field defined
   twice, is reported.
-- **`id`:** must not contain "obsidian" or end with "plugin", as the developer docs'
-  [manifest reference](https://docs.obsidian.md/Reference/Manifest) requires. The review does
-  not check this.
+- **`id`**, only with the `checkId` option: must not contain "obsidian" or end with "plugin",
+  as the developer docs' [manifest reference](https://docs.obsidian.md/Reference/Manifest)
+  asks of a new plugin. This is off by default: a published plugin's id can never change, since
+  that would orphan every user's install, settings, hotkeys and `obsidian://` links, and the
+  review does not check it either. Turn it on for a plugin you have not submitted yet.
 - **`name`:** must not include "Obsidian", parts of it ("obsi", "sidian", or a leading
   "ob"), or "Plugin".
 - **`description`:** must be 10 to 250 characters and end with `.`, `!` or `?`. It must
@@ -48,8 +50,9 @@ top-level options. Keep this table in step with the rule's schema. -->
 
 | Name                       | Description                                                                                                                                                                                                                                 | Type     |
 | :------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | :------- |
-| `allowedWords`             | Words (`obsidian`, `plugin`) to stop checking for, per field, matched case-insensitively. Allowing `obsidian` in the `name` also allows its parts; allowing `plugin` in the `description` allows a self-reference. Use this for findings that can never be acted on, such as a published plugin id that will always contain 'obsidian'. | Object   |
-| `allowedWords.id`          | Forbidden words to allow in the manifest's `id`.                                                                                                                                                                                            | String[] |
+| `checkId`                  | Also check that the `id` does not contain `obsidian` or end with `plugin`, as the developer docs ask of a new plugin. Off by default: a published plugin's id can never change, and the community scanner does not check it. | Boolean  |
+| `allowedWords`             | Words (`obsidian`, `plugin`) to stop checking for, per field, matched case-insensitively. Allowing `obsidian` in the `name` also allows its parts; allowing `plugin` in the `description` allows a self-reference. | Object   |
+| `allowedWords.id`          | Forbidden words to allow in the manifest's `id`, with `checkId`.                                                                                                                                                                            | String[] |
 | `allowedWords.name`        | Forbidden words to allow in the manifest's `name`.                                                                                                                                                                                          | String[] |
 | `allowedWords.description` | Forbidden words to allow in the manifest's `description`.                                                                                                                                                                                   | String[] |
 | `ignore`                   | Checks to skip entirely: `noForbiddenWords` (every word check on `id`, `name` and `description`) and `descriptionFormat` (the description's length, punctuation and name checks). See below for why there is no in-file marker. | String[] |
@@ -71,8 +74,8 @@ import obsidianmd from "eslint-plugin-obsidianmd";
     language: "json/json",
     plugins: { json, obsidianmd },
     rules: {
-        // A published plugin id can never change, so this finding can never be acted on.
-        "obsidianmd/validate-manifest": ["warn", { allowedWords: { id: ["obsidian"] } }],
+        // A new plugin: check its id too, but allow "obsidian" in it.
+        "obsidianmd/validate-manifest": ["warn", { checkId: true, allowedWords: { id: ["obsidian"] } }],
     },
 }
 ```

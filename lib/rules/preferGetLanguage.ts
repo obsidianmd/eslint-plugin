@@ -52,6 +52,12 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
         const sourceCode = context.sourceCode;
         const supported = supportsVersion(context.options[0]?.minAppVersion, GET_LANGUAGE_SINCE);
 
+        // Below 1.8.7 there is no getLanguage(), and reading the language
+        // from localStorage, which getLanguage() wraps, is the way to do it.
+        if (supported === false) {
+            return {};
+        }
+
         return {
             CallExpression(node: TSESTree.CallExpression) {
                 if (!isLocalStorageGetItemLanguage(node)) {
@@ -95,7 +101,6 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
         function suggestion(node: TSESTree.CallExpression): TSESLint.SuggestionReportDescriptor<MessageIds>[] {
             const callee = node.callee as TSESTree.MemberExpression;
             if (
-                supported === false ||
                 // Dropping the storage, or another argument, must drop no side effect.
                 node.arguments.length !== 1 ||
                 !isPlainReceiver(callee.object) ||

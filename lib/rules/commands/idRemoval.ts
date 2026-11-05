@@ -16,15 +16,20 @@ const WORD_CHAR = /^[\p{L}\p{N}\p{M}]$/u;
  * them, or the one before them at the end of the ID. A camelCase ID stays
  * camelCase, so `myPluginOpen` becomes `open`. Null where the words are next
  * to something other than a separator or another word, or nothing would be
- * left.
+ * left. With `atStart`, only where they start the ID, as many times as they
+ * do.
  */
-export function removeIdWords(id: string, wanted: readonly string[]): StringEdit | null {
+export function removeIdWords(
+    id: string,
+    wanted: readonly string[],
+    { atStart = false }: { atStart?: boolean } = {},
+): StringEdit | null {
     const edit = new StringEdit(id);
     for (;;) {
         const text = edit.text;
         const spans = idWordSpans(text);
         const at = indexOfWords(spans.map((span) => span.word), wanted);
-        if (at < 0) {
+        if (at < 0 || (atStart && at > 0)) {
             break;
         }
         const start = spans[at].start;

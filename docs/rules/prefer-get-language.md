@@ -26,7 +26,12 @@ const lang = localStorage.getItem("language"); // reported
 const lang = getLanguage(); // use this instead
 ```
 
-Not reported: other keys, `getItem("language")` on any other object, such as a
+Nothing is reported with a `minAppVersion` below 1.8.7: there `getLanguage()` does not exist, and
+`localStorage.getItem("language")`, which it wraps, is the way to read the language. The version is
+the rule's `minAppVersion` option, else the `minAppVersion` in `manifest.json`; where neither is a
+version, the rule reports.
+
+Not reported either: other keys, `getItem("language")` on any other object, such as a
 variable holding the storage, a computed access by a variable, such as `localStorage[method]`, a
 dynamic `import()` of the detector, and other i18n packages, such as `i18next` itself.
 
@@ -58,11 +63,11 @@ Nothing is offered:
   `getWindow().localStorage.getItem("language")`, or a comment is inside the call;
 - with type information, where the `obsidian` typings do not export `getLanguage()` (older than
   1.8.7), or are not part of the program;
-- with a `minAppVersion` below 1.8.7, which has no `getLanguage()`. Where no version is known (no
-  `minAppVersion` option and no `manifest.json` `minAppVersion`, or the one that applies, the option
-  before the manifest, is not a version, such as `latest`), the suggestion is offered and says it
-  needs Obsidian 1.8.7;
 - for `i18next-browser-languagedetector`, whose replacement depends on how it is used.
+
+Where no version is known (no `minAppVersion` option and no `manifest.json` `minAppVersion`, or the
+one that applies, the option before the manifest, is not a version, such as `latest`), the
+suggestion is offered and says it needs Obsidian 1.8.7.
 
 ## Options
 

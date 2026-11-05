@@ -11,7 +11,8 @@
 ## What is reported
 
 The `name` of a command passed to `addCommand()` as an object literal, when it is a string literal
-that contains the word "command", in any case. The key may be quoted (`"name": …`):
+in which the word "command", in any case, is a redundant label rather than a word the name needs.
+The key may be quoted (`"name": …`):
 
 ```ts
 this.addCommand({ id: "open-note", name: "Open note command", callback }); // reported
@@ -19,11 +20,24 @@ this.addCommand({ id: "open-note", name: "Command: open note", callback }); // r
 this.addCommand({ id: "open-note", name: "Open note", callback });
 ```
 
-Only the whole word counts: no letter or digit, in any script, may come right before or after it.
-Not reported, therefore: "command" inside a longer word, as in "Open Commander" or "Recommended
-settings", and the plural, as in "Show all commands", where the commands are what the command acts
-on. Nor are a name built from a template literal or a variable, and a command object defined
-elsewhere and passed to `addCommand()` by name.
+"command" is a label:
+
+- at the start or the end, with a separator such as `:`, `-` with spaces, `|` or `/` between it and
+  the rest, as in "Command: open note" or "Open note - command";
+- in brackets at the start or the end, as in "[Command] open note" or "Open note (command)";
+- as the last word after a space, as in "Open settings command", where at least two words are left,
+  the word before it is not one that makes "command" its object, such as "for", "of", "the", "a",
+  "raw" or "custom", and the name does not start with a verb that takes a command, such as "Run",
+  "Execute", "Copy", "Select", "Insert" or "Search".
+
+Not reported, therefore: "command" as what the command acts on, as in "Copy URI for command",
+"Raw command", "Run command" or "Run shell command"; "command" in the middle of the name or before
+the next word, as in "Select and copy command ID", "Toggle command palette" or
+"Command palette: open"; and a name of nothing but "command", as "Command" or "Command:". Only the
+whole word counts: no letter or digit, in any script, may come right before or after it, so
+"command" inside a longer word, as in "Open Commander" or "Command-line tools", and the plural, as
+in "Show all commands", are not reported either. Nor are a name built from a template literal or a
+variable, and a command object defined elsewhere and passed to `addCommand()` by name.
 
 ## Suggestion
 
@@ -36,14 +50,9 @@ this.addCommand({ id: "open-note", name: "Command: open note", callback }); // s
 ```
 
 It goes as the plugin name does in
-[no-plugin-name-in-command-name](no-plugin-name-in-command-name.md#suggestion): at the start with
-the separator after it, at the end with the separator before it, or in brackets, every time it is
-there, and where it began with a capital, the rest starts with one too. The string keeps its quotes
-and its escapes. Spaces alone separate it only at the end, as in "Open note command": at the start,
-as in "Command palette: open", it is part of the sentence.
-
-Not offered where nothing would be left, as for "Command" or "Command:", or where "command" is part
-of the sentence, as in "Toggle command palette", "Command-line tools" or "Run command.".
+[no-plugin-name-in-command-name](no-plugin-name-in-command-name.md#suggestion), with the separator
+next to it, every time it is there, and where it began with a capital, the rest starts with one too.
+The string keeps its quotes and its escapes. Every name the rule reports has a suggestion.
 
 ## Further reading
 

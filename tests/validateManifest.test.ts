@@ -151,6 +151,35 @@ ruleTester.run("validate-manifest", manifestRule as unknown as Rule.RuleModule, 
                 }`,
         },
         {
+            // obsidian-tasks-plugin, obsidian-meta-bind-plugin: a published
+            // id can never change.
+            name: "the id is not checked by default",
+            filename: "manifest.json",
+            code: `{
+                    "id": "obsidian-tasks-plugin",
+                    "name": "Tasks",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Track tasks across your vault.",
+                    "isDesktopOnly": false
+                }`,
+        },
+        {
+            name: "checkId: false does not check the id",
+            filename: "manifest.json",
+            code: `{
+                    "id": "obsidian-tasks-plugin",
+                    "name": "Tasks",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Track tasks across your vault.",
+                    "isDesktopOnly": false
+                }`,
+            options: [{ checkId: false }],
+        },
+        {
             name: "allowedWords lets a published id keep a forbidden word",
             filename: "manifest.json",
             code: `{
@@ -162,7 +191,7 @@ ruleTester.run("validate-manifest", manifestRule as unknown as Rule.RuleModule, 
                     "description": "Manage your notes efficiently.",
                     "isDesktopOnly": false
                 }`,
-            options: [{ allowedWords: { id: ["obsidian"] } }],
+            options: [{ checkId: true, allowedWords: { id: ["obsidian"] } }],
         },
         {
             // The field is matched case-insensitively, so the allowed words
@@ -178,7 +207,7 @@ ruleTester.run("validate-manifest", manifestRule as unknown as Rule.RuleModule, 
                     "description": "Manage your notes efficiently.",
                     "isDesktopOnly": false
                 }`,
-            options: [{ allowedWords: { id: ["Obsidian"], name: ["OBSIDIAN"] } }],
+            options: [{ checkId: true, allowedWords: { id: ["Obsidian"], name: ["OBSIDIAN"] } }],
         },
         {
             name: "ignore skips the forbidden words check entirely",
@@ -316,7 +345,7 @@ ruleTester.run("validate-manifest", manifestRule as unknown as Rule.RuleModule, 
                     "description": "Counts words in the active note.",
                     "isDesktopOnly": false
                 }`,
-            options: [{ allowedWords: { id: ["plugin"] } }],
+            options: [{ checkId: true, allowedWords: { id: ["plugin"] } }],
         },
         {
             name: "allowedWords 'obsidian' on the name also accepts its fragments",
@@ -476,6 +505,7 @@ ruleTester.run("validate-manifest", manifestRule as unknown as Rule.RuleModule, 
         {
             name: "an id containing 'obsidian' is reported",
             filename: "manifest.json",
+            options: [{ checkId: true }],
             code: `{
                     "id": "obsidian-git",
                     "name": "Git",
@@ -492,6 +522,7 @@ ruleTester.run("validate-manifest", manifestRule as unknown as Rule.RuleModule, 
         {
             name: "an id ending with 'plugin' is reported",
             filename: "manifest.json",
+            options: [{ checkId: true }],
             code: `{
                     "id": "my-tool-plugin",
                     "name": "My tool",
@@ -508,6 +539,7 @@ ruleTester.run("validate-manifest", manifestRule as unknown as Rule.RuleModule, 
         {
             name: "an id containing 'obsidian' and ending with 'plugin' reports both",
             filename: "manifest.json",
+            options: [{ checkId: true }],
             code: `{
                     "id": "obsidian-tasks-plugin",
                     "name": "Tasks",
@@ -760,7 +792,7 @@ ruleTester.run("validate-manifest", manifestRule as unknown as Rule.RuleModule, 
                     "description": "Counts words in the active note.",
                     "isDesktopOnly": false
                 }`,
-            options: [{ allowedWords: { id: ["obsidian"] } }],
+            options: [{ checkId: true, allowedWords: { id: ["obsidian"] } }],
             errors: [
                 { messageId: "nameObsidian" },
             ],
@@ -1420,6 +1452,7 @@ ruleTester.run("validate-manifest", manifestRule as unknown as Rule.RuleModule, 
             // A word or type problem is the value's, an unknown key the key's.
             name: "each problem is reported on the key or value it is about",
             filename: "manifest.json",
+            options: [{ checkId: true }],
             code: `{
                     "id": "obsidian-tally",
                     "name": "Word tally",

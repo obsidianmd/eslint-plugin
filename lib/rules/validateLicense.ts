@@ -42,6 +42,10 @@ const COPYRIGHT_REGEX = /^[ \t]*Copyright (?:\([Cc]\)|©) (\d{4})(?:\s*-\s*(\d{4
 
 const SAMPLE_HOLDER = "Dynalist Inc.";
 
+// The holder of the notice on the GPL-family licence texts themselves, which
+// says nothing about who holds the copyright of the plugin.
+const LICENCE_TEXT_HOLDER = /^Free Software Foundation\b/;
+
 const rule: PlainTextRuleDefinition<{
     MessageIds: MessageIds;
     RuleOptions: [ValidateLicenseOptions?];
@@ -82,6 +86,13 @@ const rule: PlainTextRuleDefinition<{
         const currentYear = options.currentYear ?? new Date().getFullYear();
         const disableUnchangedYear = options.disableUnchangedYear ?? false;
 
+        // The sample holder's lines, reported once the whole file is read:
+        // next to the author's own copyright line, the sample's is the
+        // upstream notice kept as attribution, as a license over code taken
+        // from the sample plugin should keep it.
+        const sampleLines: Array<{ node: PlainTextNode; endYear: number }> = [];
+        let otherHolder = false;
+
         return {
             Line(node) {
                 const match = node.value.match(COPYRIGHT_REGEX);
@@ -92,26 +103,34 @@ const rule: PlainTextRuleDefinition<{
                 const startYear = parseInt(match[1], 10);
                 const endYear = match[2] ? parseInt(match[2], 10) : startYear;
                 const holder = match[3].trim();
-                if (holder !== SAMPLE_HOLDER) {
+                if (holder === SAMPLE_HOLDER) {
+                    sampleLines.push({ node, endYear });
+                } else if (!LICENCE_TEXT_HOLDER.test(holder)) {
+                    otherHolder = true;
+                }
+            },
+            "Document:exit"() {
+                if (otherHolder) {
                     return;
                 }
+                for (const { node, endYear } of sampleLines) {
+                    if (!disableUnchangedYear && endYear < currentYear) {
+                        context.report({
+                            messageId: "unchangedYear",
+                            loc: node.loc,
+                            data: {
+                                expected: currentYear.toString(),
+                                actual: endYear.toString(),
+                            }
+                        });
+                    }
 
-                if (!disableUnchangedYear && endYear < currentYear) {
                     context.report({
-                        messageId: "unchangedYear",
+                        messageId: "unchangedCopyright",
                         loc: node.loc,
-                        data: {
-                            expected: currentYear.toString(),
-                            actual: endYear.toString(),
-                        }
                     });
                 }
-
-                context.report({
-                    messageId: "unchangedCopyright",
-                    loc: node.loc,
-                });
-            }
+            },
         };
     },
 };

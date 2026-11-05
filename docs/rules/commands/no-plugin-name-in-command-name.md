@@ -47,7 +47,8 @@ this.addCommand({ id: "pdf", name: "Word Tally - pdf export", callback }); // su
 It removes the plugin name, matched as the rule matches it, where it labels the command:
 
 - at the start, with the separator after it: `:`, `|`, `/`, `>`, `»`, `›`, `→`, `·`, `•`, `–` or
-  `—` with or without spaces, `-` with spaces, or only spaces before a word, as in "Git commit";
+  `—` with or without spaces, `-` with spaces, or only spaces before a word that starts with a
+  capital, as in "Fit Sync";
 - at the end, with the separator before it, the same ones except spaces alone;
 - in brackets, `(…)` or `[…]`, at the start or the end.
 
@@ -59,6 +60,9 @@ is, for ui/sentence-case to report. The string keeps its quotes and its escapes.
 Not offered where:
 
 - nothing would be left, as for "Word Tally" or "Word Tally:";
+- only spaces separate the plugin name at the start from a word in lower case, as in "Zoom in" of
+  the plugin "Zoom" or "Git commit": the plugin name is then a word of the sentence, and "In" would
+  mean nothing;
 - the plugin name is part of the sentence, where the rest would not read or would mean something
   else: "Open Word Tally settings", "Count with Word Tally", "Word Tally-based count",
   "Word Tally's settings", "Count words (for Word Tally)";
