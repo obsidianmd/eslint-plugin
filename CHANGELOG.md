@@ -45,6 +45,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `validate-manifest` checks the `id` (no "obsidian", not ending with "plugin") only with the new `checkId: true` option. A published plugin's id can never change, and the community scanner does not check it, so these were the findings that could never be acted on. `allowedWords.id` still applies with `checkId` ([#246](https://github.com/obsidianmd/eslint-plugin/pull/246)).
+### Changed
+
+- Test files and tool configs no longer get `no-forbidden-elements`, `no-static-styles-assignment`, `prefer-file-manager-trash-file`, `prefer-get-language`, `platform` or `rule-custom-message`'s `no-console`, besides the rules about code that runs in Obsidian they already skipped; `no-new-func` and the other security rules still apply. Test files now also include test runners' setup files and helpers (`**/*.setup.*`, `**/test-setup.*`, `**/setupTests.*`, `**/global-setup.*`, `**/*.testing.*`, and `test-helpers/`, `test_helpers/`, `test-support/`, `test-utils/` and `test_utils/` directories). Tool configs and scripts, named as the community scanner leaves them out (`eslint.config.*`, `vite.config.*`, `vitest.config.*`, `jest.config.*`, `rollup.config.*` and other tools' configs, `.eslintrc.*`, `esbuild.*`, `version-bump.*` and `scripts/` directories), are exempt the same way. Worker files no longer get `platform`. In a run over 600 community plugins, 256 of the 469 `no-nodejs-modules` findings and 1,055 of the 2,656 `no-console` ones came from these files. Common errors: new entry for "… was included by allowDefaultProject but also was found in the project service", and the "… was not found by the project service" entry names tool configs and tests outside the tsconfig (#TBD).
 
 ### Documentation
 

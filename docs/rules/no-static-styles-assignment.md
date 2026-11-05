@@ -34,3 +34,6 @@ Not reported:
 - computed keys that are not written out, such as `[key]`, a spread (`{ ...styles }`), `setCssProps()`
   and `setCssStyles()` called with a variable or with no argument, other attributes, and reading a
   style.
+
+The recommended config does not apply this rule to [test files and tool configs](../configuration.md#test-files),
+which never run in Obsidian.

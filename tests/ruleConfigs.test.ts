@@ -78,8 +78,8 @@ describe("ruleConfigs", () => {
 
 	it("the docs' turn-everything-off snippet leaves no obsidianmd rule on and every other rule alone", async () => {
 		const off = docsTurnEverythingOff();
-		assert.deepStrictEqual(off.files, ["scripts/**"]);
-		for (const filename of ["scripts/build.ts", "scripts/build.js"]) {
+		assert.deepStrictEqual(off.files, ["tools/**"]);
+		for (const filename of ["tools/build.ts", "tools/build.js"]) {
 			const before = await rulesFor(filename);
 			const after = await rulesFor(filename, [off]);
 			assert.ok(Object.keys(obsidianmdRules(before)).length > 0, filename);
@@ -91,6 +91,6 @@ describe("ruleConfigs", () => {
 				}
 			}
 		}
-		assert.strictEqual(normalize((await rulesFor("scripts/build.ts", [off]))["@typescript-eslint/no-deprecated"])[0], 1);
+		assert.strictEqual(normalize((await rulesFor("tools/build.ts", [off]))["@typescript-eslint/no-deprecated"])[0], 1);
 	});
 });

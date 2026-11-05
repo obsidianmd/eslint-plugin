@@ -149,6 +149,25 @@ const plugin: ObsidianmdPlugin = {
     withCustomMessages,
 };
 
+// The rules obsidianmd/rule-custom-message runs, each with its message. Only
+// no-console is about code that runs in Obsidian (the guidelines ask plugins
+// not to fill the developer console); no-new-func is a security rule.
+const CUSTOM_MESSAGE_NO_CONSOLE = {
+    "no-console": {
+        messages: {
+            "Unexpected console statement. Only these console methods are allowed: warn, error, debug.": "Avoid unnecessary logging to console. See https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#Avoid+unnecessary+logging+to+console",
+        },
+        options: [{ allow: ["warn", "error", "debug"] }],
+    },
+};
+const CUSTOM_MESSAGE_NO_NEW_FUNC = {
+    "no-new-func": {
+        messages: {
+            "The Function constructor is eval": "Using the `Function` constructor is dangerous because it executes arbitrary code, similar to `eval()`",
+        },
+    },
+};
+
 // Rules that require type information (call getParserServices).
 // These must only run on files linted with type information (the TS block,
 // which extends recommendedTypeChecked). Applying them to plain JS files
@@ -194,22 +213,7 @@ const recommendedPluginRulesConfigBase: RulesConfig = {
     "obsidianmd/prefer-window-timers": "warn",
     "obsidianmd/prefer-active-doc": "warn",
     "obsidianmd/regex-lookbehind": "error",
-    "obsidianmd/rule-custom-message": [
-        "error",
-        {
-            "no-console": {
-                messages: {
-                    "Unexpected console statement. Only these console methods are allowed: warn, error, debug.": "Avoid unnecessary logging to console. See https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#Avoid+unnecessary+logging+to+console",
-                },
-                options: [{ allow: ["warn", "error", "debug"] }],
-            },
-            "no-new-func": {
-                messages: {
-                    "The Function constructor is eval": "Using the `Function` constructor is dangerous because it executes arbitrary code, similar to `eval()`",
-                },
-            },
-        }
-    ],
+    "obsidianmd/rule-custom-message": ["error", { ...CUSTOM_MESSAGE_NO_CONSOLE, ...CUSTOM_MESSAGE_NO_NEW_FUNC }],
     "obsidianmd/sample-names": "error",
     // validate-manifest and validate-license are NOT here: they lint
     // manifest.json and LICENSE, neither of which can match the JS/TS globs this
@@ -249,11 +253,13 @@ const recommendedPluginRulesConfig: RulesConfig = {
 // Web worker code runs without a window: `window`, `activeWindow`,
 // `activeDocument` and Obsidian's DOM helpers do not exist there, so these
 // rules' advice cannot be followed and their autofixes (`globalThis` ->
-// `window`, `setTimeout` -> `window.setTimeout`) break it. They apply to every
-// JS/TS file except worker code. A file path is all it takes to match
+// `window`, `setTimeout` -> `window.setTimeout`) break it. Nor can a worker
+// import Obsidian's Platform API, which obsidianmd/platform asks for. They apply
+// to every JS/TS file except worker code. A file path is all it takes to match
 // WORKER_FILES, so no security rule may be listed here.
 const WINDOW_ONLY_RULES = new Set([
     "obsidianmd/no-global-this",
+    "obsidianmd/platform",
     "obsidianmd/prefer-active-doc",
     "obsidianmd/prefer-create-el",
     "obsidianmd/prefer-instanceof",
@@ -290,34 +296,62 @@ const obsidianGlobals = {
 
 // Tests run in Node or a DOM emulation, not inside Obsidian, so the rules about
 // code that runs in Obsidian do not apply to them: there is no popout window,
-// Node.js modules are available, mocks cast to TFile, fixtures name `.obsidian`,
-// and the code never runs in an older Obsidian (no-unsupported-api) or on iOS
-// before 16.4 (regex-lookbehind). They are the window-only rules plus these. A
-// file path is all it takes to match TEST_FILES, so no security rule may be
-// listed here; the community scanner does not lint tests at all.
+// Node.js modules are available, mocks cast to TFile and delete files outright,
+// fixtures name `.obsidian`, set styles and add stylesheets, there is no user to
+// read a console, language setting or OS, and the code never runs in an older
+// Obsidian (no-unsupported-api) or on iOS before 16.4 (regex-lookbehind). They
+// are the window-only rules plus these, and rule-custom-message's no-console,
+// which the blocks below handle. A file path is all it takes to match
+// TEST_FILES, so no security rule may be listed here; the community scanner
+// does not lint tests at all.
 const OBSIDIAN_RUNTIME_RULES = new Set([
     ...WINDOW_ONLY_RULES,
     "obsidianmd/hardcoded-config-path",
+    "obsidianmd/no-forbidden-elements",
     "obsidianmd/no-nodejs-modules",
+    "obsidianmd/no-static-styles-assignment",
     "obsidianmd/no-tfile-tfolder-cast",
     "obsidianmd/no-unsupported-api",
+    "obsidianmd/prefer-file-manager-trash-file",
+    "obsidianmd/prefer-get-language",
     "obsidianmd/regex-lookbehind",
 ]);
 // The test files the community scanner leaves out (its ignores.json), plus the
 // end-to-end tests, which drive Obsidian from Node: `e2e/` and `e2e-tests/` hold
 // them, `*.e2e.*` names them (wdio-obsidian-service's convention), and
 // `wdio.conf.*`, `wdio.<name>.conf.*` and `playwright.config.*` configure their
-// runners. Each name is only used for tests; end-to-end encryption code (`e2ee`)
-// does not match. These are only ever `ignores`, in blocks that already apply to
-// JS and TS files alone.
+// runners. Also the test runners' setup files (`vitest.setup.ts`,
+// `jest.setup.js`, `src/test-setup.ts`, `setupTests.ts`, `global-setup.ts`),
+// fakes named `*.testing.*`, and the helper directories of tests kept beside
+// them. Each name is only used for tests; end-to-end encryption code (`e2ee`),
+// `src/commands/gym-log-setup.ts` and `src/testing/`, which may hold code that
+// runs in Obsidian, do not match. These are only ever `ignores`, in blocks that
+// already apply to JS and TS files alone.
 const TEST_FILES = [
-    '**/*.{test,tests,spec,specs,e2e}.*',
+    '**/*.{test,tests,spec,specs,e2e,setup,testing}.*',
     '**/{test,tests,__tests__,mocks,__mocks__,e2e,e2e-tests}/**',
+    '**/{test-helpers,test_helpers,test-support,test-utils,test_utils}/**',
+    '**/{test-setup,setupTests,global-setup,*-global-setup}.*',
     '**/testUtils*',
     '**/testUtils*/**',
     '{automation,test-vault}/**',
     '**/{wdio.conf,wdio.*.conf,playwright.config}.*',
 ];
+// Build, test and lint tool configs and scripts, which run in Node and never in
+// Obsidian, as the community scanner leaves them out (its ignores.json): the
+// configs named after their tool, as `vite.config.ts`, `vitest.e2e.config.mts`
+// or `.eslintrc.js` (a plugin's own `config.ts` or `settings.config.ts` is not
+// one), the sample plugin's `esbuild.config.mjs` and `version-bump.mjs` and
+// other esbuild scripts, and `scripts/` directories. They get the same
+// exemptions as tests.
+const TOOLING_FILES = [
+    '**/{astro,babel,commitlint,docusaurus,esbuild,eslint,jest,oxlint,postcss,prettier,rolldown,rollup,stylelint,svelte,tailwind,tsdown,tsup,uno,vite,vitest,webpack}.config.*',
+    '**/{eslint,jest,vite,vitest}.*.config.*',
+    '**/.{babelrc,eslintrc,mocharc,prettierrc}.*',
+    '**/{esbuild,version-bump}.*',
+    '**/scripts/**',
+];
+const NOT_RUN_IN_OBSIDIAN = [...TEST_FILES, ...TOOLING_FILES];
 
 // The rules of `config` that `keep` accepts. The window-only and Obsidian-runtime
 // rules go in their own blocks with `ignores` rather than being switched off in
@@ -329,6 +363,17 @@ function pickRules(config: RulesConfig, keep: (rule: string) => boolean): RulesC
 const isRuntimeOnly = (rule: string) => OBSIDIAN_RUNTIME_RULES.has(rule);
 const isWindowOnly = (rule: string) => WINDOW_ONLY_RULES.has(rule);
 const isRuntimeNotWindowOnly = (rule: string) => isRuntimeOnly(rule) && !isWindowOnly(rule);
+
+// rule-custom-message runs no-console and no-new-func, and only no-console is
+// about code that runs in Obsidian. One rule cannot be left out of the test and
+// tooling files in part, so the JS and TS blocks give every file the rule with
+// no-new-func alone, and the blocks for code that runs in Obsidian restate it
+// with both. Anything reading the config's rules without regard to `files` sees
+// the full rule last, as it sees the other Obsidian-runtime rules on.
+const CUSTOM_MESSAGE_RULE = "obsidianmd/rule-custom-message";
+const customMessageEverywhere: RulesConfig = {
+    [CUSTOM_MESSAGE_RULE]: ["error", CUSTOM_MESSAGE_NO_NEW_FUNC],
+};
 
 import { fixDryRunConfigs } from "./singleRun.js";
 import { restrictedGlobalsOptions, restrictedImportsOptions, noUnusedExpressionsOptions, noUnusedVarsOptions, noDeprecatedOptions } from "./ruleOptions.js";
@@ -419,7 +464,8 @@ const flatRecommendedConfig: Config[] = defineConfig([
         extends: [...(tseslint.configs.recommended as Config[]), noUnsanitizedPlugin.configs.recommended],
         rules: {
             ...flatRecommendedGeneralRules,
-            ...pickRules(recommendedPluginRulesConfigBase, (rule) => !isRuntimeOnly(rule))
+            ...pickRules(recommendedPluginRulesConfigBase, (rule) => !isRuntimeOnly(rule)),
+            ...customMessageEverywhere,
         }
     },
     {
@@ -436,29 +482,37 @@ const flatRecommendedConfig: Config[] = defineConfig([
         rules: {
             ...flatRecommendedGeneralRules,
             ...recommendedTypeCheckedGeneralRules,
-            ...pickRules(recommendedPluginRulesConfig, (rule) => !isRuntimeOnly(rule))
+            ...pickRules(recommendedPluginRulesConfig, (rule) => !isRuntimeOnly(rule)),
+            ...customMessageEverywhere,
         },
     },
     ...fixDryRunConfigs(process.argv),
     {
         files: ['**/*.{js,cjs,mjs,jsx}'],
-        ignores: [...WORKER_FILES, ...TEST_FILES],
+        ignores: [...WORKER_FILES, ...NOT_RUN_IN_OBSIDIAN],
         rules: pickRules(recommendedPluginRulesConfigBase, isWindowOnly),
     },
     {
         files: ['**/*.{ts,cts,mts,tsx}'],
-        ignores: [...WORKER_FILES, ...TEST_FILES],
+        ignores: [...WORKER_FILES, ...NOT_RUN_IN_OBSIDIAN],
         rules: pickRules(recommendedPluginRulesConfig, isWindowOnly),
     },
+    // The full rule-custom-message, with no-console, comes back here.
     {
         files: ['**/*.{js,cjs,mjs,jsx}'],
-        ignores: TEST_FILES,
-        rules: pickRules(recommendedPluginRulesConfigBase, isRuntimeNotWindowOnly),
+        ignores: NOT_RUN_IN_OBSIDIAN,
+        rules: {
+            ...pickRules(recommendedPluginRulesConfigBase, isRuntimeNotWindowOnly),
+            ...pickRules(recommendedPluginRulesConfigBase, (rule) => rule === CUSTOM_MESSAGE_RULE),
+        },
     },
     {
         files: ['**/*.{ts,cts,mts,tsx}'],
-        ignores: TEST_FILES,
-        rules: pickRules(recommendedPluginRulesConfig, isRuntimeNotWindowOnly),
+        ignores: NOT_RUN_IN_OBSIDIAN,
+        rules: {
+            ...pickRules(recommendedPluginRulesConfig, isRuntimeNotWindowOnly),
+            ...pickRules(recommendedPluginRulesConfig, (rule) => rule === CUSTOM_MESSAGE_RULE),
+        },
     },
     {
         files: ['package.json'],

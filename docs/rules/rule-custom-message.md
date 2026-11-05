@@ -54,6 +54,10 @@ this rule instead, at `error`, on JavaScript and TypeScript files:
 - `no-new-func`: `new Function(…)` and `Function(…)` are reported as
   ``[no-new-func] Using the `Function` constructor is dangerous because it executes arbitrary code, similar to `eval()` ``.
 
+In [test files and tool configs](../configuration.md#test-files), which never run in Obsidian, the
+rule runs `no-new-func` alone, so they may log to the console; the `Function` constructor is still
+reported there.
+
 Setting this rule's options in your own config replaces that object, as for any rule, so list both
 entries again next to the rules you add. Setting only a severity
 (`"obsidianmd/rule-custom-message": "warn"`) keeps them.

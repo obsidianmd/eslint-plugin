@@ -331,7 +331,10 @@ need it.
 
 ## Disabling rules for specific files
 
-To turn off obsidianmd rules for files that are not part of your Obsidian plugin (e.g., build scripts), add a config block with the relevant `files` glob:
+The recommended config already exempts test files, tool configs and `scripts/` directories from the
+rules about code that runs in Obsidian (see [Test files](#test-files)). To turn off obsidianmd rules
+for other files that are not part of your Obsidian plugin (e.g., build tooling under another name),
+add a config block with the relevant `files` glob:
 
 ```js
 export default defineConfig([
@@ -347,8 +350,8 @@ export default defineConfig([
     },
   },
   {
-    // Build scripts are not plugin code
-    files: ["scripts/**"],
+    // Build tooling is not plugin code
+    files: ["tools/**"],
     rules: {
       "obsidianmd/no-nodejs-modules": "off",
       "obsidianmd/rule-custom-message": "off",
@@ -361,7 +364,7 @@ ESLint does not support disabling all rules from a plugin with a single glob lik
 
 ```js
 {
-  files: ["scripts/**"],
+  files: ["tools/**"],
   rules: Object.fromEntries([
     ...Object.keys(obsidianmd.ruleConfigs.recommended),
     ...Object.keys(obsidianmd.ruleConfigs.recommendedTypeChecked),
@@ -402,7 +405,8 @@ do not exist there, and `globalThis` is the right way to reach the worker's own 
 recommended config therefore treats files matching `**/*.worker.*`, `**/*-worker.*` or `**/*_worker.*`
 (such as `search.worker.ts`, `bergamot-translator-worker.js` or `index_worker.ts`) and anything under
 a `workers/` directory as worker code. It switches off the rules whose fix needs a window — `no-global-this`,
-`prefer-active-doc`, `prefer-create-el`, `prefer-instanceof` and `prefer-window-timers` — and gives
+`prefer-active-doc`, `prefer-create-el`, `prefer-instanceof` and `prefer-window-timers` — and
+`platform`, since a worker cannot import Obsidian's `Platform` API, and gives
 these files the worker globals (`self`, `importScripts`, `postMessage`, …) in place of the browser
 and Obsidian ones. In JavaScript, `no-undef` then reports `window`, `document`, `localStorage`,
 `createEl` and the rest, which would throw in a worker; browser APIs a worker also has, such as
@@ -422,6 +426,7 @@ the worker globals from the `globals` package and switch off the window globals 
   },
   rules: {
     "obsidianmd/no-global-this": "off",
+    "obsidianmd/platform": "off",
     "obsidianmd/prefer-active-doc": "off",
     "obsidianmd/prefer-create-el": "off",
     "obsidianmd/prefer-instanceof": "off",
@@ -434,20 +439,49 @@ the worker globals from the `globals` package and switch off the window globals 
 
 Tests run in Node or a DOM emulation such as jsdom, not inside Obsidian, so the rules about code that
 runs in Obsidian do not fit them: there is no popout window, Node.js modules are available, mocks cast
-to `TFile`, fixtures name `.obsidian`, and the code never runs in an older Obsidian or on iOS. The
+to `TFile` and delete files outright, fixtures name `.obsidian`, set styles and add stylesheets, there
+is no user to read the console, and the code never runs in an older Obsidian or on iOS. The
 recommended config treats the files the community scanner leaves out as tests: files matching
 `**/*.{test,tests,spec,specs}.*` or `**/testUtils*`, anything under a `test/`, `tests/`, `__tests__/`,
 `mocks/`, `__mocks__/` or `testUtils*/` directory, and anything under a top-level `automation/` or
 `test-vault/` directory. So are end-to-end tests, which drive Obsidian from Node: files matching
 `**/*.e2e.*`, anything under an `e2e/` or `e2e-tests/` directory, and the WebdriverIO and Playwright
-configs (`wdio.conf.*`, `wdio.*.conf.*` and `playwright.config.*`). For all of them it switches off `no-global-this`, `prefer-active-doc`,
-`prefer-create-el`, `prefer-instanceof`, `prefer-window-timers`, `no-nodejs-modules`,
-`no-tfile-tfolder-cast`, `hardcoded-config-path`, `no-unsupported-api` and `regex-lookbehind`. Every
-other rule, including the security rules, still applies. The community scanner does not lint most of
-these files at all; see its [ignored files](#community-plugin-scanner-configuration).
+configs (`wdio.conf.*`, `wdio.*.conf.*` and `playwright.config.*`). So are the test runners' setup
+files and test helpers: files matching `**/*.setup.*` (`vitest.setup.ts`, `jest.setup.js`),
+`**/test-setup.*`, `**/setupTests.*`, `**/global-setup.*`, `**/*-global-setup.*` or `**/*.testing.*`,
+and anything under a `test-helpers/`, `test_helpers/`, `test-support/`, `test-utils/` or
+`test_utils/` directory.
 
-For tests under another name, such as an `integration-tests/` directory, add the same overrides for
-its path, or leave the directory out with `globalIgnores`.
+Build, test and lint tool configs and scripts run in Node at build time and never in Obsidian
+either, and get the same treatment, named as the community scanner leaves them out:
+
+- the configs named after their tool: `eslint.config.*`, `vite.config.*`, `vitest.config.*`,
+  `jest.config.*`, `rollup.config.*`, `esbuild.config.*`, `webpack.config.*`, `svelte.config.*`,
+  `babel.config.*`, `prettier.config.*`, `stylelint.config.*`, `postcss.config.*`,
+  `tailwind.config.*` and those of astro, commitlint, docusaurus, oxlint, rolldown, tsdown, tsup and
+  uno; `eslint.*.config.*`, `jest.*.config.*`, `vite.*.config.*` and `vitest.*.config.*`, such as
+  `vitest.integration.config.ts`; and `.babelrc.*`, `.eslintrc.*`, `.mocharc.*` and `.prettierrc.*`.
+  A plugin's own `config.ts` or `settings.config.ts` is not a tool config and keeps every rule;
+- `esbuild.*` and `version-bump.*`, such as the sample plugin's `esbuild.config.mjs` and
+  `version-bump.mjs`;
+- anything under a `scripts/` directory.
+
+For all of these files it switches off `no-global-this`, `prefer-active-doc`, `prefer-create-el`,
+`prefer-instanceof`, `prefer-window-timers`, `platform`, `no-nodejs-modules`, `no-tfile-tfolder-cast`,
+`hardcoded-config-path`, `no-forbidden-elements`, `no-static-styles-assignment`,
+`prefer-file-manager-trash-file`, `prefer-get-language`, `no-unsupported-api` and `regex-lookbehind`,
+and `rule-custom-message` runs `no-new-func` without `no-console`, so they may log to the console.
+Every other rule, including the security rules and `no-new-func`, still applies. The community
+scanner does not lint most of these files at all; see its
+[ignored files](#community-plugin-scanner-configuration).
+
+Ignoring the sample plugin's `esbuild.config.mjs` and `version-bump.mjs` (see
+[Ignoring files](#ignoring-files)) is still worthwhile: they are in no `tsconfig.json`, so without
+an ignore they need `allowDefaultProject` (see
+["… was not found by the project service"](#-was-not-found-by-the-project-service)).
+
+For tests or tooling under another name, such as an `integration-tests/` or `tools/` directory, add
+the same overrides for its path, or leave the directory out with `globalIgnores`.
 
 ## Upgrading to 0.5.0
 
@@ -622,8 +656,9 @@ switch a rule off for specific files (see [Disabling rules for specific files](#
 
 A few of these are worth knowing in advance:
 
-- Test files are exempt from `prefer-active-doc` and the other rules about code that runs in
-  Obsidian (see [Test files](#test-files)), so its findings come from your plugin's own code.
+- Test files and tool configs are exempt from `prefer-active-doc` and the other rules about code
+  that runs in Obsidian (see [Test files](#test-files)), so its findings come from your plugin's own
+  code.
 - A published plugin id cannot change. In 0.5.0, `validate-manifest` reported an id that contains
   "obsidian" or ends with "plugin", which you could accept with
   `"obsidianmd/validate-manifest": ["warn", { allowedWords: { id: ["obsidian"] } }]`. From 0.5.1 the
@@ -737,11 +772,35 @@ the globs of your source (see [Overriding rules](#overriding-rules) and
 
 A file ESLint lints is in no `tsconfig.json` and not matched by `allowDefaultProject`. With the
 sample plugin's layout this is the bundled `main.js` and the Node scripts `esbuild.config.mjs` and
-`version-bump.mjs`. If the file is build output or a script rather than plugin source, ignore it (see
+`version-bump.mjs`. Beyond that layout, the usual cases are:
+
+- tool configs the tsconfig leaves out: `rollup.config.js`, `jest.config.js`, `vitest.config.ts`,
+  `vite.config.ts`, `svelte.config.js`, `babel.config.js`, `prettier.config.js` or `.prettierrc.js`,
+  `.eslintrc.js` and the like;
+- test files outside the tsconfig, such as a `tests/` directory next to `src/` when `include` is
+  `["src/**/*.ts"]`, or a tsconfig whose `exclude` leaves out `**/*.test.ts`.
+
+If the file is build output, a script or a tool config rather than plugin source, ignore it (see
 [Ignoring files](#ignoring-files)); otherwise add it to your `tsconfig.json`'s `include` (with
-`allowJs` for a JavaScript file), or for a few loose files, to `allowDefaultProject`. In a plugin
+`allowJs` for a JavaScript file), or for a few loose files, to `allowDefaultProject`. For tests, a
+separate `tsconfig.json` that includes them works too, such as a `tests/tsconfig.json` that extends
+the root one: the project service uses the nearest tsconfig that includes the file. In a plugin
 written in JavaScript, every source file fails this way when the TypeScript `parserOptions` block
 reaches it; see [Plugins written in JavaScript](#plugins-written-in-javascript).
+
+### "… was included by allowDefaultProject but also was found in the project service"
+
+```
+Parsing error: /path/to/your-plugin/eslint.config.mts was included by allowDefaultProject but also was found in the project service. Consider removing it from allowDefaultProject.
+```
+
+A file matched by `allowDefaultProject` is also in a `tsconfig.json`, and typescript-eslint refuses
+to choose between them. It is usually `eslint.config.*` (`.mts`, `.ts`, `.mjs` or `.js`) with a
+tsconfig whose `include` takes in the files at the root, such as `["**/*.ts", "**/*.mts"]`,
+`["*.mts", "src/**/*.ts"]` or, with `allowJs`, `["**/*"]`. Either drop
+the pattern from `allowDefaultProject`, since the tsconfig already gives the file type information,
+or leave the file out of the tsconfig's `include` and keep the pattern. `allowDefaultProject` is for
+files in no tsconfig only.
 
 ### "Cannot read properties of undefined (reading 'includes')" with `--fix-dry-run`
 
