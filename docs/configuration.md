@@ -255,6 +255,80 @@ Declaring the two globals is enough. With `sourceType: "commonjs"` instead, `no-
 the module's top level against the built-in globals, and `const { Plugin } = require("obsidian")`
 is reported, because `Plugin` is also a browser global.
 
+## Plugins written in JavaScript
+
+The recommended config lints `.js`, `.cjs`, `.mjs` and `.jsx` files without type information:
+they get ESLint's core rules, typescript-eslint's `recommended` (not `recommendedTypeChecked`) and
+every obsidianmd rule except the seven that need the type checker: `no-unsupported-api`,
+`no-misused-promises`, `prefer-create-el`, `prefer-file-manager-trash-file`, `prefer-instanceof`,
+`no-plugin-as-component` and `no-view-references-in-plugin` (the 💭 rules in the
+[README](../README.md#rules)).
+
+A JavaScript plugin therefore needs no `parserOptions`. The `parserOptions` block of the
+[quick start](#quick-start) is for TypeScript: it has no `files`, so it reaches your `.js` files too,
+and any of them that no `tsconfig.json` or `jsconfig.json` takes in fails with
+*"… was not found by the project service"*. Leave the block out:
+
+```js
+// eslint.config.mjs
+import { defineConfig, globalIgnores } from "eslint/config";
+import obsidianmd from "eslint-plugin-obsidianmd";
+
+export default defineConfig([
+  globalIgnores(["node_modules", "dist", "main.js", "esbuild.config.mjs", "version-bump.mjs"]),
+  ...obsidianmd.configs.recommended,
+]);
+```
+
+Keep `main.js` in `globalIgnores` only if your build writes it; if you write it yourself, see
+[Ignoring files](#ignoring-files). `allowDefaultProject` is no way around a `jsconfig.json` for more
+than a few files: typescript-eslint rejects a `**` in its globs and, by default, more than eight
+matched files.
+
+To get the seven type-aware rules (and typescript-eslint's type-checked rules) in JavaScript as
+well, which is worth it at least for `no-unsupported-api`, add a `jsconfig.json` that takes in your
+sources, and a block that turns them on for those files:
+
+```jsonc
+// jsconfig.json
+{
+  "compilerOptions": {
+    "module": "ESNext",
+    "target": "ES2021",
+    "moduleResolution": "bundler",
+    "lib": ["ES2021", "DOM"]
+  },
+  "include": ["src/**/*.js"]
+}
+```
+
+```js
+// eslint.config.mjs
+import { defineConfig, globalIgnores } from "eslint/config";
+import tseslint from "typescript-eslint";
+import obsidianmd from "eslint-plugin-obsidianmd";
+
+export default defineConfig([
+  globalIgnores(["node_modules", "dist", "main.js", "esbuild.config.mjs", "version-bump.mjs"]),
+  ...obsidianmd.configs.recommended,
+  {
+    files: ["src/**/*.js"],
+    extends: [tseslint.configs.recommendedTypeChecked],
+    languageOptions: { parserOptions: { projectService: true } },
+    rules: {
+      ...obsidianmd.ruleConfigs.recommendedTypeChecked,
+      // Replaced by obsidianmd/no-misused-promises, from recommendedTypeChecked above
+      "@typescript-eslint/no-misused-promises": "off",
+    },
+  },
+]);
+```
+
+`obsidian` has to be installed for the types (see the [README](../README.md#installation)). A
+`tsconfig.json` with `"allowJs": true` works the same way as a `jsconfig.json`. Add
+`"checkJs": true` only if you also want TypeScript's own errors in your JavaScript; the rules do not
+need it.
+
 ## Disabling rules for specific files
 
 To turn off obsidianmd rules for files that are not part of your Obsidian plugin (e.g., build scripts), add a config block with the relevant `files` glob:
@@ -379,6 +453,17 @@ its path, or leave the directory out with `globalIgnores`.
 0.5.0 lints more files than 0.4 did and needs newer tooling. Work through the items below that
 apply to your project; [CHANGELOG.md](../CHANGELOG.md) lists every change.
 
+### From the sample plugin's configuration
+
+A project generated from the [sample plugin](https://github.com/obsidianmd/obsidian-sample-plugin)
+upgrades with `npm install --save-dev eslint-plugin-obsidianmd@0.5`; its `eslint.config.mts` works
+unchanged. Two of its settings were only needed for 0.4, which read `manifest.json` with the
+TypeScript parser, and can go: `'manifest.json'` in `allowDefaultProject`, and
+`extraFileExtensions: ['.json']`. Its `globalIgnores` leaves out `package.json`, so the
+`depend/ban-dependencies` check on it does not run; drop `'package.json'` from the list to get it.
+Expect the new findings described below, on `manifest.json` and `LICENSE` in particular, until you
+replace the sample's id, name, description and copyright holder.
+
 ### Node.js 20.19, 22.13 or 24
 
 Node.js 18 is no longer supported. `@eslint/json` 2 and ESLint 10 need the same versions. Upgrade
@@ -462,6 +547,10 @@ only with `ES2022` or later in your `tsconfig.json` `lib`; the sample plugin's i
 `devDependencies` (`npm install --save-dev @eslint/js`); projects generated from the sample plugin
 already have it. ESLint 9 depends on it itself, so npm usually still installs it; ESLint 10 does not.
 
+To move to ESLint 10, run `npm install --save-dev eslint@10`, and `@eslint/js@10` with it if your
+configuration imports `@eslint/js`. npm then warns about three bundled plugins that do not declare
+ESLint 10 support yet; linting works (see the [README](../README.md#installation)).
+
 ### `ui/sentence-case` is off
 
 0.3.0 meant to turn it off, but it stayed on through 0.4.2. To keep it, opt in:
@@ -507,6 +596,15 @@ A few of these are worth knowing in advance:
 - A published plugin id that contains "obsidian" cannot change. Accept it with
   `"obsidianmd/validate-manifest": ["warn", { allowedWords: { id: ["obsidian"] } }]` in a block with
   `files: ["manifest.json"]` (see [`validate-manifest`](rules/validate-manifest.md)).
+- `no-static-styles-assignment`, an `error`, now checks `setCssStyles()` and `setCssProps()` with
+  unquoted keys as well, such as `el.setCssStyles({ color: "red" })`. In a run over the community
+  plugins this was the largest new source of errors: the plugins it reports went from 775 to 1,946.
+  Move fixed styles to your `styles.css`, and set what has to change at run time as CSS variables
+  with `` setCssProps({ "--my-width": `${width}px` }) `` (see
+  [`no-static-styles-assignment`](rules/no-static-styles-assignment.md)).
+- `prefer-instanceof` reports more: values that may be `null`, such as
+  `el.parentElement instanceof HTMLElement` (with a `?.instanceOf()` suggestion, not a fix), and
+  instances of generic classes. The plugins it reports went from 372 to 1,052 in the same run.
 - `regex-lookbehind` now also reports negative lookbehinds such as `(?<!x)`, which fail on iOS before
   16.4 just like `(?<=x)`.
 - `@typescript-eslint/no-require-imports` is off again, so a disable comment for it is reported as
@@ -594,7 +692,9 @@ A file ESLint lints is in no `tsconfig.json` and not matched by `allowDefaultPro
 sample plugin's layout this is the bundled `main.js` and the Node scripts `esbuild.config.mjs` and
 `version-bump.mjs`. If the file is build output or a script rather than plugin source, ignore it (see
 [Ignoring files](#ignoring-files)); otherwise add it to your `tsconfig.json`'s `include` (with
-`allowJs` for a JavaScript file), or for a few loose files, to `allowDefaultProject`.
+`allowJs` for a JavaScript file), or for a few loose files, to `allowDefaultProject`. In a plugin
+written in JavaScript, every source file fails this way when the TypeScript `parserOptions` block
+reaches it; see [Plugins written in JavaScript](#plugins-written-in-javascript).
 
 ### "Cannot read properties of undefined (reading 'includes')" with `--fix-dry-run`
 
@@ -649,6 +749,35 @@ export default defineConfig([
   // ...
 ]);
 ```
+
+## Known issues
+
+- **ESLint 10:** npm prints `ERESOLVE overriding peer dependency` warnings, `npm ls` exits with
+  `invalid: eslint@10…`, and an install with `strict-peer-deps` fails, because three bundled plugins
+  do not declare ESLint 10 support yet. Linting works (see the [README](../README.md#installation)).
+- **TypeScript 7** is not supported: it has no JavaScript API yet, which typescript-eslint and this
+  plugin need. Keep TypeScript 5 or 6.
+- **TypeScript 6** no longer adds every installed `@types` package by default (`types` is `[]`).
+  Files linted through `allowDefaultProject`, such as the sample plugin's `eslint.config.mts`, then
+  have no Node.js types, and `tsconfigRootDir: import.meta.dirname` is reported by
+  `@typescript-eslint/no-unsafe-assignment`. Add `"types": ["node"]` to your `tsconfig.json`'s
+  `compilerOptions`. (TypeScript 6 also stops `tsc` on the sample plugin's
+  `"moduleResolution": "node"`; use `"bundler"`.)
+- **Yarn 1** with an exact `typescript-eslint` or `@eslint/json` version in your `package.json` fails
+  with `Cannot redefine plugin`; see
+  [that error](#cannot-redefine-plugin-typescript-eslint-or-cannot-redefine-plugin-json).
+- **`manifest.json` is read from the working directory** by the rules that use `minAppVersion` or
+  `isDesktopOnly` (`no-unsupported-api`, `no-nodejs-modules`, the settings-tab rules and others).
+  Run ESLint from the project root, which the files linted by name need anyway (see
+  [Files linted beyond your source](#files-linted-beyond-your-source)); in a monorepo, run it in
+  each plugin's directory.
+- **`ui/sentence-case`** does not know every abbreviation: after "Dr." or "Inc." it treats the next
+  word as the start of a sentence, so "Contact Dr. Smith" is reported as "Contact dr. Smith" (see
+  the [README](../README.md#ui-sentence-case)).
+- **`prefer-instanceof`** reports `x instanceof el.ownerDocument.defaultView!.HTMLElement`, which
+  already checks against the element's own window. `x?.instanceOf(HTMLElement)` does the same check, so take the rule's suggestion or write that.
+- **`ui/sentence-case-locale-module`** reports a string twice when the module exports the same
+  object twice, as in `export { strings }; export default strings;`.
 
 ## Using only obsidianmd rules (without the recommended config)
 
