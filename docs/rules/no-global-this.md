@@ -64,7 +64,8 @@ suggestion too, as in `if (globalThis.crypto?.randomUUID) return globalThis.cryp
 with only the call fixed, TypeScript reports the probe as always true (TS2774). So does code that
 may run without a window: in a `try` whose `catch` drops the error, as in `try { … } catch {}`, or
 decided by a condition that names the environment, such as `if (isBrowser)`, `env.isNode ? … : …` or
-`typeof process !== "undefined"`; see [Window checks](prefer-window-timers.md#window-checks).
+`typeof process !== "undefined"`, or in Emscripten output, a file that reads
+`ENVIRONMENT_IS_WORKER` or `ENVIRONMENT_IS_NODE`; see [Window checks](prefer-window-timers.md#window-checks).
 
 Without type information, only rewrites that can never change a type are fixed: a read through a cast
 to `any`, `unknown` or `never`, and the timer
