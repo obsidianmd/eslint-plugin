@@ -237,6 +237,20 @@ export default ruleCreator<Options, "apiNotAvailable">({
                         sinceVersion = declared;
                     }
                 }
+                const oldest = DECLARATION_HISTORY_VERSIONS[0];
+                if (
+                    sinceVersion === oldest &&
+                    entry?.some(([, value]) => {
+                        const since = toSince(value);
+                        return since !== null && gt(since, oldest);
+                    })
+                ) {
+                    // Older than its @since, the member is in the oldest typings on
+                    // npm, which tell only that the app had it by then, not since
+                    // when. A plugin with a lower minAppVersion is not told that it
+                    // needs that release.
+                    continue;
+                }
                 if (gt(sinceVersion, minVersion)) {
                     // A check that the member exists proves enough only when
                     // existing is all the use needs: not for a call that needs a

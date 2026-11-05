@@ -97,7 +97,9 @@ needs today's signature. The first typings that declare a member are an upper bo
 had it: a typings release describes the app release of the same version and is published with it or
 later, the app may have had the member undeclared before, and there are no typings before 0.11.13. So
 the table can make the rule ask for a later version than the app needed, never one older than the
-typings show.
+typings show. For the same reason, a member that is in the 0.11.13 typings before its `@since` is not
+reported at all: those typings only show that the app had it by then, not since when, so a plugin
+with a lower `minAppVersion` is not told that it needs 0.11.13.
 
 ## Guarding with `requireApiVersion`
 

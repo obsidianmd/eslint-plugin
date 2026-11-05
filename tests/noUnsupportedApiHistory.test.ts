@@ -9,6 +9,23 @@ const ruleTester = new RuleTester();
 ruleTester.run("no-unsupported-api: the first typings that declare a member", rule, {
     valid: [
         {
+            // Older than their @since, these are in the 0.11.13 typings, the
+            // oldest on npm, which cannot tell how much older they are: a plugin
+            // with a lower minAppVersion is not told it needs 0.11.13.
+            name: "members in the oldest published typings, below that version",
+            code: `
+                import { App, BaseComponent, Menu } from 'obsidian';
+                declare const app: App;
+                declare const component: BaseComponent;
+                declare const menu: Menu;
+                app.workspace.getLeaf(false);
+                const duplicate = app.workspace.duplicateLeaf;
+                component.setDisabled(true);
+                menu.addItem((item) => item.setIcon("trash"));
+            `,
+            options: [{ minAppVersion: "0.9.11" }],
+        },
+        {
             // setDisabled @since 1.2.3, Menu.addItem 0.15.3, MenuItem.setIcon
             // 0.16.2: all in the 0.11.13 typings, as the calls use them.
             name: "a member with the same signature in older typings than its @since",
@@ -219,18 +236,6 @@ ruleTester.run("no-unsupported-api: the first typings that declare a member", ru
                 { messageId: "apiNotAvailable", line: 4, data: { qualifiedName: "Workspace.openLinkText", sinceVersion: "0.16.0", minAppVersion: "0.15.0" } },
                 { messageId: "apiNotAvailable", line: 5, data: { qualifiedName: "Workspace.openLinkText", sinceVersion: "0.16.0", minAppVersion: "0.15.0" } },
             ],
-        },
-        {
-            // Below the first typings that declare it, the member is reported
-            // with that version, lower than its @since.
-            name: "below the first typings that declare the member",
-            code: `
-                import { App } from 'obsidian';
-                declare const app: App;
-                app.workspace.getLeaf(false);
-            `,
-            options: [{ minAppVersion: "0.11.0" }],
-            errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "Workspace.getLeaf", sinceVersion: "0.11.13", minAppVersion: "0.11.0" } }],
         },
         {
             // Whoever calls it later may read its result, the Promise it

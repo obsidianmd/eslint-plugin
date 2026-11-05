@@ -911,19 +911,6 @@ ruleTester.run("no-unsupported-api", rule, {
             ],
         },
         {
-            name: "an overloaded method used without a call is reported below its earliest overload",
-            code: `
-                import { App } from 'obsidian';
-                declare const app: App;
-                const duplicate = app.workspace.duplicateLeaf;
-            `,
-            options: [{ minAppVersion: "0.11.0" }],
-            errors: [
-                // The (leaf, direction?) form is @since 0.13.8, and in the 0.11.13 typings.
-                { messageId: "apiNotAvailable", data: { qualifiedName: "Workspace.duplicateLeaf", sinceVersion: "0.11.13", minAppVersion: "0.11.0" } },
-            ],
-        },
-        {
             name: "a newer overload under a guard for an older version is reported",
             code: `
                 import { App, requireApiVersion } from 'obsidian';
@@ -997,18 +984,6 @@ ruleTester.run("no-unsupported-api", rule, {
             `,
             options: [{ minAppVersion: "1.0.0" }],
             errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "displayTooltip", sinceVersion: "1.8.7", minAppVersion: "1.0.0" } }],
-        },
-        {
-            // setDisabled is @since 1.2.3, but the 0.11.13 typings, the first on
-            // npm, have it with the same signature.
-            name: "BaseComponent has no @since but setDisabled requires the first typings that have it",
-            code: `
-                import { BaseComponent } from 'obsidian';
-                declare const component: BaseComponent;
-                component.setDisabled(true);
-            `,
-            options: [{ minAppVersion: "0.11.0" }],
-            errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "BaseComponent.setDisabled", sinceVersion: "0.11.13", minAppVersion: "0.11.0" } }],
         },
         {
             name: "Global augmentation: Array.findLastIndex requires 1.4.4",
