@@ -55,7 +55,7 @@ Code that runs outside Obsidian, such as unit tests under jsdom or happy-dom, ha
 unless it adds one, so the fix breaks it there.
 
 The rule needs type information, so the recommended config runs it on TypeScript files only. It
-switches the rule off for worker and test files, which have no popout windows and no `instanceOf()`;
+switches the rule off for worker files, test files and tool configs, which have no popout windows and no `instanceOf()`;
 see [Web worker files](../configuration.md#web-worker-files) and
 [Test files](../configuration.md#test-files).
 

@@ -65,7 +65,7 @@ version. The settings classes, such as `SettingPage` and `SettingGroup`, are sti
 runtime exports, and extending one on an older Obsidian fails when the plugin loads.
 
 The rule needs type information, so the recommended config runs it on TypeScript files only. It does
-not apply the rule to [test files](../configuration.md#test-files), which never run in an older
+not apply the rule to [test files and tool configs](../configuration.md#test-files), which never run in an older
 Obsidian.
 
 ### Members older than their `@since`

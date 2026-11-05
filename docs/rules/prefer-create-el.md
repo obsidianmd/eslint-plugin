@@ -25,14 +25,16 @@ tag that has a shorter helper:
 
 The document decides where the replacement is called: the global `document` uses the global
 helpers, `activeDocument` uses `activeWindow.`, and any other value typed as a `Document`, such as
-`el.doc`, uses its window, `el.doc.win.`. A document that may be null or undefined counts too, such
+`el.doc`, uses its window, `el.doc.win.`, where that window's type declares the helpers (see
+[Popout window documents](#popout-window-documents)). A document that may be null or undefined counts too, such
 as `node.ownerDocument` (typed `Document | null`) or an optional `doc?: Document` parameter.
 
 [`prefer-active-doc`](prefer-active-doc.md) does not report the global `document` in a call this rule
 reports, as the replacement drops `document`; see
 [Calls left to `prefer-create-el`](prefer-active-doc.md#calls-left-to-prefer-create-el). Where a
 comment turns this rule off for a call, `prefer-active-doc` reports `document` there; if you switch
-this rule off in your config, neither rule reports these calls.
+this rule off in your config, neither rule reports these calls. Inside an implementation of the
+helpers (see [Helper implementations](#helper-implementations)), neither rule reports them either.
 
 Not reported:
 
@@ -44,7 +46,7 @@ Not reported:
 - code inside an implementation of the helpers; see [Helper implementations](#helper-implementations)
 
 The rule needs type information, so the recommended config runs it on TypeScript files only. It
-switches the rule off for worker and test files, which have no Obsidian DOM helpers; see
+switches the rule off for worker files, test files and tool configs, which have no Obsidian DOM helpers; see
 [Web worker files](../configuration.md#web-worker-files) and [Test files](../configuration.md#test-files).
 
 ### Fix or suggestion
@@ -81,7 +83,8 @@ did, as it does with Obsidian's types. Otherwise:
   `createDiv()` that returns an `HTMLDivElement`) or a spread argument: a suggestion. A call that is
   a statement of its own, whose result is not used, is still fixed when only the result type differs.
 
-On an `any` value, or with no helper declared anywhere, the replacement is fixed as before. An
+On an `any` value, or with no helper declared anywhere, the `createEl("div")` shorthand is fixed as
+before. An
 optional chain is kept: `el?.createEl("div")` becomes `el?.createDiv()`, and `doc?.createElement("p")`
 becomes `doc?.win.createEl("p")`, also when `doc` may be null or is read through a chain, as in
 `view?.doc.createElement("p")`.

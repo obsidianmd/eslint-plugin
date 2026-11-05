@@ -354,7 +354,14 @@ export default defineConfig([
     files: ["tools/**"],
     rules: {
       "obsidianmd/no-nodejs-modules": "off",
-      "obsidianmd/rule-custom-message": "off",
+      // Keep no-new-func, a security rule; leave out only no-console
+      "obsidianmd/rule-custom-message": ["error", {
+        "no-new-func": {
+          messages: {
+            "The Function constructor is eval": "Using the `Function` constructor is dangerous because it executes arbitrary code, similar to `eval()`",
+          },
+        },
+      }],
     },
   },
 ]);
@@ -453,7 +460,7 @@ and anything under a `test-helpers/`, `test_helpers/`, `test-support/`, `test-ut
 `test_utils/` directory.
 
 Build, test and lint tool configs and scripts run in Node at build time and never in Obsidian
-either, and get the same treatment, named as the community scanner leaves them out:
+either, and get the same treatment, named like those the community scanner leaves out:
 
 - the configs named after their tool: `eslint.config.*`, `vite.config.*`, `vitest.config.*`,
   `jest.config.*`, `rollup.config.*`, `esbuild.config.*`, `webpack.config.*`, `svelte.config.*`,
@@ -481,7 +488,40 @@ an ignore they need `allowDefaultProject` (see
 ["… was not found by the project service"](#-was-not-found-by-the-project-service)).
 
 For tests or tooling under another name, such as an `integration-tests/` or `tools/` directory, add
-the same overrides for its path, or leave the directory out with `globalIgnores`.
+the same overrides for its path, or leave the directory out with `globalIgnores`. To drop only
+`no-console` there, restate `rule-custom-message` with its `no-new-func` entry alone, as in
+[Disabling rules for specific files](#disabling-rules-for-specific-files).
+
+## Upgrading to 0.5.1
+
+0.5.1 fixes findings on correct code, and fixes and suggestions that changed what correct code
+does, found by linting 600 community plugins with 0.5.0. No configuration change is needed. What
+to expect:
+
+- **New warnings from `prefer-instanceof`** on `instanceof` of an event's target, such as
+  `e.target instanceof HTMLElement`, `relatedTarget`, `currentTarget` and `srcElement`. The check is
+  false for an element of a popout window, whose `HTMLElement` is another window's. They are never
+  fixed; where it is safe, the editor suggests `e.targetNode?.instanceOf(HTMLElement)` (see
+  [`prefer-instanceof`](rules/prefer-instanceof.md)).
+- **`validate-manifest` checks the `id` only with `checkId: true`.** A published plugin id cannot
+  change, so an `allowedWords: { id: [...] }` entry added for 0.5.0 can go (see
+  [`validate-manifest`](rules/validate-manifest.md)).
+- **Fewer findings.** Among others, `no-unsupported-api` no longer reports members the published
+  `obsidian` typings had before their `@since`; `no-static-styles-assignment` no longer reports
+  computed values in `setCssStyles()` and `setCssProps()`; `prefer-get-language`,
+  `prefer-abstract-input-suggest` and `prefer-file-manager-trash-file` report nothing below the
+  `minAppVersion` their replacement needs; tool configs, `scripts/` and test runners' setup files
+  are exempt like test files (see [Test files](#test-files)).
+- **`no-static-styles-assignment` reports at the property.** A `setCssStyles()` or `setCssProps()`
+  call is reported at its first fixed-value property instead of at the call, so an
+  `eslint-disable-next-line` comment above a call written over several lines may need to move next
+  to that property.
+- **New message for changes to the main window.** `prefer-active-doc` reports a change to
+  `document.body`, `document.documentElement` or `document.head` with its own message,
+  `perWindowState`, and no suggestion: such a change has to be made, and undone, in each window's
+  document.
+
+The [changelog](../CHANGELOG.md#051---2026-11-05) lists every change.
 
 ## Upgrading to 0.5.0
 
@@ -497,7 +537,8 @@ TypeScript parser, and can go: `'manifest.json'` in `allowDefaultProject`, and
 `extraFileExtensions: ['.json']`. Its `globalIgnores` leaves out `package.json`, so the
 `depend/ban-dependencies` check on it does not run; drop `'package.json'` from the list to get it.
 Expect the new findings described below, on `manifest.json` and `LICENSE` in particular, until you
-replace the sample's id, name, description and copyright holder.
+replace the sample's name, description and copyright holder. Change its id too before you submit;
+`validate-manifest` checks the id only with `checkId: true`.
 
 ### Node.js 20.19, 22.13 or 24
 
@@ -656,8 +697,8 @@ switch a rule off for specific files (see [Disabling rules for specific files](#
 
 A few of these are worth knowing in advance:
 
-- Test files and tool configs are exempt from `prefer-active-doc` and the other rules about code
-  that runs in Obsidian (see [Test files](#test-files)), so its findings come from your plugin's own
+- Test files (and, from 0.5.1, tool configs and scripts) are exempt from `prefer-active-doc` and
+  the other rules about code that runs in Obsidian (see [Test files](#test-files)), so its findings come from your plugin's own
   code.
 - A published plugin id cannot change. In 0.5.0, `validate-manifest` reported an id that contains
   "obsidian" or ends with "plugin", which you could accept with
@@ -963,7 +1004,7 @@ If your tseslint setup does not include type checking (e.g., you use `tseslint.c
 A few things to keep in mind with this approach:
 
 - **Obsidian globals** must be declared manually. The recommended config does this for you; here you need to add them yourself. The list above covers the most common ones. `DomElementInfo`, `SvgElementInfo`, `isBoolean`, `nextFrame`, and `ready` are also available.
-- **Test and worker files** are not exempted. The recommended config switches some rules off for them (see [Web worker files](#web-worker-files) and [Test files](#test-files)); `ruleConfigs` applies every rule to every file your block matches, so add those overrides yourself.
+- **Test files, tool configs, scripts and worker files** are not exempted. The recommended config switches some rules off for them, and runs `rule-custom-message` without `no-console` in tests, tool configs and scripts (see [Web worker files](#web-worker-files) and [Test files](#test-files)); `ruleConfigs` applies every rule to every file your block matches, so add those overrides yourself.
 - **Rules from other plugins** that the recommended config sets are not in `ruleConfigs` — notably typescript-eslint's `no-deprecated`, which it runs at `warn` with `caretRangeFromPoint` allowed. While `minAppVersion` in `manifest.json` is below 1.13.0, or there is no valid one, it allows `display()` as well: the `obsidian` typings mark `SettingTab#display()` deprecated since 1.13.0, but before 1.13 there is no `update()`, so a settings tab has to keep calling `display()`. From 1.13.0 the call is reported, alongside [`settings-tab/prefer-update-over-display`](rules/settings-tab/prefer-update-over-display.md). Add these rules yourself if you want them; for the `display()` allowance, the entries are `{ from: "package", package: "obsidian", name: "display" }` and `{ from: "file", name: "display" }`.
 - **Third-party plugins** bundled by the recommended config (`@microsoft/eslint-plugin-sdl`, `eslint-plugin-import`, `eslint-plugin-no-unsanitized`, `eslint-plugin-depend`, `@eslint-community/eslint-plugin-eslint-comments`) are not included. Add them separately if you want them.
 - **`package.json` and `manifest.json` linting** (`validate-manifest`, `depend/ban-dependencies`) is not set up, and is not covered by `ruleConfigs` — those presets only carry rules that apply to source files. `validate-manifest` needs its own config block, because `manifest.json` matches no source glob and needs the JSON language to be parsed at all. Install `@eslint/json` 2.x for it (`npm install --save-dev @eslint/json`):

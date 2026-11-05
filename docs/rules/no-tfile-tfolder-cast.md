@@ -48,5 +48,5 @@ Not reported:
   `folder.children.find((c) => c instanceof TFile && c.extension === "md") as TFile | undefined`:
   the callback has checked the type, but TypeScript infers no type predicate from such a callback
 
-The recommended config switches this rule off for test files, where mocks are routinely asserted to
+The recommended config switches this rule off for test files and tool configs, where mocks are routinely asserted to
 `TFile`; see [Test files](../configuration.md#test-files).
