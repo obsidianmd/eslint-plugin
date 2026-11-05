@@ -580,14 +580,74 @@ ruleTester.run("no-global-this on probes of the global object", noGlobalThisRule
             errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" } }],
         },
         {
-            name: "a property read for its value next to a probe is fixed",
+            name: "a property read for its value where a probe decides it runs gets a suggestion too",
             code: "export const id = typeof globalThis.crypto !== 'undefined' ? globalThis.crypto.randomUUID() : '';",
-            output: "export const id = typeof globalThis.crypto !== 'undefined' ? window.crypto.randomUUID() : '';",
+            output: null,
             errors: [
                 {
                     messageId: "avoidGlobal",
                     data: { name: "globalThis" },
                     suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "export const id = typeof window.crypto !== 'undefined' ? globalThis.crypto.randomUUID() : '';" }],
+                },
+                {
+                    messageId: "avoidGlobal",
+                    data: { name: "globalThis" },
+                    suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "export const id = typeof globalThis.crypto !== 'undefined' ? window.crypto.randomUUID() : '';" }],
+                },
+            ],
+        },
+        // Found in the community-plugin run: with the probe left alone and the
+        // call fixed, TypeScript reported the probe as always true (TS2774).
+        ...[
+            [
+                "an if with ?.",
+                "export function newId(): string { if (globalThis.crypto?.randomUUID) { return globalThis.crypto.randomUUID(); } return ''; }",
+            ],
+            [
+                "an if with ?. and no braces",
+                "export function newId(): string { if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID(); return ''; }",
+            ],
+            [
+                "&& after typeof globalThis",
+                "export function fill(bytes: Uint8Array) { if (typeof globalThis !== 'undefined' && globalThis.crypto?.getRandomValues) { globalThis.crypto.getRandomValues(bytes); } }",
+            ],
+            [
+                "an early return",
+                "export function newId(): string { if (!globalThis.crypto?.randomUUID) return ''; return globalThis.crypto.randomUUID(); }",
+            ],
+            [
+                "an in check",
+                "export function newId(): string { return 'crypto' in globalThis ? globalThis.crypto.randomUUID() : ''; }",
+            ],
+        ].map(([form, code]) => {
+            // Each globalThis but the one in `typeof globalThis`, which is not reported.
+            const at = [...code.matchAll(/globalThis/g)]
+                .map((m) => m.index)
+                .filter((index) => !code.slice(0, index).endsWith("typeof "));
+            return {
+                name: `the code a probe guards, as ${form}, gets a suggestion, as the probe does`,
+                code,
+                output: null,
+                errors: at.map((index) => ({
+                    messageId: "avoidGlobal" as const,
+                    data: { name: "globalThis" },
+                    suggestions: [{
+                        messageId: "useWindow" as const,
+                        data: { name: "globalThis" },
+                        output: code.slice(0, index) + "window" + code.slice(index + "globalThis".length),
+                    }],
+                })),
+            };
+        }),
+        {
+            name: "code after a probe that does not decide whether it runs is still fixed",
+            code: "export function newId(): string { const has = Boolean(globalThis.crypto?.randomUUID); return has ? 'x' : globalThis.performance.now().toString(); }",
+            output: "export function newId(): string { const has = Boolean(globalThis.crypto?.randomUUID); return has ? 'x' : window.performance.now().toString(); }",
+            errors: [
+                {
+                    messageId: "avoidGlobal",
+                    data: { name: "globalThis" },
+                    suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "export function newId(): string { const has = Boolean(window.crypto?.randomUUID); return has ? 'x' : globalThis.performance.now().toString(); }" }],
                 },
                 { messageId: "avoidGlobal", data: { name: "globalThis" } },
             ],

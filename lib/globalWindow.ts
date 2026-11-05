@@ -755,6 +755,42 @@ export function isProbeOfGlobal(node: TSESTree.Node): boolean {
     }
 }
 
+/**
+ * Whether code at `node` runs only after a probe of the global object, as
+ * isProbeOfGlobal finds it, decides that it runs:
+ * `if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();`,
+ * `if (!("crypto" in globalThis)) return; globalThis.crypto.getRandomValues(a);`.
+ * Such code is written for where the property may be missing, and may run
+ * where it is there without a window, as `crypto` is in Node. A rule offers
+ * its rewrite there as a suggestion, as it does for the probe: the code alone
+ * rewritten would no longer read what the probe tests, and TypeScript reports
+ * a probe of a method the code then calls through another path as always
+ * true (TS2774).
+ */
+export function followsProbeOfGlobal(sourceCode: Context["sourceCode"], node: TSESTree.Node): boolean {
+    const visit = (current: TSESTree.Node): boolean => {
+        if (isFunction(current)) {
+            return false;
+        }
+        if (
+            current.type === TSESTree.AST_NODE_TYPES.Identifier &&
+            GLOBAL_OBJECTS.has(current.name) &&
+            // `typeof globalThis`: whether there is a global object, not a probe of it.
+            !(current.parent.type === TSESTree.AST_NODE_TYPES.UnaryExpression && current.parent.operator === "typeof") &&
+            // `if (!globalThis.window) return;`: what follows has a window.
+            !isInWindowCheck(current) &&
+            isProbeOfGlobal(current)
+        ) {
+            return true;
+        }
+        return (sourceCode.visitorKeys[current.type] ?? []).some((key) => {
+            const child: unknown = (current as unknown as Record<string, unknown>)[key];
+            return Array.isArray(child) ? child.some((item) => isNode(item) && visit(item)) : isNode(child) && visit(child);
+        });
+    };
+    return decidingConditions(node).some(visit);
+}
+
 // The window or worker name that `node` checks for, if it is a window check.
 function checkedName(node: TSESTree.Node): string | undefined {
     if (node.type === TSESTree.AST_NODE_TYPES.UnaryExpression && node.operator === "typeof") {

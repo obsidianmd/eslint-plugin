@@ -1,6 +1,7 @@
 import { type TSESLint, TSESTree } from "@typescript-eslint/utils";
 import ts from "typescript";
 import {
+    followsProbeOfGlobal,
     getGlobalWindowType,
     getTypeInfo,
     isGlobalWindowAt,
@@ -94,10 +95,14 @@ export default ruleCreator({
                 // where there is no window. The same goes for a write, which
                 // defines a global for code that may run without a window, and
                 // for code that may run without one, such as the body of
-                // `try { … } catch {}`.
+                // `try { … } catch {}`, or the code a probe guards:
+                // `if (globalThis.crypto?.randomUUID) globalThis.crypto.randomUUID()`.
                 if (
                     rewrite === "fix" &&
-                    (isProbeOfGlobal(node) || writesGlobal(node) || mayLackWindowAt(context, node))
+                    (isProbeOfGlobal(node) ||
+                        writesGlobal(node) ||
+                        mayLackWindowAt(context, node) ||
+                        followsProbeOfGlobal(context.sourceCode, node))
                 ) {
                     rewrite = "suggest";
                 }
