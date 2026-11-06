@@ -105,7 +105,7 @@ with a lower `minAppVersion` is not told that it needs 0.11.13.
 ### Declarations without `@since`
 
 About 600 declarations of the 1.14.4 typings have no `@since`. Those the oldest typings on npm,
-0.11.13, already declare are not reported. The others, 115 in 1.14.4, need the first published
+0.11.13, already declare are not reported. The others, 92 in 1.14.4, need the first published
 typings that declare them, by the same table: a use needs the first release from which on every
 release, up to your `obsidian` version, declared it in a form the use fits (as above), or else
 declared it at all. They include:
@@ -134,7 +134,11 @@ Not reported, as they exist on every version or are the plugin's own:
 - a member of an interface of the obsidian module, such as `RequestUrlParam.url` or
   `CachedMetadata.sections`, or of a global interface only `obsidian.d.ts` declares, such as the
   `DomElementInfo` options of `createEl()`: the plugin or the app supplies that data;
-- a write to a property, such as `this.navigation = true` in a `FileView`;
+- a member a base class declared in earlier typings, such as `FileView.navigation` (from `View`);
+- a field or accessor of one of Obsidian's classes that the typings declare later than the class,
+  such as `leaf.parent`, `modal.scope` or `this.app` in an `EditorSuggest`: the instances had that
+  state before the typings described it;
+- a write to a property, such as `node.doc = …`;
 - a use in a type, such as `typeof activeDocument`;
 - a use behind a `requireApiVersion()` check or a feature check, as described below:
   `typeof activeDocument !== "undefined" ? activeDocument : document` or `el.setCssStyles?.(…)`.

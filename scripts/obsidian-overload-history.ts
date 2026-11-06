@@ -169,15 +169,78 @@ export interface DeclarationHistory {
     types: [string, [string, string][]][];
     // The declarations of the latest typings without any @since that the
     // oldest typings did not have, except members of the obsidian module's own
-    // interfaces; their shapes are in `declarations` too.
+    // interfaces, members an ancestor declared earlier, and fields of a class
+    // declared after the class; their shapes are in `declarations` too.
     undated: string[];
+}
+
+interface ClassInfo {
+    isClass: boolean;
+    bases: string[];
+    members: Map<string, ts.SyntaxKind>;
+}
+
+// Each class and interface, by name, with the names it extends or implements
+// and the kind of each member it declares.
+function indexClasses(sourceFile: ts.SourceFile): Map<string, ClassInfo> {
+    const classes = new Map<string, ClassInfo>();
+    const visit = (node: ts.Node): void => {
+        if ((ts.isClassDeclaration(node) || ts.isInterfaceDeclaration(node)) && node.name) {
+            const info: ClassInfo = classes.get(node.name.text) ?? { isClass: false, bases: [], members: new Map() };
+            info.isClass ||= ts.isClassDeclaration(node);
+            for (const clause of node.heritageClauses ?? []) {
+                info.bases.push(...clause.types.map((type) => type.expression.getText(sourceFile)));
+            }
+            for (const member of node.members) {
+                if (member.name) {
+                    info.members.set(member.name.getText(sourceFile), member.kind);
+                }
+            }
+            classes.set(node.name.text, info);
+        } else {
+            ts.forEachChild(node, visit);
+        }
+    };
+    visit(sourceFile);
+    return classes;
+}
+
+function hasMember(classes: Map<string, ClassInfo>, owner: string, member: string, seen = new Set<string>()): boolean {
+    const info = classes.get(owner);
+    if (!info || seen.has(owner)) {
+        return false;
+    }
+    seen.add(owner);
+    return info.members.has(member) || info.bases.some((base) => hasMember(classes, base, member, seen));
+}
+
+const STATE_KINDS = new Set([ts.SyntaxKind.PropertyDeclaration, ts.SyntaxKind.GetAccessor, ts.SyntaxKind.SetAccessor]);
+
+// Whether the first typings that declare an undated member are evidence that
+// the app added it then. They are not when an ancestor declared the member
+// earlier (FileView.navigation, inherited from View), nor for a field of one of
+// Obsidian's classes declared after the class (Modal.scope, WorkspaceLeaf.parent,
+// PopoverSuggest.app): the typings then describe state the instances had.
+function isAddedWithDeclaration(
+    parsed: { classes: Map<string, ClassInfo> }[],
+    firstIndex: number,
+    owner: string,
+    member: string,
+): boolean {
+    const earlier = parsed.slice(0, firstIndex);
+    if (earlier.some(({ classes }) => hasMember(classes, owner, member))) {
+        return false;
+    }
+    const info = parsed[parsed.length - 1].classes.get(owner);
+    const kind = info?.members.get(member);
+    return !(info?.isClass && kind !== undefined && STATE_KINDS.has(kind) && earlier.some(({ classes }) => classes.has(owner)));
 }
 
 export function buildDeclarationHistory(typings: Typings[]): DeclarationHistory {
     const parsed = typings.map(({ version, text }) => {
         const sourceFile = ts.createSourceFile("obsidian.d.ts", text, ts.ScriptTarget.Latest, true);
         const index = indexTypeDeclarations(sourceFile);
-        return { version, shapes: collectDeclarationShapes(sourceFile), index, hash: typeHashes(index) };
+        return { version, shapes: collectDeclarationShapes(sourceFile), index, hash: typeHashes(index), classes: indexClasses(sourceFile) };
     });
     const versions = parsed.map(({ version }) => version);
     const latest = parsed[parsed.length - 1];
@@ -202,6 +265,9 @@ export function buildDeclarationHistory(typings: Typings[]): DeclarationHistory 
             continue;
         }
         if (isUndated && first && first !== parsed[0]) {
+            if (owner !== undefined && !isAddedWithDeclaration(parsed, parsed.indexOf(first), owner, name.slice(owner.length + 1))) {
+                continue;
+            }
             undated.push(name);
         } else if (!since || !first || !lt(first.version, since)) {
             continue;

@@ -224,6 +224,8 @@ describe("scripts/obsidian-overload-history.ts declarations without @since", () 
                 export { moment_2 as moment }
                 export class Workspace { old(): void; }
                 export interface Options { a?: string; }
+                export class View { navigation: boolean; }
+                export class FileView extends View {}
             `,
         },
         {
@@ -234,13 +236,15 @@ describe("scripts/obsidian-overload-history.ts declarations without @since", () 
                     var activeDocument: Document;
                 }
                 export const moment: unknown;
-                export class Workspace { old(): void; fresh(): void; }
+                export class Workspace { old(): void; fresh(): void; field: number; }
                 export interface Options { a?: string; b?: string; }
+                export class View { navigation: boolean; }
+                export class FileView extends View { navigation: boolean; }
             `,
         },
     ]);
 
-    it("lists those the oldest typings did not have, by their exported name, but not data interfaces", () => {
+    it("lists those the oldest typings did not have, by their exported name, but not data interfaces, inherited members or later fields", () => {
         assert.deepStrictEqual(history.undated, ["HTMLElement.setCssProps", "activeDocument", "Workspace.fresh"]);
         assert.deepStrictEqual(
             history.declarations.map(([name, shapes]) => [name, shapes.map(([ranges]) => ranges)]),

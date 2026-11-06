@@ -86,16 +86,33 @@ ruleTester.run("no-unsupported-api: declarations without @since", rule, {
             options: [{ minAppVersion: "0.14.0" }],
         },
         {
-            // FileView.navigation is first in the 0.15.1 typings.
-            name: "a write to a property",
+            // FileView.navigation is first in the 0.15.1 typings, View.navigation in
+            // the oldest; WorkspaceLeaf.parent, Modal.scope and PopoverSuggest.app
+            // are first in typings later than their classes.
+            name: "inherited members and fields of Obsidian's classes",
             code: `
-                import { FileView } from 'obsidian';
-                abstract class View extends FileView {
-                    constructor(leaf: never) {
-                        super(leaf);
-                        this.navigation = true;
+                import { EditorSuggest, FileView, Modal, WorkspaceLeaf } from 'obsidian';
+                declare const view: FileView;
+                declare const leaf: WorkspaceLeaf;
+                declare const modal: Modal;
+                abstract class Suggest extends EditorSuggest<string> {
+                    vault() {
+                        return this.app.vault;
                     }
                 }
+                view.navigation;
+                leaf.parent;
+                modal.scope.register([], "Enter", () => false);
+            `,
+            options: [{ minAppVersion: "0.12.17" }],
+        },
+        {
+            // Node.doc is first in the 0.15.3 typings.
+            name: "a write to a property",
+            code: `
+                import 'obsidian';
+                declare const el: HTMLElement;
+                el.doc = document;
             `,
             options: [{ minAppVersion: "0.14.0" }],
         },
