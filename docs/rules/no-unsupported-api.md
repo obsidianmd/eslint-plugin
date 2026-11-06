@@ -117,8 +117,11 @@ them, by the same table: a use needs the first release from which on every relea
 there is no `@since` to fall back on, a use counts as fitting an older form unless it is known not
 to: a call with more or fewer arguments than that form takes, an argument of a type the older
 parameter, whose types the table knows, does not take, or a result the older form types otherwise.
-So `scope.register([], "Enter", cb)` needs 0.10.3, the first typings with `Scope.register`, though
-`KeymapEventListener` changed since. They include:
+`null` or `undefined` where the older parameter leaves them out counts as fitting: without
+`strictNullChecks` the older type took them too. So `scope.register([], "Enter", cb)` and
+`scope.register(null, null, cb)` need 0.10.3, the first typings with `Scope.register`, though
+`KeymapEventListener` changed since, and `modifiers` takes `null` only from the 1.7.2 typings on.
+They include:
 
 | API | Needs |
 | :-- | :-- |

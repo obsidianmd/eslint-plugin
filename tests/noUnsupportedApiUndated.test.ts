@@ -107,6 +107,17 @@ ruleTester.run("no-unsupported-api: declarations without @since", rule, {
             options: [{ minAppVersion: "0.12.17" }],
         },
         {
+            // Scope.register's modifiers take null from the 1.7.2 typings on; the
+            // older Modifier[] took it too without strictNullChecks.
+            name: "null where older typings left it out",
+            code: `
+                import { Modal } from 'obsidian';
+                declare const modal: Modal;
+                modal.scope.register(null, null, () => false);
+            `,
+            options: [{ minAppVersion: "0.15.0" }],
+        },
+        {
             // Node.doc is first in the 0.15.3 typings.
             name: "a write to a property",
             code: `

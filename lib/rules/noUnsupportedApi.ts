@@ -566,11 +566,21 @@ export default ruleCreator<Options, "apiNotAvailable">({
             if (values.some((value) => value.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown))) {
                 return undefined;
             }
-            return values.every(
+            const rejected = values.filter(
                 (value) =>
-                    simple.some((member) => simpleTypeHolds(member, value)) ||
-                    named.some((target) => checker.isTypeAssignableTo(value, target)),
+                    !simple.some((member) => simpleTypeHolds(member, value)) &&
+                    !named.some((target) => checker.isTypeAssignableTo(value, target)),
             );
+            if (rejected.length === 0) {
+                return true;
+            }
+            // Only `null` or `undefined` the older type leaves out, as in
+            // `scope.register(null, ...)` before `modifiers` took `null`: without
+            // strictNullChecks the older type took them too, and a later release
+            // adding `| null` often only writes down what the code did already.
+            return rejected.every((value) => value.flags & (ts.TypeFlags.Null | ts.TypeFlags.Undefined | ts.TypeFlags.Void))
+                ? undefined
+                : false;
         }
 
         // The type a class, interface, type alias or enum of the plugin's
