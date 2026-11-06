@@ -98,7 +98,7 @@ export default ruleCreator<Options, "apiNotAvailable">({
         ],
         messages: {
             apiNotAvailable:
-                "'{{qualifiedName}}' requires Obsidian v{{sinceVersion}}, but minAppVersion is {{minAppVersion}}.",
+                "'{{qualifiedName}}' requires Obsidian v{{sinceVersion}}, but minAppVersion is {{minAppVersion}}. Raise minAppVersion to {{sinceVersion}}, or guard this use with requireApiVersion(\"{{sinceVersion}}\").",
         },
     },
     defaultOptions: [{}],
