@@ -2012,12 +2012,12 @@ describe("no-unsupported-api overload resolution", function () {
             `// @ts-expect-error`,
             `thing.send("x", "not a number");`, // the literal decides: 1.5.0
         ].join("\n")), [
-            "7: 'Thing.mode' requires Obsidian v1.5.0, but minAppVersion is 1.0.0.",
-            "11: 'Thing.pick' requires Obsidian v1.2.0, but minAppVersion is 1.0.0.",
-            "13: 'Thing.on' requires Obsidian v1.5.0, but minAppVersion is 1.0.0.",
-            "15: 'Thing.listen' requires Obsidian v1.5.0, but minAppVersion is 1.0.0.",
-            "17: 'Thing.open' requires Obsidian v1.5.0, but minAppVersion is 1.0.0.",
-            "20: 'Thing.send' requires Obsidian v1.5.0, but minAppVersion is 1.0.0.",
+            "7: 'Thing.mode' requires Obsidian v1.5.0, but minAppVersion is 1.0.0. Raise minAppVersion to 1.5.0, or guard this use with requireApiVersion(\"1.5.0\").",
+            "11: 'Thing.pick' requires Obsidian v1.2.0, but minAppVersion is 1.0.0. Raise minAppVersion to 1.2.0, or guard this use with requireApiVersion(\"1.2.0\").",
+            "13: 'Thing.on' requires Obsidian v1.5.0, but minAppVersion is 1.0.0. Raise minAppVersion to 1.5.0, or guard this use with requireApiVersion(\"1.5.0\").",
+            "15: 'Thing.listen' requires Obsidian v1.5.0, but minAppVersion is 1.0.0. Raise minAppVersion to 1.5.0, or guard this use with requireApiVersion(\"1.5.0\").",
+            "17: 'Thing.open' requires Obsidian v1.5.0, but minAppVersion is 1.0.0. Raise minAppVersion to 1.5.0, or guard this use with requireApiVersion(\"1.5.0\").",
+            "20: 'Thing.send' requires Obsidian v1.5.0, but minAppVersion is 1.0.0. Raise minAppVersion to 1.5.0, or guard this use with requireApiVersion(\"1.5.0\").",
         ]);
     });
 });
