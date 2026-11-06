@@ -5,6 +5,7 @@ import { vault } from "./rules/vault/index.js";
 import detachLeaves from "./rules/detachLeaves.js";
 import editorDropPaste from "./rules/editorDropPaste.js";
 import hardcodedConfigPath from "./rules/hardcodedConfigPath.js";
+import noAwaitChainable from "./rules/noAwaitChainable.js";
 import noForbiddenElements from "./rules/noForbiddenElements.js";
 import noGlobalThis from "./rules/noGlobalThis.js";
 import noSampleCode from "./rules/noSampleCode.js";
@@ -110,6 +111,7 @@ const plugin: ObsidianmdPlugin = {
         "detach-leaves": detachLeaves,
         "editor-drop-paste": editorDropPaste,
         "hardcoded-config-path": hardcodedConfigPath,
+        "no-await-chainable": noAwaitChainable,
         "no-forbidden-elements": noForbiddenElements,
         "no-global-this": noGlobalThis,
         "no-plugin-as-component": noPluginAsComponent,
@@ -173,6 +175,7 @@ const CUSTOM_MESSAGE_NO_NEW_FUNC = {
 // which extends recommendedTypeChecked). Applying them to plain JS files
 // throws "you have used a rule which requires type information".
 const recommendedPluginRulesConfigTypeChecked: RulesConfig = {
+    "obsidianmd/no-await-chainable": "error",
     "obsidianmd/no-plugin-as-component": "error",
     "obsidianmd/no-view-references-in-plugin": "error",
     "obsidianmd/no-unsupported-api": "error",
