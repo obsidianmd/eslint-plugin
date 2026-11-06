@@ -2,6 +2,7 @@ import { ESLintUtils, type TSESLint, TSESTree } from "@typescript-eslint/utils";
 import type { ParserServices } from "@typescript-eslint/utils";
 import ts from "typescript";
 import { type MinAppVersionOptions, minAppVersionSchema, supportsVersion } from "../minAppVersion.js";
+import { API_SINCE } from "../obsidianApiVersions.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 const INSTANCEABLE_BASE_TYPES = new Set(["Node", "UIEvent"]);
@@ -115,8 +116,8 @@ const EQUALITY_OPERATORS = new Set(["===", "!==", "==", "!="]);
 // Popout windows came with Obsidian 0.15.0; before that there is one window,
 // and `instanceof` is right. Node's and UIEvent's instanceOf(), and
 // UIEvent's targetNode, are first declared in the 0.15.3 typings.
-const POPOUT_SINCE = "0.15.0";
-const INSTANCE_OF_SINCE = "0.15.3";
+const POPOUT_SINCE = API_SINCE.activeWindow;
+const INSTANCE_OF_SINCE = API_SINCE["Node.instanceOf"];
 
 const SINCE_MESSAGE = " (needs Obsidian {{since}} or later)";
 

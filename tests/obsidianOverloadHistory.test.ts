@@ -16,6 +16,7 @@ import {
     buildDeclarationHistory,
     buildOverloadHistory,
     historyEntries,
+    mergeTypings,
     renderDeclarationHistoryModule,
     renderHistoryModule,
 } from "../scripts/obsidian-overload-history.js";
@@ -250,5 +251,27 @@ describe("scripts/obsidian-overload-history.ts declarations without @since", () 
             history.declarations.map(([name, shapes]) => [name, shapes.map(([ranges]) => ranges)]),
             [["HTMLElement.setCssProps", ["1"]], ["activeDocument", ["1"]], ["Workspace.fresh", ["1"]]],
         );
+    });
+});
+
+describe("scripts/obsidian-overload-history.ts sources", () => {
+    it("takes each version from npm where published, else from the repository, in version order", () => {
+        const merged = mergeTypings(
+            [
+                { version: "0.11.13", text: "npm 0.11.13" },
+                { version: "0.12.0", text: "npm 0.12.0" },
+            ],
+            [
+                { version: "0.9.7", text: "git 0.9.7" },
+                { version: "0.12.6", text: "git 0.12.6" },
+                { version: "0.11.13", text: "git 0.11.13" },
+            ],
+        );
+        assert.deepStrictEqual(merged.map(({ version, text }) => `${version}:${text}`), [
+            "0.9.7:git 0.9.7",
+            "0.11.13:npm 0.11.13",
+            "0.12.0:npm 0.12.0",
+            "0.12.6:git 0.12.6",
+        ]);
     });
 });

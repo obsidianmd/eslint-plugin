@@ -1096,7 +1096,7 @@ globalsRuleTester.run("prefer-create-el with the recommended config's globals", 
 });
 
 // Replacements that need a newer Obsidian than the plugin's minAppVersion are
-// not offered: createSvg() 1.1.1, activeWindow 0.15.0, `doc.win` 0.15.3. The
+// not offered: createDiv() and createSpan() 0.10.0, createFragment() 0.9.11, createSvg() 1.1.0, activeWindow 0.15.0, `doc.win` 0.15.3. The
 // native call is right on older versions, so it is not reported either.
 const versionRuleTester = new RuleTester();
 const at = (minAppVersion: string): [{ minAppVersion: string }] => [{ minAppVersion }];
@@ -1106,16 +1106,19 @@ const DOC_WIN = `${MOCK_OBSIDIAN_DOM}\ndeclare const doc: Document & { win: type
 
 versionRuleTester.run("prefer-create-el and minAppVersion", preferCreateEl, {
     valid: [
-        { name: "createSvg() below 1.1.1 is not reported", code: SVG, options: at("1.1.0") },
+        { name: "createSvg() below 1.1.0 is not reported", code: SVG, options: at("1.0.9") },
+        { name: "createDiv() below 0.10.0 is not reported", code: `${MOCK_OBSIDIAN_DOM}\ndocument.createElement('div');`, options: at("0.9.21") },
+        { name: "el.createDiv() below 0.10.0 is not reported", code: `${MOCK_OBSIDIAN_DOM}\ndeclare const el: HTMLElement;\nel.createEl('div');`, options: at("0.9.21") },
+        { name: "createFragment() below 0.9.11 is not reported", code: `${MOCK_OBSIDIAN_DOM}\ndocument.createDocumentFragment();`, options: at("0.9.8") },
         { name: "activeWindow below 0.15.0 is not reported", code: ACTIVE, options: at("0.14.9") },
         { name: "doc.win below 0.15.3 is not reported", code: DOC_WIN, options: at("0.15.2") },
         { name: "doc.win at 0.15.0, from the repository's manifest.json, is not reported", code: DOC_WIN },
     ],
     invalid: [
         {
-            name: "createSvg() at 1.1.1 is fixed",
+            name: "createSvg() at 1.1.0 is fixed",
             code: SVG,
-            options: at("1.1.1"),
+            options: at("1.1.0"),
             output: `${MOCK_OBSIDIAN_DOM}\ncreateSvg('path');`,
             errors: [{ messageId: "preferCreateEl" }],
         },
@@ -1141,9 +1144,9 @@ versionRuleTester.run("prefer-create-el and minAppVersion", preferCreateEl, {
             errors: [{ messageId: "preferCreateEl" }],
         },
         {
-            name: "document.createElement('div') → createDiv() needs no newer version",
+            name: "document.createElement('div') → createDiv() at 0.10.0 is fixed",
             code: `${MOCK_OBSIDIAN_DOM}\ndocument.createElement('div');`,
-            options: at("0.11.13"),
+            options: at("0.10.0"),
             output: `${MOCK_OBSIDIAN_DOM}\ncreateDiv();`,
             errors: [{ messageId: "preferCreateEl" }],
         },
@@ -1155,14 +1158,14 @@ versionRuleTester.run("prefer-create-el and minAppVersion", preferCreateEl, {
             errors: [
                 {
                     messageId: "preferCreateEl",
-                    suggestions: [{ messageId: "preferCreateElSuggestionSince", data: { since: "1.1.1", original: "document.createElementNS('http://www.w3.org/2000/svg', 'path')", replacement: "createSvg('path')" }, output: "createSvg('path');" }],
+                    suggestions: [{ messageId: "preferCreateElSuggestionSince", data: { since: "1.1.0", original: "document.createElementNS('http://www.w3.org/2000/svg', 'path')", replacement: "createSvg('path')" }, output: "createSvg('path');" }],
                 },
             ],
         },
         {
-            name: "a suggested createSvg() at 1.1.1 does not mention a version",
+            name: "a suggested createSvg() at 1.1.0 does not mention a version",
             code: "document.createElementNS('http://www.w3.org/2000/svg', 'path');",
-            options: at("1.1.1"),
+            options: at("1.1.0"),
             output: null,
             errors: [
                 {

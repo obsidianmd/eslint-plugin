@@ -9,8 +9,8 @@ const error = (line: number, qualifiedName: string, sinceVersion: string, minApp
     data: { qualifiedName, sinceVersion, minAppVersion },
 });
 
-// Declarations without @since need the first published typings that declare
-// them (UNDATED_DECLARATIONS in obsidianDeclarationHistory.ts).
+// Declarations without @since need the first typings in the obsidian-api
+// history that declare them (UNDATED_DECLARATIONS in obsidianDeclarationHistory.ts).
 ruleTester.run("no-unsupported-api: declarations without @since", rule, {
     valid: [
         {
@@ -27,7 +27,7 @@ ruleTester.run("no-unsupported-api: declarations without @since", rule, {
                 void nextFrame();
                 [1, 2].unique();
             `,
-            options: [{ minAppVersion: "1.2.3" }],
+            options: [{ minAppVersion: "1.1.7" }],
         },
         {
             name: "a member the oldest typings already declare",
@@ -133,11 +133,11 @@ ruleTester.run("no-unsupported-api: declarations without @since", rule, {
             `,
             options: [{ minAppVersion: "0.14.0" }],
             errors: [
-                error(5, "HTMLElement.setCssProps", "1.2.3", "0.14.0"),
+                error(5, "HTMLElement.setCssProps", "1.1.7", "0.14.0"),
                 error(6, "UIEvent.targetNode", "0.15.3", "0.14.0"),
                 error(7, "Node.instanceOf", "0.15.3", "0.14.0"),
-                error(8, "createSvg", "1.1.1", "0.14.0"),
-                error(9, "nextFrame", "1.2.3", "0.14.0"),
+                error(8, "createSvg", "1.1.0", "0.14.0"),
+                error(9, "nextFrame", "1.1.7", "0.14.0"),
                 error(10, "HTMLElement.innerWidth", "0.15.0", "0.14.0"),
             ],
         },
@@ -169,14 +169,16 @@ ruleTester.run("no-unsupported-api: declarations without @since", rule, {
             options: [{ minAppVersion: "0.14.0" }],
             errors: [
                 error(3, "Array.unique", "0.14.4", "0.14.0"),
-                error(4, "ArrayConstructor.combine", "1.1.1", "0.14.0"),
+                error(4, "ArrayConstructor.combine", "1.1.0", "0.14.0"),
                 error(5, "sleep", "0.14.3", "0.14.0"),
             ],
         },
         {
             // requestUrl took only a RequestUrlParam until 0.16.0 took a URL
-            // string. It is first in the 0.13.26 typings, but RequestUrlParam
-            // and RequestUrlResponse are declared as today from 0.14.4 on.
+            // string. It is first in the 0.13.26 typings, whose RequestUrlParam
+            // has `url` and RequestUrlResponse `json`: the history has only
+            // hashes of those types, which changed since, so that cannot be
+            // told, and without a @since the first typings decide.
             name: "a class member and a module function",
             code: `
                 import { Modal, App, requestUrl } from 'obsidian';
@@ -193,9 +195,9 @@ ruleTester.run("no-unsupported-api: declarations without @since", rule, {
             `,
             options: [{ minAppVersion: "0.12.0" }],
             errors: [
-                error(5, "Modal.setTitle", "1.5.7", "0.12.0"),
+                error(5, "Modal.setTitle", "1.5.1", "0.12.0"),
                 error(8, "requestUrl", "0.16.0", "0.12.0"),
-                error(10, "requestUrl", "0.14.4", "0.12.0"),
+                error(10, "requestUrl", "0.13.26", "0.12.0"),
             ],
         },
     ],

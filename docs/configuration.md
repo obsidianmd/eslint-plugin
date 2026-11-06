@@ -504,9 +504,11 @@ to expect:
   fixed; where it is safe, the editor suggests `e.targetNode?.instanceOf(HTMLElement)` (see
   [`prefer-instanceof`](rules/prefer-instanceof.md)).
 - **New errors from `no-unsupported-api`** for APIs without a `@since` in `obsidian.d.ts`, which
-  it now checks against the first published typings that declare them: `activeDocument` and
-  `activeWindow` need 0.15.0, `e.targetNode` and `el.instanceOf()` 0.15.3, `createSvg()` 1.1.1,
-  `el.setCssStyles()`, `el.setCssProps()` and `nextFrame()` 1.2.3. Guard them, or raise
+  it now checks against the first typings that declare them, from every version in the history of
+  the obsidian-api repository: `activeDocument` and `activeWindow` need 0.15.0, `e.targetNode` and
+  `el.instanceOf()` 0.15.3, `createSvg()` 1.1.0, `el.setCssStyles()`, `el.setCssProps()` and
+  `nextFrame()` 1.1.7. A `minAppVersion` below 0.11.13 also gets findings for APIs added since 0.9.7,
+  such as `createDiv()` (0.10.0). Guard them, or raise
   `minAppVersion` (see [`no-unsupported-api`](rules/no-unsupported-api.md#declarations-without-since)).
 - **`validate-manifest` checks the `id` only with `checkId: true`.** A published plugin id cannot
   change, so an `allowedWords: { id: [...] }` entry added for 0.5.0 can go (see

@@ -1,6 +1,7 @@
 import { ASTUtils, ESLintUtils, TSESTree } from "@typescript-eslint/utils";
 import ts from "typescript";
 import { type MinAppVersionOptions, minAppVersionSchema, supportsVersion } from "../minAppVersion.js";
+import { API_SINCE, laterVersion } from "../obsidianApiVersions.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 const TAG_SHORTHANDS: Record<string, string> = {
@@ -179,13 +180,14 @@ function getStringLiteralValue(
     return undefined;
 }
 
-// The first typings that declare what a replacement calls: createSvg() (also
-// as el.createSvg()) 1.1.1, activeWindow 0.15.0, and `doc.win` (Node.win)
-// 0.15.3. createEl(), createDiv(), createSpan() and createFragment() are in
-// the oldest typings, 0.11.13.
-const CREATE_SVG_SINCE = "1.1.1";
-const ACTIVE_WINDOW_SINCE = "0.15.0";
-const NODE_WIN_SINCE = "0.15.3";
+// The version each helper a replacement calls needs (createEl() is in the
+// first typings), and activeWindow and `doc.win` for the window prefixes.
+const HELPER_SINCE: Readonly<Record<string, string>> = {
+    createDiv: API_SINCE.createDiv,
+    createSpan: API_SINCE.createSpan,
+    createFragment: API_SINCE.createFragment,
+    createSvg: API_SINCE.createSvg,
+};
 
 type MessageIds = "preferCreateEl" | "preferCreateElSuggestion" | "preferCreateElSuggestionSince";
 
@@ -298,7 +300,7 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
                 // the native call is the one that does.
                 return {
                     prefix: "activeWindow.",
-                    since: ACTIVE_WINDOW_SINCE,
+                    since: API_SINCE.activeWindow,
                     canAutofix: (helper) => winHasHelper(obj, helper) || undefined,
                 };
             }
@@ -307,7 +309,7 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
                 // `doc?.createElement()` keeps its `?.`: `doc?.win.createEl()`.
                 return {
                     prefix: `${getObjectText(obj)}${callee.optional ? "?." : "."}win.`,
-                    since: NODE_WIN_SINCE,
+                    since: API_SINCE["Node.win"],
                     canAutofix: (helper) => winHasHelper(obj, helper) || undefined,
                 };
             }
@@ -348,7 +350,7 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
                 ? `${target.prefix}${shorthand}()`
                 : `${target.prefix}createEl(${getText(tagArg)})`;
             const compiles = shorthand !== undefined || resolvesToTagMapOverload(node, "HTMLElementTagNameMap");
-            report(node, replacement, compiles ? canAutofix : null, target.since);
+            report(node, replacement, compiles ? canAutofix : null, laterVersion(target.since, HELPER_SINCE[shorthand ?? "createEl"]));
         }
 
         function checkCreateElementNS(node: TSESTree.CallExpression): void {
@@ -370,7 +372,7 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
             const argsText = [getText(tagArg), ...remainingArgs.map((arg) => getText(arg))].join(", ");
             const replacement = `${target.prefix}createSvg(${argsText})`;
             const compiles = resolvesToTagMapOverload(node, "SVGElementTagNameMap");
-            report(node, replacement, compiles ? canAutofix : null, CREATE_SVG_SINCE);
+            report(node, replacement, compiles ? canAutofix : null, laterVersion(target.since, HELPER_SINCE.createSvg));
         }
 
         function checkCreateElShorthand(node: TSESTree.CallExpression): void {
@@ -398,7 +400,7 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
                 .join(", ");
             const replacement = `${prefix}${shorthand}${node.optional ? "?.(" : "("}${argsText})`;
 
-            report(node, replacement, checkShorthand(node, shorthand, isDocGlobal ? undefined : obj));
+            report(node, replacement, checkShorthand(node, shorthand, isDocGlobal ? undefined : obj), HELPER_SINCE[shorthand]);
         }
 
         // Whether `createDiv(...)` or `el.createDiv(...)`, with the arguments
@@ -535,7 +537,7 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
                 return;
             }
             const replacement = `${target.prefix}createFragment()`;
-            report(node, replacement, canAutofix, target.since);
+            report(node, replacement, canAutofix, laterVersion(target.since, HELPER_SINCE.createFragment));
         }
 
         // Whether `name`, called bare at `node`, resolves to a binding of the

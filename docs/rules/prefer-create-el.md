@@ -144,11 +144,12 @@ still reported in favour of `createEl("canvas")`.
 ### Minimum app version
 
 Some replacements need a newer Obsidian than the plugin may support, by the first typings that
-declare what they call: `createSvg()` (and `el.createSvg()`) 1.1.1, `activeWindow` 0.15.0, and a
-document's `win` 0.15.3. Where the plugin's minimum app version (the `minAppVersion` option, else
-`minAppVersion` in `manifest.json`) is older than that, the native call is the right one there, and
-it is not reported. `createEl()`, `createDiv()`, `createSpan()` and `createFragment()` are in every
-version, so `document.createElement("div")` is reported whatever the version. Where no version is
+declare what they call: `createFragment()` 0.9.11, `createDiv()` and `createSpan()` (also as
+`el.createDiv()` and `el.createSpan()`) 0.10.0, `createSvg()` (and `el.createSvg()`) 1.1.0,
+`activeWindow` 0.15.0, and a document's `win` 0.15.3. Where the plugin's minimum app version (the
+`minAppVersion` option, else `minAppVersion` in `manifest.json`) is older than that, the native call
+or `createEl()` is the right one there, and it is not reported. `createEl()` is in every version, so
+`document.createElement("p")` is reported whatever the version. Where no version is
 known (no option and no `manifest.json` `minAppVersion`, or the one that applies is not a version,
 such as `latest`), the fix is applied as before, and a suggestion says which version it needs.
 

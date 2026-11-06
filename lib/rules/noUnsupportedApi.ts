@@ -297,7 +297,7 @@ export default ruleCreator<Options, "apiNotAvailable">({
         }
 
         // The version a use of a declaration without @since needs: the first
-        // published typings from which on every release declared it in a form
+        // typings from which on every release declared it in a form
         // the use fits, or else declared it at all. Only for the declarations
         // the history lists (see UNDATED_DECLARATIONS), that obsidian.d.ts
         // alone declares: a member that lib.dom or the plugin declares too,
@@ -323,7 +323,7 @@ export default ruleCreator<Options, "apiNotAvailable">({
             const called = call ? resolvedOverload(call, overloads) : undefined;
             const used = called ? [called] : overloads;
             const version =
-                history.firstDeclared(qualifiedName, (shape, at) => fitsShape(shape, at, used, called && call)) ??
+                history.firstDeclared(qualifiedName, (shape, at) => fitsShape(shape, at, used, called && call, true)) ??
                 history.firstDeclared(qualifiedName, () => true);
             return { version, called };
         }
@@ -348,26 +348,37 @@ export default ruleCreator<Options, "apiNotAvailable">({
         // at index `at` of the history. A use fits the shape a declaration has
         // now. A call to a single declaration, `call` being given, also fits a
         // shape it can make with the same effect: see callFits.
+        //
+        // `lenient` is for a declaration without @since, whose first typings
+        // are all there is to go by: a use then fits unless it is known not to
+        // (see callFits), as the older types the history has only hashes of
+        // cannot tell. With a @since, the @since decides what cannot be told.
         function fitsShape(
             shape: ShapeEntry,
             at: number,
             declarations: ts.Declaration[],
             call: TSESTree.CallExpression | undefined,
+            lenient = false,
         ): boolean {
             const sameAsNow = declarations.some((declaration) => shapeOf(declaration) === shape.text);
             if (sameAsNow && history.sameTypes(shape.node, at, declarations[0].getSourceFile())) {
                 return true;
             }
             const [declaration] = declarations;
-            return (
+            const callable =
                 call !== undefined &&
                 shape.node !== undefined &&
                 ts.isFunctionTypeNode(shape.node) &&
                 (ts.isMethodDeclaration(declaration) ||
                     ts.isMethodSignature(declaration) ||
-                    ts.isFunctionDeclaration(declaration)) &&
-                callFits(shape.node, declaration, call, at)
-            );
+                    ts.isFunctionDeclaration(declaration));
+            if (!callable) {
+                // A read of a property whose type changed, or a call to what
+                // was not a signature then, cannot be told.
+                return lenient;
+            }
+            const fits = callFits(shape.node as ts.FunctionTypeNode, declaration as ts.SignatureDeclaration, call as TSESTree.CallExpression, at);
+            return fits === true || (lenient && fits === undefined);
         }
 
         // Whether a call to `declaration` would do the same with the older
@@ -376,13 +387,16 @@ export default ruleCreator<Options, "apiNotAvailable">({
         // too, and the result is either typed the same or unused. When that
         // cannot be told, as for a spread argument, a rest or generic
         // parameter, or a parameter type that changed beyond what the checks
-        // below follow, it does not fit.
+        // below follow, it is undefined; false only when the call is known not
+        // to fit: it passes too many or too few arguments, an argument the
+        // older type, all of whose types the history knows, does not take, or
+        // uses a result the older signature types as a simple other type.
         function callFits(
             old: ts.FunctionTypeNode,
             declaration: ts.SignatureDeclaration,
             call: TSESTree.CallExpression,
             at: number,
-        ): boolean {
+        ): boolean | undefined {
             const sourceFile = declaration.getSourceFile();
             const same = (a: ts.TypeNode | undefined, b: ts.TypeNode | undefined) =>
                 sameType(a, b, at, sourceFile);
@@ -394,7 +408,7 @@ export default ruleCreator<Options, "apiNotAvailable">({
                 [...oldParameters, ...parameters].some((parameter) => parameter.dotDotDotToken) ||
                 call.arguments.some((argument) => argument.type === AST_NODE_TYPES.SpreadElement)
             ) {
-                return false;
+                return undefined;
             }
             const required = oldParameters.filter((parameter) => !parameter.questionToken && !parameter.initializer).length;
             if (
@@ -404,23 +418,29 @@ export default ruleCreator<Options, "apiNotAvailable">({
             ) {
                 return false;
             }
+            let known = true;
             for (const [index, argument] of call.arguments.entries()) {
                 const was = oldParameters[index].type;
                 const is = parameters[index].type;
-                if (
-                    !same(was, is) &&
-                    !acceptsAll(was) &&
-                    !olderTypeAccepts(was, argument, at, sourceFile) &&
-                    !callbackFits(was, is, argument, at, sourceFile)
-                ) {
+                if (same(was, is) || acceptsAll(was) || callbackFits(was, is, argument, at, sourceFile)) {
+                    continue;
+                }
+                const accepts = olderTypeAccepts(was, argument, at, sourceFile, is);
+                if (accepts === false) {
                     return false;
                 }
+                if (accepts === undefined) {
+                    known = false;
+                }
             }
-            return (
+            if (
                 same(old.type, declaration.type) ||
                 isResultUnused(call) ||
                 awaitedResultFits(old.type, call, at, sourceFile)
-            );
+            ) {
+                return known ? true : undefined;
+            }
+            return old.type !== undefined && unionMembers(old.type).every(isSimpleType) ? false : undefined;
         }
 
         // Whether a function the plugin passes for a parameter typed `is`, which
@@ -503,15 +523,29 @@ export default ruleCreator<Options, "apiNotAvailable">({
             argument: TSESTree.CallExpressionArgument,
             at: number,
             sourceFile: ts.SourceFile,
-        ): boolean {
+            current?: ts.TypeNode,
+        ): boolean | undefined {
             if (!type) {
-                return false;
+                return undefined;
             }
             const simple: ts.TypeNode[] = [];
             const named: ts.Type[] = [];
+            const currentMembers = current ? unionMembers(current) : [];
             for (const member of unionMembers(type)) {
                 if (isSimpleType(member)) {
                     simple.push(member);
+                    continue;
+                }
+                // A member the current parameter type has too, written the same
+                // and naming types that meant then what they mean now, such as
+                // the `Modifier[]` of `Modifier[] | null`: the current
+                // declaration's type for it is the older one's.
+                const same =
+                    typeof checker.isTypeAssignableTo === "function" && history.sameTypes(member, at, sourceFile)
+                        ? currentMembers.find((candidate) => normalize(candidate) === normalize(member))
+                        : undefined;
+                if (same) {
+                    named.push(checker.getTypeFromTypeNode(same));
                     continue;
                 }
                 const declared =
@@ -523,17 +557,19 @@ export default ruleCreator<Options, "apiNotAvailable">({
                         ? getDeclaredType(sourceFile, member.typeName.text)
                         : undefined;
                 if (!declared) {
-                    return false;
+                    return undefined;
                 }
                 named.push(declared);
             }
             const argumentType = checker.getTypeAtLocation(services.esTreeNodeToTSNodeMap.get(argument));
             const values = argumentType.isUnion() ? argumentType.types : [argumentType];
+            if (values.some((value) => value.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown))) {
+                return undefined;
+            }
             return values.every(
                 (value) =>
-                    !(value.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) &&
-                    (simple.some((member) => simpleTypeHolds(member, value)) ||
-                        named.some((target) => checker.isTypeAssignableTo(value, target))),
+                    simple.some((member) => simpleTypeHolds(member, value)) ||
+                    named.some((target) => checker.isTypeAssignableTo(value, target)),
             );
         }
 
@@ -1566,7 +1602,7 @@ function memberName(node: TSESTree.MemberExpression): string | undefined {
 // The members obsidianOverloadHistory.ts has an overload of.
 const HISTORY_MEMBERS = new Set(Object.keys(OVERLOAD_HISTORY).map((key) => key.slice(0, key.indexOf("("))));
 
-// The version an overload needs: its @since, or the first published typings
+// The version an overload needs: its @since, or the first typings
 // that had it, if those are older. An overload the table does not list, as in
 // typings newer than the table, keeps its @since.
 function firstPublishedSince(qualifiedName: QualifiedName, declaration: ts.Declaration, since: Version): Version {
