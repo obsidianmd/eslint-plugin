@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `commands/check-callback-uses-checking` reports a `checkCallback` or `editorCheckCallback` in `addCommand()` that never reads its `checking` parameter. Obsidian calls it with `checking` set to `true` to ask whether the command is available, for example while the command palette is open, so such a callback runs its action on every check. It warns in the `recommended` config ([#248](https://github.com/obsidianmd/eslint-plugin/pull/248)).
+
 ## [0.5.1] - 2026-11-06
 
 Fixes for findings on correct code, and for fixes and suggestions that changed what correct
