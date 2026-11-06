@@ -2,12 +2,13 @@ import { type TSESLint, TSESTree } from "@typescript-eslint/utils";
 import { getParserServices } from "@typescript-eslint/utils/eslint-utils";
 import type ts from "typescript";
 import { type MinAppVersionOptions, minAppVersionSchema, supportsVersion } from "../minAppVersion.js";
+import { API_SINCE } from "../obsidianApiVersions.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 const BANNED_METHODS = new Set(["trash", "delete"]);
 
 // The Obsidian version that added FileManager.trashFile().
-const TRASH_FILE_SINCE = "1.6.6";
+const TRASH_FILE_SINCE = API_SINCE["FileManager.trashFile"];
 
 type MessageIds = "preferTrashFile" | "useTrashFile" | "useTrashFileSince";
 

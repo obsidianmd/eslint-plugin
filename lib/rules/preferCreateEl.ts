@@ -1,5 +1,7 @@
 import { ASTUtils, ESLintUtils, TSESTree } from "@typescript-eslint/utils";
 import ts from "typescript";
+import { type MinAppVersionOptions, minAppVersionSchema, supportsVersion } from "../minAppVersion.js";
+import { API_SINCE, laterVersion } from "../obsidianApiVersions.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 const TAG_SHORTHANDS: Record<string, string> = {
@@ -57,12 +59,113 @@ function isReplacedMethodCall(
  * `document.createElementNS(svgNamespace, tag, …)`,
  * `document.createDocumentFragment()` and `document.createEl("div" | "span", …)`.
  * The replacement calls a global helper (`createEl(tag)`, `createDiv()`, …),
- * which leaves no `document` for prefer-active-doc to report. (Inside an
+ * which leaves no `document` for prefer-active-doc to report. Inside an
  * implementation of the helpers themselves, such as a polyfill, this rule
- * reports nothing, and prefer-active-doc then leaves the call alone too.)
+ * reports nothing, so prefer-active-doc reports `document` there.
  */
 export function isReportedOnGlobalDocument(call: TSESTree.CallExpression): boolean {
-    return Object.keys(REPLACED_METHODS).some((method) => isReplacedMethodCall(call, method));
+    return (
+        !isInHelperImplementation(call) &&
+        Object.keys(REPLACED_METHODS).some((method) => isReplacedMethodCall(call, method))
+    );
+}
+
+// Whether `node` is inside a function named after one of Obsidian's DOM
+// helpers: `function createDiv() {}`, a method or property
+// (`createSpan(o) { return this.createEl("span", o); }`,
+// `{ createFragment: () => … }`), or a function assigned to one
+// (`window.createDiv = …`, `Element.prototype.createEl = function () {}`,
+// `Object.defineProperty(proto, "createEl", { value() {} })`). There the
+// replacement could call the function it is in, or the polyfill being
+// defined, and recurse forever.
+export function isInHelperImplementation(node: TSESTree.Node): boolean {
+    for (let current = node.parent; current; current = current.parent) {
+        if (
+            (current.type === TSESTree.AST_NODE_TYPES.FunctionDeclaration ||
+                current.type === TSESTree.AST_NODE_TYPES.FunctionExpression ||
+                current.type === TSESTree.AST_NODE_TYPES.ArrowFunctionExpression) &&
+            getFunctionNames(current).some((name) => HELPER_NAMES.has(name))
+        ) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// The names a function goes by: its own, and that of the variable,
+// property, method or member it is the value of.
+function getFunctionNames(
+    fn: TSESTree.FunctionDeclaration | TSESTree.FunctionExpression | TSESTree.ArrowFunctionExpression,
+): string[] {
+    const names: string[] = [];
+    if (fn.id) {
+        names.push(fn.id.name);
+    }
+    let child: TSESTree.Node = fn;
+    let parent = fn.parent;
+    while (
+        parent.type === TSESTree.AST_NODE_TYPES.TSAsExpression ||
+        parent.type === TSESTree.AST_NODE_TYPES.TSSatisfiesExpression ||
+        parent.type === TSESTree.AST_NODE_TYPES.TSNonNullExpression ||
+        parent.type === TSESTree.AST_NODE_TYPES.TSTypeAssertion
+    ) {
+        child = parent;
+        parent = parent.parent;
+    }
+    const keyName = (key: TSESTree.Node, computed: boolean) =>
+        !computed && key.type === TSESTree.AST_NODE_TYPES.Identifier ? key.name : getStringLiteralValue(key);
+    let name: string | undefined;
+    switch (parent.type) {
+        case TSESTree.AST_NODE_TYPES.VariableDeclarator:
+            if (parent.init === child && parent.id.type === TSESTree.AST_NODE_TYPES.Identifier) {
+                name = parent.id.name;
+            }
+            break;
+        case TSESTree.AST_NODE_TYPES.AssignmentExpression:
+            if (parent.right === child) {
+                name =
+                    parent.left.type === TSESTree.AST_NODE_TYPES.Identifier
+                        ? parent.left.name
+                        : parent.left.type === TSESTree.AST_NODE_TYPES.MemberExpression
+                            ? keyName(parent.left.property, parent.left.computed)
+                            : undefined;
+            }
+            break;
+        case TSESTree.AST_NODE_TYPES.MethodDefinition:
+        case TSESTree.AST_NODE_TYPES.PropertyDefinition:
+            name = keyName(parent.key, parent.computed);
+            break;
+        case TSESTree.AST_NODE_TYPES.Property:
+            if (parent.value === child) {
+                name = keyName(parent.key, parent.computed);
+                const descriptorName = getDefinedPropertyName(parent);
+                if (descriptorName !== undefined) {
+                    names.push(descriptorName);
+                }
+            }
+            break;
+    }
+    if (name !== undefined) {
+        names.push(name);
+    }
+    return names;
+}
+
+// For `value`, `get` or `set` in the descriptor of
+// `Object.defineProperty(target, "name", { value: … })`, the property's name.
+function getDefinedPropertyName(property: TSESTree.Property): string | undefined {
+    const descriptor = property.parent;
+    const call = descriptor.parent;
+    if (
+        call?.type !== TSESTree.AST_NODE_TYPES.CallExpression ||
+        call.arguments[2] !== descriptor ||
+        call.callee.type !== TSESTree.AST_NODE_TYPES.MemberExpression ||
+        call.callee.property.type !== TSESTree.AST_NODE_TYPES.Identifier ||
+        call.callee.property.name !== "defineProperty"
+    ) {
+        return undefined;
+    }
+    return getStringLiteralValue(call.arguments[1]);
 }
 
 function getStringLiteralValue(
@@ -77,7 +180,18 @@ function getStringLiteralValue(
     return undefined;
 }
 
-export default ruleCreator({
+// The version each helper a replacement calls needs (createEl() is in the
+// first typings), and activeWindow and `doc.win` for the window prefixes.
+const HELPER_SINCE: Readonly<Record<string, string>> = {
+    createDiv: API_SINCE.createDiv,
+    createSpan: API_SINCE.createSpan,
+    createFragment: API_SINCE.createFragment,
+    createSvg: API_SINCE.createSvg,
+};
+
+type MessageIds = "preferCreateEl" | "preferCreateElSuggestion" | "preferCreateElSuggestionSince";
+
+export default ruleCreator<MinAppVersionOptions, MessageIds>({
     meta: {
         type: "suggestion" as const,
         docs: {
@@ -86,7 +200,7 @@ export default ruleCreator({
             url: docsUrl("prefer-create-el"),
             requiresTypeChecking: true,
         },
-        schema: [],
+        schema: minAppVersionSchema,
         fixable: "code" as const,
         hasSuggestions: true as const,
         messages: {
@@ -94,10 +208,13 @@ export default ruleCreator({
                 "Use '{{replacement}}' instead of '{{original}}'.",
             preferCreateElSuggestion:
                 "Replace '{{original}}' with '{{replacement}}'.",
+            preferCreateElSuggestionSince:
+                "Replace '{{original}}' with '{{replacement}}' (needs Obsidian {{since}} or later).",
         },
     },
-    defaultOptions: [],
+    defaultOptions: [{}],
     create(context) {
+        const minAppVersion = context.options[0]?.minAppVersion;
         const services = ESLintUtils.getParserServices(context);
         const checker = services.program.getTypeChecker();
 
@@ -159,7 +276,7 @@ export default ruleCreator({
         // not declare `helper`: the call is then not reported.
         function classifyDocumentTarget(
             callee: TSESTree.MemberExpression,
-        ): { prefix: string; canAutofix: (helper: string) => boolean | undefined } | null {
+        ): { prefix: string; since?: string; canAutofix: (helper: string) => boolean | undefined } | null {
             const obj = callee.object;
             if (isIframeDocument(obj)) {
                 return null;
@@ -183,6 +300,7 @@ export default ruleCreator({
                 // the native call is the one that does.
                 return {
                     prefix: "activeWindow.",
+                    since: API_SINCE.activeWindow,
                     canAutofix: (helper) => winHasHelper(obj, helper) || undefined,
                 };
             }
@@ -191,6 +309,7 @@ export default ruleCreator({
                 // `doc?.createElement()` keeps its `?.`: `doc?.win.createEl()`.
                 return {
                     prefix: `${getObjectText(obj)}${callee.optional ? "?." : "."}win.`,
+                    since: API_SINCE["Node.win"],
                     canAutofix: (helper) => winHasHelper(obj, helper) || undefined,
                 };
             }
@@ -231,7 +350,7 @@ export default ruleCreator({
                 ? `${target.prefix}${shorthand}()`
                 : `${target.prefix}createEl(${getText(tagArg)})`;
             const compiles = shorthand !== undefined || resolvesToTagMapOverload(node, "HTMLElementTagNameMap");
-            report(node, replacement, compiles ? canAutofix : null);
+            report(node, replacement, compiles ? canAutofix : null, laterVersion(target.since, HELPER_SINCE[shorthand ?? "createEl"]));
         }
 
         function checkCreateElementNS(node: TSESTree.CallExpression): void {
@@ -253,7 +372,7 @@ export default ruleCreator({
             const argsText = [getText(tagArg), ...remainingArgs.map((arg) => getText(arg))].join(", ");
             const replacement = `${target.prefix}createSvg(${argsText})`;
             const compiles = resolvesToTagMapOverload(node, "SVGElementTagNameMap");
-            report(node, replacement, compiles ? canAutofix : null);
+            report(node, replacement, compiles ? canAutofix : null, laterVersion(target.since, HELPER_SINCE.createSvg));
         }
 
         function checkCreateElShorthand(node: TSESTree.CallExpression): void {
@@ -281,7 +400,7 @@ export default ruleCreator({
                 .join(", ");
             const replacement = `${prefix}${shorthand}${node.optional ? "?.(" : "("}${argsText})`;
 
-            report(node, replacement, checkShorthand(node, shorthand, isDocGlobal ? undefined : obj));
+            report(node, replacement, checkShorthand(node, shorthand, isDocGlobal ? undefined : obj), HELPER_SINCE[shorthand]);
         }
 
         // Whether `createDiv(...)` or `el.createDiv(...)`, with the arguments
@@ -418,7 +537,7 @@ export default ruleCreator({
                 return;
             }
             const replacement = `${target.prefix}createFragment()`;
-            report(node, replacement, canAutofix);
+            report(node, replacement, canAutofix, laterVersion(target.since, HELPER_SINCE.createFragment));
         }
 
         // Whether `name`, called bare at `node`, resolves to a binding of the
@@ -449,107 +568,23 @@ export default ruleCreator({
             return false;
         }
 
-        // Whether `node` is inside a function named after one of Obsidian's DOM
-        // helpers: `function createDiv() {}`, a method or property
-        // (`createSpan(o) { return this.createEl("span", o); }`,
-        // `{ createFragment: () => … }`), or a function assigned to one
-        // (`window.createDiv = …`, `Element.prototype.createEl = function () {}`,
-        // `Object.defineProperty(proto, "createEl", { value() {} })`). There the
-        // replacement could call the function it is in, or the polyfill being
-        // defined, and recurse forever.
-        function isInHelperImplementation(node: TSESTree.Node): boolean {
-            for (let current = node.parent; current; current = current.parent) {
-                if (
-                    (current.type === TSESTree.AST_NODE_TYPES.FunctionDeclaration ||
-                        current.type === TSESTree.AST_NODE_TYPES.FunctionExpression ||
-                        current.type === TSESTree.AST_NODE_TYPES.ArrowFunctionExpression) &&
-                    getFunctionNames(current).some((name) => HELPER_NAMES.has(name))
-                ) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        // The names a function goes by: its own, and that of the variable,
-        // property, method or member it is the value of.
-        function getFunctionNames(
-            fn: TSESTree.FunctionDeclaration | TSESTree.FunctionExpression | TSESTree.ArrowFunctionExpression,
-        ): string[] {
-            const names: string[] = [];
-            if (fn.id) {
-                names.push(fn.id.name);
-            }
-            let child: TSESTree.Node = fn;
-            let parent = fn.parent;
-            while (
-                parent.type === TSESTree.AST_NODE_TYPES.TSAsExpression ||
-                parent.type === TSESTree.AST_NODE_TYPES.TSSatisfiesExpression ||
-                parent.type === TSESTree.AST_NODE_TYPES.TSNonNullExpression ||
-                parent.type === TSESTree.AST_NODE_TYPES.TSTypeAssertion
-            ) {
-                child = parent;
-                parent = parent.parent;
-            }
-            const keyName = (key: TSESTree.Node, computed: boolean) =>
-                !computed && key.type === TSESTree.AST_NODE_TYPES.Identifier ? key.name : getStringLiteralValue(key);
-            let name: string | undefined;
-            switch (parent.type) {
-                case TSESTree.AST_NODE_TYPES.VariableDeclarator:
-                    if (parent.init === child && parent.id.type === TSESTree.AST_NODE_TYPES.Identifier) {
-                        name = parent.id.name;
-                    }
-                    break;
-                case TSESTree.AST_NODE_TYPES.AssignmentExpression:
-                    if (parent.right === child) {
-                        name =
-                            parent.left.type === TSESTree.AST_NODE_TYPES.Identifier
-                                ? parent.left.name
-                                : parent.left.type === TSESTree.AST_NODE_TYPES.MemberExpression
-                                    ? keyName(parent.left.property, parent.left.computed)
-                                    : undefined;
-                    }
-                    break;
-                case TSESTree.AST_NODE_TYPES.MethodDefinition:
-                case TSESTree.AST_NODE_TYPES.PropertyDefinition:
-                    name = keyName(parent.key, parent.computed);
-                    break;
-                case TSESTree.AST_NODE_TYPES.Property:
-                    if (parent.value === child) {
-                        name = keyName(parent.key, parent.computed);
-                        const descriptorName = getDefinedPropertyName(parent);
-                        if (descriptorName !== undefined) {
-                            names.push(descriptorName);
-                        }
-                    }
-                    break;
-            }
-            if (name !== undefined) {
-                names.push(name);
-            }
-            return names;
-        }
-
-        // For `value`, `get` or `set` in the descriptor of
-        // `Object.defineProperty(target, "name", { value: … })`, the property's name.
-        function getDefinedPropertyName(property: TSESTree.Property): string | undefined {
-            const descriptor = property.parent;
-            const call = descriptor.parent;
-            if (
-                call?.type !== TSESTree.AST_NODE_TYPES.CallExpression ||
-                call.arguments[2] !== descriptor ||
-                call.callee.type !== TSESTree.AST_NODE_TYPES.MemberExpression ||
-                call.callee.property.type !== TSESTree.AST_NODE_TYPES.Identifier ||
-                call.callee.property.name !== "defineProperty"
-            ) {
-                return undefined;
-            }
-            return getStringLiteralValue(call.arguments[1]);
-        }
-
         // `canAutofix` is null when the replacement would not compile at all: the
         // finding is reported without a fix or a suggestion.
-        function report(node: TSESTree.CallExpression, replacement: string, canAutofix: boolean | null): void {
+        //
+        // `since` is the Obsidian version the replacement needs. Below the
+        // plugin's minAppVersion the native call is the right one, so it is
+        // not reported; where no version is known, the replacement is offered
+        // as before, and a suggestion says which version it needs.
+        function report(
+            node: TSESTree.CallExpression,
+            replacement: string,
+            canAutofix: boolean | null,
+            since?: string,
+        ): void {
+            const supported = since === undefined ? true : supportsVersion(minAppVersion, since);
+            if (supported === false) {
+                return;
+            }
             const original = getText(node);
             const bareHelper = BARE_HELPER_CALL.exec(replacement)?.[1];
             if (bareHelper !== undefined && shadowsGlobalHelper(node, bareHelper)) {
@@ -573,8 +608,10 @@ export default ruleCreator({
                     : {
                         suggest: [
                             {
-                                messageId: "preferCreateElSuggestion" as const,
-                                data: { replacement, original },
+                                messageId: supported === undefined
+                                    ? "preferCreateElSuggestionSince" as const
+                                    : "preferCreateElSuggestion" as const,
+                                data: { replacement, original, since: since ?? "" },
                                 fix(fixer) {
                                     return fixer.replaceText(node, replacement);
                                 },

@@ -60,7 +60,8 @@ reported there.
 
 Setting this rule's options in your own config replaces that object, as for any rule, so list both
 entries again next to the rules you add. Setting only a severity
-(`"obsidianmd/rule-custom-message": "warn"`) keeps them.
+(`"obsidianmd/rule-custom-message": "warn"`) keeps them. Give such a block your source's `files`:
+in a block without `files`, the restated `no-console` reaches test files and tool configs again.
 
 Both are reported as `obsidianmd/rule-custom-message`, so an `eslint-disable` comment naming
 `no-console` or `no-new-func` does not silence them. A comment naming this rule does, but the

@@ -8,6 +8,7 @@ import {
     DECLARATION_HISTORY,
     DECLARATION_HISTORY_VERSIONS,
     TYPE_HISTORY,
+    UNDATED_DECLARATIONS,
 } from "../lib/rules/obsidianDeclarationHistory.js";
 import { collectDeclarationShapes, indexTypeDeclarations, typeHashes } from "../lib/rules/obsidianDeclarations.js";
 import { OVERLOAD_HISTORY, OVERLOAD_HISTORY_SOURCE } from "../lib/rules/obsidianOverloadHistory.js";
@@ -15,6 +16,7 @@ import {
     buildDeclarationHistory,
     buildOverloadHistory,
     historyEntries,
+    mergeTypings,
     renderDeclarationHistoryModule,
     renderHistoryModule,
 } from "../scripts/obsidian-overload-history.js";
@@ -153,6 +155,7 @@ describe("the generated obsidianDeclarationHistory.ts", () => {
             versions: [...DECLARATION_HISTORY_VERSIONS],
             declarations: Object.entries(DECLARATION_HISTORY).map(([name, entries]) => [name, entries.map(([a, b]) => [a, b])]),
             types: Object.entries(TYPE_HISTORY).map(([name, entries]) => [name, entries.map(([a, b]) => [a, b])]),
+            undated: [...UNDATED_DECLARATIONS],
         });
         assert.strictEqual(checkedIn, rendered);
     });
@@ -210,5 +213,65 @@ describe("scripts/obsidian-overload-history.ts declaration history", () => {
         assert.strictEqual(name, "PaneType");
         // 0.12.0 and 0.13.0 mean the same; 1.0.0 added 'window'.
         assert.deepStrictEqual(hashes.map(([ranges]) => ranges), ["0-1", "2"]);
+    });
+});
+
+describe("scripts/obsidian-overload-history.ts declarations without @since", () => {
+    const history = buildDeclarationHistory([
+        {
+            version: "0.12.0",
+            text: `
+                export const moment_2: unknown;
+                export { moment_2 as moment }
+                export class Workspace { old(): void; }
+                export interface Options { a?: string; }
+                export class View { navigation: boolean; }
+                export class FileView extends View {}
+            `,
+        },
+        {
+            version: "1.0.0",
+            text: `
+                declare global {
+                    interface HTMLElement { setCssProps(props: Record<string, string>): void; }
+                    var activeDocument: Document;
+                }
+                export const moment: unknown;
+                export class Workspace { old(): void; fresh(): void; field: number; }
+                export interface Options { a?: string; b?: string; }
+                export class View { navigation: boolean; }
+                export class FileView extends View { navigation: boolean; }
+            `,
+        },
+    ]);
+
+    it("lists those the oldest typings did not have, by their exported name, but not data interfaces, inherited members or later fields", () => {
+        assert.deepStrictEqual(history.undated, ["HTMLElement.setCssProps", "activeDocument", "Workspace.fresh"]);
+        assert.deepStrictEqual(
+            history.declarations.map(([name, shapes]) => [name, shapes.map(([ranges]) => ranges)]),
+            [["HTMLElement.setCssProps", ["1"]], ["activeDocument", ["1"]], ["Workspace.fresh", ["1"]]],
+        );
+    });
+});
+
+describe("scripts/obsidian-overload-history.ts sources", () => {
+    it("takes each version from npm where published, else from the repository, in version order", () => {
+        const merged = mergeTypings(
+            [
+                { version: "0.11.13", text: "npm 0.11.13" },
+                { version: "0.12.0", text: "npm 0.12.0" },
+            ],
+            [
+                { version: "0.9.7", text: "git 0.9.7" },
+                { version: "0.12.6", text: "git 0.12.6" },
+                { version: "0.11.13", text: "git 0.11.13" },
+            ],
+        );
+        assert.deepStrictEqual(merged.map(({ version, text }) => `${version}:${text}`), [
+            "0.9.7:git 0.9.7",
+            "0.11.13:npm 0.11.13",
+            "0.12.0:npm 0.12.0",
+            "0.12.6:git 0.12.6",
+        ]);
     });
 });
