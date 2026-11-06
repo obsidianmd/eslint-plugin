@@ -60,7 +60,6 @@ The recommended config is an array of flat config objects that sets up:
 - **obsidianmd rules** at their default severities, except `ui/sentence-case`, which is off, and the two locale rules, which `recommendedWithLocalesEn` adds
 - **Third-party plugins**: `@microsoft/eslint-plugin-sdl`, `eslint-plugin-import`, `eslint-plugin-no-unsanitized`, `eslint-plugin-depend`, `@eslint-community/eslint-plugin-eslint-comments`
 - **Obsidian globals** (`activeDocument`, `activeWindow`, `createEl`, etc.)
-- **`package.json` linting** via `eslint-plugin-depend` (ban common micro-utilities)
 - **`manifest.json` linting** via `validate-manifest`, parsed with `@eslint/json`
 - **`LICENSE` linting** via `validate-license`, read with the plugin's `obsidianmd/plain-text` language
 
@@ -72,7 +71,7 @@ Because of this, you do **not** need to separately add `eslint.configs.recommend
 
 ### Files linted beyond your source
 
-The recommended config lints more than `.ts` and `.js`. It matches `package.json`, `manifest.json`
+The recommended config lints more than `.ts` and `.js`. It matches `manifest.json`
 and `LICENSE` by name, each read with its own language, so **ESLint has to be pointed at the project
 root for those checks to run at all**. A lint script scoped to your sources — `eslint src` — will
 never visit them, and the rules covering them silently do nothing:
@@ -80,7 +79,7 @@ never visit them, and the rules covering them silently do nothing:
 ```jsonc
 // package.json
 "scripts": {
-  "lint": "eslint .",       // package.json, manifest.json and LICENSE are checked
+  "lint": "eslint .",       // manifest.json and LICENSE are checked
   "lint:src": "eslint src"  // they are not
 }
 ```
@@ -107,7 +106,7 @@ the language the plugin contributes:
 restricting its `files`** replaces it for every file — including `LICENSE`, which would then reach
 (say) the TypeScript parser and fail with *"was not found by the project service because the
 extension for the file (``) is non-standard"*. A `language` is only replaced by another `language`,
-so that cannot happen. The same reasoning is why `package.json` uses `language: "json/json"`.
+so that cannot happen. The same reasoning is why `manifest.json` uses `language: "json/json"`.
 
 None of these files get the ESLint core rules: those are scoped to `.js`/`.ts` files and their
 variants. The same goes for any other JSON you lint with your own block, such as
@@ -115,6 +114,28 @@ variants. The same goes for any other JSON you lint with your own block, such as
 `@eslint/json`; a core rule like `no-irregular-whitespace` cannot read a JSON file and would
 otherwise abort the run. If you lint other JavaScript-like files with your own parser — `.svelte` or
 `.vue`, say — add `js.configs.recommended` for them yourself.
+
+## Linting `package.json`
+
+`package.json` linting (`depend/ban-dependencies`, which bans common micro-utilities) is a separate config, `packageJson`. Spread it **last**:
+
+```js
+export default defineConfig([
+  ...obsidianmd.configs.recommended,
+  {
+    languageOptions: {
+      parserOptions: {
+        projectService: {
+          allowDefaultProject: ["eslint.config.*"],
+        },
+      },
+    },
+  },
+  ...obsidianmd.configs.packageJson,
+]);
+```
+
+It is not part of `recommended` because once any config object matches `package.json`, ESLint lints that file, and every config object without `files` applies to it as well. Type-checked configs such as `tseslint.configs.strictTypeChecked` then throw "You have used a rule which requires type information" on `package.json`. `packageJson` turns the type-checked rules off for `package.json`, so it has to come after every config object that turns them on.
 
 ## Using alongside stricter typescript-eslint configs
 
@@ -1014,7 +1035,7 @@ A few things to keep in mind with this approach:
 - **Test files, tool configs, scripts and worker files** are not exempted. The recommended config switches some rules off for them, and runs `rule-custom-message` without `no-console` in tests, tool configs and scripts (see [Web worker files](#web-worker-files) and [Test files](#test-files)); `ruleConfigs` applies every rule to every file your block matches, so add those overrides yourself.
 - **Rules from other plugins** that the recommended config sets are not in `ruleConfigs` — notably typescript-eslint's `no-deprecated`, which it runs at `warn` with `caretRangeFromPoint` allowed. While `minAppVersion` in `manifest.json` is below 1.13.0, or there is no valid one, it allows `display()` as well: the `obsidian` typings mark `SettingTab#display()` deprecated since 1.13.0, but before 1.13 there is no `update()`, so a settings tab has to keep calling `display()`. From 1.13.0 the call is reported, alongside [`settings-tab/prefer-update-over-display`](rules/settings-tab/prefer-update-over-display.md). Add these rules yourself if you want them; for the `display()` allowance, the entries are `{ from: "package", package: "obsidian", name: "display" }` and `{ from: "file", name: "display" }`.
 - **Third-party plugins** bundled by the recommended config (`@microsoft/eslint-plugin-sdl`, `eslint-plugin-import`, `eslint-plugin-no-unsanitized`, `eslint-plugin-depend`, `@eslint-community/eslint-plugin-eslint-comments`) are not included. Add them separately if you want them.
-- **`package.json` and `manifest.json` linting** (`validate-manifest`, `depend/ban-dependencies`) is not set up, and is not covered by `ruleConfigs` — those presets only carry rules that apply to source files. `validate-manifest` needs its own config block, because `manifest.json` matches no source glob and needs the JSON language to be parsed at all. Install `@eslint/json` 2.x for it (`npm install --save-dev @eslint/json`):
+- **`manifest.json` linting** (`validate-manifest`) is not set up, and is not covered by `ruleConfigs` — those presets only carry rules that apply to source files. `validate-manifest` needs its own config block, because `manifest.json` matches no source glob and needs the JSON language to be parsed at all. Install `@eslint/json` 2.x for it (`npm install --save-dev @eslint/json`):
 
   ```js
   import json from "@eslint/json";
@@ -1045,6 +1066,8 @@ A few things to keep in mind with this approach:
     },
   }
   ```
+
+For `package.json`, spread `obsidianmd.configs.packageJson` last, as described in [Linting `package.json`](#linting-packagejson).
 
 ## Community plugin scanner configuration
 
