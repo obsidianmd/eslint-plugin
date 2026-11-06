@@ -1,3 +1,8 @@
 # eslint-doc-generator writes its lists with LF (see .editorconfig), so the docs it
 # checks must stay LF in every checkout, including core.autocrlf=true on Windows.
 *.md text eol=lf
+
+# scripts/obsidian-overload-history.ts writes these with LF, and a test compares
+# the checked-out files with what it would write.
+lib/rules/obsidianOverloadHistory.ts text eol=lf
+lib/rules/obsidianDeclarationHistory.ts text eol=lf
