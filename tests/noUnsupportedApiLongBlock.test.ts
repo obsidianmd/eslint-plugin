@@ -10,19 +10,29 @@ import rule from "../lib/rules/noUnsupportedApi.js";
 // call. Going over the statements before the call in each list made the rule
 // quadratic in a long list that calls many such APIs: a generated file, or a
 // plugin whose minAppVersion is far behind the APIs it uses. The list's early
-// exits are read once instead. The second lint of the same text reuses the
-// type information, so the rule's time is its own work; the limit leaves room
-// for a loaded machine.
-const LIMIT_MS = 1000;
+// exits are read once instead. The same calls are linted as one long list and
+// as many short ones, which a linear rule takes the same time for and a
+// quadratic one LISTS times as long; comparing the two rather than taking a
+// fixed limit keeps a loaded machine from failing it. The second lint of each
+// text reuses its type information, so the rule's time is its own work.
 const STATEMENTS = 16_000;
+const LISTS = 16;
+const MAX_RATIO = 3;
+
+function source(lists: number): string {
+    const lines = ['import { App, TFile } from "obsidian";'];
+    for (let list = 0; list < lists; list++) {
+        lines.push(`export async function run${list}(app: App, file: TFile): Promise<void> {`);
+        for (let i = 0; i < STATEMENTS / lists; i++) lines.push("    await app.fileManager.trashFile(file);");
+        lines.push("}");
+    }
+    return lines.join("\n");
+}
 
 describe("no-unsupported-api in a long statement list", function () {
-    this.timeout(120_000);
+    this.timeout(240_000);
 
     it("takes time linear in the statements", () => {
-        const lines = ['import { App, TFile } from "obsidian";', "export async function run(app: App, file: TFile): Promise<void> {"];
-        for (let i = 0; i < STATEMENTS; i++) lines.push("    await app.fileManager.trashFile(file);");
-        lines.push("}");
         const config: Linter.Config[] = [
             {
                 files: ["**/*.ts"],
@@ -49,11 +59,14 @@ describe("no-unsupported-api in a long statement list", function () {
             stats: true,
             fix: false,
         };
-        const lint = () => linter.verifyAndFix(lines.join("\n"), config, options);
-        lint();
-        const { messages } = lint();
-        assert.strictEqual(messages.length, STATEMENTS, JSON.stringify(messages[0]));
-        const ms = linter.getTimes().passes[0].rules?.["obsidianmd/no-unsupported-api"]?.total ?? 0;
-        assert.ok(ms < LIMIT_MS, `took ${ms.toFixed(0)} ms`);
+        const ruleTime = (text: string) => {
+            linter.verifyAndFix(text, config, options);
+            const { messages } = linter.verifyAndFix(text, config, options);
+            assert.strictEqual(messages.length, STATEMENTS, JSON.stringify(messages[0]));
+            return linter.getTimes().passes[0].rules?.["obsidianmd/no-unsupported-api"]?.total ?? 0;
+        };
+        const short = ruleTime(source(LISTS));
+        const long = ruleTime(source(1));
+        assert.ok(long < short * MAX_RATIO, `took ${long.toFixed(0)} ms in one list, ${short.toFixed(0)} ms in ${LISTS}`);
     });
 });
