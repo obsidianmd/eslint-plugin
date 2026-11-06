@@ -528,7 +528,7 @@ to expect:
   `perWindowState`, and no suggestion: such a change has to be made, and undone, in each window's
   document.
 
-The [changelog](../CHANGELOG.md#051---2026-11-05) lists every change.
+The [changelog](../CHANGELOG.md#051---2026-11-06) lists every change.
 
 ## Upgrading to 0.5.0
 
