@@ -12,6 +12,17 @@
 
 Type-checking with `tsc` reports this as error TS1062. This rule also catches it in JavaScript and in builds that skip type-checking.
 
+## What is reported
+
+- `await x`, where the type of `x` is, or is a union that includes, a type whose `then` is
+  declared only in Obsidian's `obsidian.d.ts`: `Setting`, `BaseComponent` and its subclasses, and
+  your own subclasses of them. `Setting | undefined` is reported too.
+- `return x` and an arrow function's expression body `=> x` in an `async` function, for the same
+  types, since the async function's promise resolves with `x` the same way.
+
+Not reported: a class that declares or overrides its own `then`, and returning such an object
+from a function that is not `async`.
+
 ## Examples
 
 Incorrect:
