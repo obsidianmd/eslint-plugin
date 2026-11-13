@@ -253,7 +253,9 @@ export default defineConfig([
 
 Declaring the two globals is enough. With `sourceType: "commonjs"` instead, `no-redeclare` checks
 the module's top level against the built-in globals, and `const { Plugin } = require("obsidian")`
-is reported, because `Plugin` is also a browser global.
+is reported, because `Plugin` is also a browser global. The recommended config declares `module`
+and `exports` for every `.cjs` file in the same way, so only a CommonJS file named `.js` needs this
+block.
 
 ## Plugins written in JavaScript
 
@@ -479,7 +481,10 @@ For all of these files it switches off `no-global-this`, `prefer-active-doc`, `p
 `hardcoded-config-path`, `no-forbidden-elements`, `no-static-styles-assignment`,
 `prefer-file-manager-trash-file`, `prefer-get-language`, `no-unsupported-api` and `regex-lookbehind`,
 and `rule-custom-message` runs `no-new-func` without `no-console`, so they may log to the console.
-Every other rule, including the security rules and `no-new-func`, still applies. The community
+They also get the Node globals (`process`, `module`, `exports`, `__dirname`, `Buffer`, …), which the
+rest of a plugin that is not desktop-only does not, so `module.exports` in `jest.config.js` and
+`process` in a script are not reported by `no-undef`. Every other rule, including the security
+rules and `no-new-func`, still applies. The community
 scanner does not lint most of these files at all; see its
 [ignored files](#community-plugin-scanner-configuration).
 
