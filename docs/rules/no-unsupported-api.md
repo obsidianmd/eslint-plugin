@@ -51,10 +51,13 @@ on, and every release on npm:
 | `Workspace.on("editor-menu", …)` | 1.1.0 | 0.12.6 |
 | `Workspace.on("editor-change", …)` | 1.1.1 | 0.12.17 |
 | `Workspace.on("editor-paste", …)`, `Workspace.on("editor-drop", …)` | 1.1.0 | 0.12.17 |
-| `Workspace.duplicateLeaf(leaf, direction?)` | 0.13.8 | 0.9.7 |
+| `Workspace.duplicateLeaf(leaf, direction?)` | 0.13.8 | 0.9.7, or 0.13.8 for a call that uses the result |
 
 The table only lowers a version; an overload it does not list keeps its `@since`. It matches an
-overload by its string literal parameters, or else by its parameter types.
+overload by its string literal parameters, or else by its parameter types. A call that uses the
+result also needs the first typings with the overload's return type: `duplicateLeaf()` returned
+`Promise<void>` before 0.13.8, so `await workspace.duplicateLeaf(leaf);` needs 0.9.7, and
+`const copy = await workspace.duplicateLeaf(leaf)` 0.13.8.
 
 A use is allowed where a `requireApiVersion()` check proves the app is new enough, as described below.
 There is no fix: either guard the call, or raise `minAppVersion` if the plugin needs the API anyway.
@@ -106,7 +109,9 @@ then, not since when, so a plugin with a lower `minAppVersion` is not told that 
 
 A version of the repository's history counts with the typings of its last commit, so a declaration
 counts from the first version that any commit declares it in, and a prerelease such as 1.10.2-1
-counts as its release. A version on npm counts with the typings published there.
+counts as its release. One commit counts with the next version: 7c7a0f4 ("Update API for upcoming
+mobile release") still names 0.11.0 in its `package.json` but adds what 0.11.7 has, such as `Editor`,
+which so needs 0.11.7. A version on npm counts with the typings published there.
 
 ### Declarations without `@since`
 
