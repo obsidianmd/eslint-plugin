@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The recommended config treats a file named `worker.ts` (or `worker.js` and the other extensions), such as `src/worker.ts`, as web worker code, like `*.worker.ts`. `prefer-window-timers` rewrote its `setTimeout()` to `window.setTimeout()`, and `no-global-this` its `globalThis` to `window`, which a worker does not have.
+
 ## [0.5.1] - 2026-11-06
 
 Fixes for findings on correct code, and for fixes and suggestions that changed what correct
