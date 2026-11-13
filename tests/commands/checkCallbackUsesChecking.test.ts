@@ -6,6 +6,22 @@ const ruleTester = new RuleTester();
 ruleTester.run("check-callback-uses-checking", checkCallbackUsesCheckingRule, {
     valid: [
         {
+            name: "a function expression that reads checking through arguments is allowed",
+            code: `
+                this.addCommand({
+                    id: 'foo',
+                    name: 'Foo',
+                    checkCallback: function () {
+                        if (arguments[0]) {
+                            return true;
+                        }
+                        run();
+                        return true;
+                    },
+                });
+            `,
+        },
+        {
             name: "checkCallback that returns early when checking is allowed",
             code: `
                 this.addCommand({
@@ -83,6 +99,22 @@ ruleTester.run("check-callback-uses-checking", checkCallbackUsesCheckingRule, {
         },
     ],
     invalid: [
+        {
+            name: "an arrow function inside the callback does not read its arguments",
+            code: `
+                function outer() {
+                    this.addCommand({
+                        id: 'foo',
+                        name: 'Foo',
+                        checkCallback: () => {
+                            run(arguments.length);
+                            return true;
+                        },
+                    });
+                }
+            `,
+            errors: [{ messageId: "checking" }],
+        },
         {
             name: "checkCallback without parameters is forbidden",
             code: `

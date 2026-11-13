@@ -8,6 +8,13 @@
 
 Obsidian calls `checkCallback` and `editorCheckCallback` with `checking` set to `true` to ask whether the command is available, for example while the command palette is open. The command should only run when `checking` is `false`. A callback that never reads `checking` runs its action on every availability check.
 
+## What is reported
+
+A `checkCallback` or `editorCheckCallback` written as a function in a command passed to
+`addCommand()` as an object literal, when the function has no first parameter or never reads it.
+Not reported: a function that reads `arguments`, a destructured first parameter, and a callback
+passed by name or defined elsewhere.
+
 ## Examples
 
 Incorrect:

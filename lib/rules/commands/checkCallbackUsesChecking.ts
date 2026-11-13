@@ -21,6 +21,13 @@ export default ruleCreator({
     defaultOptions: [],
     create(context) {
         function readsFirstParameter(fn: FunctionNode): boolean {
+            // `function () { if (arguments[0]) ... }` reads it without naming it.
+            if (
+                fn.type === TSESTree.AST_NODE_TYPES.FunctionExpression &&
+                (context.sourceCode.getScope(fn).set.get("arguments")?.references.length ?? 0) > 0
+            ) {
+                return true;
+            }
             const param = fn.params[0];
             if (param === undefined) {
                 return false;
