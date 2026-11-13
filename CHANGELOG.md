@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `commands/check-callback-uses-checking` reports a `checkCallback` or `editorCheckCallback` in `addCommand()` that never reads its `checking` parameter. Obsidian calls it with `checking` set to `true` to ask whether the command is available, for example while the command palette is open, so such a callback runs its action on every check. It warns in the `recommended` config ([#248](https://github.com/obsidianmd/eslint-plugin/pull/248)).
 
+### Changed
+
+- `no-unsupported-api` names the fix in its report: raise `minAppVersion` to the version the API needs, or guard the use with `requireApiVersion()` and that version. Below 0.13.21, which first has `requireApiVersion()`, it suggests a check that the API exists instead, and for a superclass, such as `class extends AbstractInputSuggest`, or a newer signature that no such check proves, only raising `minAppVersion` ([#250](https://github.com/obsidianmd/eslint-plugin/pull/250)).
+
+### Fixed
+
+- `settings-tab/no-problematic-settings-headings` no longer stops the whole ESLint run when `manifest.json` has a `name` that is not a string, such as `"name": 123`. It threw `TypeError: pluginName.toLowerCase is not a function`; now it skips only the plugin-name check, and the "settings" and "general" checks still report ([#251](https://github.com/obsidianmd/eslint-plugin/pull/251)).
+
 ## [0.5.1] - 2026-11-06
 
 Fixes for findings on correct code, and for fixes and suggestions that changed what correct
