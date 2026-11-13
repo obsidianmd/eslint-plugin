@@ -45,7 +45,8 @@ Not reported:
   call `evt.preventDefault()`. Obsidian inserts the content, and `preventDefault()` would cancel
   that.
 - A handler that passes `evt` to another function or constructor (`this.handlePaste(evt, editor)`),
-  which may check and cancel it.
+  which may check and cancel it. A `console` method, as in `console.log(evt)`, only prints the
+  event, so passing it there does not count.
 - A handler passed by reference (`this.onPaste`), an arrow function with an expression body, a
   handler with no parameters or whose first parameter is destructured, and an event name that is
   not a string literal.
