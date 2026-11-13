@@ -161,6 +161,15 @@ Not reported, as they exist on every version or are the plugin's own:
 - a use behind a `requireApiVersion()` check or a feature check, as described below:
   `typeof activeDocument !== "undefined" ? activeDocument : document` or `el.setCssStyles?.(…)`.
 
+The report names the version to raise `minAppVersion` to, and a guard where one can work:
+
+- `requireApiVersion("x.y.z")`, described below, where `minAppVersion` is 0.13.21 or later, the
+  first release with `requireApiVersion()` itself;
+- below that, a check that the API exists, where the API is newer as a whole;
+- only raising `minAppVersion` for a superclass, as in `class extends AbstractInputSuggest`, which is
+  defined when the module loads, and below 0.13.21 for a newer signature of a member older releases
+  had, which no check of its existence proves.
+
 With a `minAppVersion` below 0.15.0, [`prefer-active-doc`](prefer-active-doc.md) does not report
 `document`, so the two rules do not ask for opposite changes.
 

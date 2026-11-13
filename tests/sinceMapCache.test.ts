@@ -230,7 +230,7 @@ describe("no-unsupported-api without a minAppVersion", function () {
             );
             assert.deepStrictEqual(JSON.parse(stdout.trim().split("\n").pop() ?? "null"), [
                 [],
-                ["'App.renderContext' requires Obsidian v1.10.0, but minAppVersion is 1.0.0."],
+                ["'App.renderContext' requires Obsidian v1.10.0, but minAppVersion is 1.0.0. Raise minAppVersion to 1.10.0, or guard this use with requireApiVersion(\"1.10.0\")."],
             ]);
         } finally {
             fs.rmSync(dir, { recursive: true });
