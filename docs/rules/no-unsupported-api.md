@@ -85,7 +85,9 @@ its `@since` and the first release from which on every release, up to your `obsi
 signature the use fits:
 
 - any use fits a signature written the same as today's, with each interface, type alias and enum it
-  names declared the same as in your typings;
+  names declared the same as in your typings. A type alias also counts as the type it stands for:
+  `View.icon` was `string` before 1.1.0 typed it `IconName`, which is `type IconName = string`, so
+  `this.icon = "dice"` and `view.getIcon()` need only the 0.9.7 typings;
 - a call also fits an older signature it can make the same way: it passes at least the arguments
   that one requires and no more than it takes, and each argument is one the older parameter takes
   too. That is the same type; or a parameter of `string`, `number`, `boolean`, `null`, `undefined`,
@@ -181,17 +183,22 @@ suggestion to use `activeDocument`, so the two rules do not ask for opposite cha
 ## Guarding with `requireApiVersion`
 
 An API newer than `minAppVersion` is allowed where a `requireApiVersion(...)` check proves the
-running app is new enough. That holds:
+running app is new enough, also when it is imported under another name, `import {
+requireApiVersion as rav }`, or called from a namespace import, `obsidian.requireApiVersion(...)`.
+That holds:
 
 - inside the `if` branch or ternary branch it guards, or to the right of `&&`;
 - after an early exit on a failed check, for the rest of the block. The exit must be a `return`,
   `throw`, `break` or `continue` that always runs, directly or at the top of a `{ ... }` block;
 - in the `else` branch or ternary alternate of a negated check, or to the right of `||` after one;
-- wherever a `const` holding the check's result is used the same way;
+- wherever a `const` holding the check's result is used the same way, or a `readonly` field
+  initialized with it, as `this.hasDarkMode` for `private readonly hasDarkMode =
+  requireApiVersion("1.10.0")`, if the file assigns that field nowhere else;
+- when the check is compared with `true` or `false`: `requireApiVersion("1.10.0") === true`;
 - when several checks are combined: `a && b` proves the higher version, and `a || b` the lower;
 - inside an override of a method only Obsidian calls, from the release that added it on:
   `getSettingDefinitions()`, `getControlValue()` and `setControlValue()` (1.13.0),
-  `onExternalSettingsChange()` (1.5.7) and `onPaneMenu()` (0.15.3), so `this.refreshDomState()` in
+  `onExternalSettingsChange()` (1.5.7), `onPaneMenu()` (0.15.3) and `onUserEnable()` (1.7.2), so `this.refreshDomState()` in
   `getSettingDefinitions()` is allowed. Not in a file that also names the method other than as
   `super.name`, such as `this.getSettingDefinitions()`, since the plugin may then call it on an
   older Obsidian itself.
@@ -215,11 +222,20 @@ if (SUPPORTS_RENDER_CONTEXT) {
 
 A check that the API exists works the same way where the API is newer as a whole: `typeof
 x.member === "function"`, `typeof x.member !== "undefined"`, `x.member != null`, `x.member !==
-undefined`, `"member" in x` and `x.member` itself as a condition, for that same `x.member` (or
-function), and an optional call `x.member?.()`. The check itself, which reads a missing member as
-`undefined`, is not reported either. It does not prove a newer signature of a member older releases
-had: `typeof workspace.getLeaf === "function"` exists on every version, so `getLeaf("tab")` after it
-still needs 0.16.0.
+undefined`, `"member" in x` and `x.member` itself as a condition, also held in a `const`, for that
+same `x.member` (or function), and an optional call `x.member?.()`. The check itself, which reads a
+missing member as `undefined`, is not reported either, and neither is a read with a fallback,
+`x.member ?? fallback` or `x.member || fallback`, nor an optional access, `x.member?.y`. The rest of
+such a chain runs only on a release that has `x.member`, so `app.secretStorage?.getSecret("token")`
+needs no newer release than `App.secretStorage`. A check does not prove a newer signature of a
+member older releases had: `typeof workspace.getLeaf === "function"` exists on every version, so
+`getLeaf("tab")` after it still needs 0.16.0.
+
+A global the app declares, such as `activeDocument` or `createSvg`, can only be checked with
+`typeof`: reading one that the running release does not declare throws a `ReferenceError`. So
+`activeDocument || document`, `if (activeDocument)`, `activeDocument != null`,
+`activeDocument?.body` and `createSvg?.("svg")` are reported below the global's version, and so is a use
+they guard. `window.activeDocument` reads a property instead, which works like any member.
 
 ```ts
 if (typeof this.app.isDarkMode === "function") {

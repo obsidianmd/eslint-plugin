@@ -44,6 +44,23 @@ Not reported:
 - A handler that only observes the paste or drop: it does not write to its editor and does not
   call `evt.preventDefault()`. Obsidian inserts the content, and `preventDefault()` would cancel
   that.
+- A handler that lets Obsidian insert the content and changes the result afterwards, as in tidying
+  the pasted text: it writes to its editor only later, in a function passed to `setTimeout()`,
+  `setInterval()`, `setImmediate()`, `requestAnimationFrame()`, `requestIdleCallback()`,
+  `queueMicrotask()`, `nextTick()`, `then()`, `catch()` or `finally()` (also as a method, such as
+  `window.setTimeout()`), or after an `await`, and it does not read the pasted or dropped content
+  (`evt.clipboardData`, `evt.dataTransfer`). `preventDefault()` would cancel the insertion it relies on. A handler that
+  reads the content and inserts it later, such as after uploading a dropped file, is reported: it
+  must call `evt.preventDefault()` before it returns, so that Obsidian does not insert the content
+  as well.
+
+  ```ts
+  this.registerEvent(
+    this.app.workspace.on("editor-paste", (evt, editor) => {
+      window.setTimeout(() => editor.setValue(tidy(editor.getValue())), 0);
+    }),
+  );
+  ```
 - A handler that passes `evt` to another function or constructor (`this.handlePaste(evt, editor)`),
   which may check and cancel it. A `console` method, as in `console.log(evt)`, only prints the
   event, so passing it there does not count.

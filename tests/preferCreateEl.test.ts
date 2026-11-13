@@ -1176,3 +1176,87 @@ versionRuleTester.run("prefer-create-el and minAppVersion", preferCreateEl, {
         },
     ],
 });
+
+// A fallback for where Obsidian's helpers are missing, as in a browser or under
+// jsdom: the native call is the one that works there.
+ruleTester.run("prefer-create-el in a fallback for where the helpers are missing", preferCreateEl, {
+    valid: [
+        {
+            name: "the other branch of a typeof check of a helper is not reported",
+            code: `${MOCK_OBSIDIAN_DOM}\nexport function make(): HTMLDivElement { return typeof createDiv === 'function' ? createDiv() : document.createElement('div'); }`,
+        },
+        {
+            name: "a call after a typeof check of a helper that returns is not reported",
+            code: `${MOCK_OBSIDIAN_DOM}\nexport function make(): HTMLElement { if (typeof createEl === 'function') { return createEl('p'); } return document.createElement('p'); }`,
+        },
+        {
+            name: "a branch for where activeDocument is missing is not reported",
+            code: `${MOCK_OBSIDIAN_DOM}\nexport function make(): HTMLElement { if (typeof activeDocument === 'undefined') { return document.createElement('p'); } return createEl('p'); }`,
+        },
+        {
+            name: "the catch of a try that calls a helper is not reported",
+            code: `${MOCK_OBSIDIAN_DOM}\nexport function make(): HTMLElement { try { return createEl('p'); } catch { return document.createElement('p'); } }`,
+        },
+        {
+            name: "a branch that checks for a helper on window is not reported",
+            code: `${MOCK_OBSIDIAN_DOM}\nexport function make(): DocumentFragment { return 'createFragment' in window ? createFragment() : document.createDocumentFragment(); }`,
+        },
+    ],
+    invalid: [
+        {
+            name: "a try that calls a helper does not stop a report in its own block",
+            code: `${MOCK_OBSIDIAN_DOM}\nexport function make(): HTMLElement { try { createEl('p'); return document.createElement('p'); } catch (e) { console.error(e); throw e; } }`,
+            output: `${MOCK_OBSIDIAN_DOM}\nexport function make(): HTMLElement { try { createEl('p'); return createEl('p'); } catch (e) { console.error(e); throw e; } }`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        {
+            name: "a helper called inside a function in the try is not a guard",
+            code: `${MOCK_OBSIDIAN_DOM}\nexport function make(): HTMLElement { try { [1].map(() => createEl('p')); } catch { return document.createElement('p'); } return createEl('p'); }`,
+            output: `${MOCK_OBSIDIAN_DOM}\nexport function make(): HTMLElement { try { [1].map(() => createEl('p')); } catch { return createEl('p'); } return createEl('p'); }`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+    ],
+});
+
+// The replacement is built from the arguments it keeps, so a comment between or
+// around them would be lost: a suggestion instead of a fix.
+ruleTester.run("prefer-create-el and comments", preferCreateEl, {
+    valid: [],
+    invalid: [
+        {
+            name: "a comment after the tag gets a suggestion",
+            code: `${MOCK_OBSIDIAN_DOM}\nexport function f(el: HTMLElement) { el.createEl(\n  'div', // container for the chart\n  { cls: 'a' },\n); }`,
+            output: null,
+            errors: [
+                {
+                    messageId: "preferCreateEl",
+                    suggestions: [
+                        {
+                            messageId: "preferCreateElSuggestion",
+                            output: `${MOCK_OBSIDIAN_DOM}\nexport function f(el: HTMLElement) { el.createDiv({ cls: 'a' }); }`,
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "a comment before the tag gets a suggestion",
+            code: `${MOCK_OBSIDIAN_DOM}\nexport const a = document.createElement(/* TODO: switch to section */ 'p');`,
+            output: null,
+            errors: [
+                {
+                    messageId: "preferCreateEl",
+                    suggestions: [
+                        { messageId: "preferCreateElSuggestion", output: `${MOCK_OBSIDIAN_DOM}\nexport const a = createEl('p');` },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "a comment inside a kept argument is kept, so the call is fixed",
+            code: `${MOCK_OBSIDIAN_DOM}\nexport function f(el: HTMLElement) { el.createEl('div', { cls: 'a' /* the chart */ }); }`,
+            output: `${MOCK_OBSIDIAN_DOM}\nexport function f(el: HTMLElement) { el.createDiv({ cls: 'a' /* the chart */ }); }`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+    ],
+});

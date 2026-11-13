@@ -1,5 +1,6 @@
 import { ASTUtils, ESLintUtils, TSESTree } from "@typescript-eslint/utils";
 import ts from "typescript";
+import { mayRunOutsideObsidianAt } from "../globalWindow.js";
 import { type MinAppVersionOptions, minAppVersionSchema, supportsVersion } from "../minAppVersion.js";
 import { API_SINCE, laterVersion } from "../obsidianApiVersions.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
@@ -289,6 +290,14 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
         ): { prefix: string; since?: string; canAutofix: (helper: string) => boolean | undefined } | null {
             const obj = callee.object;
             if (isIframeDocument(obj)) {
+                return null;
+            }
+            // A fallback for where Obsidian's helpers are missing, as in a
+            // browser or under jsdom: `typeof createDiv === "function" ?
+            // createDiv() : document.createElement("div")`, the `catch` of
+            // `try { createEl("p"); }`, or code after a window check. The
+            // native call is the one that works there.
+            if (mayRunOutsideObsidianAt(context, callee)) {
                 return null;
             }
 
@@ -605,6 +614,12 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
                 context.report({ node, messageId: "preferCreateEl", data: { replacement, original } });
                 return;
             }
+            // The replacement is built from the text of the arguments it
+            // keeps, so a comment between or around them would be lost: a
+            // suggestion then, for the author to move it.
+            if (canAutofix && dropsComments(node, replacement)) {
+                canAutofix = false;
+            }
             context.report({
                 node,
                 messageId: "preferCreateEl",
@@ -629,6 +644,13 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
                         ],
                     }),
             });
+        }
+
+        // Whether a comment in `node` is missing from `replacement`.
+        function dropsComments(node: TSESTree.CallExpression, replacement: string): boolean {
+            return context.sourceCode
+                .getCommentsInside(node)
+                .some((comment) => !replacement.includes(context.sourceCode.getText(comment as unknown as TSESTree.Node)));
         }
 
         // An iframe's document belongs to the iframe's own window, which Obsidian
