@@ -58,7 +58,7 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
         // `x.fileManager.trashFile(file)` for `x.vault.trash(file, system)`:
         // the receiver must be `<expr>.vault`, with a `fileManager` that has
         // trashFile() on `<expr>`'s type. The second argument, a literal
-        // (the rule reports no other), is dropped. Never for `vault.delete()`: a
+        // (the rule reports no other for trash()), is dropped. Never for `vault.delete()`: a
         // permanent delete is often deliberate (a temporary, cache or backup
         // file of the plugin's own), and moving it to the trash instead is a
         // change of intent that cannot be judged from the call.
@@ -169,8 +169,10 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
         }
 
         // What a deletion call does, to tell the branches of a destination
-        // switch apart: `trash:true`, `trash:false`, `delete:` or
-        // `trashFile`; undefined for any other call.
+        // switch apart: `trash:true`, `trash:false`, `delete` or
+        // `trashFile`; undefined for any other call. delete()'s second
+        // argument, `force`, only lets it delete a folder that is not empty:
+        // with or without it, the file is gone for good.
         function deletionVariant(node: TSESTree.CallExpression): string | undefined {
             const callee = node.callee;
             if (
@@ -182,6 +184,9 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
             const methodName = vaultDeletion(node);
             if (methodName === undefined) {
                 return undefined;
+            }
+            if (methodName === "delete") {
+                return "delete";
             }
             const extra = node.arguments[1];
             return `${methodName}:${extra ? sourceCode.getText(extra) : ""}`;
@@ -261,9 +266,14 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
                 }
 
                 // `vault.trash(file, this.settings.useSystemTrash)`: the
-                // caller chooses where the file goes.
+                // caller chooses where the file goes. Not delete()'s `force`,
+                // which does not choose a destination.
                 const extra = node.arguments[1];
-                if (extra !== undefined && extra.type !== TSESTree.AST_NODE_TYPES.Literal) {
+                if (
+                    methodName === "trash" &&
+                    extra !== undefined &&
+                    extra.type !== TSESTree.AST_NODE_TYPES.Literal
+                ) {
                     return;
                 }
 
