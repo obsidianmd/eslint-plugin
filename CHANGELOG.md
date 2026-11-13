@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- `prefer-window-timers` no longer rewrites `activeWindow.clearTimeout(id)` and `activeWindow.clearInterval(id)` to `window` automatically, and offers it as a suggestion instead. A timer ID belongs to the window that set the timer: where `activeWindow.setTimeout()` in a popout window set it, `window.clearTimeout(id)` did not clear it ([#TBD](https://github.com/obsidianmd/eslint-plugin/pull/TBD)).
+- `prefer-window-timers` no longer rewrites `activeWindow.clearTimeout(id)` and `activeWindow.clearInterval(id)` to `window` automatically, and offers it as a suggestion instead. A timer ID belongs to the window that set the timer: where `activeWindow.setTimeout()` in a popout window set it, `window.clearTimeout(id)` did not clear it ([#266](https://github.com/obsidianmd/eslint-plugin/pull/266)).
 
 ## [0.5.1] - 2026-11-06
 
