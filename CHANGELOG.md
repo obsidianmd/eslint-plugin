@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `settings-tab/no-problematic-settings-headings` no longer stops the whole ESLint run when `manifest.json` has a `name` that is not a string, such as `"name": 123`. It threw `TypeError: pluginName.toLowerCase is not a function`; now it skips only the plugin-name check, and the "settings" and "general" checks still report ([#251](https://github.com/obsidianmd/eslint-plugin/pull/251)).
+
 ## [0.5.1] - 2026-11-06
 
 Fixes for findings on correct code, and for fixes and suggestions that changed what correct
