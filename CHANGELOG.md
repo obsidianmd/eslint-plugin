@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `settings-tab/no-problematic-settings-headings` no longer stops the whole ESLint run when `manifest.json` has a `name` that is not a string, such as `"name": 123`. It threw `TypeError: pluginName.toLowerCase is not a function`; now it skips only the plugin-name check, and the "settings" and "general" checks still report ([#251](https://github.com/obsidianmd/eslint-plugin/pull/251)).
+
 ## [0.5.1] - 2026-11-06
 
 Fixes for findings on correct code, and for fixes and suggestions that changed what correct
@@ -22,7 +26,6 @@ the new `checkId` option.
 
 ### Fixed
 
-- `settings-tab/no-problematic-settings-headings` no longer stops the whole ESLint run when `manifest.json` has a `name` that is not a string, such as `"name": 123`. It threw `TypeError: pluginName.toLowerCase is not a function`; now it skips only the plugin-name check, and the "settings" and "general" checks still report ([#251](https://github.com/obsidianmd/eslint-plugin/pull/251)).
 - `prefer-active-doc` no longer reports `document` in a listener on the main window's `document` or `window`, such as `this.registerDomEvent(document, "visibilitychange", () => document.visibilityState …)` or a `const` handler only ever added to and removed from `window`, where it is the document of the window whose event is handled. It offers no suggestion where `document` is a listener's target, as in `registerDomEvent(document, …)` or `document.removeEventListener()`: `activeDocument` there attached the listener to whichever window had focus, and a removal could name another document than the addition. Also found in a sweep of 600 plugins, for code that is correct, or a suggestion that would move the bug to another window:
   - Not reported: `document` as the other choice to `activeDocument` (`requireApiVersion("0.15.0") ? activeDocument : document`, `activeDocument ?? document`); listed with other documents (`[document, ...popoutDocuments]`, `new Set([document, activeDocument])`); and a lookup of UI only the main window has, by a class such as `status-bar`, `workspace-ribbon`, `side-dock-ribbon`, `mod-left-split` or `mod-right-split`, which a popout window lacks.
   - No suggestion where `document` is handed on as a value (an argument, an array element, a property's value, assigned, a default, a field's value or returned), in a function that compares a document with `document`, for `document.dispatchEvent()` (a plugin's event bus, whose listeners stay on the main document), for `document.body.contains(el)`, or for an element looked up to be removed (`document.getElementById("my-style")?.remove()`).
