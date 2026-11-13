@@ -732,6 +732,24 @@ ruleTester.run("no-global-this in try and catch", noGlobalThisRule, {
     ],
 });
 
+// A function whose source the file turns into a string runs elsewhere, as an
+// inline web worker does, where there is no window.
+ruleTester.run("no-global-this in a function that becomes a string", noGlobalThisRule, {
+    valid: [],
+    invalid: [
+        {
+            name: "globalThis in a function stringified for an inline worker gets a suggestion",
+            code: "const body = function () { globalThis.crypto.randomUUID(); }; export const blob = new Blob([`(${body.toString()})()`]);",
+            output: null,
+            errors: [{
+                messageId: "avoidGlobal",
+                data: { name: "globalThis" },
+                suggestions: [{ messageId: "useWindow", data: { name: "globalThis" }, output: "const body = function () { window.crypto.randomUUID(); }; export const blob = new Blob([`(${body.toString()})()`]);" }],
+            }],
+        },
+    ],
+});
+
 // A condition that names the environment, from a check that cannot be
 // followed here, may say there is no window: a suggestion, not a fix.
 ruleTester.run("no-global-this under an environment flag", noGlobalThisRule, {

@@ -1,5 +1,11 @@
 import { type TSESLint, TSESTree } from "@typescript-eslint/utils";
-import { getTypeInfo, isGlobalWindowAt, isTimerCallTypeSafe, mayLackWindowAt } from "../globalWindow.js";
+import {
+    getTypeInfo,
+    isGlobalWindowAt,
+    isResultDiscarded,
+    isTimerCallTypeSafe,
+    mayLackWindowAt,
+} from "../globalWindow.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 const TIMER_FUNCTIONS = new Set([
@@ -104,12 +110,19 @@ export default ruleCreator({
                     const fix = (fixer: TSESLint.RuleFixer) => fixer.replaceText(object, "window");
                     if (!isGlobalWindowAt(context, object)) {
                         context.report({ node: callee, messageId: "noActiveWindowTimer", data: { name } });
-                    } else if (mayLackWindowAt(context, object) || name.startsWith("clear")) {
+                    } else if (
+                        mayLackWindowAt(context, object) ||
+                        name.startsWith("clear") ||
+                        !isResultDiscarded(node)
+                    ) {
                         // A timer ID belongs to the window that set it:
                         // `window.clearTimeout(id)` clears only a timer
                         // `window` set, and the one `activeWindow` set may
                         // still be pending. Only a suggestion, for the code
-                        // that sets the timer to change with it.
+                        // that sets the timer and the code that clears it to
+                        // change together: a setter whose ID is kept, as in
+                        // `this.id = activeWindow.setInterval(…)`, may be
+                        // cleared by `activeWindow.clearInterval(this.id)`.
                         context.report({
                             node: callee,
                             messageId: "noActiveWindowTimer",

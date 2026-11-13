@@ -62,7 +62,10 @@ export function isGlobalWindowAt(context: Context, node: TSESTree.Node): boolean
  *   unseen;
  * - the file is Emscripten output, which reads `ENVIRONMENT_IS_WORKER` or
  *   `ENVIRONMENT_IS_NODE` to run in a web worker or in Node as well, and
- *   calls the bare timers outside those checks.
+ *   calls the bare timers outside those checks;
+ * - it is in a function whose source the file turns into a string, as in
+ *   `new Blob([`(${body.toString()})()`])` for an inline web worker, where
+ *   the code runs without a window.
  *
  * A rule offers its rewrite there as a suggestion, not a fix.
  */
@@ -74,8 +77,113 @@ export function mayLackWindowAt(context: Context, node: TSESTree.Node): boolean 
     const { knownChecks } = getWindowFacts(sourceCode);
     return (
         decidingConditions(node).some((condition) => readsEnvironmentName(sourceCode, condition, knownChecks)) ||
-        isInSilentTry(sourceCode, node)
+        isInSilentTry(sourceCode, node) ||
+        isInStringifiedFunction(sourceCode, node)
     );
+}
+
+const stringifiedCache = new WeakMap<TSESTree.Node, boolean>();
+
+// Whether `node` is in a function whose source the file turns into a string:
+// `fn.toString()`, `String(fn)`, `` `${fn}` `` or `"…" + fn`, for the function
+// itself or for a variable or function declaration that holds it. The string
+// is code that runs elsewhere, typically in an inline web worker
+// (`new Worker(URL.createObjectURL(new Blob([`(${body})()`])))`), which has no
+// window.
+function isInStringifiedFunction(sourceCode: Context["sourceCode"], node: TSESTree.Node): boolean {
+    for (let current = node.parent; current; current = current.parent) {
+        if (!isFunction(current)) {
+            continue;
+        }
+        let found = stringifiedCache.get(current);
+        if (found === undefined) {
+            found = functionReferences(sourceCode, current).some(isStringified);
+            stringifiedCache.set(current, found);
+        }
+        if (found) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// The function expression itself and every read of the name that holds it.
+function functionReferences(sourceCode: Context["sourceCode"], fn: TSESTree.Node): TSESTree.Node[] {
+    const references: TSESTree.Node[] = [fn];
+    let holder: TSESTree.Node | undefined;
+    if (fn.type === TSESTree.AST_NODE_TYPES.FunctionDeclaration) {
+        holder = fn;
+    } else {
+        let top: TSESTree.Node = fn;
+        while (top.parent && skipChainAndCasts(top.parent) === top) {
+            top = top.parent;
+        }
+        if (
+            top.parent?.type === TSESTree.AST_NODE_TYPES.VariableDeclarator &&
+            top.parent.init === top &&
+            top.parent.id.type === TSESTree.AST_NODE_TYPES.Identifier
+        ) {
+            holder = top.parent;
+        }
+    }
+    if (holder) {
+        for (const variable of sourceCode.getDeclaredVariables(holder)) {
+            for (const reference of variable.references) {
+                if (reference.isRead()) {
+                    references.push(reference.identifier);
+                }
+            }
+        }
+    }
+    return references;
+}
+
+// Whether the value of `node`, a function, is turned into its source text.
+function isStringified(node: TSESTree.Node): boolean {
+    let child = node;
+    let parent = node.parent;
+    // Parentheses leave no node; casts and `!` do.
+    while (parent && skipChainAndCasts(parent) === child) {
+        child = parent;
+        parent = parent.parent;
+    }
+    if (!parent) {
+        return false;
+    }
+    switch (parent.type) {
+        case TSESTree.AST_NODE_TYPES.MemberExpression:
+            // fn.toString()
+            return (
+                parent.object === child &&
+                staticKey(parent) === "toString" &&
+                parent.parent.type === TSESTree.AST_NODE_TYPES.CallExpression &&
+                parent.parent.callee === parent
+            );
+        case TSESTree.AST_NODE_TYPES.TemplateLiteral:
+            // `${fn}`, not a tagged template, which gets the value itself.
+            return parent.parent.type !== TSESTree.AST_NODE_TYPES.TaggedTemplateExpression;
+        case TSESTree.AST_NODE_TYPES.CallExpression:
+            // String(fn)
+            return (
+                parent.arguments[0] === child &&
+                parent.callee.type === TSESTree.AST_NODE_TYPES.Identifier &&
+                parent.callee.name === "String"
+            );
+        case TSESTree.AST_NODE_TYPES.BinaryExpression: {
+            // "(" + fn + ")()"
+            if (parent.operator !== "+") {
+                return false;
+            }
+            const other = parent.left === child ? parent.right : parent.left;
+            return (
+                (other.type === TSESTree.AST_NODE_TYPES.Literal && typeof other.value === "string") ||
+                other.type === TSESTree.AST_NODE_TYPES.TemplateLiteral ||
+                other.type === TSESTree.AST_NODE_TYPES.BinaryExpression
+            );
+        }
+        default:
+            return false;
+    }
 }
 
 const EMSCRIPTEN_ENVIRONMENT = /\bENVIRONMENT_IS_(?:WORKER|NODE)\b/;

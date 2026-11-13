@@ -15,15 +15,20 @@ A call to `setTimeout`, `setInterval`, `clearTimeout`, `clearInterval`, `request
 
 - called bare, as the global function. The fix prefixes `window.`
 - called on `activeWindow`, which may be a popout window that the user closes, taking its timers with
-  it. The fix replaces `activeWindow` with `window`. For `activeWindow.clearTimeout()` and
-  `activeWindow.clearInterval()` that is a suggestion only: a timer ID belongs to the window that set
-  the timer, so `window.clearTimeout(id)` clears the timer only once the code that sets it uses
-  `window` too. Not `activeWindow.requestAnimationFrame()` and `activeWindow.cancelAnimationFrame()`;
-  see below
+  it. The fix replaces `activeWindow` with `window`. A timer ID belongs to the window that set the
+  timer, so `window.clearTimeout(id)` clears only a timer `window` set. The fix is therefore applied
+  automatically only to an `activeWindow.setTimeout()` or `activeWindow.setInterval()` whose ID is
+  not used (a statement on its own, or `void`), which nothing can clear. One whose ID is stored,
+  returned or passed on, and every `activeWindow.clearTimeout()` and `activeWindow.clearInterval()`,
+  get the rewrite as a suggestion only, for the code that sets the timer and the code that clears it
+  to change together. Not `activeWindow.requestAnimationFrame()` and
+  `activeWindow.cancelAnimationFrame()`; see below
 
 ```ts
 setTimeout(save, 1000); // reported, fixed to window.setTimeout(save, 1000)
-activeWindow.setInterval(tick, 500); // reported, fixed to window.setInterval(tick, 500)
+activeWindow.setTimeout(save, 500); // reported, fixed to window.setTimeout(save, 500)
+this.id = activeWindow.setInterval(tick, 500); // reported, suggestion only
+activeWindow.clearInterval(this.id); // reported, suggestion only
 ```
 
 With `@types/node` installed, the bare functions are Node's: `setTimeout()` and `setInterval()`
@@ -39,7 +44,8 @@ change with it:
   `NodeJS.Timeout` argument gets a suggestion.
 - `requestAnimationFrame()` and `cancelAnimationFrame()` are DOM functions either way, so their type
   never changes.
-- `setTimeout()` and `setInterval()` on `activeWindow` are fixed: both are a `Window`.
+- on `activeWindow`, both functions are a `Window`'s, so the type never changes; the ID's window
+  does, as described above.
 
 `activeWindow.requestAnimationFrame()` and `activeWindow.cancelAnimationFrame()` are not reported. A
 frame callback runs when its own window paints, and a closed popout has nothing left to paint. The
@@ -128,13 +134,35 @@ A file that reads `ENVIRONMENT_IS_WORKER` or `ENVIRONMENT_IS_NODE` is taken as E
 which also runs in a web worker or in Node and calls the timers outside those checks: every call in
 it gets a suggestion instead of a fix.
 
-Code that still runs without
-a window where none of this shows can be fixed, so keep it in a web worker or test file, where the
-recommended config switches this rule off, or disable the rule for it.
+A function whose source the file turns into a string runs elsewhere, typically as an inline web
+worker, which has no window. A call in such a function gets a suggestion instead of a fix. The
+function counts when it, or the variable or function declaration that holds it, is used in
+`fn.toString()`, `String(fn)`, a template literal (`` `(${fn})()` ``, but not a tagged template) or
+a `+` with a string:
+
+```ts
+const body = function () { setTimeout(() => postMessage(1), 0); }; // suggestion
+new Worker(URL.createObjectURL(new Blob([`(${body.toString()})()`])));
+```
+
+Code that still runs without a window where none of this shows can be fixed. Keep it in a web worker
+or test file, where the recommended config switches this rule off, or switch the rule off for that
+file in your own config. A disable comment does not work with the recommended config, whose
+`eslint-comments/no-restricted-disable` reports one for any `obsidianmd/` rule:
+
+```js
+// eslint.config.mjs
+export default [
+    ...obsidianmd.configs.recommended,
+    { files: ["src/env.ts"], rules: { "obsidianmd/prefer-window-timers": "off" } },
+];
+```
 
 ## Web workers and tests
 
 A web worker has no `window`, so `globalThis` and the bare timer functions are correct there. The
-recommended config switches this rule off for files matching `**/*.worker.*`, `**/*-worker.*` or
-`**/*_worker.*` and anything under a `workers/` directory, and for test files and tool configs; see [Web worker files](../configuration.md#web-worker-files)
-and [Test files](../configuration.md#test-files).
+recommended config switches this rule off for TypeScript and JavaScript files (`.ts`, `.cts`, `.mts`,
+`.tsx`, `.js`, `.cjs`, `.mjs` or `.jsx`) matching `**/worker.*`, `**/*.worker.*`, `**/*-worker.*` or
+`**/*_worker.*`, such as `src/worker.ts` or `search.worker.ts`, and anything under a `workers/`
+directory, but not a `worker/` directory. It does the same for test files and tool configs; see
+[Web worker files](../configuration.md#web-worker-files) and [Test files](../configuration.md#test-files).

@@ -138,6 +138,75 @@ ruleTester.run("prefer-window-timers", preferWindowTimersRule, {
             ],
         },
         {
+            // The ID is kept, so activeWindow.clearInterval(this.id) may clear
+            // it: rewriting only the setter would leave the two in different
+            // windows.
+            name: "activeWindow.setInterval whose ID is kept gets a suggestion, as does its clear",
+            code: "export class V { id = 0; start() { this.id = activeWindow.setInterval(() => {}, 1000); } stop() { activeWindow.clearInterval(this.id); } }",
+            output: null,
+            errors: [
+                {
+                    messageId: "noActiveWindowTimer",
+                    data: { name: "setInterval" },
+                    suggestions: [
+                        {
+                            messageId: "useWindowTimer",
+                            output: "export class V { id = 0; start() { this.id = window.setInterval(() => {}, 1000); } stop() { activeWindow.clearInterval(this.id); } }",
+                        },
+                    ],
+                },
+                {
+                    messageId: "noActiveWindowTimer",
+                    data: { name: "clearInterval" },
+                    suggestions: [
+                        {
+                            messageId: "useWindowTimer",
+                            output: "export class V { id = 0; start() { this.id = activeWindow.setInterval(() => {}, 1000); } stop() { window.clearInterval(this.id); } }",
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            name: 'activeWindow.setTimeout whose ID is stored in a variable gets a suggestion',
+            code: 'const id = activeWindow.setTimeout(() => {}, 100);',
+            output: null,
+            errors: [
+                {
+                    messageId: "noActiveWindowTimer",
+                    suggestions: [{ messageId: "useWindowTimer", output: 'const id = window.setTimeout(() => {}, 100);' }],
+                },
+            ],
+        },
+        {
+            name: 'activeWindow.setTimeout whose ID is returned gets a suggestion',
+            code: 'export function later(fn: () => void) { return activeWindow.setTimeout(fn, 100); }',
+            output: null,
+            errors: [
+                {
+                    messageId: "noActiveWindowTimer",
+                    suggestions: [{ messageId: "useWindowTimer", output: 'export function later(fn: () => void) { return window.setTimeout(fn, 100); }' }],
+                },
+            ],
+        },
+        {
+            name: 'activeWindow.setTimeout whose ID is passed on gets a suggestion',
+            code: 'declare const ids: number[]; ids.push(activeWindow.setTimeout(() => {}, 100));',
+            output: null,
+            errors: [
+                {
+                    messageId: "noActiveWindowTimer",
+                    suggestions: [{ messageId: "useWindowTimer", output: 'declare const ids: number[]; ids.push(window.setTimeout(() => {}, 100));' }],
+                },
+            ],
+        },
+        {
+            name: "activeWindow.setTimeout under void is fixed, as its ID is thrown away",
+            code: "void activeWindow.setTimeout(() => {}, 100);",
+            output: "void window.setTimeout(() => {}, 100);",
+            errors: [{ messageId: "noActiveWindowTimer", data: { name: "setTimeout" } }],
+        },
+        {
             name: "bare requestAnimationFrame is forbidden",
             code: "requestAnimationFrame(() => {});",
             output: "window.requestAnimationFrame(() => {});",
@@ -894,6 +963,107 @@ window.setTimeout(() => {}, 1);`,
                     ],
                 },
             ],
+        },
+    ],
+});
+
+// A function whose source the file turns into a string runs elsewhere, as an
+// inline web worker does, where there is no window: `window.setTimeout` would
+// throw there.
+globalsRuleTester.run("prefer-window-timers in a function that becomes a string", preferWindowTimersRule, {
+    valid: [],
+    invalid: [
+        {
+            name: "a timer in a function stringified for an inline worker gets a suggestion",
+            code: "export function start() { const body = function () { self.onmessage = () => { setTimeout(() => postMessage(1), 0); }; }; return new Worker(URL.createObjectURL(new Blob([`(${body.toString()})()`]))); }",
+            output: null,
+            errors: [
+                {
+                    messageId: "preferWindowTimer",
+                    suggestions: [
+                        {
+                            messageId: "useWindowTimer",
+                            output: "export function start() { const body = function () { self.onmessage = () => { window.setTimeout(() => postMessage(1), 0); }; }; return new Worker(URL.createObjectURL(new Blob([`(${body.toString()})()`]))); }",
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "an arrow function stringified in place gets a suggestion",
+            code: "export const source = `(${(() => { setInterval(() => postMessage(1), 10); }).toString()})()`;",
+            output: null,
+            errors: [
+                {
+                    messageId: "preferWindowTimer",
+                    suggestions: [
+                        {
+                            messageId: "useWindowTimer",
+                            output: "export const source = `(${(() => { window.setInterval(() => postMessage(1), 10); }).toString()})()`;",
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "a function declaration in a template literal gets a suggestion",
+            code: "function work() { setTimeout(() => postMessage(1), 0); } export const blob = new Blob([`(${work})()`]);",
+            output: null,
+            errors: [
+                {
+                    messageId: "preferWindowTimer",
+                    suggestions: [
+                        {
+                            messageId: "useWindowTimer",
+                            output: "function work() { window.setTimeout(() => postMessage(1), 0); } export const blob = new Blob([`(${work})()`]);",
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "a function passed to String() gets a suggestion",
+            code: "function work() { activeWindow.setTimeout(() => postMessage(1), 0); } export const source = String(work);",
+            output: null,
+            errors: [
+                {
+                    messageId: "noActiveWindowTimer",
+                    suggestions: [
+                        {
+                            messageId: "useWindowTimer",
+                            output: "function work() { window.setTimeout(() => postMessage(1), 0); } export const source = String(work);",
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "a function joined to a string gets a suggestion",
+            code: "const work = () => { setTimeout(() => postMessage(1), 0); }; export const source = '(' + work + ')()';",
+            output: null,
+            errors: [
+                {
+                    messageId: "preferWindowTimer",
+                    suggestions: [
+                        {
+                            messageId: "useWindowTimer",
+                            output: "const work = () => { window.setTimeout(() => postMessage(1), 0); }; export const source = '(' + work + ')()';",
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "a function that is only called is still fixed",
+            code: "const work = () => { setTimeout(() => {}, 0); }; work(); export const name = work.name;",
+            output: "const work = () => { window.setTimeout(() => {}, 0); }; work(); export const name = work.name;",
+            errors: [{ messageId: "preferWindowTimer" }],
+        },
+        {
+            name: "a function given to a tagged template is still fixed",
+            code: "declare function tag(s: TemplateStringsArray, ...v: unknown[]): void; const work = () => { setTimeout(() => {}, 0); }; tag`${work}`;",
+            output: "declare function tag(s: TemplateStringsArray, ...v: unknown[]): void; const work = () => { window.setTimeout(() => {}, 0); }; tag`${work}`;",
+            errors: [{ messageId: "preferWindowTimer" }],
         },
     ],
 });
