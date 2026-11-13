@@ -229,6 +229,30 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
         },
         // Calls prefer-create-el does not report, or whose replacement keeps `document`.
         {
+            // prefer-create-el reports nothing inside an implementation of its
+            // helpers, where its replacement could call the function it is in.
+            name: "document.createElement() inside a helper polyfill is flagged here",
+            code: "(window as any).createDiv = () => document.createElement('div');",
+            errors: [
+                {
+                    messageId: "preferActive",
+                    data: { original: "document", replacement: "activeDocument" },
+                    suggestions: [{ messageId: "useActiveDocument", output: "(window as any).createDiv = () => activeDocument.createElement('div');" }],
+                },
+            ],
+        },
+        {
+            name: "document.createElement() inside a method named after a helper is flagged here",
+            code: "class Shim { createSpan() { return document.createElement('span'); } }",
+            errors: [
+                {
+                    messageId: "preferActive",
+                    data: { original: "document", replacement: "activeDocument" },
+                    suggestions: [{ messageId: "useActiveDocument", output: "class Shim { createSpan() { return activeDocument.createElement('span'); } }" }],
+                },
+            ],
+        },
+        {
             name: "document.createElement() with options is still flagged",
             code: "document.createElement('div', { is: 'my-div' });",
             errors: [

@@ -77,7 +77,7 @@ With `verbatimModuleSyntax`, TypeScript keeps an import or re-export whose speci
 inline `type` ones as `import {} from "node:fs"`, which still loads the module, so when the file is
 linted with type information from such a project those are reported; write `import type` instead.
 
-The recommended config does not apply this rule to [test files](../configuration.md#test-files),
+The recommended config does not apply this rule to [test files and tool configs](../configuration.md#test-files),
 which run in Node.js.
 
 ## Options

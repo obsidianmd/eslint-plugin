@@ -62,7 +62,6 @@ Nothing is offered:
 - for `vault.delete()`. A permanent delete is often deliberate, as for the plugin's own temporary,
   cache or backup files, and with `trashFile()` such files would pile up in the user's trash. If
   the call deletes a user's file, replace it with `fileManager.trashFile()` yourself;
-
 - where the vault is not read as `<expr>.vault`, such as a `vault` variable or parameter, or
   `app["vault"]`: only there is `<expr>.fileManager` known to be next to it;
 - where the type of `<expr>` has no `fileManager` with a `trashFile()`, as with `obsidian` typings
