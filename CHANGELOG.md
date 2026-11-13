@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `settings-tab/no-problematic-settings-headings` no longer stops the whole ESLint run when `manifest.json` has a `name` that is not a string, such as `"name": 123`. It threw `TypeError: pluginName.toLowerCase is not a function`; now it skips only the plugin-name check, and the "settings" and "general" checks still report ([#251](https://github.com/obsidianmd/eslint-plugin/pull/251)).
 - `no-static-styles-assignment` no longer stops the whole ESLint run on `el.style.setProperty()` called without arguments, which threw `TypeError: Cannot read properties of undefined (reading 'type')` ([#264](https://github.com/obsidianmd/eslint-plugin/pull/264)).
 - `ui/sentence-case`, `ui/sentence-case-json` and `ui/sentence-case-locale-module` ignore an empty string in the `brands`, `acronyms` and `ignoreWords` options. With `brands: [""]`, a text that is empty or starts with a character other than a letter or digit, such as `"(Open) settings"`, made the rule loop forever, and the lint run never finished ([#265](https://github.com/obsidianmd/eslint-plugin/pull/265)).
+- `prefer-window-timers` no longer rewrites `activeWindow.clearTimeout(id)` and `activeWindow.clearInterval(id)` to `window` automatically, and offers it as a suggestion instead. A timer ID belongs to the window that set the timer: where `activeWindow.setTimeout()` in a popout window set it, `window.clearTimeout(id)` did not clear it ([#266](https://github.com/obsidianmd/eslint-plugin/pull/266)).
 
 ## [0.5.1] - 2026-11-06
 
