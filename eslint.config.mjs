@@ -34,6 +34,26 @@ export default [
         ...eslintPluginPlugin.configs["tests-recommended"],
         files: ["tests/**/*.ts"],
     },
+    // This repo is the plugin, not an Obsidian plugin: it runs in Node, inside
+    // ESLint. The rules about what an Obsidian plugin can rely on at runtime
+    // do not apply to it: Node's modules are its platform, its regular
+    // expressions never run on iOS, and the hardcoded-config-path rule has to
+    // name `.obsidian` to find it.
+    {
+        rules: {
+            "obsidianmd/no-nodejs-modules": "off",
+            "obsidianmd/regex-lookbehind": "off",
+            "obsidianmd/hardcoded-config-path": "off",
+        },
+    },
+    // eslint-plugin-import is what the recommended config's import rules come
+    // from, so it is a dependency of the plugin, not one to replace.
+    {
+        files: ["package.json"],
+        rules: {
+            "depend/ban-dependencies": ["error", { allowed: ["eslint-plugin-import"] }],
+        },
+    },
     // This repo is the plugin, not an Obsidian plugin. Its manifest.json is a
     // fixture for the sample plugin, so the rule is correct to fire here and the
     // findings are unactionable.
