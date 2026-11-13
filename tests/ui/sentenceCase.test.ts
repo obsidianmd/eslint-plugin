@@ -10,6 +10,16 @@ const tester = new RuleTester();
 tester.run("ui-sentence-case", rule, {
     valid: [
         {
+            name: "words that keep a capital in English are not reported, also with allowAutoFix",
+            code: "new Notice('Sorry, I could not sort A-Z'); new Setting(el).setName('Copy Obsidian URI').setDesc('Press Enter on Monday, or use Ctrl-S');",
+            options: [{ allowAutoFix: true }],
+        },
+        {
+            name: "an ignored word in a hyphenated word keeps its case",
+            code: "new Setting(el).setName('Use Dataview-powered queries');",
+            options: [{ ignoreWords: ["Dataview"] }],
+        },
+        {
             name: "Notice with sentence case is allowed",
             code: "new Notice('Enable auto-reveal');",
         },
@@ -435,8 +445,8 @@ tester.run("ui-sentence-case", rule, {
             errors: [{ messageId: "useSentenceCase" }],
         },
         {
-            name: "auto-fix lowercases all-caps second sentence",
-            code: "new Notice('Hello. WORLD.');",
+            name: "auto-fix lowercases all-caps second sentence in text that is all in capitals",
+            code: "new Notice('HELLO. WORLD.');",
             options: [{ allowAutoFix: true }],
             output: "new Notice('Hello. World.');",
             errors: [{ messageId: "useSentenceCase" }],
@@ -456,9 +466,9 @@ tester.run("ui-sentence-case", rule, {
             errors: [{ messageId: "useSentenceCase" }],
         },
         {
-            name: "auto-fix corrects all-caps after abbreviation",
+            name: "auto-fix corrects all-caps after abbreviation in strict mode",
             code: "new Notice('Visit U.S. EMBASSY');",
-            options: [{ allowAutoFix: true }],
+            options: [{ allowAutoFix: true, mode: "strict" }],
             output: "new Notice('Visit U.S. Embassy');",
             errors: [{ messageId: "useSentenceCase" }],
         },
