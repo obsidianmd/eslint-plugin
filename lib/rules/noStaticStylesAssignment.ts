@@ -51,7 +51,10 @@ function isStaticValue(node: TSESTree.Node): boolean {
 
 // The string a node spells out: a string literal or a template literal without
 // expressions.
-function getStaticString(node: TSESTree.Node): string | undefined {
+function getStaticString(node: TSESTree.Node | undefined): string | undefined {
+    if (node === undefined) {
+        return undefined;
+    }
     if (node.type === TSESTree.AST_NODE_TYPES.Literal && typeof node.value === "string") {
         return node.value;
     }
@@ -161,11 +164,12 @@ export default ruleCreator({
                     isStyleMemberExpression(callee.object)
                 ) {
                     // A fixed value for a CSS property; custom properties
-                    // (`--name`) are allowed, as in `setCssProps()`.
-                    const name = getStaticString(node.arguments[0]);
+                    // (`--name`) are allowed, as in `setCssProps()`. A call
+                    // without arguments, such as `el.style.setProperty()`,
+                    // sets nothing.
                     if (
                         node.arguments.length > 1 &&
-                        !(name?.startsWith("--") ?? false) &&
+                        !(getStaticString(node.arguments[0])?.startsWith("--") ?? false) &&
                         isStaticValue(node.arguments[1])
                     ) {
                         context.report({

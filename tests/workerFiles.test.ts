@@ -41,12 +41,14 @@ const WORKER_FILES = [
 	"src/indexer.worker.mjs",
 	"src/handlers/bergamot/bergamot-translator-worker.js",
 	"src/search_worker.ts",
+	"src/worker.ts",
+	"worker.js",
 ];
 
 const EXTENSIONS = ["ts", "cts", "mts", "tsx", "js", "cjs", "mjs", "jsx"];
 
 // Names that only look like worker code keep every rule.
-const NOT_WORKER_FILES = ["src/main.ts", "src/workerManager.ts", "src/view.js", "src/worker-utils/pool.ts", "src/worker/view.js", "src/worker-pool.ts", "src/networker.ts"];
+const NOT_WORKER_FILES = ["src/main.ts", "src/workerManager.ts", "src/view.js", "src/worker-utils/pool.ts", "src/worker/view.js", "src/worker/loader.ts", "src/workerApi.ts", "src/worker-pool.ts", "src/networker.ts"];
 
 // A worker has no window, so these must not be declared for worker files: in a
 // JavaScript worker, no-undef reports them rather than letting them fail at

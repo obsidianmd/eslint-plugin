@@ -103,7 +103,7 @@ ruleTester.run("require-display", requireDisplayRule, {
         },
         {
             name: "an unknown minAppVersion option is a no-op",
-            options: [{ minAppVersion: "1.12" }],
+            options: [{ minAppVersion: "latest" }],
             code: `
                 ${MOCK_CLASS}
                 class MyTab extends PluginSettingTab {}
@@ -111,6 +111,17 @@ ruleTester.run("require-display", requireDisplayRule, {
         },
     ],
     invalid: [
+        {
+            name: "a minAppVersion without a patch version below 1.13",
+            options: [{ minAppVersion: "1.12" }],
+            code: `
+                ${MOCK_CLASS}
+                class MyTab extends PluginSettingTab {
+                    getSettingDefinitions() { return []; }
+                }
+            `,
+            errors: [{ messageId: "missingDisplay", data: { minAppVersion: "1.12.0" } }],
+        },
         {
             name: "minAppVersion below 1.13 without display() is an error",
             options: [{ minAppVersion: "1.12.0" }],

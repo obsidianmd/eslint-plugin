@@ -108,16 +108,34 @@ ruleTester.run("prefer-window-timers", preferWindowTimersRule, {
             errors: [{ messageId: "noActiveWindowTimer", data: { name: "setInterval" } }],
         },
         {
-            name: "activeWindow.clearTimeout is forbidden",
+            // The ID may be from activeWindow.setTimeout(), which
+            // window.clearTimeout() does not clear.
+            name: "activeWindow.clearTimeout is forbidden, with a suggestion only",
             code: "activeWindow.clearTimeout(id);",
-            output: "window.clearTimeout(id);",
-            errors: [{ messageId: "noActiveWindowTimer", data: { name: "clearTimeout" } }],
+            output: null,
+            errors: [
+                {
+                    messageId: "noActiveWindowTimer",
+                    data: { name: "clearTimeout" },
+                    suggestions: [
+                        { messageId: "useWindowTimer", data: { name: "clearTimeout" }, output: "window.clearTimeout(id);" },
+                    ],
+                },
+            ],
         },
         {
-            name: "activeWindow.clearInterval is forbidden",
+            name: "activeWindow.clearInterval is forbidden, with a suggestion only",
             code: "activeWindow.clearInterval(id);",
-            output: "window.clearInterval(id);",
-            errors: [{ messageId: "noActiveWindowTimer", data: { name: "clearInterval" } }],
+            output: null,
+            errors: [
+                {
+                    messageId: "noActiveWindowTimer",
+                    data: { name: "clearInterval" },
+                    suggestions: [
+                        { messageId: "useWindowTimer", data: { name: "clearInterval" }, output: "window.clearInterval(id);" },
+                    ],
+                },
+            ],
         },
         {
             name: "bare requestAnimationFrame is forbidden",
