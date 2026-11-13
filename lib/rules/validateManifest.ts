@@ -139,6 +139,9 @@ function isCheckedWordField(key: string): key is CheckedWordField {
     return (CHECKED_WORD_FIELDS as readonly string[]).includes(key);
 }
 
+// Control and format characters (Unicode Cc and Cf), which display as nothing.
+const INVISIBLE_CHARACTERS = /[\p{Cc}\p{Cf}]/gu;
+
 // The word checks a field's value fails, as message ids. `allowed` holds the
 // words `allowedWords` drops for this field; matching is case-insensitive.
 function findWordProblems(
@@ -148,7 +151,10 @@ function findWordProblems(
 ): MessageIds[] {
     const allowedLower = new Set(allowed.map((word) => word.toLowerCase()));
     const checks = (word: ForbiddenWord) => !allowedLower.has(word);
-    const lower = value.toLowerCase();
+    // Without the invisible characters a word could hide behind, such as a
+    // zero-width space, soft hyphen or bidi control in "Obs\u200Bidian".
+    const visible = value.replace(INVISIBLE_CHARACTERS, "");
+    const lower = visible.toLowerCase();
     const problems: MessageIds[] = [];
     switch (field) {
         case "id":
@@ -178,7 +184,7 @@ function findWordProblems(
             if (checks("obsidian") && lower.includes("obsidian")) {
                 problems.push("descriptionObsidian");
             }
-            if (checks("plugin") && DESCRIPTION_SELF_REFERENCE.test(value)) {
+            if (checks("plugin") && DESCRIPTION_SELF_REFERENCE.test(visible)) {
                 problems.push("descriptionSelfReference");
             }
             break;
