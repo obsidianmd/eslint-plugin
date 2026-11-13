@@ -15,8 +15,8 @@ in which the word "command", in any case, is a redundant label rather than a wor
 The key may be quoted (`"name": …`):
 
 ```ts
-this.addCommand({ id: "open-note", name: "Open note command", callback }); // reported
 this.addCommand({ id: "open-note", name: "Command: open note", callback }); // reported
+this.addCommand({ id: "open-note", name: "Open note (command)", callback }); // reported
 this.addCommand({ id: "open-note", name: "Open note", callback });
 ```
 
@@ -24,14 +24,12 @@ this.addCommand({ id: "open-note", name: "Open note", callback });
 
 - at the start or the end, with a separator such as `:`, `-` with spaces, `|` or `/` between it and
   the rest, as in "Command: open note" or "Open note - command";
-- in brackets at the start or the end, as in "[Command] open note" or "Open note (command)";
-- as the last word after a space, as in "Open settings command", where at least two words are left,
-  the word before it is not one that makes "command" its object, such as "for", "of", "the", "a",
-  "raw" or "custom", and the name does not start with a verb that takes a command, such as "Run",
-  "Execute", "Copy", "Select", "Insert" or "Search".
+- in brackets at the start or the end, as in "[Command] open note" or "Open note (command)".
 
-Not reported, therefore: "command" as what the command acts on, as in "Copy URI for command",
-"Raw command", "Run command" or "Run shell command"; "command" in the middle of the name or before
+Not reported, therefore: "command" as the last word after only a space, as in "Run command",
+"Create slash command", "Edit shell command" or "Open settings command": it may be what the command
+acts on, a slash command or a shell command, and the words cannot tell that from a label. Nor is
+"command" as what the command acts on elsewhere, as in "Copy URI for command"; "command" in the middle of the name or before
 the next word, as in "Select and copy command ID", "Toggle command palette" or
 "Command palette: open"; and a name of nothing but "command", as "Command" or "Command:". Only the
 whole word counts: no letter or digit, in any script, may come right before or after it, so
@@ -45,8 +43,8 @@ Your editor offers to remove the word "command" from the command name, never `--
 name users see changes:
 
 ```ts
-this.addCommand({ id: "open-note", name: "Open note command", callback }); // suggests "Open note"
 this.addCommand({ id: "open-note", name: "Command: open note", callback }); // suggests "Open note"
+this.addCommand({ id: "open-note", name: "Open note (command)", callback }); // suggests "Open note"
 ```
 
 It goes as the plugin name does in

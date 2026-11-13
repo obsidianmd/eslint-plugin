@@ -34,6 +34,11 @@ built from a template literal or a variable, and a command object defined elsewh
 `addCommand()` by name. With no plugin ID to compare with, because there is neither the option nor
 a `manifest.json`, or with one that has no words, such as `-`, nothing is reported.
 
+Nor is an ID whose command's `name`, a string written out, starts with the plugin ID's words as a
+word of the sentence, as no-plugin-name-in-command-name has it, as in
+`{ id: "zoom-in", name: "Zoom in" }` of the plugin `zoom`: the ID follows the name, whose verb the
+plugin ID is.
+
 Changing the ID of a command you already ship resets any hotkey your users assigned to it, so the
 [community scanner](../../configuration.md#community-plugin-scanner-configuration) only checks this
 for the most recently submitted plugins.
@@ -59,6 +64,8 @@ does, in lower case. The string keeps its quotes and its escapes.
 Not offered where:
 
 - nothing would be left, as for `word-tally` or `word-tally:`;
+- only a word that names no command on its own would be left, such as `in`, `out`, `up`, `down`,
+  `on`, `off` or `back`, as for `zoom-in` of the plugin `zoom`;
 - the plugin ID is next to something other than a separator or another word, as in
   `word-tally#count`;
 - another command in the same file has that ID already: an object passed to `addCommand()`, or
