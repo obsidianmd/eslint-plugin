@@ -1,8 +1,9 @@
 import { RuleTester } from "@typescript-eslint/rule-tester";
+import { atMinAppVersion } from "./atMinAppVersion.js";
 import globals from "globals";
 import preferCreateEl from "../lib/rules/preferCreateEl.js";
 
-const ruleTester = new RuleTester();
+const ruleTester = atMinAppVersion(new RuleTester(), "1.5.0");
 
 const MOCK_OBSIDIAN_DOM = `
     declare global {
@@ -1043,9 +1044,9 @@ ruleTester.run("prefer-create-el: createEl() shorthands", preferCreateEl, {
 
 // Without strictNullChecks an unknown receiver stays unknown, which the types
 // cannot tell anything about: fixed, like an any receiver.
-const nonStrictRuleTester = new RuleTester({
+const nonStrictRuleTester = atMinAppVersion(new RuleTester({
     languageOptions: { parserOptions: { project: "./tests/fixtures/tsconfig.non-strict.json" } },
-});
+}), "1.5.0");
 
 nonStrictRuleTester.run("prefer-create-el without strictNullChecks", preferCreateEl, {
     valid: [],
@@ -1061,7 +1062,7 @@ nonStrictRuleTester.run("prefer-create-el without strictNullChecks", preferCreat
 
 // The recommended config declares the browser's and Obsidian's globals. They
 // are variables without a declaration in the file: still the globals.
-const globalsRuleTester = new RuleTester({
+const globalsRuleTester = atMinAppVersion(new RuleTester({
     languageOptions: {
         globals: {
             ...globals.browser,
@@ -1074,7 +1075,7 @@ const globalsRuleTester = new RuleTester({
             createSvg: "readonly",
         },
     },
-});
+}), "1.5.0");
 
 globalsRuleTester.run("prefer-create-el with the recommended config's globals", preferCreateEl, {
     valid: [],
@@ -1090,6 +1091,88 @@ globalsRuleTester.run("prefer-create-el with the recommended config's globals", 
             code: `${MOCK_OBSIDIAN_DOM}\ncreateEl('span');`,
             output: `${MOCK_OBSIDIAN_DOM}\ncreateSpan();`,
             errors: [{ messageId: "preferCreateEl" }],
+        },
+    ],
+});
+
+// Replacements that need a newer Obsidian than the plugin's minAppVersion are
+// not offered: createDiv() and createSpan() 0.10.0, createFragment() 0.9.11, createSvg() 1.1.0, activeWindow 0.15.0, `doc.win` 0.15.3. The
+// native call is right on older versions, so it is not reported either.
+const versionRuleTester = new RuleTester();
+const at = (minAppVersion: string): [{ minAppVersion: string }] => [{ minAppVersion }];
+const SVG = `${MOCK_OBSIDIAN_DOM}\ndocument.createElementNS('http://www.w3.org/2000/svg', 'path');`;
+const ACTIVE = `${MOCK_ACTIVE_WINDOW_WITH_HELPERS}\nactiveDocument.createElement('div');`;
+const DOC_WIN = `${MOCK_OBSIDIAN_DOM}\ndeclare const doc: Document & { win: typeof globalThis };\ndoc.createElement('div');`;
+
+versionRuleTester.run("prefer-create-el and minAppVersion", preferCreateEl, {
+    valid: [
+        { name: "createSvg() below 1.1.0 is not reported", code: SVG, options: at("1.0.9") },
+        { name: "createDiv() below 0.10.0 is not reported", code: `${MOCK_OBSIDIAN_DOM}\ndocument.createElement('div');`, options: at("0.9.21") },
+        { name: "el.createDiv() below 0.10.0 is not reported", code: `${MOCK_OBSIDIAN_DOM}\ndeclare const el: HTMLElement;\nel.createEl('div');`, options: at("0.9.21") },
+        { name: "createFragment() below 0.9.11 is not reported", code: `${MOCK_OBSIDIAN_DOM}\ndocument.createDocumentFragment();`, options: at("0.9.8") },
+        { name: "activeWindow below 0.15.0 is not reported", code: ACTIVE, options: at("0.14.9") },
+        { name: "doc.win below 0.15.3 is not reported", code: DOC_WIN, options: at("0.15.2") },
+        { name: "doc.win at 0.15.0, from the repository's manifest.json, is not reported", code: DOC_WIN },
+    ],
+    invalid: [
+        {
+            name: "createSvg() at 1.1.0 is fixed",
+            code: SVG,
+            options: at("1.1.0"),
+            output: `${MOCK_OBSIDIAN_DOM}\ncreateSvg('path');`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        {
+            name: "createSvg() with an unknown version is fixed as before",
+            code: SVG,
+            options: at("latest"),
+            output: `${MOCK_OBSIDIAN_DOM}\ncreateSvg('path');`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        {
+            name: "activeWindow at 0.15.0 is fixed",
+            code: ACTIVE,
+            options: at("0.15.0"),
+            output: `${MOCK_ACTIVE_WINDOW_WITH_HELPERS}\nactiveWindow.createDiv();`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        {
+            name: "doc.win at 0.15.3 is fixed",
+            code: DOC_WIN,
+            options: at("0.15.3"),
+            output: `${MOCK_OBSIDIAN_DOM}\ndeclare const doc: Document & { win: typeof globalThis };\ndoc.win.createDiv();`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        {
+            name: "document.createElement('div') → createDiv() at 0.10.0 is fixed",
+            code: `${MOCK_OBSIDIAN_DOM}\ndocument.createElement('div');`,
+            options: at("0.10.0"),
+            output: `${MOCK_OBSIDIAN_DOM}\ncreateDiv();`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        {
+            name: "a suggested createSvg() says which version it needs when none is known",
+            code: "document.createElementNS('http://www.w3.org/2000/svg', 'path');",
+            options: at("latest"),
+            output: null,
+            errors: [
+                {
+                    messageId: "preferCreateEl",
+                    suggestions: [{ messageId: "preferCreateElSuggestionSince", data: { since: "1.1.0", original: "document.createElementNS('http://www.w3.org/2000/svg', 'path')", replacement: "createSvg('path')" }, output: "createSvg('path');" }],
+                },
+            ],
+        },
+        {
+            name: "a suggested createSvg() at 1.1.0 does not mention a version",
+            code: "document.createElementNS('http://www.w3.org/2000/svg', 'path');",
+            options: at("1.1.0"),
+            output: null,
+            errors: [
+                {
+                    messageId: "preferCreateEl",
+                    suggestions: [{ messageId: "preferCreateElSuggestion", output: "createSvg('path');" }],
+                },
+            ],
         },
     ],
 });

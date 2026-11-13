@@ -2,10 +2,11 @@ import { type TSESLint, TSESTree } from "@typescript-eslint/utils";
 import ts from "typescript";
 import { getTypeInfo } from "../globalWindow.js";
 import { type MinAppVersionOptions, minAppVersionSchema, supportsVersion } from "../minAppVersion.js";
+import { API_SINCE } from "../obsidianApiVersions.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 // The Obsidian version that added getLanguage().
-const GET_LANGUAGE_SINCE = "1.8.7";
+const GET_LANGUAGE_SINCE = API_SINCE.getLanguage;
 
 type MessageIds = "localStorageLanguage" | "i18nextDetector" | "useGetLanguage" | "useGetLanguageSince";
 type Scope = TSESLint.Scope.Scope;

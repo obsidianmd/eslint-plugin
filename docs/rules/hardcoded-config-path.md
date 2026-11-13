@@ -22,5 +22,5 @@ Not reported:
   `` `${dir}.obsidian` `` or `` `.obsidian${suffix}` ``, since the placeholder may be part of the same
   name. Write the separator out, as in `` `${dir}/.obsidian` ``, and it is reported
 
-The recommended config does not apply this rule to [test files](../configuration.md#test-files),
+The recommended config does not apply this rule to [test files and tool configs](../configuration.md#test-files),
 whose fixtures name `.obsidian` on purpose.
