@@ -31,13 +31,16 @@ describe("withCustomMessages", () => {
 
     it("keeps the wrapped rule's meta and other properties and leaves the rule unchanged", () => {
         const original = tsPlugin.rules["no-explicit-any"];
+        // eslint-disable-next-line @typescript-eslint/unbound-method -- compared by identity, never called
         const create = original.create;
         const wrapped = withCustomMessages(original, { "Unexpected any": "Custom" });
         assert.notStrictEqual(wrapped, original);
         assert.strictEqual(wrapped.meta, original.meta);
         // eslint-disable-next-line @typescript-eslint/no-deprecated -- the top-level defaultOptions, which typescript-eslint 8.35.1 reads (see PluginRule)
         assert.strictEqual(wrapped.defaultOptions, original.defaultOptions);
+        // eslint-disable-next-line @typescript-eslint/unbound-method -- compared by identity, never called
         assert.notStrictEqual(wrapped.create, create);
+        // eslint-disable-next-line @typescript-eslint/unbound-method -- compared by identity, never called
         assert.strictEqual(original.create, create);
     });
 
@@ -240,7 +243,7 @@ describe("withCustomMessages", () => {
             create(context) {
                 return {
                     Identifier(node) {
-                        const report = context.report as (...args: unknown[]) => void;
+                        const report = context.report.bind(context) as (...args: unknown[]) => void;
                         if (node.name === "a") {
                             // (node, loc, message, data)
                             report(node, { line: 1, column: 0 }, "Old {{name}}", { name: node.name });

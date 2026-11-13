@@ -14,7 +14,7 @@ async function rulesFor(configName: keyof typeof plugin.configs, filename: strin
 		overrideConfigFile: true,
 		overrideConfig: plugin.configs[configName],
 	});
-	const cfg = await eslint.calculateConfigForFile(filename);
+	const cfg = (await eslint.calculateConfigForFile(filename)) as Linter.Config;
 	return cfg.rules ?? {};
 }
 
@@ -383,6 +383,7 @@ describe("validate-license on a user-configured filename", () => {
 		);
 		const match = /```js\n(\{\n {2}files: \["COPYING"\],\n[\s\S]*?\n\})\n```/.exec(section);
 		assert.ok(match, "no COPYING block under ### Files linted beyond your source");
+		// eslint-disable-next-line @typescript-eslint/no-implied-eval, @typescript-eslint/no-unsafe-call, obsidianmd/rule-custom-message -- runs the example in this repo's own docs, to test it
 		return new Function(`return (${match[1]});`)() as Linter.Config;
 	}
 
@@ -683,10 +684,10 @@ describe("English JSON locale files", () => {
 				overrideConfigFile: true,
 				overrideConfig: plugin.configs.recommendedWithLocalesEn,
 			});
-			const config = await eslint.calculateConfigForFile(filePath);
+			const config = (await eslint.calculateConfigForFile(filePath)) as Linter.Config;
 			assert.strictEqual(config.language, json.languages.json);
 			assert.strictEqual(
-				getSeverity(config.rules["obsidianmd/ui/sentence-case-json"]),
+				getSeverity(config.rules?.["obsidianmd/ui/sentence-case-json"]),
 				"warn"
 			);
 		});
@@ -903,7 +904,9 @@ describe("require() in plugin code", () => {
 		describe(filePath, () => {
 			it("no-require-imports is off and require is a readonly global", async () => {
 				const eslint = new ESLint({ overrideConfigFile: true, overrideConfig: plugin.configs.recommended });
-				const config = await eslint.calculateConfigForFile(filePath);
+				const config = (await eslint.calculateConfigForFile(filePath)) as Linter.Config & {
+					languageOptions?: Linter.LanguageOptions;
+				};
 				assert.strictEqual(getSeverity(config.rules?.["@typescript-eslint/no-require-imports"]), "off");
 				assert.strictEqual(config.languageOptions?.globals?.require, "readonly");
 			});
@@ -1162,7 +1165,7 @@ describe("plugin object", () => {
 					},
 				],
 			});
-			const rules = (await eslint.calculateConfigForFile(filename)).rules ?? {};
+			const rules = ((await eslint.calculateConfigForFile(filename)) as Linter.Config).rules ?? {};
 			assert.deepStrictEqual(
 				["depend/ban-dependencies", "noUnsanitizedPlugin/method"].map(rule => getSeverity(rules[rule])),
 				["warn", "warn"]

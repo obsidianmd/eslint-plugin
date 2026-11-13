@@ -3,6 +3,7 @@ import { ESLint, Linter, type Rule } from "eslint";
 import plugin from "../../lib/index.js";
 import { RuleTester } from "@typescript-eslint/rule-tester";
 import parser, { parse } from "@typescript-eslint/parser";
+import { AST_NODE_TYPES } from "@typescript-eslint/utils";
 import rule from "../../lib/rules/ui/sentenceCaseLocaleModule.js";
 import { typedRuleTesterConfig } from "../mocha-setup.js";
 import type { RuleTesterConfig } from "@typescript-eslint/rule-tester";
@@ -374,7 +375,10 @@ describe("ui-sentence-case-locale-module message", () => {
 describe("sentence-case-locale-module in recommendedWithLocalesEn", () => {
     const eslint = new ESLint({ overrideConfigFile: true, overrideConfig: plugin.configs.recommendedWithLocalesEn });
     const severityFor = async (file: string) =>
-        (await eslint.calculateConfigForFile(file))?.rules?.["obsidianmd/ui/sentence-case-locale-module"]?.[0];
+        // calculateConfigForFile() is typed any; it gives undefined for a file no config matches.
+        ((await eslint.calculateConfigForFile(file)) as { rules?: Record<string, unknown[]> } | undefined)?.rules?.[
+            "obsidianmd/ui/sentence-case-locale-module"
+        ]?.[0];
 
     for (const file of ["src/lang/en.cjs", "en-GB.ts", "src/en_GB.mjs", "src/lang/en/common.js", "src/lang/en/menus/file.ts"]) {
         it(`runs on ${file}`, async () => {
@@ -397,9 +401,12 @@ describe("ui-sentence-case-locale-module fix of a template literal in a CRLF fil
             rules: { "o/sentence-case-locale-module": ["warn", { allowAutoFix: true }] },
         }], "en.ts");
         const statement = parse(output).body[0];
-        assert.ok(statement.type === "ExportDefaultDeclaration" && statement.declaration.type === "ObjectExpression");
+        assert.ok(
+            statement.type === AST_NODE_TYPES.ExportDefaultDeclaration &&
+                statement.declaration.type === AST_NODE_TYPES.ObjectExpression,
+        );
         const property = statement.declaration.properties[0];
-        assert.ok(property.type === "Property" && property.value.type === "TemplateLiteral");
+        assert.ok(property.type === AST_NODE_TYPES.Property && property.value.type === AST_NODE_TYPES.TemplateLiteral);
         assert.strictEqual(property.value.quasis[0].value.cooked, "Enable auto\nreveal");
     });
 });

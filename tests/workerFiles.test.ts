@@ -7,6 +7,10 @@ import globals from "globals";
 import plugin from "../lib/index.js";
 import { isWorkerFile } from "../lib/workerGlobals.js";
 
+// The config calculateConfigForFile() gives for a JavaScript or TypeScript
+// file, whose languageOptions are JavaScript's. ESLint types the call `any`.
+type JsConfig = Linter.Config & { languageOptions?: Linter.LanguageOptions };
+
 // Web worker code runs without a window, so the recommended config switches off
 // the rules whose fix needs one (#171). Their autofixes rewrote `globalThis` to
 // `window` and `setTimeout` to `window.setTimeout`, which breaks a worker.
@@ -82,7 +86,7 @@ const ALSO_IN_WORKERS = [
 ];
 
 function getSeverity(ruleValue: unknown): string {
-	const value = Array.isArray(ruleValue) ? ruleValue[0] : ruleValue;
+	const value: unknown = Array.isArray(ruleValue) ? (ruleValue as unknown[])[0] : ruleValue;
 	return ({ 0: "off", 1: "warn", 2: "error" } as Record<string, string>)[String(value)] ?? String(value);
 }
 
@@ -95,14 +99,14 @@ for (const configName of ["recommended", "recommendedWithLocalesEn"] as const) {
 
 		for (const filename of WORKER_FILES) {
 			it(`switches off the window-only rules for ${filename}`, async () => {
-				const { rules = {} } = await eslint.calculateConfigForFile(filename);
+				const { rules = {} } = (await eslint.calculateConfigForFile(filename)) as JsConfig;
 				for (const rule of WINDOW_ONLY_RULES) {
 					assert.strictEqual(getSeverity(rules[rule] ?? "off"), "off", rule);
 				}
 			});
 
 			it(`keeps the security rules for ${filename}`, async () => {
-				const { rules = {} } = await eslint.calculateConfigForFile(filename);
+				const { rules = {} } = (await eslint.calculateConfigForFile(filename)) as JsConfig;
 				for (const [rule, severity] of Object.entries(STILL_ENFORCED)) {
 					assert.strictEqual(getSeverity(rules[rule]), severity, rule);
 				}
@@ -113,23 +117,23 @@ for (const configName of ["recommended", "recommendedWithLocalesEn"] as const) {
 		// the same options; the window-only rules are left out, not set to "off".
 		for (const extension of EXTENSIONS) {
 			it(`leaves out exactly the window-only rules for .${extension} worker files`, async () => {
-				const { rules: plain = {} } = await eslint.calculateConfigForFile(`src/main.${extension}`);
+				const { rules: plain = {} } = (await eslint.calculateConfigForFile(`src/main.${extension}`)) as JsConfig;
 				const expected = Object.fromEntries(Object.entries(plain).filter(([rule]) => !WINDOW_ONLY_RULES.includes(rule)));
 				for (const filename of [`src/indexer.worker.${extension}`, `src/workers/nested/helper.${extension}`]) {
-					const { rules = {} } = await eslint.calculateConfigForFile(filename);
+					const { rules = {} } = (await eslint.calculateConfigForFile(filename)) as JsConfig;
 					assert.deepStrictEqual(rules, expected, filename);
 				}
 			});
 		}
 
 		it("declares worker globals for worker files", async () => {
-			const { languageOptions } = await eslint.calculateConfigForFile("src/workers/shims.ts");
+			const { languageOptions } = (await eslint.calculateConfigForFile("src/workers/shims.ts")) as JsConfig;
 			assert.ok(languageOptions?.globals && "importScripts" in languageOptions.globals);
 		});
 
 		for (const filename of WORKER_FILES) {
 			it(`switches off the browser and Obsidian globals a worker lacks for ${filename}`, async () => {
-				const { languageOptions } = await eslint.calculateConfigForFile(filename);
+				const { languageOptions } = (await eslint.calculateConfigForFile(filename)) as JsConfig;
 				const declared = languageOptions?.globals ?? {};
 				for (const name of NOT_IN_WORKERS) {
 					assert.strictEqual(declared[name], "off", name);
@@ -137,7 +141,7 @@ for (const configName of ["recommended", "recommendedWithLocalesEn"] as const) {
 			});
 
 			it(`keeps the browser globals a worker also has for ${filename}`, async () => {
-				const { languageOptions } = await eslint.calculateConfigForFile(filename);
+				const { languageOptions } = (await eslint.calculateConfigForFile(filename)) as JsConfig;
 				const declared = languageOptions?.globals ?? {};
 				for (const name of ALSO_IN_WORKERS) {
 					assert.ok(name in declared, `${name} is not declared`);
@@ -155,13 +159,13 @@ for (const configName of ["recommended", "recommendedWithLocalesEn"] as const) {
 				.map((match) => match[1])
 				.filter((name) => Object.hasOwn(globals.browser, name));
 			assert.ok(workerNames.length > 50, `only ${workerNames.length} names found`);
-			const { languageOptions } = await eslint.calculateConfigForFile("src/workers/shims.js");
+			const { languageOptions } = (await eslint.calculateConfigForFile("src/workers/shims.js")) as JsConfig;
 			const declared = languageOptions?.globals ?? {};
 			assert.deepStrictEqual(workerNames.filter((name) => !(name in declared) || declared[name] === "off"), []);
 		});
 
 		it("uses the worker's own values for globals both scopes have", async () => {
-			const { languageOptions } = await eslint.calculateConfigForFile("src/workers/shims.js");
+			const { languageOptions } = (await eslint.calculateConfigForFile("src/workers/shims.js")) as JsConfig;
 			const declared = languageOptions?.globals ?? {};
 			// A worker's `self` and `postMessage` are writable; a window's are readonly.
 			assert.strictEqual(declared.self, true);
@@ -169,7 +173,7 @@ for (const configName of ["recommended", "recommendedWithLocalesEn"] as const) {
 		});
 
 		it("switches off none of the worker's own globals", async () => {
-			const { languageOptions } = await eslint.calculateConfigForFile("src/workers/shims.js");
+			const { languageOptions } = (await eslint.calculateConfigForFile("src/workers/shims.js")) as JsConfig;
 			const declared = languageOptions?.globals ?? {};
 			for (const name of Object.keys(globals.worker)) {
 				assert.notStrictEqual(declared[name], "off", name);
@@ -177,13 +181,13 @@ for (const configName of ["recommended", "recommendedWithLocalesEn"] as const) {
 		});
 
 		it("keeps no-undef off for TypeScript worker files", async () => {
-			const { rules = {} } = await eslint.calculateConfigForFile("src/workers/shims.ts");
+			const { rules = {} } = (await eslint.calculateConfigForFile("src/workers/shims.ts")) as JsConfig;
 			assert.strictEqual(getSeverity(rules["no-undef"]), "off");
 		});
 
 		it("leaves the browser and Obsidian globals declared for other files", async () => {
 			for (const filename of NOT_WORKER_FILES) {
-				const { languageOptions } = await eslint.calculateConfigForFile(filename);
+				const { languageOptions } = (await eslint.calculateConfigForFile(filename)) as JsConfig;
 				const declared = languageOptions?.globals ?? {};
 				for (const name of NOT_IN_WORKERS) {
 					assert.ok(name in declared, `${name} is not declared in ${filename}`);
@@ -195,7 +199,7 @@ for (const configName of ["recommended", "recommendedWithLocalesEn"] as const) {
 
 		it("leaves the window-only rules on for other files", async () => {
 			for (const filename of NOT_WORKER_FILES) {
-				const { rules = {} } = await eslint.calculateConfigForFile(filename);
+				const { rules = {} } = (await eslint.calculateConfigForFile(filename)) as JsConfig;
 				assert.strictEqual(getSeverity(rules["obsidianmd/no-global-this"]), "warn", filename);
 				assert.strictEqual(getSeverity(rules["obsidianmd/prefer-window-timers"]), "warn", filename);
 			}
@@ -283,7 +287,8 @@ describe("worker code under another name, with the docs' override", () => {
 		const section = text.slice(text.indexOf("### Web worker files"), text.indexOf("### Test files"));
 		const match = /```js\n\/\/ import globals from "globals";\n([\s\S]*?)```/.exec(section);
 		assert.ok(match, "no override example under ### Web worker files");
-		return new Function("globals", `return (${match[1]});`)(globals) as Linter.Config;
+		// eslint-disable-next-line @typescript-eslint/no-implied-eval, @typescript-eslint/no-unsafe-call, obsidianmd/rule-custom-message -- runs the example in this repo's own docs, to test it
+		return new Function("globals", `return (${match[1]});`)(globals) as JsConfig;
 	}
 
 	const override = docsOverride();
@@ -297,7 +302,7 @@ describe("worker code under another name, with the docs' override", () => {
 	});
 
 	it("switches off the window-only rules", async () => {
-		const { rules = {} } = await eslint.calculateConfigForFile("src/background/embed.js");
+		const { rules = {} } = (await eslint.calculateConfigForFile("src/background/embed.js")) as JsConfig;
 		for (const rule of WINDOW_ONLY_RULES) {
 			assert.strictEqual(getSeverity(rules[rule] ?? "off"), "off", rule);
 		}
