@@ -284,9 +284,15 @@ function desktopWhenFalse(expr: TSESTree.Expression): boolean {
 }
 
 function isGuardedByPlatformIsDesktop(node: TSESTree.CallExpression | TSESTree.ImportExpression): boolean {
-    // `require?.("fs")` and `window.require?.("fs")` call require() only where
-    // it exists.
-    if (node.type === AST_NODE_TYPES.CallExpression && node.optional) {
+    // `window.require?.("fs")` calls require() only where the global object
+    // has it, as only the desktop app does. A bare `require?.("fs")` is no
+    // guard: the bundle's own `require` exists on mobile too, and throws there
+    // for a Node.js module.
+    if (
+        node.type === AST_NODE_TYPES.CallExpression &&
+        node.optional &&
+        node.callee.type !== AST_NODE_TYPES.Identifier
+    ) {
         return true;
     }
     let current: TSESTree.Node | undefined = node.parent;
@@ -340,11 +346,13 @@ function isGuardedByPlatformIsDesktop(node: TSESTree.CallExpression | TSESTree.I
         } else if (current.type === AST_NODE_TYPES.TryStatement) {
             // try { require("fs") } catch { ... }: on mobile the catch runs. An
             // import() rejects instead of throwing, which the catch sees only
-            // when it is awaited there.
+            // when it is awaited there. A catch that always throws, as in
+            // `catch (e) { throw e; }`, hands the failure on, and is no guard.
             if (
                 inSameFunction &&
                 prevChild === current.block &&
                 current.handler !== null &&
+                !alwaysThrows(current.handler.body) &&
                 (node.type === AST_NODE_TYPES.CallExpression || isAwaited(node))
             ) {
                 return true;
@@ -390,6 +398,54 @@ function isEarlyExitGuard(statement: TSESTree.Statement): boolean {
         desktopWhenFalse(statement.test) &&
         alwaysExits(statement.consequent)
     );
+}
+
+/**
+ * A block that reaches a `throw` among its own statements, with no statement
+ * before it that could leave the block otherwise: a `return`, `break` or
+ * `continue`, also inside an `if` or another nested statement.
+ */
+function alwaysThrows(block: TSESTree.BlockStatement): boolean {
+    for (const statement of block.body) {
+        if (statement.type === AST_NODE_TYPES.ThrowStatement) {
+            return true;
+        }
+        if (mayLeave(statement)) {
+            return false;
+        }
+    }
+    return false;
+}
+
+// Whether `node` holds a `return`, `break` or `continue`, outside nested functions.
+function mayLeave(node: TSESTree.Node): boolean {
+    if (
+        node.type === AST_NODE_TYPES.ReturnStatement ||
+        node.type === AST_NODE_TYPES.BreakStatement ||
+        node.type === AST_NODE_TYPES.ContinueStatement
+    ) {
+        return true;
+    }
+    if (
+        node.type === AST_NODE_TYPES.FunctionDeclaration ||
+        node.type === AST_NODE_TYPES.FunctionExpression ||
+        node.type === AST_NODE_TYPES.ArrowFunctionExpression ||
+        node.type === AST_NODE_TYPES.ClassDeclaration ||
+        node.type === AST_NODE_TYPES.ClassExpression
+    ) {
+        return false;
+    }
+    for (const [key, value] of Object.entries(node)) {
+        if (key === "parent") {
+            continue;
+        }
+        for (const child of Array.isArray(value) ? value : [value]) {
+            if (child !== null && typeof child === "object" && typeof (child as TSESTree.Node).type === "string" && mayLeave(child as TSESTree.Node)) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 /**
