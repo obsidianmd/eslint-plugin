@@ -23,10 +23,14 @@ const FORBIDDEN_ELEMENT_TYPES = ["link", "style"];
 // The documents a plugin creates elements in: `document`, `activeDocument`, and
 // a property access ending in `.document`, `.activeDocument`, `.doc` (Obsidian's
 // Node#doc) or `.ownerDocument`, such as `window.document`, `activeWindow.document`
-// or `el.doc`. An iframe's `contentDocument` is not the plugin's own document, and
-// a document held in a variable is not followed.
+// or `el.doc`. An iframe's `contentDocument`, and its `contentWindow.document`, is
+// not the plugin's own document, and a document held in a variable is not followed.
 const DOCUMENT_NAMES = new Set(["document", "activeDocument"]);
 const DOCUMENT_PROPERTIES = new Set(["document", "activeDocument", "doc", "ownerDocument"]);
+// The properties of a window that are its document.
+const WINDOW_DOCUMENT_PROPERTIES = new Set(["document", "activeDocument"]);
+// The properties of a window or document that lead to another window.
+const OTHER_WINDOW_PROPERTIES = new Set(["defaultView", "parent", "top", "opener", "frameElement", "ownerDocument"]);
 
 // The expression inside `x!`, `x as T`, `x satisfies T` and `<T>x`, which only
 // change its type.
@@ -51,8 +55,18 @@ function isDocument(node: TSESTree.Node): boolean {
         node.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
         !node.computed &&
         node.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
-        DOCUMENT_PROPERTIES.has(node.property.name)
+        DOCUMENT_PROPERTIES.has(node.property.name) &&
+        !isFrameWindowDocument(node)
     );
+}
+
+// `iframe.contentWindow.document`, also with `!` or `?.`: the iframe's document.
+function isFrameWindowDocument(node: TSESTree.MemberExpression): boolean {
+    if (node.property.type !== TSESTree.AST_NODE_TYPES.Identifier || !WINDOW_DOCUMENT_PROPERTIES.has(node.property.name)) {
+        return false;
+    }
+    const object = skipTypeAssertions(node.object);
+    return object.type === TSESTree.AST_NODE_TYPES.MemberExpression && getMemberName(object) === "contentWindow";
 }
 
 function isForbiddenCreateElementCall(node: TSESTree.CallExpression): string | undefined {
@@ -271,6 +285,54 @@ export default ruleCreator({
             return false;
         }
 
+        // Whether `node` is an iframe's document or an element in it:
+        // `iframe.contentDocument`, `iframe.contentWindow.document`, a member
+        // of either, such as `iframe.contentDocument.head`, what a method
+        // called on one returns, such as `querySelector(…)` or `createEl(…)`,
+        // and a `const` holding any of these. styles.css does not reach into
+        // an iframe's document, so a `<style>` or `<link>` there is the only
+        // way to style it. A window or document reached from it, such as its
+        // `defaultView.parent.document`, is not followed.
+        function isInFrameDocument(node: TSESTree.Node, seen = new Set<TSESTree.Node>()): boolean {
+            node = skipTypeAssertions(node);
+            if (node.type === TSESTree.AST_NODE_TYPES.ChainExpression) {
+                return isInFrameDocument(node.expression, seen);
+            }
+            if (node.type === TSESTree.AST_NODE_TYPES.MemberExpression) {
+                const name = getMemberName(node);
+                if (name === "contentDocument" || isFrameWindowDocument(node)) {
+                    return true;
+                }
+                if (name === undefined || OTHER_WINDOW_PROPERTIES.has(name) || WINDOW_DOCUMENT_PROPERTIES.has(name)) {
+                    return false;
+                }
+                return isInFrameDocument(node.object, seen);
+            }
+            if (node.type === TSESTree.AST_NODE_TYPES.CallExpression) {
+                const callee = skipTypeAssertions(node.callee);
+                return callee.type === TSESTree.AST_NODE_TYPES.MemberExpression && isInFrameDocument(callee.object, seen);
+            }
+            if (node.type !== TSESTree.AST_NODE_TYPES.Identifier || seen.has(node)) {
+                return false;
+            }
+            seen.add(node);
+            const variable = ASTUtils.findVariable(context.sourceCode.getScope(node), node);
+            const def = variable?.defs.length === 1 ? variable.defs[0] : undefined;
+            return (
+                def?.type === "Variable" &&
+                def.node.id === def.name &&
+                def.parent.kind === "const" &&
+                def.node.init !== null &&
+                isInFrameDocument(def.node.init, seen)
+            );
+        }
+
+        // Whether a `<style>` or `<link>` in `node` stays out of the plugin's
+        // document: a shadow root, an iframe's document, or an element in one.
+        function isInOwnStyleScope(node: TSESTree.Node): boolean {
+            return isInShadowRoot(node) || isInFrameDocument(node);
+        }
+
         // The nodes the element `call` creates is inserted into: directly, as in
         // `shadowRoot.appendChild(document.createElement("style"))`, or through
         // a `const` holding it, by `appendChild()`, `append()`, `prepend()`,
@@ -369,14 +431,14 @@ export default ruleCreator({
                         !isForbiddenCreateElementCall(node)
                             ? node.callee.object
                             : undefined;
-                    // Created in a shadow root, it stays exempt unless it is moved
-                    // out of it; created elsewhere, it is exempt when it is
-                    // inserted, and only ever into a shadow root.
+                    // Created in a shadow root or an iframe's document, it stays
+                    // exempt unless it is moved out of it; created elsewhere, it
+                    // is exempt when it is inserted, and only ever into one.
                     const targets = getInsertionTargets(node) ?? [];
-                    const intoShadowRoot = targets.every((target) => isInShadowRoot(target));
+                    const intoOwnScope = targets.every((target) => isInOwnStyleScope(target));
                     if (
-                        intoShadowRoot &&
-                        ((receiver !== undefined && isInShadowRoot(receiver)) || targets.length > 0)
+                        intoOwnScope &&
+                        ((receiver !== undefined && isInOwnStyleScope(receiver)) || targets.length > 0)
                     ) {
                         return;
                     }
