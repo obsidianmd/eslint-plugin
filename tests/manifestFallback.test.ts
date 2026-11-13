@@ -36,6 +36,7 @@ interface ChildResult {
     noDeprecated: {
         tsEntry: [number, { allow: { name: string }[] }];
     };
+    settingsHeadingPluginName: number;
 }
 
 interface ChildRun {
@@ -66,16 +67,38 @@ describe("manifest fallback in the linted repo's working directory", () => {
     let noManifest: ChildRun;
     let declarativeSettings: ChildRun;
     let preDeclarativeSettings: ChildRun;
+    let stringName: ChildRun;
+    let numberName: ChildRun;
 
     before(async function () {
         this.timeout(60000);
-        [desktopOnly, stringFalse, noManifest, declarativeSettings, preDeclarativeSettings] = await Promise.all([
+        [
+            desktopOnly,
+            stringFalse,
+            noManifest,
+            declarativeSettings,
+            preDeclarativeSettings,
+            stringName,
+            numberName,
+        ] = await Promise.all([
             runWithManifest(JSON.stringify({ isDesktopOnly: true })),
             runWithManifest(JSON.stringify({ isDesktopOnly: "false" })),
             runWithManifest(null),
             runWithManifest(JSON.stringify({ minAppVersion: "1.13.0" })),
             runWithManifest(JSON.stringify({ minAppVersion: "1.12.7" })),
+            runWithManifest(JSON.stringify({ name: "Sample Plugin" })),
+            runWithManifest(JSON.stringify({ name: 123 })),
         ]);
+    });
+
+    describe("settings-tab/no-problematic-settings-headings", () => {
+        it("reports a heading with the manifest's plugin name", () => {
+            assert.strictEqual(stringName.result.settingsHeadingPluginName, 1);
+        });
+
+        it("skips the plugin-name check when the manifest's name is not a string", () => {
+            assert.strictEqual(numberName.result.settingsHeadingPluginName, 0);
+        });
     });
 
     describe("no-nodejs-modules", () => {
