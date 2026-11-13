@@ -214,8 +214,36 @@ ruleTester.run("no-unsupported-api: the first typings that declare a member", ru
             `,
             options: [{ minAppVersion: "0.15.0" }],
         },
+        {
+            // requestSaveLayout was a `() => void` until 0.16.0 typed it a
+            // Debouncer: a call that passes nothing and ignores the result does
+            // the same on both, back to the 0.9.7 typings.
+            name: "requestSaveLayout() called for its effect",
+            code: `
+                import { Workspace } from 'obsidian';
+                declare const workspace: Workspace;
+                workspace.requestSaveLayout();
+                void workspace.requestSaveLayout();
+            `,
+            options: [{ minAppVersion: "0.15.0" }],
+        },
     ],
     invalid: [
+        {
+            // The Debouncer it returns, and its cancel(), are new in 0.16.0.
+            name: "requestSaveLayout() with its result used, or cancel(), below 0.16.0",
+            code: `
+                import { Workspace } from 'obsidian';
+                declare const workspace: Workspace;
+                const debouncer = workspace.requestSaveLayout();
+                workspace.requestSaveLayout.cancel();
+            `,
+            options: [{ minAppVersion: "0.15.0" }],
+            errors: [
+                { messageId: "apiNotAvailable", line: 4, data: { qualifiedName: "Workspace.requestSaveLayout", sinceVersion: "0.16.0", minAppVersion: "0.15.0" } },
+                { messageId: "apiNotAvailable", line: 5, data: { qualifiedName: "Workspace.requestSaveLayout", sinceVersion: "0.16.0", minAppVersion: "0.15.0" } },
+            ],
+        },
         {
             name: "duplicateLeaf() with its result used, below 0.13.8",
             code: `

@@ -1,6 +1,7 @@
 import { type TSESLint, TSESTree } from "@typescript-eslint/utils";
 import {
     getTypeInfo,
+    isDiscardedArrowBody,
     isGlobalWindowAt,
     isResultDiscarded,
     isTimerCallTypeSafe,
@@ -113,7 +114,7 @@ export default ruleCreator({
                     } else if (
                         mayLackWindowAt(context, object) ||
                         name.startsWith("clear") ||
-                        !isResultDiscarded(node)
+                        !(isResultDiscarded(node) || isDiscardedArrowBody(node, types))
                     ) {
                         // A timer ID belongs to the window that set it:
                         // `window.clearTimeout(id)` clears only a timer

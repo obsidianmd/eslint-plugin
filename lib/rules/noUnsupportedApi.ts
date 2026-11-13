@@ -261,7 +261,7 @@ export default ruleCreator<Options, MessageId>({
                 if (gt(sinceVersion, minVersion)) {
                     const used = required.called ? [required.called] : overloads;
                     const declared = history.firstDeclared(qualifiedName, (shape, at) =>
-                        fitsShape(shape, at, used, required.called && call),
+                        fitsShape(shape, at, used, fittedCall(node, required.called, overloads, call)),
                     );
                     if (declared && lt(declared, sinceVersion)) {
                         sinceVersion = declared;
@@ -341,7 +341,7 @@ export default ruleCreator<Options, MessageId>({
             const called = call ? resolvedOverload(call, overloads) : undefined;
             const used = called ? [called] : overloads;
             const version =
-                history.firstDeclared(qualifiedName, (shape, at) => fitsShape(shape, at, used, called && call, true)) ??
+                history.firstDeclared(qualifiedName, (shape, at) => fitsShape(shape, at, used, fittedCall(node, called, overloads, call), true)) ??
                 history.firstDeclared(qualifiedName, () => true);
             return { version, called };
         }
@@ -398,12 +398,56 @@ export default ruleCreator<Options, MessageId>({
                     ts.isMethodSignature(declaration) ||
                     ts.isFunctionDeclaration(declaration));
             if (!callable) {
+                // A call to a property of a callable type, such as
+                // `requestSaveLayout()`, a `() => void` before 0.16.0 typed it a
+                // Debouncer, does the same on the older type when it passes
+                // nothing and ignores the result: the older type is a function
+                // that needs no argument, or the type it is now, whose call
+                // signature stays while other members of it change, such as
+                // Debouncer.run().
+                if (
+                    call !== undefined &&
+                    call.arguments.length === 0 &&
+                    isResultUnused(call) &&
+                    isCallableProperty(declaration) &&
+                    shape.node !== undefined &&
+                    (sameAsNow ||
+                        (ts.isFunctionTypeNode(shape.node) &&
+                            callerParameters(shape.node).every(
+                                (parameter) => parameter.questionToken || parameter.initializer || parameter.dotDotDotToken,
+                            )))
+                ) {
+                    return true;
+                }
                 // A read of a property whose type changed, or a call to what
                 // was not a signature then, cannot be told.
                 return lenient;
             }
             const fits = callFits(shape.node as ts.FunctionTypeNode, declaration as ts.SignatureDeclaration, call as TSESTree.CallExpression, at);
             return fits === true || (lenient && fits === undefined);
+        }
+
+        // The call to compare with an older shape: `call`, `node` being its
+        // callee, when it calls the overload `called`, or the one property
+        // `overloads` declares.
+        function fittedCall(
+            node: TSESTree.Node,
+            called: ts.Declaration | undefined,
+            overloads: ts.Declaration[],
+            call: TSESTree.CallExpression | undefined,
+        ): TSESTree.CallExpression | undefined {
+            if (called) {
+                return call;
+            }
+            return call?.callee === node && overloads.length === 1 && isCallableProperty(overloads[0]) ? call : undefined;
+        }
+
+        // A property whose type can be called, such as a Debouncer.
+        function isCallableProperty(declaration: ts.Declaration): boolean {
+            return (
+                (ts.isPropertySignature(declaration) || ts.isPropertyDeclaration(declaration)) &&
+                checker.getTypeAtLocation(declaration).getCallSignatures().length > 0
+            );
         }
 
         // Whether a call to `declaration` would do the same with the older

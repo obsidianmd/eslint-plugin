@@ -199,8 +199,48 @@ ruleTester.run("no-problematic-settings-headings", rule, {
                 ${tab(`new Setting(this.containerEl).setName("General").setHeading().setName(label);`)}
             `,
         },
+        {
+            // empty() of another element, or one that may not run, leaves what
+            // came before it in the tab.
+            name: "a 'General' heading after a call is not reported when what is emptied is not surely the tab",
+            code: tab(`
+                this.renderIntro();
+                this.intro.empty();
+                new Setting(this.containerEl).setName("General").setHeading();`) + tab(`
+                this.renderIntro();
+                if (this.dirty) this.containerEl.empty();
+                new Setting(this.containerEl).setName("General").setHeading();`) + tab(`
+                const { containerEl } = this;
+                containerEl.empty();
+                this.renderIntro();
+                new Setting(containerEl).setName("General").setHeading();`),
+        },
     ],
     invalid: [
+        {
+            // What ran before the tab was emptied is not in it any more.
+            name: "a heading after the tab is emptied is first, whatever ran before",
+            code: tab(`
+                this.unsubscribe?.();
+                this.unsubscribe = null;
+                const { containerEl } = this;
+                containerEl.empty();
+                new Setting(containerEl).setHeading().setName("Neuro Roadmap");`) + tab(`
+                this.renderIntro();
+                this.containerEl.empty();
+                new Setting(this.containerEl).setName("General").setHeading();`),
+            options: [{ pluginName: "Neuro Roadmap" }],
+            errors: [{ messageId: "pluginName" }, { messageId: "general" }],
+            output: tab(`
+                this.unsubscribe?.();
+                this.unsubscribe = null;
+                const { containerEl } = this;
+                containerEl.empty();
+                ;`) + tab(`
+                this.renderIntro();
+                this.containerEl.empty();
+                ;`),
+        },
         {
             name: "the message names the word it matched (novel-word-count)",
             code: tab(`new Setting(this.containerEl).setName("Show advanced options").setHeading();`),

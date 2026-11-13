@@ -1,4 +1,4 @@
-import { type TSESLint, TSESTree } from "@typescript-eslint/utils";
+import { ASTUtils, TSESLint, TSESTree } from "@typescript-eslint/utils";
 import { getManifest } from "../../manifest.js";
 import { staticMemberName } from "../../memberName.js";
 import { docsUrl, ruleCreator } from "../../ruleCreator.js";
@@ -58,6 +58,8 @@ function headingSubject(name: string): string | null {
     const subject = normalizeName(name.replace(new RegExp(SETTINGS_WORD.source, "giu"), " "));
     return subject === "" ? null : subject;
 }
+
+const { DefinitionType } = TSESLint.Scope;
 
 // Calls that leave the tab as it was, so a heading after them is still the
 // first thing in it: emptying the container, setting its classes and
@@ -204,9 +206,11 @@ export default ruleCreator<Options, "settings" | "general" | "pluginName" | "rem
         // the tab. Where the order cannot be told it is not: in a loop, in
         // another function, such as a callback, which may run at any time, or
         // in a method other than display(), which display() may call after
-        // adding settings.
+        // adding settings. What runs before display() empties the tab, as
+        // `containerEl.empty()` does, is not in it any more.
         function isFirstInTab(top: TSESTree.CallExpression): boolean {
             let current: TSESTree.Node = top;
+            let cleared = false;
             for (;;) {
                 const parent: TSESTree.Node | undefined = current.parent;
                 if (parent === undefined) {
@@ -226,13 +230,77 @@ export default ruleCreator<Options, "settings" | "general" | "pluginName" | "rem
                     return false;
                 }
                 const start = current.range[0];
-                for (const child of children(parent)) {
-                    if (child.range[1] <= start && !addsNothing(child)) {
+                const before = cleared ? [] : children(parent).filter((child) => child.range[1] <= start);
+                for (let index = before.length - 1; index >= 0; index--) {
+                    if (parent.type === TSESTree.AST_NODE_TYPES.BlockStatement && emptiesTab(before[index])) {
+                        cleared = true;
+                        break;
+                    }
+                    if (!addsNothing(before[index])) {
                         return false;
                     }
                 }
                 current = parent;
             }
+        }
+
+        // `containerEl.empty();` or `this.containerEl.empty();`, `containerEl`
+        // being the tab's, as `const { containerEl } = this` declares it.
+        function emptiesTab(statement: TSESTree.Node): boolean {
+            if (statement.type !== TSESTree.AST_NODE_TYPES.ExpressionStatement) {
+                return false;
+            }
+            const call = statement.expression;
+            return (
+                call.type === TSESTree.AST_NODE_TYPES.CallExpression &&
+                call.arguments.length === 0 &&
+                call.callee.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
+                !call.callee.computed &&
+                call.callee.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
+                call.callee.property.name === "empty" &&
+                isTabContainer(call.callee.object)
+            );
+        }
+
+        function isTabContainer(node: TSESTree.Node): boolean {
+            if (node.type === TSESTree.AST_NODE_TYPES.MemberExpression) {
+                return (
+                    node.object.type === TSESTree.AST_NODE_TYPES.ThisExpression &&
+                    !node.computed &&
+                    node.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
+                    node.property.name === "containerEl"
+                );
+            }
+            if (node.type !== TSESTree.AST_NODE_TYPES.Identifier) {
+                return false;
+            }
+            const variable = ASTUtils.findVariable(context.sourceCode.getScope(node), node);
+            const [definition] = variable?.defs ?? [];
+            if (
+                variable?.defs.length !== 1 ||
+                definition.type !== DefinitionType.Variable ||
+                definition.parent.kind !== "const" ||
+                !definition.node.init
+            ) {
+                return false;
+            }
+            const { id, init } = definition.node;
+            if (id.type === TSESTree.AST_NODE_TYPES.Identifier) {
+                return isTabContainer(init);
+            }
+            // `const { containerEl } = this` or `const { containerEl: el } = this`
+            return (
+                id.type === TSESTree.AST_NODE_TYPES.ObjectPattern &&
+                init.type === TSESTree.AST_NODE_TYPES.ThisExpression &&
+                id.properties.some(
+                    (property) =>
+                        property.type === TSESTree.AST_NODE_TYPES.Property &&
+                        !property.computed &&
+                        property.key.type === TSESTree.AST_NODE_TYPES.Identifier &&
+                        property.key.name === "containerEl" &&
+                        property.value === definition.name,
+                )
+            );
         }
 
         // Whether running `node` leaves the tab as it was: it creates nothing
