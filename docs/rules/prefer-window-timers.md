@@ -15,8 +15,11 @@ A call to `setTimeout`, `setInterval`, `clearTimeout`, `clearInterval`, `request
 
 - called bare, as the global function. The fix prefixes `window.`
 - called on `activeWindow`, which may be a popout window that the user closes, taking its timers with
-  it. The fix replaces `activeWindow` with `window`. Not `activeWindow.requestAnimationFrame()` and
-  `activeWindow.cancelAnimationFrame()`; see below
+  it. The fix replaces `activeWindow` with `window`. For `activeWindow.clearTimeout()` and
+  `activeWindow.clearInterval()` that is a suggestion only: a timer ID belongs to the window that set
+  the timer, so `window.clearTimeout(id)` clears the timer only once the code that sets it uses
+  `window` too. Not `activeWindow.requestAnimationFrame()` and `activeWindow.cancelAnimationFrame()`;
+  see below
 
 ```ts
 setTimeout(save, 1000); // reported, fixed to window.setTimeout(save, 1000)
@@ -36,7 +39,7 @@ change with it:
   `NodeJS.Timeout` argument gets a suggestion.
 - `requestAnimationFrame()` and `cancelAnimationFrame()` are DOM functions either way, so their type
   never changes.
-- Calls on `activeWindow` are fixed: both are a `Window`.
+- `setTimeout()` and `setInterval()` on `activeWindow` are fixed: both are a `Window`.
 
 `activeWindow.requestAnimationFrame()` and `activeWindow.cancelAnimationFrame()` are not reported. A
 frame callback runs when its own window paints, and a closed popout has nothing left to paint. The

@@ -175,8 +175,8 @@ The report names the version to raise `minAppVersion` to, and a guard where one 
   defined when the module loads, and below 0.13.21 for a newer signature of a member older releases
   had, which no check of its existence proves.
 
-With a `minAppVersion` below 0.15.0, [`prefer-active-doc`](prefer-active-doc.md) does not report
-`document`, so the two rules do not ask for opposite changes.
+With a `minAppVersion` below 0.15.0, [`prefer-active-doc`](prefer-active-doc.md) offers no
+suggestion to use `activeDocument`, so the two rules do not ask for opposite changes.
 
 ## Guarding with `requireApiVersion`
 
