@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- `settings-tab/no-deprecated-display`, `settings-tab/prefer-update-over-display` and `settings-tab/require-display` read a `minAppVersion` without a patch version, such as `"1.13"`, as `1.13.0`, as `no-unsupported-api` does. They did nothing for such a version.
+- `settings-tab/no-deprecated-display`, `settings-tab/prefer-update-over-display` and `settings-tab/require-display` read a `minAppVersion` without a patch version, such as `"1.13"`, as `1.13.0`, as `no-unsupported-api` does. They did nothing for such a version ([#TBD](https://github.com/obsidianmd/eslint-plugin/pull/TBD)).
 
 ## [0.5.1] - 2026-11-06
 
