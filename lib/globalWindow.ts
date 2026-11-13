@@ -221,8 +221,10 @@ function isEmscriptenOutput(sourceCode: Context["sourceCode"]): boolean {
  * - the same for a check of Obsidian's own globals: `typeof activeDocument`,
  *   `"activeWindow" in window`, `window.activeDocument ?? …`, or a bare
  *   `activeDocument` that is only tested;
- * - it runs where a `try` that reads the window has failed, or mayLackWindowAt
- *   holds.
+ * - the same for a check of one of Obsidian's DOM helpers:
+ *   `typeof createDiv === "function"`, `"createEl" in window`;
+ * - it runs where a `try` that reads the window, or calls one of those
+ *   helpers by its bare name, has failed, or mayLackWindowAt holds.
  *
  * A rule offers no rewrite to `activeDocument` or `activeWindow` there.
  */
@@ -231,6 +233,7 @@ export function mayRunOutsideObsidianAt(context: Context, node: TSESTree.Node): 
     return (
         followsWindowCheck(context.sourceCode, node, true) ||
         followsCheck(facts.obsidianChecks, node, true) ||
+        facts.obsidianTries.some((statement) => runsWhenTryFails(statement, node)) ||
         mayLackWindowAt(context, node)
     );
 }
@@ -442,6 +445,9 @@ interface WindowFacts {
     obsidianChecks: FoundWindowCheck[];
     // Each `try` whose block reads the window, so throws without one.
     windowTries: TSESTree.TryStatement[];
+    // Each `try` whose block calls one of Obsidian's DOM helpers by its bare
+    // name, so throws without Obsidian: `try { createEl("p"); } catch { … }`.
+    obsidianTries: TSESTree.TryStatement[];
     // The reads and calls that hold a check whose meaning is known:
     // `hasWindow` after `const hasWindow = typeof window !== "undefined"`.
     knownChecks: Set<TSESTree.Node>;
@@ -691,7 +697,13 @@ function getWindowFacts(sourceCode: Context["sourceCode"]): WindowFacts {
     if (cached) {
         return cached;
     }
-    const facts: WindowFacts = { checks: [], obsidianChecks: [], windowTries: [], knownChecks: new Set() };
+    const facts: WindowFacts = {
+        checks: [],
+        obsidianChecks: [],
+        windowTries: [],
+        obsidianTries: [],
+        knownChecks: new Set(),
+    };
     const followed = new Set<TSESTree.Node>();
     // Whether `node` or anything in it reads the window.
     const visit = (node: TSESTree.Node): boolean => {
@@ -704,6 +716,9 @@ function getWindowFacts(sourceCode: Context["sourceCode"]): WindowFacts {
             addWindowCheck(sourceCode, facts, facts.obsidianChecks, toWindowCheck(node, obsidianName), followed);
         }
         let reads = readsWindow(node);
+        if (node.type === TSESTree.AST_NODE_TYPES.TryStatement && callsObsidianHelper(sourceCode, node.block)) {
+            facts.obsidianTries.push(node);
+        }
         for (const key of sourceCode.visitorKeys[node.type] ?? []) {
             const child: unknown = (node as unknown as Record<string, unknown>)[key];
             if (Array.isArray(child)) {
@@ -724,6 +739,29 @@ function getWindowFacts(sourceCode: Context["sourceCode"]): WindowFacts {
     visit(sourceCode.ast);
     windowFactsCache.set(sourceCode.ast, facts);
     return facts;
+}
+
+// Whether `node` calls one of Obsidian's DOM helpers by its bare name, outside
+// the functions in it.
+function callsObsidianHelper(sourceCode: Context["sourceCode"], node: TSESTree.Node): boolean {
+    if (isFunction(node)) {
+        return false;
+    }
+    if (
+        node.type === TSESTree.AST_NODE_TYPES.CallExpression &&
+        node.callee.type === TSESTree.AST_NODE_TYPES.Identifier &&
+        OBSIDIAN_HELPER_NAMES.has(node.callee.name)
+    ) {
+        return true;
+    }
+    for (const key of sourceCode.visitorKeys[node.type] ?? []) {
+        const child: unknown = (node as unknown as Record<string, unknown>)[key];
+        const children = Array.isArray(child) ? child : [child];
+        if (children.some((item) => isNode(item) && callsObsidianHelper(sourceCode, item))) {
+            return true;
+        }
+    }
+    return false;
 }
 
 function isNode(value: unknown): value is TSESTree.Node {
@@ -943,7 +981,8 @@ function checkedName(node: TSESTree.Node): string | undefined {
 
 // Obsidian's globals, which a browser or jsdom does not have, and the objects
 // they are read from when the code expects them to be missing.
-const OBSIDIAN_WINDOW_NAMES = new Set(["activeDocument", "activeWindow"]);
+const OBSIDIAN_HELPER_NAMES = new Set(["createEl", "createDiv", "createSpan", "createSvg", "createFragment"]);
+const OBSIDIAN_WINDOW_NAMES = new Set(["activeDocument", "activeWindow", ...OBSIDIAN_HELPER_NAMES]);
 const OBSIDIAN_GLOBAL_OBJECTS = new Set([...GLOBAL_OBJECTS, "window"]);
 
 // The Obsidian global that `node` checks for: `typeof activeDocument`,
