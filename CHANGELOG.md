@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- `prefer-file-manager-trash-file` reports `vault.delete(file, force)` with a `force` that is not a literal, and branches that differ only in `force`, such as `if (isFolder) vault.delete(file, true); else vault.delete(file);`. `force` only lets `delete()` remove a folder that is not empty, and the file is gone for good either way, but the rule skipped such calls as if the plugin let the user choose where deleted files go, as `vault.trash(file, this.settings.useSystemTrash)` does. As before, `delete()` gets no suggestion ([#TBD](https://github.com/obsidianmd/eslint-plugin/pull/TBD)).
+- `prefer-file-manager-trash-file` reports `vault.delete(file, force)` with a `force` that is not a literal, and branches that differ only in `force`, such as `if (isFolder) vault.delete(file, true); else vault.delete(file);`. `force` only lets `delete()` remove a folder that is not empty, and the file is gone for good either way, but the rule skipped such calls as if the plugin let the user choose where deleted files go, as `vault.trash(file, this.settings.useSystemTrash)` does. As before, `delete()` gets no suggestion ([#](https://github.com/obsidianmd/eslint-plugin/pull/)).
 
 ## [0.5.1] - 2026-11-06
 
