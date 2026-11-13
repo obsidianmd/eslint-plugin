@@ -53,8 +53,10 @@ this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
 ```
 
 Nothing is offered where the result is thrown away, as in `Object.assign(DEFAULT_SETTINGS, data);`
-or `void Object.assign(…)`: such code reads the defaults afterwards, expecting them to hold the
-settings, and with `{}` the call would do nothing. Nor is it offered with type arguments, as in
+or `void Object.assign(…)`, or by the caller of an arrow function whose body is the call, as in
+`overrides.forEach((o) => Object.assign(DEFAULT_SETTINGS, o))`: such code reads the defaults
+afterwards, expecting them to hold the settings, and with `{}` the call would do nothing. With type
+information, such a caller is one whose callback type returns `void`; without it, `forEach()`. Nor is it offered with type arguments, as in
 `Object.assign<Settings, Partial<Settings>>(…)`, which are for two arguments, or where, with type
 information, the target is an instance of a class: the copy would be a plain object without the
 class's methods, getters and `instanceof`.
