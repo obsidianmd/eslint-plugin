@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `commands/check-callback-uses-checking` reports a `checkCallback` or `editorCheckCallback` in `addCommand()` that never reads its `checking` parameter. Obsidian calls it with `checking` set to `true` to ask whether the command is available, for example while the command palette is open, so such a callback runs its action on every check. It warns in the `recommended` config ([#248](https://github.com/obsidianmd/eslint-plugin/pull/248)).
+- `no-await-chainable` reports `await` of a `Setting` or a UI component (`ButtonComponent`, `TextComponent` and the other `BaseComponent` subclasses), and returning one from an async function. Their `then(cb)` is for chaining: it calls `cb` with the object and returns the object, so promise resolution calls it again forever, the `await` never settles and the app stops responding. `@typescript-eslint/await-thenable` does not catch it, because the objects are thenables. It is an error in the `recommended` config, for TypeScript files ([#249](https://github.com/obsidianmd/eslint-plugin/pull/249)).
 
 ### Changed
 
