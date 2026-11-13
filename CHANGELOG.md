@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- `editor-drop-paste` reports a handler that writes to its editor even when it passes the event to `console.log()` or another `console` method. Such a call only prints the event and neither checks nor cancels it, but it was counted as handing the event to a function that might ([#](https://github.com/obsidianmd/eslint-plugin/pull/)).
+- `editor-drop-paste` reports a handler that writes to its editor even when it passes the event to `console.log()` or another `console` method. Such a call only prints the event and neither checks nor cancels it, but it was counted as handing the event to a function that might ([#262](https://github.com/obsidianmd/eslint-plugin/pull/262)).
 
 ## [0.5.1] - 2026-11-06
 
