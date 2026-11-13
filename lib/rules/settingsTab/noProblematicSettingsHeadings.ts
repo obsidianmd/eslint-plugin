@@ -1,5 +1,6 @@
 import { type TSESLint, TSESTree } from "@typescript-eslint/utils";
 import { getManifest } from "../../manifest.js";
+import { staticMemberName } from "../../memberName.js";
 import { docsUrl, ruleCreator } from "../../ruleCreator.js";
 import { isPluginSettingTab } from "./shared.js";
 
@@ -16,17 +17,67 @@ const REMOVABLE_METHODS = new Set([...HEADING_ONLY_METHODS, "setDesc", "setToolt
 // "settings" or "options" as a word of its own, in any case: not "subsettings".
 const SETTINGS_WORD = /(?<![\p{L}\p{N}_])(settings|options)(?![\p{L}\p{N}_])/iu;
 
+// "settings" or "options" as what a verb acts on, as in "Export and import
+// settings" or "Reset all settings", or with the act after it, as in "Settings
+// backup": the heading names what its section does with the plugin's settings,
+// and the word is needed for that.
+const SETTINGS_VERBS = String.raw`(?:export|import|reset|restore|back\s*up|sync|synchroni[sz]e|copy|save|load|share|transfer|migrate|clear|delete|revert|download|upload)`;
+const SETTINGS_ACTS = String.raw`(?:export|import|reset|restore|backup|back-up|sync|synchroni[sz]ation|transfer|migration)`;
+const SETTINGS_AS_OBJECT = new RegExp(
+    String.raw`(?<![\p{L}\p{N}_])${SETTINGS_VERBS}(?:\s*(?:,|\/|&|\band\b|\bor\b)\s*${SETTINGS_VERBS})*\s+(?:(?:all|your|the|my|plugin|current|default|saved|these)\s+)*(?:settings|options)(?![\p{L}\p{N}_])` +
+        String.raw`|(?<![\p{L}\p{N}_])(?:settings|options)\s+${SETTINGS_ACTS}(?:\s*(?:,|\/|&|\band\b|\bor\b)\s*${SETTINGS_ACTS})*(?![\p{L}\p{N}_])`,
+    "giu",
+);
+
+// The first "settings" or "options" in the heading's name that is not what a
+// verb acts on, or undefined when there is none.
+function redundantSettingsWord(name: string): string | undefined {
+    const covered: [number, number][] = [];
+    for (const match of name.matchAll(SETTINGS_AS_OBJECT)) {
+        covered.push([match.index, match.index + match[0].length]);
+    }
+    for (const match of name.matchAll(new RegExp(SETTINGS_WORD.source, "giu"))) {
+        const start = match.index;
+        if (!covered.some(([from, to]) => start >= from && start < to)) {
+            return match[1];
+        }
+    }
+    return undefined;
+}
+
+// A heading's name in lower case, with runs of spaces and punctuation as one
+// space: "My Plugin:" becomes "my plugin".
+function normalizeName(name: string): string {
+    return name.replace(/[\s:\-–—|·•.]+/gu, " ").trim().toLowerCase();
+}
+
 // A heading's name, without "settings" and "options" and the punctuation and
 // spaces around them, in lower case: "General settings:" becomes "general".
 // Null when nothing is left.
 function headingSubject(name: string): string | null {
-    const subject = name
-        .replace(new RegExp(SETTINGS_WORD.source, "giu"), " ")
-        .replace(/[\s:\-–—|·•.]+/gu, " ")
-        .trim()
-        .toLowerCase();
+    const subject = normalizeName(name.replace(new RegExp(SETTINGS_WORD.source, "giu"), " "));
     return subject === "" ? null : subject;
 }
+
+// Calls that leave the tab as it was, so a heading after them is still the
+// first thing in it: emptying the container, setting its classes and
+// attributes, and logging.
+const CALLS_THAT_ADD_NOTHING = new Set([
+    "empty",
+    "addClass",
+    "addClasses",
+    "removeClass",
+    "removeClasses",
+    "toggleClass",
+    "setAttr",
+    "setAttrs",
+    "setAttribute",
+    "log",
+    "info",
+    "warn",
+    "error",
+    "debug",
+]);
 
 // How the removal of the heading is offered, and, for the suggestion's
 // description, the calls it removes that are more than the heading.
@@ -112,7 +163,7 @@ export default ruleCreator<Options, "settings" | "general" | "pluginName" | "rem
                     return;
                 }
 
-                const word = SETTINGS_WORD.exec(textArg.value)?.[1];
+                const word = redundantSettingsWord(textArg.value);
                 if (word !== undefined) {
                     context.report({ node, messageId: "settings", data: { word: word.toLowerCase() } });
                 }
@@ -125,15 +176,105 @@ export default ruleCreator<Options, "settings" | "general" | "pluginName" | "rem
                 if (subject === null) {
                     return;
                 }
+                // The guidelines are about a heading at the top of the tab. One
+                // lower down starts a section of its own, and removing it would
+                // put that section's settings under the heading before it.
+                if (!isFirstInTab(top)) {
+                    return;
+                }
                 const removal = planRemoval(top, calls, settingConstructor);
                 if (subject === "general") {
                     reportRemoval(node, "general", removal);
                 }
-                if (typeof pluginName === "string" && pluginName !== "" && subject === headingSubject(pluginName)) {
+                // The plugin's name is compared whole: "settings" and "options"
+                // are left out of the heading, not of the name, so for a plugin
+                // named Style Settings a "Style" heading is a section of its own.
+                if (
+                    typeof pluginName === "string" &&
+                    normalizeName(pluginName) !== "" &&
+                    (subject === normalizeName(pluginName) || normalizeName(textArg.value) === normalizeName(pluginName))
+                ) {
                     reportRemoval(node, "pluginName", removal);
                 }
             },
         };
+
+        // Whether the heading whose chain is `top` is the first thing display()
+        // adds to the tab: nothing that runs before it in display() may add to
+        // the tab. Where the order cannot be told it is not: in a loop, in
+        // another function, such as a callback, which may run at any time, or
+        // in a method other than display(), which display() may call after
+        // adding settings.
+        function isFirstInTab(top: TSESTree.CallExpression): boolean {
+            let current: TSESTree.Node = top;
+            for (;;) {
+                const parent: TSESTree.Node | undefined = current.parent;
+                if (parent === undefined) {
+                    return false;
+                }
+                if (isFunction(parent)) {
+                    const member = parent.parent;
+                    return (
+                        (member?.type === TSESTree.AST_NODE_TYPES.MethodDefinition ||
+                            member?.type === TSESTree.AST_NODE_TYPES.PropertyDefinition) &&
+                        member.value === parent &&
+                        !member.static &&
+                        staticMemberName(member) === "display"
+                    );
+                }
+                if (isLoop(parent)) {
+                    return false;
+                }
+                const start = current.range[0];
+                for (const child of children(parent)) {
+                    if (child.range[1] <= start && !addsNothing(child)) {
+                        return false;
+                    }
+                }
+                current = parent;
+            }
+        }
+
+        // Whether running `node` leaves the tab as it was: it creates nothing
+        // and calls nothing but the methods that add nothing. A function in it
+        // only runs when called, so its body does not count.
+        function addsNothing(node: TSESTree.Node): boolean {
+            if (isFunction(node)) {
+                return true;
+            }
+            switch (node.type) {
+                case TSESTree.AST_NODE_TYPES.NewExpression:
+                case TSESTree.AST_NODE_TYPES.TaggedTemplateExpression:
+                case TSESTree.AST_NODE_TYPES.ImportExpression:
+                    return false;
+                case TSESTree.AST_NODE_TYPES.CallExpression:
+                    if (
+                        node.callee.type !== TSESTree.AST_NODE_TYPES.MemberExpression ||
+                        node.callee.computed ||
+                        node.callee.property.type !== TSESTree.AST_NODE_TYPES.Identifier ||
+                        !CALLS_THAT_ADD_NOTHING.has(node.callee.property.name)
+                    ) {
+                        return false;
+                    }
+                    break;
+                default:
+                    break;
+            }
+            return children(node).every(addsNothing);
+        }
+
+        function children(node: TSESTree.Node): TSESTree.Node[] {
+            const result: TSESTree.Node[] = [];
+            for (const key of context.sourceCode.visitorKeys[node.type] ?? []) {
+                const child: unknown = (node as unknown as Record<string, unknown>)[key];
+                for (const item of Array.isArray(child) ? child : [child]) {
+                    if (isNode(item)) {
+                        result.push(item);
+                    }
+                }
+            }
+            return result;
+        }
 
         function reportRemoval(
             node: TSESTree.CallExpression,
@@ -263,4 +404,28 @@ function isPure(node: TSESTree.Node): boolean {
         default:
             return false;
     }
+}
+
+function isNode(value: unknown): value is TSESTree.Node {
+    return typeof value === "object" && value !== null && typeof (value as { type?: unknown }).type === "string";
+}
+
+function isFunction(
+    node: TSESTree.Node,
+): node is TSESTree.FunctionDeclaration | TSESTree.FunctionExpression | TSESTree.ArrowFunctionExpression {
+    return (
+        node.type === TSESTree.AST_NODE_TYPES.FunctionDeclaration ||
+        node.type === TSESTree.AST_NODE_TYPES.FunctionExpression ||
+        node.type === TSESTree.AST_NODE_TYPES.ArrowFunctionExpression
+    );
+}
+
+function isLoop(node: TSESTree.Node): boolean {
+    return (
+        node.type === TSESTree.AST_NODE_TYPES.ForStatement ||
+        node.type === TSESTree.AST_NODE_TYPES.ForInStatement ||
+        node.type === TSESTree.AST_NODE_TYPES.ForOfStatement ||
+        node.type === TSESTree.AST_NODE_TYPES.WhileStatement ||
+        node.type === TSESTree.AST_NODE_TYPES.DoWhileStatement
+    );
 }
