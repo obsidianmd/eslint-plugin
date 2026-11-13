@@ -2,6 +2,7 @@ import assert from "node:assert";
 import { Linter, type Rule } from "eslint";
 import { RuleTester } from "@typescript-eslint/rule-tester";
 import parser, { parse } from "@typescript-eslint/parser";
+import { AST_NODE_TYPES } from "@typescript-eslint/utils";
 import rule from "../../lib/rules/ui/sentenceCase.js";
 import { typedRuleTesterConfig } from "../mocha-setup.js";
 
@@ -887,9 +888,12 @@ describe("ui-sentence-case fix of a template literal in a CRLF file", () => {
             rules: { "o/sentence-case": ["warn", { allowAutoFix: true }] },
         }], "file.ts");
         const statement = parse(output).body[0];
-        assert.ok(statement.type === "ExpressionStatement" && statement.expression.type === "NewExpression");
+        assert.ok(
+            statement.type === AST_NODE_TYPES.ExpressionStatement &&
+                statement.expression.type === AST_NODE_TYPES.NewExpression,
+        );
         const template = statement.expression.arguments[0];
-        assert.ok(template.type === "TemplateLiteral");
+        assert.ok(template.type === AST_NODE_TYPES.TemplateLiteral);
         assert.strictEqual(template.quasis[0].value.cooked, "Open the\nsettings now");
     });
 });

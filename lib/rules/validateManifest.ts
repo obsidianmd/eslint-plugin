@@ -32,8 +32,7 @@ const OPTIONAL_SCHEMA = {
 // The words the text checks single out: "obsidian" is the Obsidian trademark,
 // and "plugin" is redundant in the plugin directory. `allowedWords` can drop
 // either, per field.
-const FORBIDDEN_WORDS = ["obsidian", "plugin"] as const;
-type ForbiddenWord = (typeof FORBIDDEN_WORDS)[number];
+type ForbiddenWord = "obsidian" | "plugin";
 
 // The fields the word checks apply to, and the only ones `allowedWords` can
 // name.

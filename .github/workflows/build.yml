@@ -54,3 +54,18 @@ jobs:
             # Rebuild documentation workflow only regenerates them after merge.
             - run: npm run check:eslint-docs
               if: matrix.eslint == '9'
+
+    # The repo lints itself with its own recommended config, built from this
+    # checkout, plus eslint-plugin's rules for rules and tests. Warnings fail too.
+    lint:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+              with:
+                  persist-credentials: false
+            - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+              with:
+                  node-version: 24.x
+                  cache: "npm"
+            - run: npm ci
+            - run: npm run lint

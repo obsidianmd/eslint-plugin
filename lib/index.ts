@@ -146,8 +146,8 @@ const plugin: ObsidianmdPlugin = {
         recommendedWithLocalesEn: []
     },
     ruleConfigs: {
-        recommended: {} as RulesConfig,
-        recommendedTypeChecked: {} as RulesConfig,
+        recommended: {},
+        recommendedTypeChecked: {},
     },
     withCustomMessages,
 };
@@ -437,6 +437,7 @@ const flatRecommendedGeneralRules: RulesConfig = {
 // (tools/update-eslint-recommended.js), so this is that config for the
 // installed version.
 const coreRecommendedRules: RulesConfig = Object.fromEntries(
+    // eslint-disable-next-line @typescript-eslint/no-deprecated -- ESLint has no other way to list its core rules
     [...builtinRules]
         .filter(([, rule]) => !rule.meta?.deprecated && rule.meta?.docs?.recommended === true)
         .map(([ruleId]) => [ruleId, "error" as const]),
@@ -529,7 +530,7 @@ const flatRecommendedConfig: Config[] = defineConfig([
     {
         files: ['package.json'],
         language: 'json/json',
-        extends: [tseslint.configs.disableTypeChecked as Config],
+        extends: [tseslint.configs.disableTypeChecked],
         plugins: {
             depend,
             json
@@ -547,7 +548,7 @@ const flatRecommendedConfig: Config[] = defineConfig([
     {
         files: ['manifest.json'],
         language: 'json/json',
-        extends: [tseslint.configs.disableTypeChecked as Config],
+        extends: [tseslint.configs.disableTypeChecked],
         plugins: {
             json,
             obsidianmd: plugin
@@ -561,7 +562,7 @@ const flatRecommendedConfig: Config[] = defineConfig([
     {
         files: ['LICENSE', 'LICENSE.md', 'LICENSE.txt'],
         language: 'obsidianmd/plain-text',
-        extends: [tseslint.configs.disableTypeChecked as Config],
+        extends: [tseslint.configs.disableTypeChecked],
         plugins: {
             obsidianmd: plugin
         },
@@ -698,8 +699,8 @@ const recommendedWithLocalesEn: Config[] = defineConfig([
 ]);
 
 plugin.configs = {
-    recommended: flatRecommendedConfig as Linter.Config[],
-    recommendedWithLocalesEn: recommendedWithLocalesEn as Linter.Config[]
+    recommended: flatRecommendedConfig,
+    recommendedWithLocalesEn
 };
 
 plugin.ruleConfigs = {

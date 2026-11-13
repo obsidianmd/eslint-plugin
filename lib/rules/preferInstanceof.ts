@@ -130,7 +130,7 @@ function withSince<T extends Record<SuggestionId, string>>(messages: T): Record<
         all[id] = `${text}.`;
         all[`${id}Since`] = `${text}${SINCE_MESSAGE}.`;
     }
-    return all as Record<SuggestionId | `${SuggestionId}Since`, string>;
+    return all;
 }
 
 type SuggestionId = "preferInstanceofSuggestion" | "preferInstanceofOptionalSuggestion" | "useTargetNode" | "castToNode";

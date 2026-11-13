@@ -23,7 +23,8 @@ async function recommendedFor(filename: string): Promise<Linter.Config> {
         overrideConfigFile: true,
         overrideConfig: plugin.configs.recommended,
     });
-    return eslint.calculateConfigForFile(filename);
+    // calculateConfigForFile() is typed any.
+    return (await eslint.calculateConfigForFile(filename)) as Linter.Config;
 }
 
 function declaresGlobal(config: Linter.Config, name: string): boolean {

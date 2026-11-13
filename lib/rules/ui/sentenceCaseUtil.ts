@@ -240,7 +240,7 @@ export function getContextFilename<MessageId extends string>(
     if (hasPhysicalFilename(context) && typeof context.physicalFilename === "string") {
         return context.physicalFilename;
     }
-    const filename = context.getFilename();
+    const filename = context.filename;
     return typeof filename === "string" ? filename : null;
 }
 
@@ -283,11 +283,11 @@ export function isEnglishLocalePath(
 export function isExpressionNode(node: TSESTree.Node | null | undefined): node is TSESTree.Expression {
     if (!node) return false;
     switch (node.type) {
-        case "ArrayPattern":
-        case "ObjectPattern":
-        case "AssignmentPattern":
-        case "RestElement":
-        case "TSParameterProperty":
+        case TSESTree.AST_NODE_TYPES.ArrayPattern:
+        case TSESTree.AST_NODE_TYPES.ObjectPattern:
+        case TSESTree.AST_NODE_TYPES.AssignmentPattern:
+        case TSESTree.AST_NODE_TYPES.RestElement:
+        case TSESTree.AST_NODE_TYPES.TSParameterProperty:
             return false;
         default:
             return true;
@@ -775,7 +775,7 @@ function keepsCapital(token: string, before: string | undefined, after: string |
 // Emoji, with the skin tones, joiners, variation selectors and keycaps that
 // build them, and flags. Unlike \p{Emoji}, it leaves out the digits, so a
 // number before the first word is text, as in "2 files selected".
-const EMOJI_RE = /[0-9#*]\uFE0F?\u20E3|[\p{Extended_Pictographic}\p{Emoji_Modifier}\p{Regional_Indicator}\u200D\uFE0F]/gu;
+const EMOJI_RE = /[0-9#*]\uFE0F?\u20E3|[\p{Extended_Pictographic}\p{Emoji_Modifier}\p{Regional_Indicator}]|\u200D|\uFE0F/gu;
 
 // What may come before a first word that keeps the case it is written in:
 // punctuation, a bullet, an arrow or quotes ("- ", "• ", "→ ", "[", "\"", "..."),
@@ -849,7 +849,7 @@ function transformSentence(sentence: string, opts: NormalizedOptions, firstWordA
         !firstWordAnyCase
     ) {
         // Find the token containing firstAlpha
-        const tokenRe = /[A-Za-z0-9][A-Za-z0-9.\-]*/g;
+        const tokenRe = /[A-Za-z0-9][A-Za-z0-9.-]*/g;
         let tokenStart = firstAlpha;
         let tokenEnd = firstAlpha + 1;
         let tm: RegExpExecArray | null;
@@ -911,7 +911,7 @@ function transformSentence(sentence: string, opts: NormalizedOptions, firstWordA
     }
 
     // Process remaining tokens
-    const tokens = Array.from(sentence.matchAll(/[A-Za-z0-9][A-Za-z0-9.\-]*/g));
+    const tokens = Array.from(sentence.matchAll(/[A-Za-z0-9][A-Za-z0-9.-]*/g));
     for (let index = 0; index < tokens.length; index++) {
         const m = tokens[index];
         const start = m.index;
