@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- `no-unsupported-api` names the fix in its report: raise `minAppVersion` to the version the API needs, or guard the use with `requireApiVersion()` and that version ([#250](https://github.com/obsidianmd/eslint-plugin/pull/250)).
+- `no-unsupported-api` names the fix in its report: raise `minAppVersion` to the version the API needs, or guard the use with `requireApiVersion()` and that version. Below 0.13.21, which first has `requireApiVersion()`, it suggests a check that the API exists instead, and for a superclass, such as `class extends AbstractInputSuggest`, or a newer signature that no such check proves, only raising `minAppVersion` ([#250](https://github.com/obsidianmd/eslint-plugin/pull/250)).
 
 ## [0.5.1] - 2026-11-06
 

@@ -74,7 +74,7 @@ function readPluginVersion(): string | undefined {
 let cachedSinceMap: SinceMap | undefined;
 let cachedDtsPath: string | undefined;
 
-export default ruleCreator<Options, "apiNotAvailable">({
+export default ruleCreator<Options, MessageId>({
     meta: {
         type: "problem",
         docs: {
@@ -99,6 +99,12 @@ export default ruleCreator<Options, "apiNotAvailable">({
         messages: {
             apiNotAvailable:
                 "'{{qualifiedName}}' requires Obsidian v{{sinceVersion}}, but minAppVersion is {{minAppVersion}}. Raise minAppVersion to {{sinceVersion}}, or guard this use with requireApiVersion(\"{{sinceVersion}}\").",
+            // Below the version that has requireApiVersion() itself.
+            apiNotAvailableCheck:
+                "'{{qualifiedName}}' requires Obsidian v{{sinceVersion}}, but minAppVersion is {{minAppVersion}}. Raise minAppVersion to {{sinceVersion}}, or check that it exists before using it.",
+            // A superclass, or a use no check of the member's existence can guard.
+            apiNotAvailableRaise:
+                "'{{qualifiedName}}' requires Obsidian v{{sinceVersion}}, but minAppVersion is {{minAppVersion}}. Raise minAppVersion to {{sinceVersion}}.",
         },
     },
     defaultOptions: [{}],
@@ -126,6 +132,11 @@ export default ruleCreator<Options, "apiNotAvailable">({
         }
         const sinceMap = buildSinceMap(dtsPath);
         const history = getDeclarationHistory(dtsPath);
+        // requireApiVersion() is first in the 0.13.21 typings: below that, a
+        // plugin cannot call it to guard a use.
+        const requireApiVersionSince = history.firstDeclared("requireApiVersion", () => true) ?? "0.13.21";
+        const canRequireApiVersion =
+            !gt(requireApiVersionSince, minVersion);
         const reported = new WeakSet<TSESTree.Node>();
         const declaredTypes = new WeakMap<ts.SourceFile, Map<string, ts.Type | undefined>>();
         const earlyExits = new WeakMap<TSESTree.Node, EarlyExit[]>();
@@ -284,7 +295,13 @@ export default ruleCreator<Options, "apiNotAvailable">({
                     reported.add(node);
                     context.report({
                         node,
-                        messageId: "apiNotAvailable",
+                        messageId: isSuperClass(node)
+                            ? "apiNotAvailableRaise"
+                            : canRequireApiVersion
+                              ? "apiNotAvailable"
+                              : feature !== undefined
+                                ? "apiNotAvailableCheck"
+                                : "apiNotAvailableRaise",
                         data: {
                             qualifiedName,
                             sinceVersion,
@@ -1571,6 +1588,19 @@ function isFeatureTest(node: TSESTree.Node): boolean {
 // `this.editor.transaction` for `this.editor?.transaction` and
 // `this.editor!.transaction`. Undefined for anything else, such as a computed
 // access with a variable.
+type MessageId = "apiNotAvailable" | "apiNotAvailableCheck" | "apiNotAvailableRaise";
+
+// `class X extends AbstractInputSuggest` or `extends obsidian.AbstractInputSuggest`:
+// the class is defined when the module loads, so no runtime check guards it.
+function isSuperClass(node: TSESTree.Node): boolean {
+    const parent = node.parent;
+    return (
+        parent !== undefined &&
+        (parent.type === AST_NODE_TYPES.ClassDeclaration || parent.type === AST_NODE_TYPES.ClassExpression) &&
+        parent.superClass === node
+    );
+}
+
 function featureKey(node: TSESTree.Node): string | undefined {
     switch (node.type) {
         case AST_NODE_TYPES.Identifier:

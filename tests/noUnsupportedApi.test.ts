@@ -809,6 +809,50 @@ ruleTester.run("no-unsupported-api", rule, {
     ],
     invalid: [
         {
+            // requireApiVersion() is first in the 0.13.21 typings.
+            name: "the report names a guard the plugin can use",
+            code: `
+                import { AbstractInputSuggest, App, Modal } from 'obsidian';
+                declare const app: App;
+                new Modal(app).setTitle("Title");
+                abstract class Suggest extends AbstractInputSuggest<string> {}
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [
+                {
+                    line: 4,
+                    messageId: "apiNotAvailable",
+                    data: { qualifiedName: "Modal.setTitle", sinceVersion: "1.5.1", minAppVersion: "1.0.0" },
+                },
+                {
+                    line: 5,
+                    messageId: "apiNotAvailableRaise",
+                    data: { qualifiedName: "AbstractInputSuggest", sinceVersion: "1.4.10", minAppVersion: "1.0.0" },
+                },
+            ],
+        },
+        {
+            name: "below 0.13.21, the report names a check that the API exists, or none",
+            code: `
+                import { requestUrl } from 'obsidian';
+                activeDocument.body;
+                void requestUrl("https://example.com");
+            `,
+            options: [{ minAppVersion: "0.12.0" }],
+            errors: [
+                {
+                    line: 3,
+                    messageId: "apiNotAvailableCheck",
+                    data: { qualifiedName: "activeDocument", sinceVersion: "0.15.0", minAppVersion: "0.12.0" },
+                },
+                {
+                    line: 4,
+                    messageId: "apiNotAvailableRaise",
+                    data: { qualifiedName: "requestUrl", sinceVersion: "0.16.0", minAppVersion: "0.12.0" },
+                },
+            ],
+        },
+        {
             name: "a call to a newer overload of Workspace.on is reported with that overload's version",
             code: `
                 import { App } from 'obsidian';
@@ -858,10 +902,10 @@ ruleTester.run("no-unsupported-api", rule, {
             `,
             options: [{ minAppVersion: "0.12.0" }],
             errors: [
-                { messageId: "apiNotAvailable", line: 4, data: { qualifiedName: "Workspace.on", sinceVersion: "0.12.6", minAppVersion: "0.12.0" } },
-                { messageId: "apiNotAvailable", line: 5, data: { qualifiedName: "Workspace.on", sinceVersion: "0.12.17", minAppVersion: "0.12.0" } },
-                { messageId: "apiNotAvailable", line: 6, data: { qualifiedName: "Workspace.on", sinceVersion: "0.12.17", minAppVersion: "0.12.0" } },
-                { messageId: "apiNotAvailable", line: 7, data: { qualifiedName: "Workspace.on", sinceVersion: "0.12.17", minAppVersion: "0.12.0" } },
+                { messageId: "apiNotAvailableRaise", line: 4, data: { qualifiedName: "Workspace.on", sinceVersion: "0.12.6", minAppVersion: "0.12.0" } },
+                { messageId: "apiNotAvailableRaise", line: 5, data: { qualifiedName: "Workspace.on", sinceVersion: "0.12.17", minAppVersion: "0.12.0" } },
+                { messageId: "apiNotAvailableRaise", line: 6, data: { qualifiedName: "Workspace.on", sinceVersion: "0.12.17", minAppVersion: "0.12.0" } },
+                { messageId: "apiNotAvailableRaise", line: 7, data: { qualifiedName: "Workspace.on", sinceVersion: "0.12.17", minAppVersion: "0.12.0" } },
             ],
         },
         {
@@ -890,7 +934,7 @@ ruleTester.run("no-unsupported-api", rule, {
             `,
             options: [{ minAppVersion: "0.12.0" }],
             errors: [
-                { messageId: "apiNotAvailable", line: 6, data: { qualifiedName: "Setting.setName", sinceVersion: "0.12.16", minAppVersion: "0.12.0" } },
+                { messageId: "apiNotAvailableRaise", line: 6, data: { qualifiedName: "Setting.setName", sinceVersion: "0.12.16", minAppVersion: "0.12.0" } },
             ],
         },
         {
@@ -973,7 +1017,7 @@ ruleTester.run("no-unsupported-api", rule, {
                 declare class MySuggest extends AbstractInputSuggest<string> {}
             `,
             options: [{ minAppVersion: "1.0.0" }],
-            errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "AbstractInputSuggest", sinceVersion: "1.4.10", minAppVersion: "1.0.0" } }],
+            errors: [{ messageId: "apiNotAvailableRaise", data: { qualifiedName: "AbstractInputSuggest", sinceVersion: "1.4.10", minAppVersion: "1.0.0" } }],
         },
         {
             name: "Function displayTooltip requires 1.8.7",
@@ -1028,7 +1072,7 @@ ruleTester.run("no-unsupported-api", rule, {
             `,
             options: [{ minAppVersion: "1.0.0" }],
             errors: [
-                { messageId: "apiNotAvailable", data: { qualifiedName: "AbstractInputSuggest", sinceVersion: "1.4.10", minAppVersion: "1.0.0" } },
+                { messageId: "apiNotAvailableRaise", data: { qualifiedName: "AbstractInputSuggest", sinceVersion: "1.4.10", minAppVersion: "1.0.0" } },
                 { messageId: "apiNotAvailable", data: { qualifiedName: "AbstractInputSuggest.setValue", sinceVersion: "1.4.10", minAppVersion: "1.0.0" } },
             ],
         },
@@ -1046,7 +1090,7 @@ ruleTester.run("no-unsupported-api", rule, {
             options: [{ minAppVersion: "1.0.0" }],
             errors: [
                 {
-                    messageId: "apiNotAvailable",
+                    messageId: "apiNotAvailableRaise",
                     data: { qualifiedName: "AbstractInputSuggest", sinceVersion: "1.4.10", minAppVersion: "1.0.0" },
                     line: 3,
                 },
@@ -1067,7 +1111,7 @@ ruleTester.run("no-unsupported-api", rule, {
                 });
             `,
             options: [{ minAppVersion: "1.0.0" }],
-            errors: [{ messageId: "apiNotAvailable" }, { messageId: "apiNotAvailable" }],
+            errors: [{ messageId: "apiNotAvailableRaise" }, { messageId: "apiNotAvailable" }],
         },
         {
             name: "API guarded by requireApiVersion with insufficient version is still flagged",
@@ -1427,7 +1471,7 @@ ruleTester.run("no-unsupported-api", rule, {
                 app.renderContext;
             `,
             options: [{ minAppVersion: "x99.0.0" }],
-            errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "App.renderContext", sinceVersion: "1.10.0", minAppVersion: "x99.0.0" } }],
+            errors: [{ messageId: "apiNotAvailableCheck", data: { qualifiedName: "App.renderContext", sinceVersion: "1.10.0", minAppVersion: "x99.0.0" } }],
         },
         {
             name: "minAppVersion with no version in it is checked as 0.0.0",
@@ -1437,7 +1481,7 @@ ruleTester.run("no-unsupported-api", rule, {
                 app.renderContext;
             `,
             options: [{ minAppVersion: "latest" }],
-            errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "App.renderContext", sinceVersion: "1.10.0", minAppVersion: "latest" } }],
+            errors: [{ messageId: "apiNotAvailableCheck", data: { qualifiedName: "App.renderContext", sinceVersion: "1.10.0", minAppVersion: "latest" } }],
         },
         {
             name: "a continue outside a loop is not an early exit",
@@ -1474,7 +1518,7 @@ ruleTester.run("no-unsupported-api", rule, {
                 }
             `,
             options: [{ minAppVersion: "1.0.0" }],
-            errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "SettingPage", sinceVersion: "1.13.0", minAppVersion: "1.0.0" } }],
+            errors: [{ messageId: "apiNotAvailableRaise", data: { qualifiedName: "SettingPage", sinceVersion: "1.13.0", minAppVersion: "1.0.0" } }],
         },
         {
             name: "a member of a runtime-provided interface is still reported",
@@ -1525,7 +1569,7 @@ ruleTester.run("no-unsupported-api", rule, {
                 app.workspace.on('quit', () => {});
             `,
             options: [{ minAppVersion: "0.10.0" }],
-            errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "Workspace.on", sinceVersion: "0.10.2", minAppVersion: "0.10.0" } }],
+            errors: [{ messageId: "apiNotAvailableRaise", data: { qualifiedName: "Workspace.on", sinceVersion: "0.10.2", minAppVersion: "0.10.0" } }],
         },
         {
             name: "a namespace import's class, superclass and function are each reported once",
@@ -1540,7 +1584,7 @@ ruleTester.run("no-unsupported-api", rule, {
             options: [{ minAppVersion: "1.0.0" }],
             errors: [
                 { messageId: "apiNotAvailable", data: { qualifiedName: "SecretComponent", sinceVersion: "1.11.1", minAppVersion: "1.0.0" }, line: 5, column: 21, endColumn: 45 },
-                { messageId: "apiNotAvailable", data: { qualifiedName: "AbstractInputSuggest", sinceVersion: "1.4.10", minAppVersion: "1.0.0" }, line: 6 },
+                { messageId: "apiNotAvailableRaise", data: { qualifiedName: "AbstractInputSuggest", sinceVersion: "1.4.10", minAppVersion: "1.0.0" }, line: 6 },
                 { messageId: "apiNotAvailable", data: { qualifiedName: "setTooltip", sinceVersion: "1.4.4", minAppVersion: "1.0.0" }, line: 7 },
             ],
         },
