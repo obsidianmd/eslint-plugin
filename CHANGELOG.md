@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- `prefer-active-doc` reports `document.createElementNS(svgNamespace, …)` where `minAppVersion` is older than 1.1.0, which first has `createSvg()`. It left the call to `prefer-create-el`, which does not report it below that version, so neither rule did.
+- `prefer-active-doc` reports `document.createElementNS(svgNamespace, …)` where `minAppVersion` is older than 1.1.0, which first has `createSvg()`. It left the call to `prefer-create-el`, which does not report it below that version, so neither rule did ([#TBD](https://github.com/obsidianmd/eslint-plugin/pull/TBD)).
 
 ## [0.5.1] - 2026-11-06
 
