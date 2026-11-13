@@ -68,6 +68,18 @@ ruleTester.run("no-forbidden-elements", noForbiddenElements, {
             code: "const style = iframe.contentDocument.createElement('style');",
         },
         {
+            name: "an iframe's contentWindow.document is not the plugin's document",
+            code: "declare const iframe: HTMLIFrameElement;\nconst style = iframe.contentWindow!.document.createElement('style');\niframe.contentDocument!.head.appendChild(style);",
+        },
+        {
+            name: "a <style> created on the document and appended into an iframe's document is allowed",
+            code: "declare const iframe: HTMLIFrameElement;\nconst style = document.createElement('style');\nstyle.textContent = css;\niframe.contentDocument!.head.appendChild(style);\niframe.contentWindow?.document.body.append(document.createElement('link'));",
+        },
+        {
+            name: "createEl('style') on an element of an iframe's document, also through a const, is allowed",
+            code: "declare const iframe: HTMLIFrameElement;\nconst frameDoc = iframe.contentDocument!;\nframeDoc.head.createEl('style', { text: css });\nconst head = frameDoc.querySelector('head')!;\nhead.appendChild(activeDocument.createElement('style'));",
+        },
+        {
             name: "createElement on an object that is not a document is not reported",
             code: "const style = factory.createElement('style');",
         },
@@ -126,6 +138,11 @@ ruleTester.run("no-forbidden-elements", noForbiddenElements, {
     ],
     invalid: [
         // --- Not in a shadow root ---
+        {
+            name: "a <style> moved from an iframe's document into the plugin's, or into a window reached from the iframe, is reported",
+            code: "declare const iframe: HTMLIFrameElement;\nconst style = iframe.contentDocument!.head.createEl('style');\ndocument.head.appendChild(style);\nconst other = document.createElement('style');\niframe.contentDocument!.defaultView!.parent.document.head.appendChild(other);",
+            errors: [{ messageId: "doNotAttachForbiddenStyleElements" }, { messageId: "doNotAttachForbiddenStyleElements" }],
+        },
         {
             name: "a created <style> appended to a shadow root and to the document head is reported",
             code: "const shadow = host.attachShadow({ mode: 'open' });\nconst style = document.createElement('style');\nshadow.appendChild(style);\ndocument.head.appendChild(style.cloneNode());\ndocument.head.appendChild(style);",
