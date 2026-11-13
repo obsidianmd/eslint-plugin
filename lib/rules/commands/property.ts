@@ -42,3 +42,17 @@ export function staticString(node: TSESTree.Node): string | null {
     }
     return null;
 }
+
+// The command's name, where it is a string written out, or null. The last
+// `name` in the object is the one it has.
+export function commandName(command: TSESTree.ObjectExpression): string | null {
+    let name: string | null = null;
+    for (const property of command.properties) {
+        if (isCommandProperty(property, "name")) {
+            name = staticString(property.value);
+        } else if (property.type === TSESTree.AST_NODE_TYPES.SpreadElement) {
+            name = null;
+        }
+    }
+    return name;
+}

@@ -1,7 +1,8 @@
 // When the word "command" in a command's name or ID is a redundant label,
-// as in "Command: open note" or "Open settings command", rather than what the
-// command acts on, as in "Copy URI for command", "Raw command",
-// "Select and copy command ID" or `open-command-selector`.
+// as in "Command: open note" or `open-note-command` of "Open note", rather
+// than what the command acts on, as in "Copy URI for command",
+// "Create slash command", "Select and copy command ID" or
+// `open-command-selector`.
 
 import { removePhrase } from "./nameRemoval.js";
 import type { StringEdit } from "./stringEdit.js";
@@ -52,30 +53,16 @@ function redundantAtEnd(before: readonly string[]): boolean {
  * The command name without "command", where "command" in it is a redundant
  * label: at the start or the end with a separator such as `:`, `-` or `|`,
  * or in brackets, as in "Command: open note", "Open note - command" or
- * "[Command] open note"; or a last word that only whitespace separates, as
- * in "Open settings command", where what is left still reads as a command
- * name (see redundantAtEnd). Null where "command" is anything else, such as
- * the object of the name or a word in the middle of it.
+ * "[Command] open note". Null where "command" is anything else, such as the
+ * object of the name or a word in the middle of it. A last word that only
+ * whitespace separates is a word of the name: "Open settings command" reads
+ * like "Create slash command" or "Edit shell command", where "command" is
+ * what the command acts on, and the words cannot tell them apart.
  */
 export function redundantCommandInName(name: string): StringEdit | null {
-    const edit = COMMAND.test(name)
-        ? removePhrase(name, COMMAND, { prefixAfterSpace: false, suffixAfterSpace: true })
+    return COMMAND.test(name)
+        ? removePhrase(name, COMMAND, { prefixAfterSpace: false, suffixAfterSpace: false })
         : null;
-    if (!edit) {
-        return null;
-    }
-    // "… command" after a word, with only whitespace between
-    if (/[\p{L}\p{N}\p{M}"'”’]\s+command\s*$/iu.test(name)) {
-        const before = edit.text
-            .trim()
-            .split(/\s+/u)
-            .map((word) => word.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "").toLowerCase())
-            .filter((word) => word !== "");
-        if (!redundantAtEnd(before)) {
-            return null;
-        }
-    }
-    return edit;
 }
 
 /**
@@ -83,8 +70,12 @@ export function redundantCommandInName(name: string): StringEdit | null {
  * last word of the ID and nowhere else, at least two other words are left,
  * and it does not describe the next word (`command-palette`) or end a name
  * whose words make it the object (`copy-uri-command`, `run-shell-command`).
+ * A last "command" is redundant only where the command's name, which
+ * `nameWithoutCommand` says, does not have the word: `create-slash-command`
+ * of "Create slash command" names a slash command, and with no name to read,
+ * the words of the ID alone cannot tell.
  */
-export function isRedundantCommandInId(id: string): boolean {
+export function isRedundantCommandInId(id: string, nameWithoutCommand: boolean): boolean {
     const words = idWords(id);
     const others = words.filter((word) => word !== "command");
     if (others.length < 2 || others.length === words.length) {
@@ -103,6 +94,6 @@ export function isRedundantCommandInId(id: string): boolean {
         return false;
     }
     const leading = start > 0 && !COMMAND_COMPOUNDS.has(middle[0]);
-    const trailing = end < words.length && redundantAtEnd(middle);
+    const trailing = end < words.length && nameWithoutCommand && redundantAtEnd(middle);
     return (start === 0 || leading) && (end === words.length || trailing);
 }
