@@ -1,8 +1,0 @@
-{
-	"serialize-javascript": {
-		"section": "overrides",
-		"why": "Mocha 11 allows serialize-javascript releases affected by GHSA-m5mm-p8h7-m29v; require a patched 7.x release.",
-		"check": "node -p \"require('./node_modules/mocha/package.json').dependencies['serialize-javascript']\"",
-		"expect": "^6.0.2"
-	}
-}
