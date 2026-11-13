@@ -1256,6 +1256,44 @@ ruleTester.run("prefer-active-doc and code that handles popout windows", preferA
             ],
         },
         {
+            name: "a download link put in the body and removed again gets the suggestion",
+            code: "export function download(a: HTMLAnchorElement) { document.body.appendChild(a); a.click(); a.remove(); }",
+            errors: [{ messageId: "preferActive", suggestions: offered("export function download(a: HTMLAnchorElement) { activeDocument.body.appendChild(a); a.click(); a.remove(); }") }],
+        },
+        {
+            name: "a textarea put in the body to copy its text gets the suggestion",
+            code: "export function copy(t: HTMLTextAreaElement) { document.body.append(t); t.select(); t.remove(); }",
+            errors: [{ messageId: "preferActive", suggestions: offered("export function copy(t: HTMLTextAreaElement) { activeDocument.body.append(t); t.select(); t.remove(); }") }],
+        },
+        {
+            name: "an element put in the body and taken out with removeChild gets the suggestion on both",
+            code: "export function copy(t: HTMLTextAreaElement) { document.body.appendChild(t); t.select(); document.body.removeChild(t); }",
+            errors: [
+                { messageId: "preferActive", suggestions: offered("export function copy(t: HTMLTextAreaElement) { activeDocument.body.appendChild(t); t.select(); document.body.removeChild(t); }") },
+                { messageId: "preferActive", suggestions: offered("export function copy(t: HTMLTextAreaElement) { document.body.appendChild(t); t.select(); activeDocument.body.removeChild(t); }") },
+            ],
+        },
+        {
+            name: "an element removed later in a callback gets the suggestion",
+            code: "export function flash(el: HTMLElement) { document.body.insertBefore(el, null); window.setTimeout(() => el.detach(), 1000); }",
+            errors: [{ messageId: "preferActive", suggestions: offered("export function flash(el: HTMLElement) { activeDocument.body.insertBefore(el, null); window.setTimeout(() => el.detach(), 1000); }") }],
+        },
+        {
+            name: "an element put in the body and never removed is the window's state",
+            code: "declare const panel: HTMLElement;\nexport function onload() { document.body.appendChild(panel); }",
+            errors: [{ messageId: "perWindowState", data: { element: "body" }, suggestions: [] }],
+        },
+        {
+            name: "an element removed but put in the body through a call that is not followed is the window's state",
+            code: "declare const el: HTMLElement;\nexport function f() { document.body.appendChild(el.cloneNode()); el.remove(); }",
+            errors: [{ messageId: "perWindowState", data: { element: "body" }, suggestions: [] }],
+        },
+        {
+            name: "a transient element in the head is still the window's state",
+            code: "export function f(s: HTMLStyleElement) { document.head.appendChild(s); s.remove(); }",
+            errors: [{ messageId: "perWindowState", data: { element: "head" }, suggestions: [] }],
+        },
+        {
             name: "a div created in the body keeps the suggestion",
             code: "export const f = () => document.body.createDiv('my-tooltip');",
             errors: [{ messageId: "preferActive", suggestions: offered("export const f = () => activeDocument.body.createDiv('my-tooltip');") }],
