@@ -288,7 +288,7 @@ describe("worker code under another name, with the docs' override", () => {
 		const match = /```js\n\/\/ import globals from "globals";\n([\s\S]*?)```/.exec(section);
 		assert.ok(match, "no override example under ### Web worker files");
 		// eslint-disable-next-line @typescript-eslint/no-implied-eval, @typescript-eslint/no-unsafe-call, obsidianmd/rule-custom-message -- runs the example in this repo's own docs, to test it
-		return new Function("globals", `return (${match[1]});`)(globals) as JsConfig;
+		return new Function("globals", `return (${match[1]});`)(globals) as Linter.Config;
 	}
 
 	const override = docsOverride();
