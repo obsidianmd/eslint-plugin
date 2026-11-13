@@ -1006,6 +1006,18 @@ globalsRuleTester.run("prefer-window-timers in a function that becomes a string"
             ],
         },
         {
+            name: "a parameter of a function in a string is not the function in a string",
+            code: 'export function show(value: unknown) { const text = "" + value; setTimeout(() => console.log(text), 0); }',
+            output: 'export function show(value: unknown) { const text = "" + value; window.setTimeout(() => console.log(text), 0); }',
+            errors: [{ messageId: "preferWindowTimer" }],
+        },
+        {
+            name: "a parameter of a function in a template literal is not the function in a string",
+            code: "export function show(value: unknown) { const text = `${value}`; setTimeout(() => console.log(text), 0); }",
+            output: "export function show(value: unknown) { const text = `${value}`; window.setTimeout(() => console.log(text), 0); }",
+            errors: [{ messageId: "preferWindowTimer" }],
+        },
+        {
             name: "a function declaration in a template literal gets a suggestion",
             code: "function work() { setTimeout(() => postMessage(1), 0); } export const blob = new Blob([`(${work})()`]);",
             output: null,

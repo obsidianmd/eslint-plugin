@@ -127,7 +127,18 @@ function functionReferences(sourceCode: Context["sourceCode"], fn: TSESTree.Node
         }
     }
     if (holder) {
+        // A function declaration also declares its parameters: only the
+        // variable of its name holds the function.
+        const name =
+            holder.type === TSESTree.AST_NODE_TYPES.FunctionDeclaration
+                ? holder.id?.name
+                : holder.type === TSESTree.AST_NODE_TYPES.VariableDeclarator && holder.id.type === TSESTree.AST_NODE_TYPES.Identifier
+                  ? holder.id.name
+                  : undefined;
         for (const variable of sourceCode.getDeclaredVariables(holder)) {
+            if (variable.name !== name) {
+                continue;
+            }
             for (const reference of variable.references) {
                 if (reference.isRead()) {
                     references.push(reference.identifier);
