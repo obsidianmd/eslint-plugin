@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- `no-static-styles-assignment` no longer stops the whole ESLint run on `el.style.setProperty()` called without arguments, which threw `TypeError: Cannot read properties of undefined (reading 'type')` ([#TBD](https://github.com/obsidianmd/eslint-plugin/pull/TBD)).
+- `no-static-styles-assignment` no longer stops the whole ESLint run on `el.style.setProperty()` called without arguments, which threw `TypeError: Cannot read properties of undefined (reading 'type')` ([#264](https://github.com/obsidianmd/eslint-plugin/pull/264)).
 
 ## [0.5.1] - 2026-11-06
 
