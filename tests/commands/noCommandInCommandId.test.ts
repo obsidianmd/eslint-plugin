@@ -6,8 +6,8 @@ const ruleTester = new RuleTester();
 
 // The suggestion that renames a command ID to `id`, giving `output`
 const rename = (id: string, output: string) => ({ messageId: "removeCommand" as const, data: { id }, output });
-// A command with the ID `id`, in single quotes
-const command = (id: string) => `this.addCommand({ id: '${id}' });`;
+// A command with the ID `id`, in single quotes, and a name without "command"
+const command = (id: string) => `this.addCommand({ id: '${id}', name: 'Open' });`;
 // One command a line, with the IDs `ids`
 const commands = (ids: readonly string[]) => ids.map(command).join("\n");
 // The errors for one command a line, with the IDs `ids`, and the suggestion
@@ -85,6 +85,14 @@ ruleTester.run("no-command-in-command-id", noCommandInIdRule, {
             code: "this.addCommand({ id: 'insert-snippet-command', name: 'Insert snippet for command' }); this.addCommand({ id: 'toggle-view-command', name: 'Toggle command palette view' });",
         },
         {
+            name: "a last 'command' that the name has too, as the noun the command acts on, is not reported",
+            code: "this.addCommand({ id: 'create-slash-command', name: 'Create slash command' }); this.addCommand({ id: 'edit-shell-command', name: 'Edit shell command' }); this.addCommand({ id: 'open-settings-command', name: 'Open settings command' });",
+        },
+        {
+            name: "a last 'command' with no name written out to tell what it is is not reported",
+            code: "this.addCommand({ id: 'create-slash-command' }); this.addCommand({ id: 'open-note-command', name: t('open') }); this.addCommand({ id: 'open-note-command', name: 'Open', ...base });",
+        },
+        {
             name: "a id that is not a string is not checked",
             code: "this.addCommand({ id: 1 }); this.addCommand({ id: null }); this.addCommand({ id: /open-command/ });",
         },
@@ -92,13 +100,13 @@ ruleTester.run("no-command-in-command-id", noCommandInIdRule, {
     invalid: [
         {
             name: "id ending with '-command' is forbidden",
-            code: "this.addCommand({ id: 'open-thing-command' });",
-            errors: [{ messageId: "commandInId", suggestions: [rename("open-thing", "this.addCommand({ id: 'open-thing' });")] }],
+            code: "this.addCommand({ id: 'open-thing-command', name: 'Open thing' });",
+            errors: [{ messageId: "commandInId", suggestions: [rename("open-thing", "this.addCommand({ id: 'open-thing', name: 'Open thing' });")] }],
         },
         {
             name: "id ending with 'Command' (camelCase) is forbidden",
-            code: "this.addCommand({ id: 'openNoteCommand' });",
-            errors: [{ messageId: "commandInId", suggestions: [rename("openNote", "this.addCommand({ id: 'openNote' });")] }],
+            code: "this.addCommand({ id: 'openNoteCommand', name: 'Open note' });",
+            errors: [{ messageId: "commandInId", suggestions: [rename("openNote", "this.addCommand({ id: 'openNote', name: 'Open note' });")] }],
         },
         {
             name: "id starting with 'command' in camelCase is forbidden",
@@ -107,44 +115,49 @@ ruleTester.run("no-command-in-command-id", noCommandInIdRule, {
         },
         {
             name: "'command' after an acronym is forbidden",
-            code: "this.addCommand({ id: 'exportPDFCommand' });",
-            errors: [{ messageId: "commandInId", suggestions: [rename("exportPDF", "this.addCommand({ id: 'exportPDF' });")] }],
+            code: "this.addCommand({ id: 'exportPDFCommand', name: 'Export PDF' });",
+            errors: [{ messageId: "commandInId", suggestions: [rename("exportPDF", "this.addCommand({ id: 'exportPDF', name: 'Export PDF' });")] }],
         },
         {
             name: "'command' after other separators is forbidden",
-            code: "this.addCommand({ id: 'open_note_command' }); this.addCommand({ id: 'editor:open:COMMAND' });",
+            code: "this.addCommand({ id: 'open_note_command', name: 'Open' }); this.addCommand({ id: 'editor:open:COMMAND', name: 'Open' });",
             errors: [
-                { messageId: "commandInId", suggestions: [rename("open_note", "this.addCommand({ id: 'open_note' }); this.addCommand({ id: 'editor:open:COMMAND' });")] },
-                { messageId: "commandInId", suggestions: [rename("editor:open", "this.addCommand({ id: 'open_note_command' }); this.addCommand({ id: 'editor:open' });")] },
+                { messageId: "commandInId", suggestions: [rename("open_note", "this.addCommand({ id: 'open_note', name: 'Open' }); this.addCommand({ id: 'editor:open:COMMAND', name: 'Open' });")] },
+                { messageId: "commandInId", suggestions: [rename("editor:open", "this.addCommand({ id: 'open_note_command', name: 'Open' }); this.addCommand({ id: 'editor:open', name: 'Open' });")] },
             ],
         },
         {
             name: "an ID whose command name has a redundant 'command', or none, is reported",
-            code: "this.addCommand({ id: 'open-settings-command', name: 'Open settings command' }); this.addCommand({ id: 'toggle-view-command', name: 'Toggle view' });",
+            code: "this.addCommand({ id: 'open-settings-command', name: 'Command: open settings' }); this.addCommand({ id: 'toggle-view-command', name: 'Toggle view' });",
             errors: [
-                { messageId: "commandInId", suggestions: [rename("open-settings", "this.addCommand({ id: 'open-settings', name: 'Open settings command' }); this.addCommand({ id: 'toggle-view-command', name: 'Toggle view' });")] },
-                { messageId: "commandInId", suggestions: [rename("toggle-view", "this.addCommand({ id: 'open-settings-command', name: 'Open settings command' }); this.addCommand({ id: 'toggle-view', name: 'Toggle view' });")] },
+                { messageId: "commandInId", suggestions: [rename("open-settings", "this.addCommand({ id: 'open-settings', name: 'Command: open settings' }); this.addCommand({ id: 'toggle-view-command', name: 'Toggle view' });")] },
+                { messageId: "commandInId", suggestions: [rename("toggle-view", "this.addCommand({ id: 'open-settings-command', name: 'Command: open settings' }); this.addCommand({ id: 'toggle-view', name: 'Toggle view' });")] },
             ],
         },
         {
+            name: "a leading 'command' is reported whatever the name",
+            code: "this.addCommand({ id: 'command-open-note', name: t('open') });",
+            errors: [{ messageId: "commandInId", suggestions: [rename("open-note", "this.addCommand({ id: 'open-note', name: t('open') });")] }],
+        },
+        {
             name: "a quoted id key is checked",
-            code: "this.addCommand({ \"id\": \"open-note-command\", \"name\": \"Open\" }); this.addCommand({ 'id': 'toggleViewCommand' }); this.addCommand({ ['id']: 'command-open-note' });",
+            code: "this.addCommand({ \"id\": \"open-note-command\", \"name\": \"Open\" }); this.addCommand({ 'id': 'toggleViewCommand', name: 'Toggle view' }); this.addCommand({ ['id']: 'command-open-note' });",
             errors: [
-                { messageId: "commandInId", suggestions: [rename("open-note", "this.addCommand({ \"id\": \"open-note\", \"name\": \"Open\" }); this.addCommand({ 'id': 'toggleViewCommand' }); this.addCommand({ ['id']: 'command-open-note' });")] },
-                { messageId: "commandInId", suggestions: [rename("toggleView", "this.addCommand({ \"id\": \"open-note-command\", \"name\": \"Open\" }); this.addCommand({ 'id': 'toggleView' }); this.addCommand({ ['id']: 'command-open-note' });")] },
-                { messageId: "commandInId", suggestions: [rename("open-note", "this.addCommand({ \"id\": \"open-note-command\", \"name\": \"Open\" }); this.addCommand({ 'id': 'toggleViewCommand' }); this.addCommand({ ['id']: 'open-note' });")] },
+                { messageId: "commandInId", suggestions: [rename("open-note", "this.addCommand({ \"id\": \"open-note\", \"name\": \"Open\" }); this.addCommand({ 'id': 'toggleViewCommand', name: 'Toggle view' }); this.addCommand({ ['id']: 'command-open-note' });")] },
+                { messageId: "commandInId", suggestions: [rename("toggleView", "this.addCommand({ \"id\": \"open-note-command\", \"name\": \"Open\" }); this.addCommand({ 'id': 'toggleView', name: 'Toggle view' }); this.addCommand({ ['id']: 'command-open-note' });")] },
+                { messageId: "commandInId", suggestions: [rename("open-note", "this.addCommand({ \"id\": \"open-note-command\", \"name\": \"Open\" }); this.addCommand({ 'id': 'toggleViewCommand', name: 'Toggle view' }); this.addCommand({ ['id']: 'open-note' });")] },
             ],
         },
         {
             name: "a spread in the command object is skipped, and the id still checked",
-            code: "this.addCommand({ ...base, id: 'open-note-command' });",
+            code: "this.addCommand({ ...base, id: 'open-note-command', name: 'Open' });",
             errors: [{
                 messageId: "commandInId",
                 line: 1,
                 column: 28,
                 endLine: 1,
                 endColumn: 51,
-                suggestions: [rename("open-note", "this.addCommand({ ...base, id: 'open-note' });")],
+                suggestions: [rename("open-note", "this.addCommand({ ...base, id: 'open-note', name: 'Open' });")],
             }],
         },
         {
@@ -157,10 +170,10 @@ ruleTester.run("no-command-in-command-id", noCommandInIdRule, {
         },
         {
             name: "the suggestion keeps the quotes and the escapes",
-            code: "this.addCommand({ id: \"open-note\\u002Dcommand\" }); this.addCommand({ id: 'open\\x2Dnow-command' });",
+            code: "this.addCommand({ id: \"open-note\\u002Dcommand\", name: 'Open' }); this.addCommand({ id: 'open\\x2Dnow-command', name: 'Open' });",
             errors: [
-                { messageId: "commandInId", suggestions: [rename("open-note", "this.addCommand({ id: \"open-note\" }); this.addCommand({ id: 'open\\x2Dnow-command' });")] },
-                { messageId: "commandInId", suggestions: [rename("open-now", "this.addCommand({ id: \"open-note\\u002Dcommand\" }); this.addCommand({ id: 'open\\x2Dnow' });")] },
+                { messageId: "commandInId", suggestions: [rename("open-note", "this.addCommand({ id: \"open-note\", name: 'Open' }); this.addCommand({ id: 'open\\x2Dnow-command', name: 'Open' });")] },
+                { messageId: "commandInId", suggestions: [rename("open-now", "this.addCommand({ id: \"open-note\\u002Dcommand\", name: 'Open' }); this.addCommand({ id: 'open\\x2Dnow', name: 'Open' });")] },
             ],
         },
         {

@@ -62,7 +62,10 @@ export function isGlobalWindowAt(context: Context, node: TSESTree.Node): boolean
  *   unseen;
  * - the file is Emscripten output, which reads `ENVIRONMENT_IS_WORKER` or
  *   `ENVIRONMENT_IS_NODE` to run in a web worker or in Node as well, and
- *   calls the bare timers outside those checks.
+ *   calls the bare timers outside those checks;
+ * - it is in a function whose source the file turns into a string, as in
+ *   `new Blob([`(${body.toString()})()`])` for an inline web worker, where
+ *   the code runs without a window.
  *
  * A rule offers its rewrite there as a suggestion, not a fix.
  */
@@ -74,8 +77,124 @@ export function mayLackWindowAt(context: Context, node: TSESTree.Node): boolean 
     const { knownChecks } = getWindowFacts(sourceCode);
     return (
         decidingConditions(node).some((condition) => readsEnvironmentName(sourceCode, condition, knownChecks)) ||
-        isInSilentTry(sourceCode, node)
+        isInSilentTry(sourceCode, node) ||
+        isInStringifiedFunction(sourceCode, node)
     );
+}
+
+const stringifiedCache = new WeakMap<TSESTree.Node, boolean>();
+
+// Whether `node` is in a function whose source the file turns into a string:
+// `fn.toString()`, `String(fn)`, `` `${fn}` `` or `"…" + fn`, for the function
+// itself or for a variable or function declaration that holds it. The string
+// is code that runs elsewhere, typically in an inline web worker
+// (`new Worker(URL.createObjectURL(new Blob([`(${body})()`])))`), which has no
+// window.
+function isInStringifiedFunction(sourceCode: Context["sourceCode"], node: TSESTree.Node): boolean {
+    for (let current = node.parent; current; current = current.parent) {
+        if (!isFunction(current)) {
+            continue;
+        }
+        let found = stringifiedCache.get(current);
+        if (found === undefined) {
+            found = functionReferences(sourceCode, current).some(isStringified);
+            stringifiedCache.set(current, found);
+        }
+        if (found) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// The function expression itself and every read of the name that holds it.
+function functionReferences(sourceCode: Context["sourceCode"], fn: TSESTree.Node): TSESTree.Node[] {
+    const references: TSESTree.Node[] = [fn];
+    let holder: TSESTree.Node | undefined;
+    if (fn.type === TSESTree.AST_NODE_TYPES.FunctionDeclaration) {
+        holder = fn;
+    } else {
+        let top: TSESTree.Node = fn;
+        while (top.parent && skipChainAndCasts(top.parent) === top) {
+            top = top.parent;
+        }
+        if (
+            top.parent?.type === TSESTree.AST_NODE_TYPES.VariableDeclarator &&
+            top.parent.init === top &&
+            top.parent.id.type === TSESTree.AST_NODE_TYPES.Identifier
+        ) {
+            holder = top.parent;
+        }
+    }
+    if (holder) {
+        // A function declaration also declares its parameters: only the
+        // variable of its name holds the function.
+        const name =
+            holder.type === TSESTree.AST_NODE_TYPES.FunctionDeclaration
+                ? holder.id?.name
+                : holder.type === TSESTree.AST_NODE_TYPES.VariableDeclarator && holder.id.type === TSESTree.AST_NODE_TYPES.Identifier
+                  ? holder.id.name
+                  : undefined;
+        for (const variable of sourceCode.getDeclaredVariables(holder)) {
+            if (variable.name !== name) {
+                continue;
+            }
+            for (const reference of variable.references) {
+                if (reference.isRead()) {
+                    references.push(reference.identifier);
+                }
+            }
+        }
+    }
+    return references;
+}
+
+// Whether the value of `node`, a function, is turned into its source text.
+function isStringified(node: TSESTree.Node): boolean {
+    let child = node;
+    let parent = node.parent;
+    // Parentheses leave no node; casts and `!` do.
+    while (parent && skipChainAndCasts(parent) === child) {
+        child = parent;
+        parent = parent.parent;
+    }
+    if (!parent) {
+        return false;
+    }
+    switch (parent.type) {
+        case TSESTree.AST_NODE_TYPES.MemberExpression:
+            // fn.toString()
+            return (
+                parent.object === child &&
+                staticKey(parent) === "toString" &&
+                parent.parent.type === TSESTree.AST_NODE_TYPES.CallExpression &&
+                parent.parent.callee === parent
+            );
+        case TSESTree.AST_NODE_TYPES.TemplateLiteral:
+            // `${fn}`, not a tagged template, which gets the value itself.
+            return parent.parent.type !== TSESTree.AST_NODE_TYPES.TaggedTemplateExpression;
+        case TSESTree.AST_NODE_TYPES.CallExpression:
+            // String(fn)
+            return (
+                parent.arguments[0] === child &&
+                parent.callee.type === TSESTree.AST_NODE_TYPES.Identifier &&
+                parent.callee.name === "String"
+            );
+        case TSESTree.AST_NODE_TYPES.BinaryExpression: {
+            // "(" + fn + ")()"
+            if (parent.operator !== "+") {
+                return false;
+            }
+            const other = parent.left === child ? parent.right : parent.left;
+            return (
+                (other.type === TSESTree.AST_NODE_TYPES.Literal && typeof other.value === "string") ||
+                other.type === TSESTree.AST_NODE_TYPES.TemplateLiteral ||
+                other.type === TSESTree.AST_NODE_TYPES.BinaryExpression
+            );
+        }
+        default:
+            return false;
+    }
 }
 
 const EMSCRIPTEN_ENVIRONMENT = /\bENVIRONMENT_IS_(?:WORKER|NODE)\b/;
@@ -102,8 +221,10 @@ function isEmscriptenOutput(sourceCode: Context["sourceCode"]): boolean {
  * - the same for a check of Obsidian's own globals: `typeof activeDocument`,
  *   `"activeWindow" in window`, `window.activeDocument ?? …`, or a bare
  *   `activeDocument` that is only tested;
- * - it runs where a `try` that reads the window has failed, or mayLackWindowAt
- *   holds.
+ * - the same for a check of one of Obsidian's DOM helpers:
+ *   `typeof createDiv === "function"`, `"createEl" in window`;
+ * - it runs where a `try` that reads the window, or calls one of those
+ *   helpers by its bare name, has failed, or mayLackWindowAt holds.
  *
  * A rule offers no rewrite to `activeDocument` or `activeWindow` there.
  */
@@ -112,6 +233,7 @@ export function mayRunOutsideObsidianAt(context: Context, node: TSESTree.Node): 
     return (
         followsWindowCheck(context.sourceCode, node, true) ||
         followsCheck(facts.obsidianChecks, node, true) ||
+        facts.obsidianTries.some((statement) => runsWhenTryFails(statement, node)) ||
         mayLackWindowAt(context, node)
     );
 }
@@ -323,6 +445,9 @@ interface WindowFacts {
     obsidianChecks: FoundWindowCheck[];
     // Each `try` whose block reads the window, so throws without one.
     windowTries: TSESTree.TryStatement[];
+    // Each `try` whose block calls one of Obsidian's DOM helpers by its bare
+    // name, so throws without Obsidian: `try { createEl("p"); } catch { … }`.
+    obsidianTries: TSESTree.TryStatement[];
     // The reads and calls that hold a check whose meaning is known:
     // `hasWindow` after `const hasWindow = typeof window !== "undefined"`.
     knownChecks: Set<TSESTree.Node>;
@@ -572,7 +697,13 @@ function getWindowFacts(sourceCode: Context["sourceCode"]): WindowFacts {
     if (cached) {
         return cached;
     }
-    const facts: WindowFacts = { checks: [], obsidianChecks: [], windowTries: [], knownChecks: new Set() };
+    const facts: WindowFacts = {
+        checks: [],
+        obsidianChecks: [],
+        windowTries: [],
+        obsidianTries: [],
+        knownChecks: new Set(),
+    };
     const followed = new Set<TSESTree.Node>();
     // Whether `node` or anything in it reads the window.
     const visit = (node: TSESTree.Node): boolean => {
@@ -585,6 +716,9 @@ function getWindowFacts(sourceCode: Context["sourceCode"]): WindowFacts {
             addWindowCheck(sourceCode, facts, facts.obsidianChecks, toWindowCheck(node, obsidianName), followed);
         }
         let reads = readsWindow(node);
+        if (node.type === TSESTree.AST_NODE_TYPES.TryStatement && callsObsidianHelper(sourceCode, node.block)) {
+            facts.obsidianTries.push(node);
+        }
         for (const key of sourceCode.visitorKeys[node.type] ?? []) {
             const child: unknown = (node as unknown as Record<string, unknown>)[key];
             if (Array.isArray(child)) {
@@ -605,6 +739,29 @@ function getWindowFacts(sourceCode: Context["sourceCode"]): WindowFacts {
     visit(sourceCode.ast);
     windowFactsCache.set(sourceCode.ast, facts);
     return facts;
+}
+
+// Whether `node` calls one of Obsidian's DOM helpers by its bare name, outside
+// the functions in it.
+function callsObsidianHelper(sourceCode: Context["sourceCode"], node: TSESTree.Node): boolean {
+    if (isFunction(node)) {
+        return false;
+    }
+    if (
+        node.type === TSESTree.AST_NODE_TYPES.CallExpression &&
+        node.callee.type === TSESTree.AST_NODE_TYPES.Identifier &&
+        OBSIDIAN_HELPER_NAMES.has(node.callee.name)
+    ) {
+        return true;
+    }
+    for (const key of sourceCode.visitorKeys[node.type] ?? []) {
+        const child: unknown = (node as unknown as Record<string, unknown>)[key];
+        const children = Array.isArray(child) ? child : [child];
+        if (children.some((item) => isNode(item) && callsObsidianHelper(sourceCode, item))) {
+            return true;
+        }
+    }
+    return false;
 }
 
 function isNode(value: unknown): value is TSESTree.Node {
@@ -824,7 +981,8 @@ function checkedName(node: TSESTree.Node): string | undefined {
 
 // Obsidian's globals, which a browser or jsdom does not have, and the objects
 // they are read from when the code expects them to be missing.
-const OBSIDIAN_WINDOW_NAMES = new Set(["activeDocument", "activeWindow"]);
+const OBSIDIAN_HELPER_NAMES = new Set(["createEl", "createDiv", "createSpan", "createSvg", "createFragment"]);
+const OBSIDIAN_WINDOW_NAMES = new Set(["activeDocument", "activeWindow", ...OBSIDIAN_HELPER_NAMES]);
 const OBSIDIAN_GLOBAL_OBJECTS = new Set([...GLOBAL_OBJECTS, "window"]);
 
 // The Obsidian global that `node` checks for: `typeof activeDocument`,

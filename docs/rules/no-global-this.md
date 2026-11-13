@@ -108,6 +108,8 @@ Neither a fix nor a suggestion is offered where `window` would be wrong:
 ## Web workers
 
 A web worker has no `window`, so `globalThis` and the bare timer functions are correct there. The
-recommended config switches this rule off for files matching `**/*.worker.*`, `**/*-worker.*` or
-`**/*_worker.*` and anything under a `workers/` directory; see [Web worker files](../configuration.md#web-worker-files). It is off for
-test files and tool configs as well, which run outside Obsidian; see [Test files](../configuration.md#test-files).
+recommended config switches this rule off for `.ts`, `.cts`, `.mts`, `.tsx`, `.js`, `.cjs`, `.mjs` or `.jsx` files matching `**/worker.*`,
+`**/*.worker.*`, `**/*-worker.*` or `**/*_worker.*`, such as `src/worker.ts` or `search.worker.ts`,
+and anything under a `workers/` directory, but not a `worker/` directory; see
+[Web worker files](../configuration.md#web-worker-files). It is off for test files and tool configs
+as well, which run outside Obsidian; see [Test files](../configuration.md#test-files).

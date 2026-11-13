@@ -16,17 +16,32 @@ and nested functions, whose name:
 
 - contains the word "settings" or "options", ignoring case: every heading in a settings tab is
   about settings, so the word adds nothing. The message names the word. Reported without a fix;
-  rename the heading (`"Advanced"` rather than `"Advanced settings"`).
-- is "General": keep general settings at the top without a heading. The fix removes the heading.
-- is the plugin's name, from the `pluginName` option or else the `name` in `manifest.json`: the tab
-  already carries it. The fix removes the heading.
+  rename the heading (`"Advanced"` rather than `"Advanced settings"`). The word is needed, and not
+  reported, where it is what a verb acts on, as in `"Export and import settings"`,
+  `"Reset all settings"`, `"Back up your settings"` or `"Sync options"`, or is followed by that act,
+  as in `"Settings backup"`. The verbs are export, import, reset, restore, back up, sync,
+  synchronize, copy, save, load, share, transfer, migrate, clear, delete, revert, download and
+  upload.
+- is "General", at the top of the tab: keep general settings at the top without a heading. The fix
+  removes the heading.
+- is the plugin's name, from the `pluginName` option or else the `name` in `manifest.json`, at the
+  top of the tab: the tab already carries it. The fix removes the heading.
+
+A "General" or plugin-name heading is at the top of the tab when it is the first thing `display()`
+adds to it: nothing before it in `display()` creates anything or calls anything other than
+`empty()`, the class and attribute methods (`addClass()`, `setAttr()`, …) and `console` logging.
+Lower down it starts a section of its own, and removing it would put that section's settings under
+the heading before it, so it is not reported. Nor is one whose place cannot be told: in a loop, in a
+callback or another function, or in a method other than `display()`.
 
 The words are matched as whole words: "Subsettings" does not contain "settings". "General" and the
 plugin's name must be the whole name, ignoring case, spaces, and the words "settings" and
 "options" with the punctuation around them: `"General"`, `"General settings"` and, for a plugin
-named Numerals, `"Numerals"` and `"Numerals: Settings"` are reported. A heading that has the word
-among others names a section of its own and is not reported: `"General appearance"`, or
-`"Inline Numerals"` for a plugin named Numerals, or `"Recurring tasks"` for one named Tasks.
+named Numerals, `"Numerals"` and `"Numerals: Settings"` are reported. The plugin's name is compared
+whole, so for a plugin named Style Settings, `"Style Settings"` is reported and `"Style"` is not. A
+heading that has the word among others names a section of its own and is not reported:
+`"General appearance"`, or `"Inline Numerals"` for a plugin named Numerals, or `"Recurring tasks"`
+for one named Tasks.
 
 The name is that of the last `setName()` in the chain, since each one replaces the one before, and
 it may come before or after `setHeading()`: `new Setting(…).setHeading().setName("General")` is

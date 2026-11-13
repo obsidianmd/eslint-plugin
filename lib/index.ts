@@ -337,8 +337,8 @@ const OBSIDIAN_RUNTIME_RULES = new Set([
 // fakes named `*.testing.*`, and the helper directories of tests kept beside
 // them. Each name is only used for tests; end-to-end encryption code (`e2ee`),
 // `src/commands/gym-log-setup.ts` and `src/testing/`, which may hold code that
-// runs in Obsidian, do not match. These are only ever `ignores`, in blocks that
-// already apply to JS and TS files alone.
+// runs in Obsidian, do not match. These are `ignores` in blocks that already
+// apply to JS and TS files alone, and `files` only paired with those.
 const TEST_FILES = [
     '**/*.{test,tests,spec,specs,e2e,setup,testing}.*',
     '**/{test,tests,__tests__,mocks,__mocks__,e2e,e2e-tests}/**',
@@ -610,6 +610,38 @@ const flatRecommendedConfig: Config[] = defineConfig([
                 } : {}),
                 ...obsidianGlobals,
             }
+        },
+    },
+    // Test files and tool configs run in Node, not in Obsidian, so they get
+    // the Node globals even where the plugin is not desktop-only:
+    // `module.exports` in `jest.config.js` and `process` in a script. Each
+    // pattern is paired with the JS and TS files, as flat config reads a
+    // nested array as patterns that must all match, so that no other
+    // language, such as JSON, gets JavaScript's language options.
+    {
+        files: NOT_RUN_IN_OBSIDIAN.map((pattern) => ['**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}', pattern]),
+        languageOptions: {
+            globals: {
+                ...globals.node,
+                NodeJS: "readonly",
+            },
+        },
+    },
+    // A `.cjs` file is CommonJS, where `module` and `exports` are defined
+    // (`require` is declared above). ESLint reads it so by default, but the
+    // typescript-eslint base config the JS block extends sets
+    // `sourceType: "module"` for it. Declaring the two globals restores them
+    // without `sourceType: "commonjs"`, under which `no-redeclare` checks the
+    // file's top level against the built-in globals, and
+    // `const { Plugin } = require("obsidian")` is reported, because `Plugin`
+    // is also a browser global.
+    {
+        files: ['**/*.cjs'],
+        languageOptions: {
+            globals: {
+                module: "writable",
+                exports: "writable",
+            },
         },
     },
     // After the block above, which gives every file the browser and Obsidian
