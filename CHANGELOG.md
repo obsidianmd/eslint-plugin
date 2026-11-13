@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `ui/sentence-case`, `ui/sentence-case-json` and `ui/sentence-case-locale-module` ignore an empty string in the `brands`, `acronyms` and `ignoreWords` options. With `brands: [""]`, a text that is empty or starts with a character other than a letter or digit, such as `"(Open) settings"`, made the rule loop forever, and the lint run never finished.
+
 ## [0.5.1] - 2026-11-06
 
 Fixes for findings on correct code, and for fixes and suggestions that changed what correct
