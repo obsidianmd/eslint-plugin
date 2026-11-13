@@ -1272,6 +1272,16 @@ ruleTester.run("prefer-active-doc and code that handles popout windows", preferA
             errors: [{ messageId: "preferActive", suggestions: [] }],
         },
         {
+            name: "document.body after a check of one of Obsidian's DOM helpers is reported, without a suggestion",
+            code: "export const f = () => typeof createDiv === 'function' ? createDiv() : document.body;",
+            errors: [{ messageId: "preferActive", suggestions: [] }],
+        },
+        {
+            name: "document.body in the catch of a try that calls a helper is reported, without a suggestion",
+            code: "export function f() { try { return createDiv(); } catch (e) { console.error(e); return document.body; } }",
+            errors: [{ messageId: "preferActive", suggestions: [] }],
+        },
+        {
             name: "a local activeDocument is not the global",
             code: "export const f = (activeDocument: Document | null) => (activeDocument ?? document).body;",
             errors: [{ messageId: "preferActive", suggestions: [] }],

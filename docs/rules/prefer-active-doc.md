@@ -189,10 +189,11 @@ Nothing is offered where `activeDocument` would not exist, or would not be what 
 - code that also runs outside Obsidian, as a check before it in the same function, or one that
   decides whether it runs, shows: `typeof document`, `typeof window`, `"window" in globalThis`, a
   check of `activeDocument` or `activeWindow` themselves, such as
-  `typeof activeDocument !== "undefined" ? activeDocument.body : document.body`, or a name such as
+  `typeof activeDocument !== "undefined" ? activeDocument.body : document.body`, or of one of
+  Obsidian's DOM helpers, such as `typeof createDiv === "function"`, or a name such as
   `isBrowser`; the body of a `try` whose `catch` drops the error; or code that runs once a `try`
-  that reads the document has failed: its `catch` or `finally`, or what follows a `catch` that goes
-  on. A browser or a DOM emulation such as jsdom has a `document` but no `activeDocument`;
+  that reads the document, or calls a DOM helper such as `createEl()` by its bare name, has failed:
+  its `catch` or `finally`, or what follows a `catch` that goes on. A browser or a DOM emulation such as jsdom has a `document` but no `activeDocument`;
 - the document itself compared, as in `e.target === document`, `el.ownerDocument !== document` or
   `case document:`, and any `document` in a function that compares a document with it, as in
   `if (newDoc !== document) { for (const cls of document.body.classList) … }`: code that tells the
