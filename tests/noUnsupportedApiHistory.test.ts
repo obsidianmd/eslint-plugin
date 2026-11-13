@@ -209,9 +209,9 @@ ruleTester.run("no-unsupported-api: the first typings that declare a member", ru
             `,
             options: [{ minAppVersion: "0.12.0" }],
             errors: [
-                { messageId: "apiNotAvailable", line: 6, data: { qualifiedName: "Workspace.duplicateLeaf", sinceVersion: "0.13.8", minAppVersion: "0.12.0" } },
-                { messageId: "apiNotAvailable", line: 7, data: { qualifiedName: "Workspace.duplicateLeaf", sinceVersion: "0.13.8", minAppVersion: "0.12.0" } },
-                { messageId: "apiNotAvailable", line: 8, data: { qualifiedName: "Workspace.duplicateLeaf", sinceVersion: "0.13.8", minAppVersion: "0.12.0" } },
+                { messageId: "apiNotAvailableRaise", line: 6, data: { qualifiedName: "Workspace.duplicateLeaf", sinceVersion: "0.13.8", minAppVersion: "0.12.0" } },
+                { messageId: "apiNotAvailableRaise", line: 7, data: { qualifiedName: "Workspace.duplicateLeaf", sinceVersion: "0.13.8", minAppVersion: "0.12.0" } },
+                { messageId: "apiNotAvailableRaise", line: 8, data: { qualifiedName: "Workspace.duplicateLeaf", sinceVersion: "0.13.8", minAppVersion: "0.12.0" } },
             ],
         },
         {
@@ -223,7 +223,7 @@ ruleTester.run("no-unsupported-api: the first typings that declare a member", ru
             `,
             options: [{ minAppVersion: "0.11.0" }],
             errors: [
-                { messageId: "apiNotAvailable", line: 4, data: { qualifiedName: "Editor.getValue", sinceVersion: "0.11.7", minAppVersion: "0.11.0" } },
+                { messageId: "apiNotAvailableCheck", line: 4, data: { qualifiedName: "Editor.getValue", sinceVersion: "0.11.7", minAppVersion: "0.11.0" } },
             ],
         },
         {
