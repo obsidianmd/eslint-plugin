@@ -91,6 +91,7 @@ describe("ruleCreator", () => {
 
     it("keeps the rule's meta", () => {
         assert.strictEqual(reportIdentifiers.meta.messages.found, "{{prefix}}{{name}}");
+        // eslint-disable-next-line @typescript-eslint/no-deprecated -- the top-level defaultOptions, which typescript-eslint 8.35.1 reads (see PluginRule)
         assert.deepStrictEqual(reportIdentifiers.defaultOptions, [{ prefix: "default:" }]);
     });
 });

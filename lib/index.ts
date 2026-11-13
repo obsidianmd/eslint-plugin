@@ -437,6 +437,7 @@ const flatRecommendedGeneralRules: RulesConfig = {
 // (tools/update-eslint-recommended.js), so this is that config for the
 // installed version.
 const coreRecommendedRules: RulesConfig = Object.fromEntries(
+    // eslint-disable-next-line @typescript-eslint/no-deprecated -- ESLint has no other way to list its core rules
     [...builtinRules]
         .filter(([, rule]) => !rule.meta?.deprecated && rule.meta?.docs?.recommended === true)
         .map(([ruleId]) => [ruleId, "error" as const]),

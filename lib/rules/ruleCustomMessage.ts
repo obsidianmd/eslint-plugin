@@ -170,6 +170,7 @@ export default ruleCreator<Options, MessageIds>({
             // Only a core rule can be named here: a plugin's rule would have to
             // come as an object in the options, and ESLint copies the options
             // with structuredClone, which cannot copy a rule's functions.
+            // eslint-disable-next-line @typescript-eslint/no-deprecated -- ESLint has no other way to reach a core rule
             const rule = builtinRules.get(ruleName) as unknown as ESLintRule | undefined;
 
             if (!rule) {

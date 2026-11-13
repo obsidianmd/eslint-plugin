@@ -33,6 +33,7 @@ const upstream = (tseslint.plugin as unknown as { rules: Record<string, RuleModu
 // "obsidian"` augmentation) keeps its declaration outside obsidian.d.ts, so those
 // types are reported exactly as before.
 const rule: TSESLint.RuleModule<string, readonly unknown[], PluginDocs> = {
+    // eslint-disable-next-line @typescript-eslint/no-deprecated -- the upstream rule's, which typescript-eslint 8.35.1 reads only here (see PluginRule)
     defaultOptions: upstream.defaultOptions,
     meta: {
         ...upstream.meta,

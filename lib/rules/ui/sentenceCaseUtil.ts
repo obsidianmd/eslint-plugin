@@ -240,7 +240,7 @@ export function getContextFilename<MessageId extends string>(
     if (hasPhysicalFilename(context) && typeof context.physicalFilename === "string") {
         return context.physicalFilename;
     }
-    const filename = context.getFilename();
+    const filename = context.filename;
     return typeof filename === "string" ? filename : null;
 }
 

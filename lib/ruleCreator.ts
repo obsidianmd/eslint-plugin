@@ -38,13 +38,28 @@ export interface PluginDocs {
 }
 
 /**
+ * A rule as ruleCreator() takes it. typescript-eslint deprecates the top-level
+ * `defaultOptions` in favour of `meta.defaultOptions`, but the oldest
+ * typescript-eslint this plugin supports, 8.35.1, reads only the top-level
+ * one: with `meta.defaultOptions` alone, a rule there would run without its
+ * defaults. So the rules keep it, under this declaration of their own.
+ */
+export type PluginRule<Options extends readonly unknown[], MessageIds extends string> = Omit<
+	ESLintUtils.RuleWithMeta<Options, MessageIds, PluginDocs>,
+	"defaultOptions"
+> & {
+	/** The options the rule runs with, merged under those the user gives. */
+	defaultOptions?: Readonly<Options>;
+};
+
+/**
  * Creates a JavaScript/TypeScript rule. Every rule made here returns no
  * visitors for a file in another language, so a type-aware rule does not throw
  * from getParserServices() and abort the whole lint run on LICENSE or
  * manifest.json.
  */
 export function ruleCreator<Options extends readonly unknown[], MessageIds extends string>(
-	rule: Readonly<ESLintUtils.RuleWithMeta<Options, MessageIds, PluginDocs>>,
+	rule: Readonly<PluginRule<Options, MessageIds>>,
 ): TSESLint.RuleModule<MessageIds, Options, PluginDocs> {
 	return ESLintUtils.RuleCreator.withoutDocs<Options, MessageIds>({
 		...rule,

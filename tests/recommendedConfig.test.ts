@@ -802,6 +802,7 @@ describe("core JS rules are the installed ESLint's recommended set", () => {
 			});
 
 			it("holds every rule this ESLint recommends, at error", () => {
+				// eslint-disable-next-line @typescript-eslint/no-deprecated -- ESLint has no other way to reach its core rules
 				const recommended = [...builtinRules]
 					.filter(([, rule]) => !rule.meta?.deprecated && rule.meta?.docs?.recommended === true)
 					.map(([ruleId]) => ruleId);
@@ -812,6 +813,7 @@ describe("core JS rules are the installed ESLint's recommended set", () => {
 			it("names only rules this ESLint has, none of them deprecated", () => {
 				assert.deepStrictEqual(
 					Object.keys(coreRules).filter(ruleId => {
+						// eslint-disable-next-line @typescript-eslint/no-deprecated -- ESLint has no other way to reach its core rules
 						const rule = builtinRules.get(ruleId);
 						return !rule || rule.meta?.deprecated || rule.meta?.docs?.recommended !== true;
 					}),

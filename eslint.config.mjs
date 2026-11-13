@@ -44,6 +44,9 @@ export default [
             "obsidianmd/no-nodejs-modules": "off",
             "obsidianmd/regex-lookbehind": "off",
             "obsidianmd/hardcoded-config-path": "off",
+            // The recommended config keeps a plugin from turning off the
+            // checks Obsidian's review relies on; this repo is not reviewed.
+            "eslint-comments/no-restricted-disable": "off",
         },
     },
     // eslint-plugin-import is what the recommended config's import rules come

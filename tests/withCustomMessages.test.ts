@@ -9,6 +9,7 @@ import plugin from "../lib/index.js";
 
 const { withCustomMessages } = plugin;
 
+// eslint-disable-next-line @typescript-eslint/no-deprecated -- ESLint has no other way to reach its core rules
 const coreRule = (name: string) => builtinRules.get(name) as Rule.RuleModule;
 
 const lint = (rule: Rule.RuleModule, ruleConfig: Linter.RuleEntry, code: string, settings?: Record<string, unknown>) => {
@@ -34,6 +35,7 @@ describe("withCustomMessages", () => {
         const wrapped = withCustomMessages(original, { "Unexpected any": "Custom" });
         assert.notStrictEqual(wrapped, original);
         assert.strictEqual(wrapped.meta, original.meta);
+        // eslint-disable-next-line @typescript-eslint/no-deprecated -- the top-level defaultOptions, which typescript-eslint 8.35.1 reads (see PluginRule)
         assert.strictEqual(wrapped.defaultOptions, original.defaultOptions);
         assert.notStrictEqual(wrapped.create, create);
         assert.strictEqual(original.create, create);
