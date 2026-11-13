@@ -1,6 +1,6 @@
 import { TSESTree, TSESLint } from "@typescript-eslint/utils";
-import { valid as semverValid } from "semver";
 import { getManifest } from "../../manifest.js";
+import { toVersion } from "../../minAppVersion.js";
 import { staticMemberName } from "../../memberName.js";
 
 /**
@@ -60,11 +60,12 @@ export function resolveMinAppVersion(
     context: TSESLint.RuleContext<string, readonly [{ minAppVersion?: string }?]>,
 ): string | null {
     const option = context.options[0]?.minAppVersion;
-    const resolved = option ?? getManifest()?.minAppVersion;
-    if (!resolved || !semverValid(resolved)) {
+    const resolved: unknown = option ?? getManifest()?.minAppVersion;
+    // "1.13" is 1.13.0, as no-unsupported-api reads it.
+    if ((typeof resolved !== "string" && typeof resolved !== "number") || resolved === "") {
         return null;
     }
-    return resolved;
+    return toVersion(String(resolved)) ?? null;
 }
 
 /**

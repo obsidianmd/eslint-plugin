@@ -1,4 +1,5 @@
 import { ASTUtils, TSESTree } from "@typescript-eslint/utils";
+import ts from "typescript";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 // We want to catch patterns like:
@@ -133,14 +134,54 @@ export default ruleCreator({
     },
     defaultOptions: [],
     create(context) {
+        // With type information, the TypeScript type of an identifier: "shadow"
+        // for a ShadowRoot, "other" for another known type, and undefined
+        // where there is none, or the type is `any`, `unknown` or a type
+        // parameter, which tell nothing.
+        const program = context.sourceCode.parserServices?.program;
+        const parserServices = context.sourceCode.parserServices;
+        function typeKind(node: TSESTree.Identifier): "shadow" | "other" | undefined {
+            if (!program || !parserServices?.esTreeNodeToTSNodeMap) {
+                return undefined;
+            }
+            const checker = program.getTypeChecker();
+            const type = checker.getTypeAtLocation(parserServices.esTreeNodeToTSNodeMap.get(node));
+            const parts = type.isUnion() ? type.types : [type];
+            let known = false;
+            for (const part of parts) {
+                const flags = part.getFlags();
+                if (flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.TypeParameter)) {
+                    return undefined;
+                }
+                if (flags & (ts.TypeFlags.Null | ts.TypeFlags.Undefined)) {
+                    continue;
+                }
+                const name = (part.aliasSymbol ?? part.getSymbol())?.getName();
+                if (name === "ShadowRoot") {
+                    return "shadow";
+                }
+                // What getRootNode() and similar return may be a shadow root.
+                if (name !== undefined && SHADOW_ROOT_SUPERTYPES.has(name)) {
+                    return undefined;
+                }
+                known = true;
+            }
+            return known ? "other" : undefined;
+        }
+
         // Whether `node` is a shadow root, or an element created inside one:
-        // `el.attachShadow(…)`, `el.shadowRoot`, a `shadowRoot` variable or
-        // parameter, one typed `ShadowRoot`, a `const` holding any of these,
-        // and `x.createEl(…)`/`createDiv()`/`createSpan()` on one, as in
-        // `const head = shadowRoot.createEl("head")`. styles.css does not reach
-        // into a shadow root, so a `<style>` or `<link>` there is the only way
-        // to style it.
+        // `el.attachShadow(…)`, `el.shadowRoot`, a variable or parameter typed
+        // `ShadowRoot`, a `const` holding any of these, or a `let` every write
+        // of which is one, and `x.createEl(…)`/`createDiv()`/`createSpan()` on
+        // one, as in `const head = shadowRoot.createEl("head")`. Only a
+        // `shadowRoot` named by nothing else, such as a global or an untyped
+        // parameter, counts by its name: `const shadowRoot = document.head`
+        // is the document's head. styles.css does not reach into a shadow
+        // root, so a `<style>` or `<link>` there is the only way to style it.
         function isInShadowRoot(node: TSESTree.Node, seen = new Set<TSESTree.Node>()): boolean {
+            if (isShadowRootAssertion(node)) {
+                return true;
+            }
             node = skipTypeAssertions(node);
             if (node.type === TSESTree.AST_NODE_TYPES.ChainExpression) {
                 return isInShadowRoot(node.expression, seen);
@@ -169,37 +210,73 @@ export default ruleCreator({
                 return false;
             }
             seen.add(node);
-            if (node.name === "shadowRoot") {
+            const kind = typeKind(node);
+            if (kind === "shadow") {
                 return true;
             }
+            const byName = kind === undefined && node.name === "shadowRoot";
             const variable = ASTUtils.findVariable(context.sourceCode.getScope(node), node);
-            if (variable?.defs.length !== 1) {
+            if (variable === null) {
+                return byName;
+            }
+            if (variable.defs.length !== 1) {
                 return false;
             }
             const def = variable.defs[0];
             const annotation = (def.name as TSESTree.Identifier).typeAnnotation?.typeAnnotation;
-            if (
-                annotation?.type === TSESTree.AST_NODE_TYPES.TSTypeReference &&
-                annotation.typeName.type === TSESTree.AST_NODE_TYPES.Identifier &&
-                annotation.typeName.name === "ShadowRoot"
-            ) {
-                return true;
+            if (annotation !== undefined) {
+                return (
+                    annotation.type === TSESTree.AST_NODE_TYPES.TSTypeReference &&
+                    annotation.typeName.type === TSESTree.AST_NODE_TYPES.Identifier &&
+                    annotation.typeName.name === "ShadowRoot"
+                );
             }
-            return (
-                def.type === "Variable" &&
-                def.parent.kind === "const" &&
-                def.node.id === def.name &&
-                def.node.init !== null &&
-                isInShadowRoot(def.node.init, seen)
-            );
+            if (def.type !== "Variable" || def.node.id !== def.name) {
+                // A parameter, or a name destructured or imported.
+                return byName;
+            }
+            const writes = variable.references.filter((reference) => reference.writeExpr);
+            if (writes.length === 0) {
+                return byName;
+            }
+            const holds = (value: TSESTree.Node) =>
+                isInShadowRoot(value, seen) || (byName && !isInDocument(value));
+            if (def.parent.kind === "const") {
+                return def.node.init !== null && holds(def.node.init);
+            }
+            return writes.every((reference) => holds(reference.writeExpr!));
         }
 
-        // Whether the element `call` creates is only ever inserted into a
-        // shadow root: `shadowRoot.appendChild(document.createElement("style"))`,
-        // or a `const` holding it that every `appendChild()`, `append()`,
-        // `prepend()` or `insertBefore()` call passes to a shadow root. An
-        // element that is never inserted in the file is still reported.
-        function isInsertedOnlyIntoShadowRoot(call: TSESTree.CallExpression): boolean {
+        // Whether `node` is known to be the document or an element outside a
+        // shadow root: `document.head`, `activeDocument.body`,
+        // `document.querySelector(…)`, `document.createElement(…)`, or
+        // `createEl(…)`/`createDiv()`/`createSpan()` on one of these.
+        function isInDocument(node: TSESTree.Node): boolean {
+            node = skipTypeAssertions(node);
+            if (node.type === TSESTree.AST_NODE_TYPES.ChainExpression) {
+                return isInDocument(node.expression);
+            }
+            if (isDocument(node)) {
+                return true;
+            }
+            if (node.type === TSESTree.AST_NODE_TYPES.MemberExpression) {
+                return isInDocument(node.object);
+            }
+            if (
+                node.type === TSESTree.AST_NODE_TYPES.CallExpression &&
+                node.callee.type === TSESTree.AST_NODE_TYPES.MemberExpression
+            ) {
+                return isInDocument(node.callee.object);
+            }
+            return false;
+        }
+
+        // The nodes the element `call` creates is inserted into: directly, as in
+        // `shadowRoot.appendChild(document.createElement("style"))`, or through
+        // a `const` holding it, by `appendChild()`, `append()`, `prepend()`,
+        // `insertBefore()` or `insertAdjacentElement()`. Undefined where the
+        // element is held otherwise, so where it goes is not known.
+        function getInsertionTargets(call: TSESTree.CallExpression): TSESTree.Node[] | undefined {
             let node: TSESTree.Node = call;
             while (
                 node.parent?.type === TSESTree.AST_NODE_TYPES.TSAsExpression ||
@@ -211,7 +288,7 @@ export default ruleCreator({
             }
             const insertion = getInsertionTarget(node);
             if (insertion !== undefined) {
-                return isInShadowRoot(insertion);
+                return [insertion];
             }
             const declarator = node.parent;
             if (
@@ -220,24 +297,20 @@ export default ruleCreator({
                 declarator.id.type !== TSESTree.AST_NODE_TYPES.Identifier ||
                 declarator.parent.kind !== "const"
             ) {
-                return false;
+                return undefined;
             }
             const variable = ASTUtils.findVariable(context.sourceCode.getScope(declarator), declarator.id);
             if (variable === null) {
-                return false;
+                return undefined;
             }
-            let inserted = false;
+            const targets: TSESTree.Node[] = [];
             for (const reference of variable.references) {
                 const target = getInsertionTarget(reference.identifier);
-                if (target === undefined) {
-                    continue;
+                if (target !== undefined) {
+                    targets.push(target);
                 }
-                if (!isInShadowRoot(target)) {
-                    return false;
-                }
-                inserted = true;
             }
-            return inserted;
+            return targets;
         }
 
         // The node `element` is inserted into, when it is an argument of
@@ -252,7 +325,13 @@ export default ruleCreator({
                 return undefined;
             }
             const method = getMemberName(call.callee);
-            if (method === "insertBefore" ? call.arguments[0] === element : INSERTION_METHODS.has(method ?? "")) {
+            if (
+                method === "insertBefore"
+                    ? call.arguments[0] === element
+                    : method === "insertAdjacentElement"
+                      ? call.arguments[1] === element
+                      : INSERTION_METHODS.has(method ?? "")
+            ) {
                 return call.callee.object;
             }
             return undefined;
@@ -290,9 +369,14 @@ export default ruleCreator({
                         !isForbiddenCreateElementCall(node)
                             ? node.callee.object
                             : undefined;
+                    // Created in a shadow root, it stays exempt unless it is moved
+                    // out of it; created elsewhere, it is exempt when it is
+                    // inserted, and only ever into a shadow root.
+                    const targets = getInsertionTargets(node) ?? [];
+                    const intoShadowRoot = targets.every((target) => isInShadowRoot(target));
                     if (
-                        (receiver !== undefined && isInShadowRoot(receiver)) ||
-                        isInsertedOnlyIntoShadowRoot(node)
+                        intoShadowRoot &&
+                        ((receiver !== undefined && isInShadowRoot(receiver)) || targets.length > 0)
                     ) {
                         return;
                     }
@@ -310,6 +394,20 @@ export default ruleCreator({
 });
 
 const INSERTION_METHODS = new Set(["appendChild", "append", "prepend"]);
+
+// The types a ShadowRoot is also: a value of one of them may be a shadow root.
+const SHADOW_ROOT_SUPERTYPES = new Set(["Node", "DocumentFragment", "EventTarget"]);
+
+// `x as ShadowRoot` or `<ShadowRoot>x`, as in `el.getRootNode() as ShadowRoot`.
+function isShadowRootAssertion(node: TSESTree.Node): boolean {
+    return (
+        (node.type === TSESTree.AST_NODE_TYPES.TSAsExpression ||
+            node.type === TSESTree.AST_NODE_TYPES.TSTypeAssertion) &&
+        node.typeAnnotation.type === TSESTree.AST_NODE_TYPES.TSTypeReference &&
+        node.typeAnnotation.typeName.type === TSESTree.AST_NODE_TYPES.Identifier &&
+        node.typeAnnotation.typeName.name === "ShadowRoot"
+    );
+}
 
 function getMemberName(node: TSESTree.MemberExpression): string | undefined {
     if (!node.computed && node.property.type === TSESTree.AST_NODE_TYPES.Identifier) {
