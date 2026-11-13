@@ -270,7 +270,12 @@ const WINDOW_ONLY_RULES = new Set([
     "obsidianmd/prefer-instanceof",
     "obsidianmd/prefer-window-timers",
 ]);
+// Worker code is named `worker.ts`, `*.worker.ts`, `*-worker.ts` or
+// `*_worker.ts`, or sits in a `workers/` directory. Not a `worker/` directory:
+// one can hold the main-thread code that starts the worker, such as
+// `src/worker/loader.ts` beside `src/worker/image.worker.ts`.
 const WORKER_FILES = [
+    '**/worker.{ts,cts,mts,tsx,js,cjs,mjs,jsx}',
     '**/*.worker.{ts,cts,mts,tsx,js,cjs,mjs,jsx}',
     '**/*-worker.{ts,cts,mts,tsx,js,cjs,mjs,jsx}',
     '**/*_worker.{ts,cts,mts,tsx,js,cjs,mjs,jsx}',
@@ -307,8 +312,10 @@ const obsidianGlobals = {
 // Obsidian (no-unsupported-api) or on iOS before 16.4 (regex-lookbehind). They
 // are the window-only rules plus these, and rule-custom-message's no-console,
 // which the blocks below handle. A file path is all it takes to match
-// TEST_FILES, so no security rule may be listed here; the community scanner
-// does not lint tests at all.
+// TEST_FILES, so no security rule may be listed here. no-forbidden-elements
+// and regex-lookbehind are not: they keep CSS in styles.css and code working on
+// older iOS, which tests and tools need not. The community scanner, which does
+// not lint tests at all, reports both in every other file whatever its name.
 const OBSIDIAN_RUNTIME_RULES = new Set([
     ...WINDOW_ONLY_RULES,
     "obsidianmd/hardcoded-config-path",
