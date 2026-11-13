@@ -91,6 +91,7 @@ function hasInstanceOfMethod(type: ts.Type): boolean {
 const MAX_DEPTH = 5;
 
 const NODE_TYPE = new Set(["Node"]);
+const UI_EVENT_TYPE = new Set(["UIEvent"]);
 const EVENT_TARGET_TYPE = new Set(["EventTarget"]);
 
 // The properties of an event that hold an EventTarget: a node, but also a
@@ -208,6 +209,15 @@ export default ruleCreator<MinAppVersionOptions, SuggestionId | `${SuggestionId}
                     return;
                 }
 
+                // `el instanceof Widget`, where `Widget` is abstract or its
+                // constructor needs arguments, cannot become
+                // `el.instanceOf(Widget)`, which takes a `new () => T`. Such a
+                // class is the code's own, not one of a window's, so
+                // `instanceof` finds it in every window.
+                if (!fitsInstanceOf(node.left, node.right, leftType)) {
+                    return;
+                }
+
                 // `null instanceof HTMLElement` is false, but `null.instanceOf()`
                 // throws. A value that may be null or undefined keeps that
                 // check with `?.`, which only a suggestion offers.
@@ -223,7 +233,9 @@ export default ruleCreator<MinAppVersionOptions, SuggestionId | `${SuggestionId}
                     ? `(${rightText})`
                     : rightText;
                 const replacement = `${leftText}${nullable ? "?." : "."}instanceOf(${argumentText})`;
-                const canAutofix = hasInstanceOfMethod(leftType) && !nullable;
+                // A comment outside the operands, as in
+                // `el /* popout-safe? */ instanceof HTMLElement`, would be lost.
+                const canAutofix = hasInstanceOfMethod(leftType) && !nullable && !hasCommentOutsideOperands(node);
                 if (instanceOfSupported === false) {
                     context.report({ node, messageId: "preferInstanceof", data: { className: argumentText } });
                     return;
@@ -256,6 +268,84 @@ export default ruleCreator<MinAppVersionOptions, SuggestionId | `${SuggestionId}
                 });
             },
         };
+
+        function hasCommentOutsideOperands(node: TSESTree.BinaryExpression): boolean {
+            const within = (comment: TSESTree.Comment, operand: TSESTree.Node) =>
+                comment.range[0] >= operand.range[0] && comment.range[1] <= operand.range[1];
+            return context.sourceCode
+                .getCommentsInside(node)
+                .some((comment) => !within(comment, node.left) && !within(comment, node.right));
+        }
+
+        // Whether the class on the right can be passed to the left's
+        // instanceOf(): `Node.instanceOf(type: { new (): T })` takes a class
+        // that is not abstract and can be made without arguments, and
+        // `UIEvent.instanceOf(type: { new (...data: any[]): T })` one that is
+        // not abstract. Where the types cannot tell, it can.
+        function fitsInstanceOf(left: TSESTree.Node, right: TSESTree.Node, leftType: ts.Type): boolean {
+            const rightType = services.getTypeAtLocation(right);
+            if ((rightType.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) !== 0) {
+                return true;
+            }
+            const rightSignatures = checker.getSignaturesOfType(rightType, ts.SignatureKind.Construct);
+            if (rightSignatures.length === 0) {
+                return true;
+            }
+            const symbol = rightType.getSymbol();
+            if (
+                symbol !== undefined &&
+                (symbol.flags & ts.SymbolFlags.Class) !== 0 &&
+                (symbol.declarations ?? []).some(
+                    (declaration) => ts.isClassLike(declaration) && (ts.getCombinedModifierFlags(declaration) & ts.ModifierFlags.Abstract) !== 0,
+                )
+            ) {
+                return false;
+            }
+            const instanceOf = withoutNullish(leftType).getProperty("instanceOf");
+            if (instanceOf === undefined) {
+                // Without Obsidian's types, the suggestion is for theirs.
+                return extendsLibType(leftType, UI_EVENT_TYPE, services) ||
+                    rightSignatures.some((signature) => requiredParameters(signature) === 0);
+            }
+            const method = checker.getTypeOfSymbolAtLocation(instanceOf, services.esTreeNodeToTSNodeMap.get(left));
+            const parameter = method.getCallSignatures()[0]?.getParameters()[0];
+            const parameterDeclaration = parameter?.valueDeclaration;
+            if (parameter === undefined || parameterDeclaration === undefined) {
+                return true;
+            }
+            const targets = checker.getSignaturesOfType(
+                checker.getTypeOfSymbolAtLocation(parameter, parameterDeclaration),
+                ts.SignatureKind.Construct,
+            );
+            if (targets.length === 0) {
+                return true;
+            }
+            return targets.some((target) => {
+                const accepts = hasRestParameter(target) ? Infinity : target.getParameters().length;
+                return rightSignatures.some((signature) => requiredParameters(signature) <= accepts);
+            });
+        }
+
+        function parameterDeclarations(signature: ts.Signature): (ts.ParameterDeclaration | undefined)[] {
+            return signature.getParameters().map((parameter) => {
+                const declaration = parameter.valueDeclaration;
+                return declaration !== undefined && ts.isParameter(declaration) ? declaration : undefined;
+            });
+        }
+
+        function requiredParameters(signature: ts.Signature): number {
+            return parameterDeclarations(signature).filter(
+                (declaration) =>
+                    declaration !== undefined &&
+                    declaration.questionToken === undefined &&
+                    declaration.initializer === undefined &&
+                    declaration.dotDotDotToken === undefined,
+            ).length;
+        }
+
+        function hasRestParameter(signature: ts.Signature): boolean {
+            return parameterDeclarations(signature).some((declaration) => declaration?.dotDotDotToken !== undefined);
+        }
 
         // Whether `right` reads the constructor from a window object other than
         // the global ones: `doc.defaultView!.HTMLElement`, `el.win.MouseEvent`,
@@ -665,11 +755,55 @@ export default ruleCreator<MinAppVersionOptions, SuggestionId | `${SuggestionId}
             // Without strictNullChecks TypeScript leaves null and undefined out of
             // every type, so getNullableType() returns the type unchanged.
             if (checker.getNullableType(type, ts.TypeFlags.Null) !== type) {
-                return false;
+                // `e.relatedTarget as HTMLElement` drops the `null` from the
+                // type, but not from the value, which the check guards against.
+                return assertsAwayNullish(node, 0);
             }
             // The types cannot tell then, so read the declarations instead:
             // `const child = el.firstElementChild` is declared `Element | null`.
             return isDeclaredNullable(node, 0);
+        }
+
+        // With strictNullChecks, whether `node` is, or is a variable set to, a
+        // type assertion (`as` or `<T>`) of a value whose type includes null or
+        // undefined, such as `e.relatedTarget as HTMLElement`. A non-null
+        // assertion (`!`) says the value is there, and is believed.
+        function assertsAwayNullish(node: ts.Node, depth: number): boolean {
+            if (depth > MAX_DEPTH) {
+                return false;
+            }
+            if (ts.isParenthesizedExpression(node) || node.kind === ts.SyntaxKind.SatisfiesExpression) {
+                return assertsAwayNullish((node as ts.ParenthesizedExpression).expression, depth);
+            }
+            if (ts.isAsExpression(node) || ts.isTypeAssertionExpression(node)) {
+                return typeIncludesNullish(checker.getTypeAtLocation(node.expression)) ||
+                    assertsAwayNullish(node.expression, depth);
+            }
+            if (ts.isConditionalExpression(node)) {
+                return assertsAwayNullish(node.whenTrue, depth) || assertsAwayNullish(node.whenFalse, depth);
+            }
+            if (
+                ts.isBinaryExpression(node) &&
+                (node.operatorToken.kind === ts.SyntaxKind.BarBarToken ||
+                    node.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken ||
+                    node.operatorToken.kind === ts.SyntaxKind.CommaToken)
+            ) {
+                return assertsAwayNullish(node.right, depth);
+            }
+            if (ts.isIdentifier(node)) {
+                let symbol = checker.getSymbolAtLocation(node);
+                if (symbol && symbol.flags & ts.SymbolFlags.Alias) {
+                    symbol = checker.getAliasedSymbol(symbol);
+                }
+                const declaration = symbol?.valueDeclaration;
+                return (
+                    declaration !== undefined &&
+                    ts.isVariableDeclaration(declaration) &&
+                    declaration.initializer !== undefined &&
+                    assertsAwayNullish(declaration.initializer, depth + 1)
+                );
+            }
+            return false;
         }
 
         function typeIncludesNullish(type: ts.Type): boolean {
@@ -708,7 +842,9 @@ export default ruleCreator<MinAppVersionOptions, SuggestionId | `${SuggestionId}
                 return false;
             }
             if (ts.isAsExpression(node) || ts.isTypeAssertionExpression(node)) {
-                return typeNodeIncludesNullish(node.type, depth);
+                // `e.relatedTarget as HTMLElement` is still null where
+                // `relatedTarget` is.
+                return typeNodeIncludesNullish(node.type, depth) || isDeclaredNullable(node.expression, depth);
             }
             if (ts.isOptionalChain(node)) {
                 return true;
@@ -755,10 +891,12 @@ export default ruleCreator<MinAppVersionOptions, SuggestionId | `${SuggestionId}
                 return false;
             }
             if (ts.isVariableDeclaration(declaration)) {
-                if (declaration.type) {
-                    return typeNodeIncludesNullish(declaration.type, depth);
-                }
-                return declaration.initializer !== undefined && isDeclaredNullable(declaration.initializer, depth + 1);
+                // Without strictNullChecks, `const input: Element = root.querySelector("input")`
+                // compiles, and the annotation says nothing about null.
+                return (
+                    (declaration.type !== undefined && typeNodeIncludesNullish(declaration.type, depth)) ||
+                    (declaration.initializer !== undefined && isDeclaredNullable(declaration.initializer, depth + 1))
+                );
             }
             if (ts.isParameter(declaration)) {
                 return (
@@ -778,7 +916,8 @@ export default ruleCreator<MinAppVersionOptions, SuggestionId | `${SuggestionId}
                 ) {
                     return (
                         declaration.questionToken !== undefined ||
-                        (declaration.type !== undefined && typeNodeIncludesNullish(declaration.type, depth))
+                        (declaration.type !== undefined && typeNodeIncludesNullish(declaration.type, depth)) ||
+                        (ts.isPropertyDeclaration(declaration) && isUnsetField(declaration))
                     );
                 }
                 if (ts.isGetAccessorDeclaration(declaration)) {
@@ -786,6 +925,37 @@ export default ruleCreator<MinAppVersionOptions, SuggestionId | `${SuggestionId}
                 }
                 return false;
             });
+        }
+
+        // Without strictNullChecks, whether a class field may still be undefined
+        // when it is read: `inputEl: Element;` with no initializer, no `!`, no
+        // `declare`, and no `this.inputEl = …` among the constructor's own
+        // statements. A view that creates it in onOpen() checks it with
+        // `this.inputEl instanceof HTMLInputElement` before then.
+        function isUnsetField(declaration: ts.PropertyDeclaration): boolean {
+            if (
+                declaration.initializer !== undefined ||
+                declaration.exclamationToken !== undefined ||
+                (ts.getCombinedModifierFlags(declaration) & (ts.ModifierFlags.Ambient | ts.ModifierFlags.Static | ts.ModifierFlags.Abstract)) !== 0 ||
+                !ts.isClassLike(declaration.parent)
+            ) {
+                return false;
+            }
+            const name = declaration.name;
+            if (!ts.isIdentifier(name) && !ts.isPrivateIdentifier(name)) {
+                return false;
+            }
+            const constructor = declaration.parent.members.find(
+                (member): member is ts.ConstructorDeclaration => ts.isConstructorDeclaration(member) && member.body !== undefined,
+            );
+            return !(constructor?.body?.statements ?? []).some((statement) =>
+                ts.isExpressionStatement(statement) &&
+                ts.isBinaryExpression(statement.expression) &&
+                statement.expression.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+                ts.isPropertyAccessExpression(statement.expression.left) &&
+                statement.expression.left.expression.kind === ts.SyntaxKind.ThisKeyword &&
+                statement.expression.left.name.text === name.text
+            );
         }
 
         function typeNodeIncludesNullish(node: ts.TypeNode, depth: number): boolean {
