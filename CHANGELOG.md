@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `no-forbidden-elements` no longer takes a variable for a shadow root by its name alone: `const shadowRoot = document.head; shadowRoot.createEl("style")` adds a `<style>` to the document's head, and is now reported. The name still counts where nothing else tells what the variable holds, such as an untyped parameter or `el.getRootNode()`; a declaration, a type annotation or, with type information, the variable's type decides first. A `<style>` or `<link>` created in a shadow root and then moved into the document, as in `document.head.insertAdjacentElement("beforeend", style)` or `document.head.appendChild(style)`, is reported too, and `insertAdjacentElement()` into a shadow root counts as inserting into it ([#TBD](https://github.com/obsidianmd/eslint-plugin/pull/TBD)).
+
 ## [0.5.1] - 2026-11-06
 
 Fixes for findings on correct code, and for fixes and suggestions that changed what correct
