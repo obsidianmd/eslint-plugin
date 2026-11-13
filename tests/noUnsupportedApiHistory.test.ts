@@ -193,6 +193,27 @@ ruleTester.run("no-unsupported-api: the first typings that declare a member", ru
             `,
             options: [{ minAppVersion: "0.11.7" }],
         },
+        {
+            // View.icon was `string` until 1.1.0 typed it `IconName`, which is
+            // `type IconName = string`: the same type, so the member is as old
+            // as the 0.9.7 typings.
+            name: "a member whose type only became an alias of the same type",
+            code: `
+                import { ItemView, View, WorkspaceLeaf } from 'obsidian';
+                class MyView extends ItemView {
+                    constructor(leaf: WorkspaceLeaf) {
+                        super(leaf);
+                        this.icon = "dice";
+                    }
+                    getViewType() { return "my-view"; }
+                    getDisplayText() { return "My view"; }
+                }
+                declare const view: View;
+                const icon: string = view.icon;
+                const shown: string = view.getIcon();
+            `,
+            options: [{ minAppVersion: "0.15.0" }],
+        },
     ],
     invalid: [
         {
@@ -425,6 +446,20 @@ ruleTester.run("no-unsupported-api: feature checks, overrides and Plugin.setting
                 }
             `,
             options: [{ minAppVersion: "0.15.0" }],
+        },
+        {
+            // onUserEnable() is first in the 1.7.2 typings, and only Obsidian
+            // calls it: its body runs on 1.7.2 or later.
+            name: "an onUserEnable() override, which only 1.7.2 calls",
+            code: `
+                import { Plugin } from 'obsidian';
+                export default class MyPlugin extends Plugin {
+                    onUserEnable() {
+                        this.app.workspace.ensureSideLeaf("my-view", "right");
+                    }
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
         },
         {
             // pdf-plus: `this.hoverEditorPlugin?.settings`.

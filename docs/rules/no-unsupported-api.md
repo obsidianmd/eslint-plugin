@@ -85,7 +85,9 @@ its `@since` and the first release from which on every release, up to your `obsi
 signature the use fits:
 
 - any use fits a signature written the same as today's, with each interface, type alias and enum it
-  names declared the same as in your typings;
+  names declared the same as in your typings. A type alias also counts as the type it stands for:
+  `View.icon` was `string` before 1.1.0 typed it `IconName`, which is `type IconName = string`, so
+  `this.icon = "dice"` and `view.getIcon()` need only the 0.9.7 typings;
 - a call also fits an older signature it can make the same way: it passes at least the arguments
   that one requires and no more than it takes, and each argument is one the older parameter takes
   too. That is the same type; or a parameter of `string`, `number`, `boolean`, `null`, `undefined`,
@@ -196,7 +198,7 @@ That holds:
 - when several checks are combined: `a && b` proves the higher version, and `a || b` the lower;
 - inside an override of a method only Obsidian calls, from the release that added it on:
   `getSettingDefinitions()`, `getControlValue()` and `setControlValue()` (1.13.0),
-  `onExternalSettingsChange()` (1.5.7) and `onPaneMenu()` (0.15.3), so `this.refreshDomState()` in
+  `onExternalSettingsChange()` (1.5.7), `onPaneMenu()` (0.15.3) and `onUserEnable()` (1.7.2), so `this.refreshDomState()` in
   `getSettingDefinitions()` is allowed. Not in a file that also names the method other than as
   `super.name`, such as `this.getSettingDefinitions()`, since the plugin may then call it on an
   older Obsidian itself.

@@ -6,6 +6,19 @@ const ruleTester = new RuleTester();
 ruleTester.run("no-static-styles-assignment", noInlineStylesRule, {
     valid: [
         {
+            // A plugin's own settings, chart options and the like.
+            name: "a style object that, by type, is not an element's style",
+            code: `
+                interface Settings { style: { theme: string } }
+                declare const settings: Settings;
+                declare const chart: { style: Record<string, string> } | undefined;
+                settings.style.theme = "compact";
+                settings.style["theme"] = "compact";
+                chart!.style.shape = "round";
+                export class Node2 { style = { type: "solid" }; dash() { this.style.type = "dashed"; } }
+            `,
+        },
+        {
             // It threw a TypeError and stopped the whole ESLint run.
             name: "style.setProperty() without arguments",
             code: `
@@ -143,6 +156,24 @@ ruleTester.run("no-static-styles-assignment", noInlineStylesRule, {
         },
     ],
     invalid: [
+        {
+            name: "an element's style, by type, and a style object that may be one",
+            code: `
+                declare const el: HTMLElement;
+                declare const svg: SVGElement | null;
+                declare const css: Partial<CSSStyleDeclaration>;
+                declare const anything: any;
+                declare const holder: { style: CSSStyleDeclaration } | { style: { theme: string } };
+                el.style.color = "red";
+                svg!.style.color = "red";
+                el.style.setProperty("color", "red");
+                anything.style.color = "red";
+                holder.style.color = "red";
+                export function f<T extends { style: CSSStyleDeclaration }>(t: T) { t.style.color = "red"; }
+                ({ style: css }).style.color = "red";
+            `,
+            errors: Array.from({ length: 7 }, () => ({ messageId: "avoidStyleAssignment" as const })),
+        },
         {
             name: "style.color with literal is forbidden",
             code: "el.style.color = 'red';",
@@ -297,6 +328,22 @@ ruleTester.run("no-static-styles-assignment", noInlineStylesRule, {
                 { messageId: "avoidStyleAssignment", data: { property: "element.setAttribute" } },
                 { messageId: "avoidStyleAssignment", data: { property: "element.setAttribute" } },
             ],
+        },
+    ],
+});
+
+const untypedRuleTester = new RuleTester({
+    languageOptions: { parserOptions: { project: null, projectService: false } },
+});
+
+untypedRuleTester.run("no-static-styles-assignment without type information", noInlineStylesRule, {
+    valid: [],
+    invalid: [
+        {
+            name: "any style object is taken for an element's",
+            filename: "main.js",
+            code: "settings.style.theme = 'compact';",
+            errors: [{ messageId: "avoidStyleAssignment" }],
         },
     ],
 });

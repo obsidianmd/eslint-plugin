@@ -16,6 +16,7 @@ import {
 } from "./obsidianDeclarationHistory.js";
 import {
     classShape,
+    type InlineReference,
     indexTypeDeclarations,
     memberShape,
     normalize,
@@ -377,7 +378,14 @@ export default ruleCreator<Options, MessageId>({
             call: TSESTree.CallExpression | undefined,
             lenient = false,
         ): boolean {
-            const sameAsNow = declarations.some((declaration) => shapeOf(declaration) === shape.text);
+            // Also the shape with each type alias written as the type it stands
+            // for: `View.icon` was `string` before 1.1.0 typed it `IconName`,
+            // which is `type IconName = string`. The older shape then names
+            // only types that meant then what they mean now, so it is the
+            // same type.
+            const sameAsNow = declarations.some(
+                (declaration) => shapeOf(declaration) === shape.text || aliasFreeShapeOf(declaration) === shape.text,
+            );
             if (sameAsNow && history.sameTypes(shape.node, at, declarations[0].getSourceFile())) {
                 return true;
             }
@@ -1408,14 +1416,15 @@ function isContextSensitive(node: TSESTree.Node): boolean {
 }
 
 // Methods only Obsidian calls, which a plugin overrides: settings definitions
-// and their values (1.13), the external change to data.json (1.5.7) and the
-// pane menu (0.15.3).
+// and their values (1.13), the external change to data.json (1.5.7), the
+// pane menu (0.15.3) and the user enabling the plugin (1.7.2).
 const OBSIDIAN_CALLED_HOOKS = new Set([
     "getSettingDefinitions",
     "getControlValue",
     "setControlValue",
     "onExternalSettingsChange",
     "onPaneMenu",
+    "onUserEnable",
 ]);
 
 // A shape an older release declared a member with, from
@@ -1575,6 +1584,61 @@ function shapeOf(declaration: ts.Declaration): string | undefined {
         );
     }
     return shapes.get(declaration);
+}
+
+const aliasFreeShapes = new WeakMap<ts.Declaration, string | undefined>();
+
+// A declaration's shape with each type alias of its typings written as the
+// type it stands for, `IconName` as `string`, or undefined where it names no
+// alias.
+function aliasFreeShapeOf(declaration: ts.Declaration): string | undefined {
+    if (!aliasFreeShapes.has(declaration)) {
+        const sourceFile = declaration.getSourceFile();
+        let inlined = false;
+        const expanding = new Set<string>();
+        const inline: InlineReference = (reference) => {
+            if (!ts.isIdentifier(reference.typeName) || reference.typeArguments) {
+                return undefined;
+            }
+            const name = reference.typeName.text;
+            const alias = findTypeDeclaration(sourceFile.statements, name);
+            if (!alias || !ts.isTypeAliasDeclaration(alias) || alias.typeParameters || expanding.has(name)) {
+                return undefined;
+            }
+            expanding.add(name);
+            const text = normalize(alias.type, inline);
+            expanding.delete(name);
+            inlined = true;
+            return needsParentheses(alias.type, reference) ? `(${text})` : text;
+        };
+        const shape = ts.isFunctionDeclaration(declaration)
+            ? signatureShape(declaration, inline)
+            : memberShape(declaration, inline);
+        aliasFreeShapes.set(declaration, inlined ? shape : undefined);
+    }
+    return aliasFreeShapes.get(declaration);
+}
+
+// Whether a type written in place of `reference` needs parentheses to keep
+// its meaning: a union in an array type, `(string | null)[]`, and the like.
+function needsParentheses(type: ts.TypeNode, reference: ts.TypeReferenceNode): boolean {
+    const compound =
+        ts.isUnionTypeNode(type) ||
+        ts.isIntersectionTypeNode(type) ||
+        ts.isFunctionTypeNode(type) ||
+        ts.isConstructorTypeNode(type) ||
+        ts.isConditionalTypeNode(type);
+    const parent = reference.parent;
+    return (
+        compound &&
+        (ts.isArrayTypeNode(parent) ||
+            ts.isIndexedAccessTypeNode(parent) ||
+            ts.isTypeOperatorNode(parent) ||
+            ts.isIntersectionTypeNode(parent) ||
+            ts.isOptionalTypeNode(parent) ||
+            ts.isRestTypeNode(parent) ||
+            (ts.isUnionTypeNode(parent) && !ts.isUnionTypeNode(type)))
+    );
 }
 
 // The parameters a caller passes, without a `this: …` one.
