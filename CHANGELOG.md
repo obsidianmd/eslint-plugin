@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `prefer-window-timers` no longer rewrites `activeWindow.clearTimeout(id)` and `activeWindow.clearInterval(id)` to `window` automatically, and offers it as a suggestion instead. A timer ID belongs to the window that set the timer: where `activeWindow.setTimeout()` in a popout window set it, `window.clearTimeout(id)` did not clear it ([#266](https://github.com/obsidianmd/eslint-plugin/pull/266)).
 - The recommended config treats a file named `worker.ts` (or `worker.js` and the other extensions), such as `src/worker.ts`, as web worker code, like `*.worker.ts`. `prefer-window-timers` rewrote its `setTimeout()` to `window.setTimeout()`, and `no-global-this` its `globalThis` to `window`, which a worker does not have ([#267](https://github.com/obsidianmd/eslint-plugin/pull/267)).
 - `settings-tab/no-deprecated-display`, `settings-tab/prefer-update-over-display` and `settings-tab/require-display` read a `minAppVersion` without a patch version, such as `"1.13"`, as `1.13.0`, as `no-unsupported-api` does. They did nothing for such a version ([#268](https://github.com/obsidianmd/eslint-plugin/pull/268)).
+- `validate-manifest` checks the words in the `id`, `name` and `description` without the invisible characters that could hide them, such as a zero-width space, a soft hyphen or a bidi control, so `"Obs\u200Bidian Sync"` is reported as using "Obsidian" ([#269](https://github.com/obsidianmd/eslint-plugin/pull/269)).
 
 ## [0.5.1] - 2026-11-06
 
