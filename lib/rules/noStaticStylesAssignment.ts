@@ -1,4 +1,6 @@
 import { TSESTree } from "@typescript-eslint/utils";
+import ts from "typescript";
+import { getTypeInfo } from "../globalWindow.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 // This rule will flag:
@@ -12,6 +14,8 @@ import { docsUrl, ruleCreator } from "../ruleCreator.js";
 //
 // This rule will not flag:
 //
+// - settings.style.theme = "compact", where type information shows that
+//   `settings.style` is not an element's style
 // - element.style.width = myWidth; (assignment from a variable)
 // - element.style.transform = `translateX(${offset}px)`; (assignment from a template literal with expressions)
 // - element.setCssStyles({ top: `${y}px` }) (a value that is not fixed)
@@ -111,6 +115,36 @@ export default ruleCreator({
     },
     defaultOptions: [],
     create(context) {
+        const types = getTypeInfo(context);
+
+        // Whether the `style` object of `el.style` may be an element's
+        // inline style. With type information, an object type that is
+        // neither a `CSSStyleDeclaration` nor has its `cssText` or
+        // `setProperty()` is something else, such as a plugin's own
+        // `settings.style`. Without it, or where the type cannot tell
+        // (`any`, an error type, a type parameter), it may be.
+        function mayBeInlineStyle(style: TSESTree.MemberExpression): boolean {
+            if (!types) {
+                return true;
+            }
+            const type = types.checker.getNonNullableType(types.checker.getTypeAtLocation(types.toTs(style)));
+            const parts = type.isUnion() ? type.types : [type];
+            return parts.some((part) => {
+                if ((part.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.TypeParameter | ts.TypeFlags.Never)) !== 0) {
+                    return true;
+                }
+                if ((part.getSymbol() ?? part.aliasSymbol)?.getName() === "CSSStyleDeclaration") {
+                    return true;
+                }
+                const apparent = types.checker.getApparentType(part);
+                return (
+                    apparent.getProperty("cssText") !== undefined ||
+                    apparent.getProperty("setProperty") !== undefined ||
+                    (part.aliasTypeArguments ?? []).some((argument) => argument.getSymbol()?.getName() === "CSSStyleDeclaration")
+                );
+            });
+        }
+
         // How the message names `el.style.<property>`: `element.style.color` for
         // `el.style.color` and `el.style["color"]`, `element.style["--my-var"]`,
         // and `element.style[prop]` for a key that is not written out.
@@ -136,7 +170,8 @@ export default ruleCreator({
 
                 if (
                     left.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
-                    isStyleMemberExpression(left.object)
+                    isStyleMemberExpression(left.object) &&
+                    mayBeInlineStyle(left.object)
                 ) {
                     context.report({
                         node,
@@ -161,7 +196,8 @@ export default ruleCreator({
                 // Case 1: `el.style.setProperty('color', 'red')`
                 if (
                     propertyName === "setProperty" &&
-                    isStyleMemberExpression(callee.object)
+                    isStyleMemberExpression(callee.object) &&
+                    mayBeInlineStyle(callee.object)
                 ) {
                     // A fixed value for a CSS property; custom properties
                     // (`--name`) are allowed, as in `setCssProps()`. A call
