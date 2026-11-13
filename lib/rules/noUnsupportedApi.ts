@@ -708,20 +708,22 @@ export default ruleCreator<Options, "apiNotAvailable">({
         // or none, needs the member to exist, which it does from its earliest
         // overload on. An overload without @since needs no version, and one
         // published before its @since (see obsidianOverloadHistory.ts) needs
-        // only the version that first had it. `called` is the overload a call
-        // calls, where that is known.
+        // only the version that first had it, or, for a call that uses the
+        // result, the first that had its return type. `called` is the overload
+        // a call calls, where that is known.
         function requiredVersion(
             qualifiedName: QualifiedName,
             entry: SinceEntry,
             overloads: ts.Declaration[],
             call: TSESTree.CallExpression | undefined,
         ): { version: Version | undefined; called: ts.Declaration | undefined } {
+            const resultUsed = call !== undefined && !isResultUnused(call);
             // A declaration the entry does not list, as when the cache was built
             // from another copy of the file, counts as the entry's earliest.
             const sinceOf = (declaration: ts.Declaration): Version | null => {
                 const listed = entry.find(([position]) => position === declaration.pos);
                 const since = listed ? toSince(listed[1]) : earliestOf(entry.map(([, value]) => toSince(value)));
-                return since && firstPublishedSince(qualifiedName, declaration, since);
+                return since && firstPublishedSince(qualifiedName, declaration, since, resultUsed);
             };
             const versions = overloads.map(sinceOf);
             const earliest = earliestOf(versions);
@@ -1613,13 +1615,21 @@ function memberName(node: TSESTree.MemberExpression): string | undefined {
 const HISTORY_MEMBERS = new Set(Object.keys(OVERLOAD_HISTORY).map((key) => key.slice(0, key.indexOf("("))));
 
 // The version an overload needs: its @since, or the first typings
-// that had it, if those are older. An overload the table does not list, as in
+// that had it, if those are older. A call that uses the result needs the first
+// typings that also had its return type: `await workspace.duplicateLeaf(leaf)`
+// resolved to nothing before 0.13.8. An overload the table does not list, as in
 // typings newer than the table, keeps its @since.
-function firstPublishedSince(qualifiedName: QualifiedName, declaration: ts.Declaration, since: Version): Version {
+function firstPublishedSince(
+    qualifiedName: QualifiedName,
+    declaration: ts.Declaration,
+    since: Version,
+    resultUsed: boolean,
+): Version {
     if (!HISTORY_MEMBERS.has(qualifiedName) || !ts.isFunctionLike(declaration)) {
         return since;
     }
-    const firstPublished = OVERLOAD_HISTORY[`${qualifiedName}${getOverloadKey(declaration)}`]?.firstPublished;
+    const row = OVERLOAD_HISTORY[`${qualifiedName}${getOverloadKey(declaration)}`];
+    const firstPublished = resultUsed ? (row?.resultFirstPublished ?? row?.firstPublished) : row?.firstPublished;
     return firstPublished && lt(firstPublished, since) ? firstPublished : since;
 }
 
