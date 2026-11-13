@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- The recommended config treats a file named `worker.ts` (or `worker.js` and the other extensions), such as `src/worker.ts`, as web worker code, like `*.worker.ts`. `prefer-window-timers` rewrote its `setTimeout()` to `window.setTimeout()`, and `no-global-this` its `globalThis` to `window`, which a worker does not have ([#TBD](https://github.com/obsidianmd/eslint-plugin/pull/TBD)).
+- The recommended config treats a file named `worker.ts` (or `worker.js` and the other extensions), such as `src/worker.ts`, as web worker code, like `*.worker.ts`. `prefer-window-timers` rewrote its `setTimeout()` to `window.setTimeout()`, and `no-global-this` its `globalThis` to `window`, which a worker does not have ([#267](https://github.com/obsidianmd/eslint-plugin/pull/267)).
 
 ## [0.5.1] - 2026-11-06
 
