@@ -201,6 +201,8 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
         {
             name: "document.createElementNS() for SVG is left to prefer-create-el",
             code: "document.createElementNS('http://www.w3.org/2000/svg', 'path');",
+            // createSvg() is 1.1.0; this repository's manifest says 0.15.0.
+            options: [{ minAppVersion: "1.1.0" }],
         },
         {
             name: "document.createDocumentFragment() is left to prefer-create-el",
@@ -260,6 +262,20 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
                     messageId: "preferActive",
                     data: { original: "document", replacement: "activeDocument" },
                     suggestions: [{ messageId: "useActiveDocument", output: "activeDocument.createElement('div', { is: 'my-div' });" }],
+                },
+            ],
+        },
+        {
+            // createSvg() is 1.1.0, so prefer-create-el leaves the call alone
+            // below that, and this rule reports it.
+            name: "document.createElementNS() for SVG below the version that has createSvg() is flagged",
+            code: "document.createElementNS('http://www.w3.org/2000/svg', 'path');",
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [
+                {
+                    messageId: "preferActive",
+                    data: { original: "document", replacement: "activeDocument" },
+                    suggestions: [{ messageId: "useActiveDocument", output: "activeDocument.createElementNS('http://www.w3.org/2000/svg', 'path');" }],
                 },
             ],
         },

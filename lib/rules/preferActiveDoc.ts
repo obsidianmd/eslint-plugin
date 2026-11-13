@@ -244,7 +244,7 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
                     node.parent.object === node &&
                     node.parent.parent.type === TSESTree.AST_NODE_TYPES.CallExpression &&
                     node.parent.parent.callee === node.parent &&
-                    isReportedOnGlobalDocument(node.parent.parent) &&
+                    isReportedOnGlobalDocument(node.parent.parent, context.options[0]?.minAppVersion) &&
                     !createElDisabledAt(node.parent.parent)
                 ) {
                     return;
