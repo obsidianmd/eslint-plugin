@@ -167,9 +167,13 @@ const cases: Record<string, Case[]> = {
         ["oauth settings", "OAuth settings"],
         ["Use oauth-based sign-in", "Use OAuth-based sign-in"],
     ],
-    "configured acronyms replace the defaults and are matched in any case": [
+    "configured acronyms add to the defaults, or replace them with replaceDefaultAcronyms, and are matched in any case": [
         ["Use abc", "Use ABC", { acronyms: ["abc"] }],
-        ["Use pdf", null, { acronyms: ["ABC"] }],
+        ["Use pdf", "Use PDF", { acronyms: ["ABC"] }],
+        ["Use abc and pdf", "Use ABC and PDF", { acronyms: ["ABC"] }],
+        ["Use pdf", null, { acronyms: ["ABC"], replaceDefaultAcronyms: true }],
+        ["Use abc and pdf", "Use ABC and pdf", { acronyms: ["ABC"], replaceDefaultAcronyms: true }],
+        ["Use pdf", null, { replaceDefaultAcronyms: true }],
         ["Use mytool", "Use MyTool", { acronyms: ["MyTool"] }],
         ["Use MYTOOL", "Use MyTool", { acronyms: ["MyTool"] }],
     ],
@@ -224,6 +228,64 @@ const cases: Record<string, Case[]> = {
         ["Open Gitea Settings", "Open gitea settings"],
         ["Use Legit Data", "Use legit data"],
     ],
+    "the pronoun I keeps its capital": [
+        ["Why? Because I said so", null],
+        ["Ask me before I delete a note", null],
+        ["Done. I'm syncing now", null],
+        ["Sorry, I've Saved It", "Sorry, I've saved it"],
+        ["Tell me if I'd like it", null],
+        // A lower-case "i" is left alone.
+        ["Ask before i delete", null],
+    ],
+    "a word in capitals is taken for an acronym in loose mode, unless the whole text is in capitals": [
+        ["Copy Obsidian URI", null],
+        ["Use UTC time", null],
+        ["Use ISO 8601 dates", null],
+        ["Enable OCR", null],
+        ["Highlight TODO items", null],
+        ["Add a todo", null],
+        ["Use aws", "Use AWS"],
+        ["Use NFC Normalization", "Use NFC normalization"],
+        ["Encode as MP3", null],
+        ["Use ISO-Based Dates", "Use ISO-based dates"],
+        ["Use NFC-Based Names", "Use NFC-based names"],
+        ["NFC normalization", null],
+        ["Do NOT delete", null],
+        ["Use NFC Normalization", "Use nfc normalization", { mode: "strict" }],
+        ["OPEN ALL NOTES", "Open all notes"],
+    ],
+    "a range of letters keeps its capitals": [
+        ["Name (A-Z)", null],
+        ["Name (Z-A)", null],
+        ["Title (A–Z)", null],
+        ["Title (A — Z)", null],
+        ["Sort A to Z", null],
+        ["Sort Z to A", null],
+        ["Sort Files A-Z By Name", "Sort files A-Z by name"],
+    ],
+    "weekdays, months and languages keep their capital": [
+        ["Week starts on Monday", null],
+        ["Starts in May", null],
+        ["You may continue", null],
+        ["Translate to Japanese", null],
+        ["Polish the text", null],
+        ["Week Starts On Monday", "Week starts on Monday"],
+        ["Use Japanese-Style Dates", "Use Japanese-style dates"],
+    ],
+    "key names keep their capital, and a name that is also a word where it is a key": [
+        ["Press Enter to confirm", null],
+        ["Press Esc to cancel", null],
+        ["Hold Shift to select more", null],
+        ["Shift-click to select", null],
+        ["Press F2 to rename", null],
+        ["Use Tab to indent", null],
+        ["Press Space to toggle", null],
+        ["Use the Home key", null],
+        ["Press Enter or Esc", null],
+        ["Open in new Tab", "Open in new tab"],
+        ["Go Home Now", "Go home now"],
+        ["Add Space Between", "Add space between"],
+    ],
     "configured brands replace the defaults, regex characters included": [
         ["Open github", null, { brands: ["Foo"] }],
         ["Use foo bar", "Use Foo Bar", { brands: ["Foo Bar"] }],
@@ -248,6 +310,10 @@ const cases: Record<string, Case[]> = {
     "ignoreWords keeps those words as written": [
         ["Use MyPlugin Here", "Use myplugin here", { mode: "strict" }],
         ["Use MyPlugin Here", "Use MyPlugin here", { mode: "strict", ignoreWords: ["MyPlugin"] }],
+        // Also as a part of a hyphenated word
+        ["Use Dataview-powered queries", "Use dataview-powered queries"],
+        ["Use Dataview-powered queries", null, { ignoreWords: ["Dataview"] }],
+        ["Use Dataview-Powered Queries", "Use Dataview-powered queries", { ignoreWords: ["Dataview"] }],
     ],
     "ignoreRegex skips a text that matches": [
         ["Open Settings", null, { ignoreRegex: ["^Open"] }],
@@ -276,7 +342,9 @@ const cases: Record<string, Case[]> = {
         ["Use D_M_YY here", null],
         ["Use DD/MM/YYYY Format", "Use DD/MM/YYYY format"],
         // A single token is a word.
-        ["Use MM Format", "Use mm format"],
+        ["Use Mm Format", "Use mm format"],
+        // In capitals it is taken for an acronym, as other words in capitals are.
+        ["Use MM Format", "Use MM format"],
         // A time format may end in an AM/PM token after a space.
         ["Format: hh:mm A", null],
         ["Use h:mm a here", null],
@@ -341,6 +409,14 @@ const skippable: [text: string, skipped: boolean][] = [
     ["Edit the .git/config File", true],
     ["Saved backup.001 Here", true],
     ["Open Main.js Here", true],
+    // Keyboard shortcuts, with "+" or with hyphens
+    ["Save With Ctrl+S", true],
+    ["Save With Ctrl-S", true],
+    ["Run Cmd-Shift-P First", true],
+    ["Close With Alt-F4", true],
+    ["Send With Ctrl-Enter", true],
+    ["Shift-Click To Select", false],
+    ["Use Ctrl-Click", false],
     // A number, or a brand such as "Node.js", is not a file name.
     ["Version 1.2 Released", false],
     ["Update To v2.1 Now", false],
@@ -424,6 +500,13 @@ describe("sentence case rule options", () => {
     it("passes every other option to the evaluator", () => {
         const { evaluatorOptions } = resolveSentenceCaseConfig([{ allowAutoFix: true, mode: "strict", brands: ["Foo"] }]);
         assert.deepStrictEqual(evaluatorOptions, { mode: "strict", brands: ["Foo"] });
+    });
+
+    it("throws a clear error for an ignoreRegex that is not a regular expression, when the evaluator is created", () => {
+        assert.throws(
+            () => createSentenceCaseEvaluator({ ignoreRegex: ["^ok", "("] }),
+            /The ignoreRegex pattern "\(" is not a valid regular expression/,
+        );
     });
 
     it("the cached evaluator gives the suggestion, or undefined for a text that is fine, each time", () => {

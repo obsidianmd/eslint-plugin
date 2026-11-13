@@ -1,12 +1,21 @@
 import { TSESLint, TSESTree } from "@typescript-eslint/utils";
 import { DEFAULT_AMBIGUOUS_BRANDS, DEFAULT_BRANDS } from "./brands.js";
 import { DEFAULT_ACRONYMS, DEFAULT_CASE_AGNOSTIC_ACRONYMS } from "./acronyms.js";
+import {
+    AMBIGUOUS_KEY_NAMES,
+    FUNCTION_KEY,
+    KEY_CONTEXT_AFTER,
+    KEY_CONTEXT_BEFORE,
+    KEY_NAMES,
+    PROPER_NOUNS,
+} from "./properNouns.js";
 
 export type Mode = "loose" | "strict";
 
 export interface EvaluatorOptions {
     brands?: string[];
     acronyms?: string[];
+    replaceDefaultAcronyms?: boolean;
     ignoreWords?: string[];
     ignoreRegex?: string[];
     mode?: Mode;
@@ -59,14 +68,17 @@ export function resolveSentenceCaseConfig(options: SentenceCaseRuleOptions): {
 // Creates a cached evaluator that returns the sentence-case suggestion for a
 // string that needs one, and undefined for a string that is already fine. It
 // is independent of the AST, so the JSON rule shares it with the ESTree rules.
+// The options are read once, when it is created, so an `ignoreRegex` that is
+// not a regular expression throws then, as a configuration error.
 export function createSentenceCaseEvaluator(
     evaluatorOptions: EvaluatorOptions,
 ): (value: string) => string | undefined {
     const cache = new Map<string, EvaluationResult>();
+    const opts = normalizeOptions(evaluatorOptions);
 
     return (value) => {
         const cached = cache.get(value);
-        const result = cached ?? evaluateSentenceCase(value, evaluatorOptions);
+        const result = cached ?? evaluateWithOptions(value, opts);
         if (!cached) {
             cache.set(value, result);
         }
@@ -391,6 +403,8 @@ export function isSkippableString(text: string, brands: readonly string[] = DEFA
     // Keyboard shortcuts
     // Examples: "Ctrl+S", "Cmd + A", "Alt+Tab", "⌘+C", "Shift + Enter"
     if (/(Ctrl|Cmd|Alt|Shift|Option|⌘|⌥|⌃|⇧)\s*\+\s*[A-Za-z]/.test(text)) return true;
+    // Examples: "Ctrl-S", "Cmd-Shift-P", "Alt-F4", but not "Shift-click"
+    if (HYPHEN_SHORTCUT_RE.test(text)) return true;
     // Version numbers
     // Examples: "v1.2.3", "2.0.0", "1.0-beta", "3_2_1"
     if (/^v?\d+(?:[._-]\d+)+$/.test(text)) return true;
@@ -400,23 +414,58 @@ export function isSkippableString(text: string, brands: readonly string[] = DEFA
     return false;
 }
 
+// A keyboard shortcut written with hyphens: modifiers, then a single letter or
+// digit, a function key, or the name of a key. It starts only at the first
+// modifier of a run, so a long run of modifiers is not tried from each one.
+const SHORTCUT_MODIFIER = "(?:Ctrl|Cmd|Alt|Shift|Option|Opt|Meta|Win|Super)";
+const HYPHEN_SHORTCUT_RE = new RegExp(
+    `(?<![A-Za-z0-9-])${SHORTCUT_MODIFIER}-(?:${SHORTCUT_MODIFIER}-)*` +
+        "(?:[A-Za-z0-9]|F\\d{1,2}|Enter|Tab|Space|Esc|Escape|Backspace|Delete|Del|Home|End|Up|Down|Left|Right|PageUp|PageDown)" +
+        "(?![A-Za-z0-9])",
+);
+
 // The casing an acronym is written in: as listed for one in mixed case, such
 // as "OAuth", and all caps otherwise
 function acronymCasing(acronym: string): string {
     return /[a-z]/.test(acronym) && /[A-Z]/.test(acronym) ? acronym : acronym.toUpperCase();
 }
 
+type NormalizedOptions = ReturnType<typeof readOptions>;
+
+// The options with no options given, read once
+let defaultOptions: NormalizedOptions | undefined;
+
 // Normalizes and prepares options with defaults for sentence case evaluation
+function normalizeOptions(options?: EvaluatorOptions): NormalizedOptions {
+    if (options === undefined) {
+        return (defaultOptions ??= readOptions(undefined));
+    }
+    return readOptions(options);
+}
+
 // An empty brand, acronym or word in the options names nothing, and an empty
-// brand matched an empty string forever.
-function normalizeOptions(options?: EvaluatorOptions) {
+// brand matched an empty string forever. The `acronyms` add to the built-in
+// ones, unless `replaceDefaultAcronyms` is set.
+function readOptions(options: EvaluatorOptions | undefined) {
     const brands = (options?.brands ?? DEFAULT_BRANDS).filter((s) => s !== "").sort((a, b) => b.length - a.length);
     const ambiguousBrands = new Set(DEFAULT_AMBIGUOUS_BRANDS);
     // Acronyms in upper case, mapped to the casing they are written in
-    const acronyms = new Map((options?.acronyms ?? DEFAULT_ACRONYMS).filter((s) => s !== "").map((s) => [s.toUpperCase(), acronymCasing(s)]));
+    const acronymList = [
+        ...(options?.replaceDefaultAcronyms === true ? [] : DEFAULT_ACRONYMS),
+        ...(options?.acronyms ?? []),
+    ];
+    const acronyms = new Map(acronymList.filter((s) => s !== "").map((s) => [s.toUpperCase(), acronymCasing(s)]));
     const caseAgnosticAcronyms = new Set(DEFAULT_CASE_AGNOSTIC_ACRONYMS);
     const ignoreWords = new Set((options?.ignoreWords ?? []).filter((s) => s !== ""));
-    const ignoreRegex = (options?.ignoreRegex ?? []).map((p) => new RegExp(p));
+    const ignoreRegex = (options?.ignoreRegex ?? []).map((pattern) => {
+        try {
+            return new RegExp(pattern);
+        } catch (error) {
+            throw new Error(
+                `The ignoreRegex pattern ${JSON.stringify(pattern)} is not a valid regular expression: ${error instanceof Error ? error.message : String(error)}`,
+            );
+        }
+    });
     const mode: Mode = options?.mode ?? "loose";
     const enforceCamelCaseLower = options?.enforceCamelCaseLower === true;
     return { brands, ambiguousBrands, acronyms, caseAgnosticAcronyms, ignoreWords, ignoreRegex, mode, enforceCamelCaseLower } as const;
@@ -561,12 +610,10 @@ const PROTECTED_PATTERNS: readonly RegExp[] = [
         `(?<![A-Za-z0-9])${DATE_FORMAT_TOKEN}(?:[-/.:_]${DATE_FORMAT_TOKEN})+(?![A-Za-z0-9])`,
         "g",
     ),
-    // A time format with an AM/PM token after a space, which a lone "A" is not
-    // Examples: "hh:mm A", "h:mm a", "HH:mm:ss A"
-    new RegExp(
-        `(?<![A-Za-z0-9])(?:HH|H|hh|h)(?:[:.]${DATE_FORMAT_TOKEN})+ ?[Aa](?![A-Za-z0-9])`,
-        "g",
-    ),
+    // A range of letters, as in a sort order
+    // Examples: "Name (A-Z)", "Title (A–Z)", "Sort A to Z"
+    /(?<![A-Za-z0-9])[A-Z] ?[-–—] ?[A-Z](?![A-Za-z0-9])/g,
+    /(?<![A-Za-z0-9])[A-Z] to [A-Z](?![A-Za-z0-9])/g,
     // Tokens joined by spaces or commas, one of them a token that is never a word
     // Examples: "MMM D, YYYY", "DD MMM YYYY", "dddd, MMMM Do", "YYYY-MM-DD HH:mm"
     // A match is only tried from the first token of a run: where one fails
@@ -625,9 +672,59 @@ export function urlRanges(text: string): number[][] {
     }
 }
 
+const HOUR_TOKENS = ["HH", "H", "hh", "h"];
+const FORMAT_TOKENS = DATE_FORMAT_TOKEN.slice(3, -1).split("|");
+// A time format with an AM/PM token after a space, which a lone "A" is not,
+// as the regex below finds it. Examples: "hh:mm A", "h:mm a", "HH:mm:ss A"
+const TIME_FORMAT_RE = new RegExp(`(?:HH|H|hh|h)(?:[:.]${DATE_FORMAT_TOKEN})+ ?[Aa](?![A-Za-z0-9])`, "y");
+
+/**
+ * The ranges of the time formats with an AM/PM token in `text`, as
+ * /(?<![A-Za-z0-9])(?:HH|H|hh|h)(?:[:.]TOKEN)+ ?[Aa](?![A-Za-z0-9])/g finds
+ * them. That regex tries each hour token of a long run such as "h:h:h:…x"
+ * to the end of the run, which is quadratic. Here a pass from the end first
+ * finds where the rest of a format, `(?:[:.]TOKEN)+ ?[Aa]`, can start, so the
+ * regex only runs where it matches.
+ */
+export function timeFormatRanges(text: string): number[][] {
+    const n = text.length;
+    const isWordChar = (i: number) => i >= 0 && i < n && /[A-Za-z0-9]/.test(text[i]);
+    // ` ?[Aa]` not followed by a letter or digit, from i
+    const endsAt = (i: number) =>
+        (/[Aa]/.test(text[i] ?? "") && !isWordChar(i + 1)) ||
+        (text[i] === " " && /[Aa]/.test(text[i + 1] ?? "") && !isWordChar(i + 2));
+    // rest[i]: `(?:[:.]TOKEN)* ?[Aa]…` matches from i; more[i]: the same
+    // with at least one `[:.]TOKEN`
+    const rest = new Uint8Array(n + 2);
+    const more = new Uint8Array(n + 2);
+    for (let i = n; i >= 0; i--) {
+        if (text[i] === ":" || text[i] === ".") {
+            for (const token of FORMAT_TOKENS) {
+                if (rest[i + 1 + token.length] === 1 && text.startsWith(token, i + 1)) {
+                    more[i] = 1;
+                    break;
+                }
+            }
+        }
+        rest[i] = more[i] === 1 || endsAt(i) ? 1 : 0;
+    }
+    const ranges: number[][] = [];
+    for (let i = 0; i < n; i++) {
+        if ((text[i] !== "H" && text[i] !== "h") || isWordChar(i - 1)) continue;
+        if (!HOUR_TOKENS.some((token) => text.startsWith(token, i) && more[i + token.length] === 1)) continue;
+        TIME_FORMAT_RE.lastIndex = i;
+        const match = TIME_FORMAT_RE.exec(text);
+        if (match) {
+            ranges.push([i, i + match[0].length]);
+            i += match[0].length - 1;
+        }
+    }
+    return ranges;
+}
+
 // Finds the character ranges of text that must keep its casing
 function collectProtectedRanges(sentence: string): number[][] {
-    const ranges: number[][] = urlRanges(sentence);
+    const ranges: number[][] = [...urlRanges(sentence), ...timeFormatRanges(sentence)];
     for (const pattern of PROTECTED_PATTERNS) {
         pattern.lastIndex = 0;
         let m: RegExpExecArray | null;
@@ -639,14 +736,40 @@ function collectProtectedRanges(sentence: string): number[][] {
 }
 
 // Cases one part of a hyphenated word: acronyms upper, all-caps case-agnostic
-// acronyms and brands as written, anything else lower
-function caseHyphenPart(part: string, opts: ReturnType<typeof normalizeOptions>): string {
+// acronyms, brands, ignored words, key names and proper nouns as written, and
+// with `keepAllCaps` an all-caps word too; anything else lower
+function caseHyphenPart(part: string, opts: NormalizedOptions, keepAllCaps: boolean): string {
     const partUpper = part.toUpperCase();
     const acronym = opts.acronyms.get(partUpper);
     if (acronym !== undefined) return acronym;
     if (opts.caseAgnosticAcronyms.has(partUpper) && part === partUpper) return part;
     if (opts.brands.includes(part)) return part;
+    if (opts.ignoreWords.has(part)) return part;
+    if (KEY_NAMES.has(part) || FUNCTION_KEY.test(part) || PROPER_NOUNS.has(part)) return part;
+    if (keepAllCaps && isAllCapsWord(part)) return part;
     return part.toLowerCase();
+}
+
+// A word in capitals with at least two letters, as "URI", "UTC" or "MP3": in
+// text that is not all in capitals it is almost always an acronym. "A" and
+// "V2" are not.
+function isAllCapsWord(token: string): boolean {
+    return /^[A-Z0-9]+$/.test(token) && /[A-Z][0-9]*[A-Z]/.test(token);
+}
+
+// Whether a capitalized word keeps its capital: the pronoun "I", a proper
+// noun such as "Monday" or "Japanese", the name of a key such as "Enter", or
+// a name such as "Tab" that is also a word, where the words around it make it
+// a key: "Press Tab", "the Tab key", "Shift+Tab".
+function keepsCapital(token: string, before: string | undefined, after: string | undefined, charBefore: string, charAfter: string): boolean {
+    if (token === "I" || PROPER_NOUNS.has(token) || KEY_NAMES.has(token) || FUNCTION_KEY.test(token)) return true;
+    if (!AMBIGUOUS_KEY_NAMES.has(token)) return false;
+    return (
+        charBefore === "+" ||
+        charAfter === "+" ||
+        (before !== undefined && KEY_CONTEXT_BEFORE.has(before.toLowerCase())) ||
+        (after !== undefined && KEY_CONTEXT_AFTER.has(after.toLowerCase()))
+    );
 }
 
 // Emoji, with the skin tones, joiners, variation selectors and keycaps that
@@ -694,7 +817,9 @@ export function leadingLabelEnd(sentence: string): number {
 // Applies sentence case transformation to a single sentence. With
 // `firstWordAnyCase`, the first word keeps the case it is written in, as after
 // a colon.
-function transformSentence(sentence: string, opts: ReturnType<typeof normalizeOptions>, firstWordAnyCase: boolean): string {
+// With `keepAllCaps`, a word in capitals, as "URI" in "Copy Obsidian URI",
+// keeps them.
+function transformSentence(sentence: string, opts: NormalizedOptions, firstWordAnyCase: boolean, keepAllCaps: boolean): string {
     // URLs and format strings keep their casing, brand names inside them included
     const protectedRanges = collectProtectedRanges(sentence);
     const protectedChars = new RangeSet(sentence.length);
@@ -757,10 +882,12 @@ function transformSentence(sentence: string, opts: ReturnType<typeof normalizeOp
         ) {
             // "API-based", "REST-based": the opening acronym keeps its caps and
             // the other parts are cased like any hyphenated word
-            const cased = firstToken.split("-").map((part) => caseHyphenPart(part, opts)).join("-");
+            const cased = firstToken.split("-").map((part) => caseHyphenPart(part, opts, keepAllCaps)).join("-");
             writeToken(chars, tokenStart, cased, firstToken.length);
         } else if (opts.caseAgnosticAcronyms.has(upperToken) && firstToken === upperToken) {
             // An all-caps "REST" opening the sentence stays as written
+        } else if (keepAllCaps && isAllCapsWord(firstToken)) {
+            // "TODO list", "UTC offset": an acronym that is not listed
         } else if (!opts.enforceCamelCaseLower && opts.mode === "loose" && isCamelOrPascal(firstToken)) {
             // Preserve camelCase/PascalCase tokens when loose mode allows it
         } else if (/^[0-9]/.test(firstToken)) {
@@ -784,9 +911,9 @@ function transformSentence(sentence: string, opts: ReturnType<typeof normalizeOp
     }
 
     // Process remaining tokens
-    const tokenRe = /[A-Za-z0-9][A-Za-z0-9.\-]*/g;
-    let m: RegExpExecArray | null;
-    while ((m = tokenRe.exec(sentence))) {
+    const tokens = Array.from(sentence.matchAll(/[A-Za-z0-9][A-Za-z0-9.\-]*/g));
+    for (let index = 0; index < tokens.length; index++) {
+        const m = tokens[index];
         const start = m.index;
         const token = m[0];
         const end = start + token.length;
@@ -831,7 +958,7 @@ function transformSentence(sentence: string, opts: ReturnType<typeof normalizeOp
         const hasHyphen = token.includes("-");
         // Handle hyphenated words
         if (hasHyphen) {
-            const newToken = token.split("-").map((part) => caseHyphenPart(part, opts)).join("-");
+            const newToken = token.split("-").map((part) => caseHyphenPart(part, opts, keepAllCaps)).join("-");
             if (newToken !== token) {
                 for (let i = 0; i < token.length; i++) {
                     chars[start + i] = newToken[i] ?? chars[start + i];
@@ -844,6 +971,9 @@ function transformSentence(sentence: string, opts: ReturnType<typeof normalizeOp
         if (opts.brands.includes(token)) continue;
         // In loose mode, preserve CamelCase unless enforceCamelCaseLower is set
         if (!opts.enforceCamelCaseLower && opts.mode === "loose" && isCamelOrPascal(token)) continue;
+        // An acronym that is not listed, as "URI" or "UTC"
+        if (keepAllCaps && isAllCapsWord(token)) continue;
+        if (keepsCapital(token, tokens[index - 1]?.[0], tokens[index + 1]?.[0], sentence[start - 1] ?? "", sentence[end] ?? "")) continue;
 
         // Lowercase the token
         const newToken = token.toLowerCase();
@@ -869,10 +999,13 @@ const ABBREVIATION_RE = /(?:^|[^A-Za-z0-9.])(?:e\.g|eg|i\.e|ie|etc|vs|cf|approx|
 // Generates a sentence case suggestion for text using normalized options
 function sentenceCaseSuggestionWithOptions(
     text: string,
-    opts: ReturnType<typeof normalizeOptions>,
+    opts: NormalizedOptions,
 ): string {
     if (!text.trim()) return text;
     if (shouldIgnoreByRegex(text, opts.ignoreRegex)) return text;
+    // In loose mode a word in capitals is taken for an acronym, unless the
+    // whole text is in capitals, as in "OPEN SETTINGS"
+    const keepAllCaps = opts.mode === "loose" && /[a-z]/.test(text);
 
     interface Segment {
         core: string;
@@ -915,7 +1048,7 @@ function sentenceCaseSuggestionWithOptions(
                 previous.punct === ";" ||
                 (previous.punct === "." && ABBREVIATION_RE.test(previous.core))
             );
-            const out = transformSentence(core, opts, firstWordAnyCase);
+            const out = transformSentence(core, opts, firstWordAnyCase, keepAllCaps);
             return out + punct + whitespace;
         })
         .join("");
@@ -931,7 +1064,10 @@ export function sentenceCaseSuggestion(text: string, options?: EvaluatorOptions)
 
 // Evaluates if text follows sentence case rules and provides a suggestion if not
 export function evaluateSentenceCase(text: string, options?: EvaluatorOptions): EvaluationResult {
-    const opts = normalizeOptions(options);
+    return evaluateWithOptions(text, normalizeOptions(options));
+}
+
+function evaluateWithOptions(text: string, opts: NormalizedOptions): EvaluationResult {
     if (isSkippableString(text, opts.brands)) return { ok: true };
     if (shouldIgnoreByRegex(text, opts.ignoreRegex)) return { ok: true };
     const suggestion = sentenceCaseSuggestionWithOptions(text, opts);

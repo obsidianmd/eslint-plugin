@@ -27,8 +27,9 @@ The message gives the expected text, and with `allowAutoFix: true`, `--fix` chan
 letters that need it and keeps the string's quotes or backticks and every escape as written; a
 string where such a letter is written as an escape (`\u0053`) is reported without a fix. A template
 literal is judged on its value, with its escapes decoded. Values are judged as in
-[`ui/sentence-case`](sentence-case.md): URLs, date formats such as `YYYY-MM-DD`, brand names and
-"REST" written in capitals keep their casing, and a brand that is also an ordinary word, such as
+[`ui/sentence-case`](sentence-case.md): URLs, date formats such as `YYYY-MM-DD`, brand names,
+acronyms and words in capitals, weekdays, months, languages, key names and the pronoun "I" keep
+their casing, and a brand that is also an ordinary word, such as
 "Windows", may be written as that word ("Close all windows"). The options work as in
 [`ui/sentence-case`](sentence-case.md#options).
 
@@ -46,14 +47,15 @@ any case, and those under a directory named so.
 
 <!-- begin auto-generated rule options list -->
 
-| Name                    | Description                                                                                       | Type     | Choices           |
-| :---------------------- | :------------------------------------------------------------------------------------------------ | :------- | :---------------- |
-| `acronyms`              | Acronyms that should remain uppercase.                                                            | String[] |                   |
-| `allowAutoFix`          | Whether to enable auto-fixes for sentence case violations.                                        | Boolean  |                   |
-| `brands`                | Brand names to preserve with their canonical casing.                                              | String[] |                   |
-| `enforceCamelCaseLower` | Whether to force CamelCase/PascalCase tokens to lowercase.                                        | Boolean  |                   |
-| `ignoreRegex`           | Regex patterns for strings to ignore entirely.                                                    | String[] |                   |
-| `ignoreWords`           | Words to skip when applying sentence case.                                                        | String[] |                   |
-| `mode`                  | Controls sentence case strictness; loose preserves CamelCase tokens while strict lowercases them. | String   | `loose`, `strict` |
+| Name                     | Description                                                                                       | Type     | Choices           |
+| :----------------------- | :------------------------------------------------------------------------------------------------ | :------- | :---------------- |
+| `acronyms`               | Acronyms that should remain uppercase, in addition to the built-in ones.                          | String[] |                   |
+| `allowAutoFix`           | Whether to enable auto-fixes for sentence case violations.                                        | Boolean  |                   |
+| `brands`                 | Brand names to preserve with their canonical casing.                                              | String[] |                   |
+| `enforceCamelCaseLower`  | Whether to force CamelCase/PascalCase tokens to lowercase.                                        | Boolean  |                   |
+| `ignoreRegex`            | Regex patterns for strings to ignore entirely.                                                    | String[] |                   |
+| `ignoreWords`            | Words to skip when applying sentence case.                                                        | String[] |                   |
+| `mode`                   | Controls sentence case strictness; loose preserves CamelCase tokens while strict lowercases them. | String   | `loose`, `strict` |
+| `replaceDefaultAcronyms` | Whether `acronyms` replaces the built-in acronyms instead of adding to them.                      | Boolean  |                   |
 
 <!-- end auto-generated rule options list -->
