@@ -81,7 +81,7 @@ const GLOBAL_HOSTS = new Set(["window", "globalThis", "self"]);
 // The document properties that hold a document, for `[document, win.document]`.
 const DOCUMENT_PROPERTIES = new Set(["doc", "document", "ownerDocument", "activeDocument"]);
 
-type MessageIds = "preferActive" | "perWindowState" | "useActiveDocument" | "useActiveDocumentSince" | "useIsConnected";
+type MessageIds = "preferActive" | "preferActiveBody" | "perWindowState" | "useActiveDocument" | "useActiveDocumentSince" | "useIsConnected";
 
 // Each scope's references by the identifier that makes them.
 const referencesByScope = new WeakMap<object, Map<TSESTree.Node, TSESLint.Scope.Reference>>();
@@ -102,6 +102,8 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
         messages: {
             preferActive:
                 "Use '{{replacement}}' instead of '{{original}}' for popout window compatibility.",
+            preferActiveBody:
+                "Use 'activeDocument.body' instead of 'document.body', so the element is put in the window that has focus, for popout window compatibility.",
             perWindowState:
                 "'document.{{element}}' is the main window's, so this change does not reach popout windows. Make it, and undo it, in each window's document, for example from `workspace.on(\"window-open\")`.",
             useActiveDocument: "Replace with `activeDocument`, the document of the window that has focus.",
@@ -272,6 +274,11 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
                     return;
                 }
 
+                if (node.name === "document" && isTransientBodyUse(node)) {
+                    context.report({ node, messageId: "preferActiveBody", suggest: suggestionsFor(node) });
+                    return;
+                }
+
                 context.report({
                     node,
                     messageId: "preferActive",
@@ -383,7 +390,7 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
                 return null;
             }
             let mutates = false;
-            if (element.name === "body" && isCalled(inner.member) && movesTransientElement(inner.member.parent, inner.name)) {
+            if (movesTransientElementIn(element.name, inner.member, inner.name)) {
                 return null;
             }
             if (isCalled(inner.member)) {
@@ -415,6 +422,18 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
         // Whether `call`, `body.<method>(…)`, puts in or takes out an element
         // that the code both puts somewhere and removes again, as in
         // `document.body.appendChild(a); a.click(); a.remove();`.
+        // Whether `node` is the `document` of `document.body.<method>(…)` that
+        // puts in or takes out an element only there for a moment.
+        function isTransientBodyUse(node: TSESTree.Identifier): boolean {
+            const element = propertyOf(outerValue(node));
+            const inner = element?.name === "body" ? propertyOf(element.member) : undefined;
+            return !!inner?.name && movesTransientElementIn("body", inner.member, inner.name);
+        }
+
+        function movesTransientElementIn(element: string, member: TSESTree.MemberExpression, method: string): boolean {
+            return element === "body" && isCalled(member) && movesTransientElement(member.parent as TSESTree.CallExpression, method);
+        }
+
         function movesTransientElement(call: TSESTree.CallExpression, method: string): boolean {
             const index = Object.hasOwn(CHILD_ADDERS, method)
                 ? CHILD_ADDERS[method]
