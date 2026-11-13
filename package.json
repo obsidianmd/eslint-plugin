@@ -20,6 +20,7 @@
 	"scripts": {
 		"build": "tsc",
 		"test": "mocha",
+		"lint": "tsc && eslint . --max-warnings 0",
 		"init:eslint-docs": "eslint-doc-generator --init-rule-docs || exit 0",
 		"update:eslint-docs": "eslint-doc-generator",
 		"check:eslint-docs": "eslint-doc-generator --check"
