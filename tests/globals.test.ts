@@ -36,8 +36,8 @@ async function declaredGlobals(filePath: string): Promise<Linter.Globals> {
     return (config.languageOptions?.globals ?? {}) as Linter.Globals;
 }
 
-async function undefinedNames(code: string): Promise<string[]> {
-    const [result] = await eslint.lintText(code, { filePath: "src/main.js" });
+async function undefinedNames(code: string, filePath = "src/main.js"): Promise<string[]> {
+    const [result] = await eslint.lintText(code, { filePath });
     assert.deepStrictEqual(result.messages.filter((m) => m.fatal).map((m) => m.message), []);
     return result.messages.filter((m) => m.ruleId === "no-undef").map((m) => m.message);
 }
@@ -82,6 +82,43 @@ describe("globals in the recommended config", () => {
             result.messages.filter((m) => m.ruleId === "no-global-assign").map((m) => m.message),
             ["Read-only global 'createEl' should not be modified."],
         );
+    });
+
+    for (const filePath of ["jest.config.js", "scripts/release.mjs", "src/main.test.js", "test/helpers.cjs", "src/main.test.ts"]) {
+        it(`declares the Node globals for ${filePath}, which runs in Node, when the manifest is not desktop-only`, async () => {
+            const declared = await declaredGlobals(filePath);
+            for (const name of ["process", "__dirname", "module", "exports", "Buffer", "NodeJS"]) {
+                assert.ok(name in declared, name);
+                assert.notStrictEqual(declared[name], "off", name);
+            }
+        });
+    }
+
+    it("no-undef reports no Node globals in a tool config", async () => {
+        assert.deepStrictEqual(
+            await undefinedNames("module.exports = { root: __dirname, ci: process.env.CI };\n", "jest.config.js"),
+            [],
+        );
+    });
+
+    it("no-undef reports neither module nor exports in a .cjs file, but other Node globals in one that runs in Obsidian", async () => {
+        assert.deepStrictEqual(
+            await undefinedNames("exports = module.exports = { root: __dirname };\n", "src/helpers.cjs"),
+            ["'__dirname' is not defined."],
+        );
+    });
+
+    it("no-redeclare does not report a browser global's name declared at the top of a .cjs file", async () => {
+        const [result] = await eslint.lintText("const { Plugin } = require('obsidian');\nmodule.exports = Plugin;\n", { filePath: "src/main.cjs" });
+        assert.deepStrictEqual(result.messages.filter((m) => m.fatal || m.ruleId === "no-redeclare" || m.ruleId === "no-undef"), []);
+    });
+
+    it("gives no other language the Node globals, as for an English locale file under test/", async () => {
+        const withLocales = new ESLint({ overrideConfigFile: true, overrideConfig: plugin.configs.recommendedWithLocalesEn });
+        const config = await withLocales.calculateConfigForFile("test/locales/en.json") as Linter.Config;
+        assert.ok(!("process" in ((config.languageOptions?.globals ?? {}) as Linter.Globals)));
+        const [result] = await withLocales.lintText('{ "greeting": "Hello" }\n', { filePath: "test/locales/en.json" });
+        assert.deepStrictEqual(result.messages, []);
     });
 
     it("no-undef reports the Node globals and undefined names", async () => {
