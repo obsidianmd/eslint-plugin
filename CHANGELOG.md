@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- `no-nodejs-modules` reports `require?.("fs")`: the bundle's own `require` exists on mobile too, so the optional call still runs there and throws for a Node.js module. `window.require?.("fs")` stays allowed, since only the desktop app puts `require` on the global object. A `try` whose `catch` always throws, as in `catch (e) { throw e; }`, no longer counts as a guard for a `require()` or an awaited `import()` in it, since it hands the failure on ([#](https://github.com/obsidianmd/eslint-plugin/pull/)).
+- `no-nodejs-modules` reports `require?.("fs")`: the bundle's own `require` exists on mobile too, so the optional call still runs there and throws for a Node.js module. `window.require?.("fs")` stays allowed, since only the desktop app puts `require` on the global object. A `try` whose `catch` always throws, as in `catch (e) { throw e; }`, no longer counts as a guard for a `require()` or an awaited `import()` in it, since it hands the failure on ([#261](https://github.com/obsidianmd/eslint-plugin/pull/261)).
 
 ## [0.5.1] - 2026-11-06
 
