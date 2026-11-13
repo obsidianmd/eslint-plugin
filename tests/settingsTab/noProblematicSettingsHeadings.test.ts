@@ -47,6 +47,62 @@ ruleTester.run("no-problematic-settings-headings", rule, {
             `,
             options: [{ pluginName: "My Awesome Plugin" }],
         },
+        // Only a heading at the top of the tab is "General" or the plugin's
+        // name in the guidelines' sense. One lower down starts a section of its
+        // own, and removing it put its settings under the heading before it.
+        {
+            name: "a 'General' heading after another section is not reported",
+            code: tab(`
+                new Setting(this.containerEl).setName("Appearance").setHeading();
+                new Setting(this.containerEl).setName("Theme").addToggle(() => {});
+                new Setting(this.containerEl).setName("General").setHeading();
+                new Setting(this.containerEl).setName("Auto-save").addToggle(() => {});`),
+        },
+        {
+            name: "a plugin-name heading after a setting is not reported",
+            code: tab(`
+                new Setting(this.containerEl).setName("Theme").addToggle(() => {});
+                new Setting(this.containerEl).setName("Sample Plugin").setHeading();`),
+            options: [{ pluginName: "Sample Plugin" }],
+        },
+        {
+            name: "a 'General' heading after content created another way, or after a call that may add some, is not reported",
+            code: tab(`
+                this.containerEl.createEl("p", { text: "Welcome" });
+                new Setting(this.containerEl).setName("General").setHeading();`) + tab(`
+                this.renderIntro();
+                if (this.ready) new Setting(this.containerEl).setName("General").setHeading();`),
+        },
+        {
+            name: "a 'General' heading in a loop, a callback, a helper function or a method other than display() is not reported",
+            code: tab(`
+                for (const el of this.sections) { new Setting(el).setName("General").setHeading(); }
+                [this.containerEl].forEach((el) => { new Setting(el).setName("General").setHeading(); });
+                const render = () => new Setting(this.containerEl).setName("General").setHeading();`) + `
+                class OtherTab extends PluginSettingTab {
+                    renderGeneral() {
+                        new Setting(this.containerEl).setName("General").setHeading();
+                    }
+                }`,
+        },
+        // A plugin named "X Settings" is not named "X".
+        {
+            name: "a heading that is the plugin's name without 'Settings' is not the plugin's name",
+            code: tab(`new Setting(this.containerEl).setName("Style").setHeading();`),
+            options: [{ pluginName: "Style Settings" }],
+        },
+        // "settings" as what the section does something with is needed.
+        {
+            name: "'settings' as what a verb acts on is allowed",
+            code: tab(`
+                new Setting(this.containerEl).setName("Export and import settings").setHeading();
+                new Setting(this.containerEl).setName("Reset all settings").setHeading();
+                new Setting(this.containerEl).setName("Back up your settings").setHeading();
+                new Setting(this.containerEl).setName("Import/export settings").setHeading();
+                new Setting(this.containerEl).setName("Sync options").setHeading();
+                new Setting(this.containerEl).setName("Settings backup").setHeading();
+                new Setting(this.containerEl).setName("Settings import and export").setHeading();`),
+        },
         {
             name: "a heading outside a settings tab is not checked",
             code: `
@@ -292,6 +348,38 @@ ruleTester.run("no-problematic-settings-headings", rule, {
             errors: [{ messageId: "settings" }, { messageId: "pluginName" }],
         },
         {
+            name: "a 'General' heading after code that adds nothing to the tab is still the first",
+            code: tab(`
+                const { containerEl } = this;
+                containerEl.empty();
+                containerEl.addClass("my-tab");
+                const onChange = () => this.plugin.saveSettings();
+                new Setting(containerEl).setName("General").setHeading();`),
+            output: tab(`
+                const { containerEl } = this;
+                containerEl.empty();
+                containerEl.addClass("my-tab");
+                const onChange = () => this.plugin.saveSettings();
+                ;`),
+            errors: [{ messageId: "general" }],
+        },
+        {
+            name: "a heading that is the whole plugin name with 'Settings' in it is the plugin's name",
+            code: tab(`new Setting(this.containerEl).setName("Style Settings").setHeading();`),
+            options: [{ pluginName: "Style Settings" }],
+            output: tab(`;`),
+            errors: [{ messageId: "settings" }, { messageId: "pluginName" }],
+        },
+        {
+            name: "'settings' that is not what a verb acts on is reported, also beside one that is",
+            code: tab(`
+                new Setting(this.containerEl).setName("Sync settings").setHeading();
+                new Setting(this.containerEl).setName("Advanced settings").setHeading();
+                new Setting(this.containerEl).setName("Export settings and other settings").setHeading();
+                new Setting(this.containerEl).setName("Exported settings").setHeading();`),
+            errors: [{ messageId: "settings" }, { messageId: "settings" }, { messageId: "settings" }],
+        },
+        {
             name: "a heading with a control is not removed (spacekeys)",
             code: tab(`
                 new Setting(this.containerEl)
@@ -330,66 +418,46 @@ ruleTester.run("no-problematic-settings-headings", rule, {
             errors: [{ messageId: "general", suggestions: [] }],
         },
         {
-            name: "removing a heading with a tooltip or a disabled state is a suggestion",
-            code: tab(`
-                new Setting(this.containerEl).setName("General").setTooltip("Applies everywhere.").setHeading();
-                new Setting(this.containerEl).setName("General").setDisabled(true).setHeading();`),
+            name: "removing a heading with a tooltip is a suggestion",
+            code: tab(`new Setting(this.containerEl).setName("General").setTooltip("Applies everywhere.").setHeading();`),
             output: null,
-            errors: [
-                {
-                    messageId: "general",
-                    suggestions: [{ messageId: "removeHeading", data: { including: ", including `setTooltip()`" }, output: tab(`
-                ;
-                new Setting(this.containerEl).setName("General").setDisabled(true).setHeading();`) }],
-                },
-                {
-                    messageId: "general",
-                    suggestions: [{ messageId: "removeHeading", data: { including: ", including `setDisabled()`" }, output: tab(`
-                new Setting(this.containerEl).setName("General").setTooltip("Applies everywhere.").setHeading();
-                ;`) }],
-                },
-            ],
+            errors: [{
+                messageId: "general",
+                suggestions: [{ messageId: "removeHeading", data: { including: ", including `setTooltip()`" }, output: tab(`;`) }],
+            }],
         },
         {
-            name: "a heading on a plain variable, or with a template literal class, is removed",
-            code: tab(`
-                [this.containerEl].forEach((el) => { new Setting(el).setName("General").setHeading(); });
-                new Setting(this.containerEl).setName("General").setHeading().setClass(\`heading-\${this.id}\`);`),
-            output: tab(`
-                [this.containerEl].forEach((el) => { ; });
-                ;`),
-            errors: [{ messageId: "general" }, { messageId: "general" }],
+            name: "removing a heading with a disabled state is a suggestion",
+            code: tab(`new Setting(this.containerEl).setName("General").setDisabled(true).setHeading();`),
+            output: null,
+            errors: [{
+                messageId: "general",
+                suggestions: [{ messageId: "removeHeading", data: { including: ", including `setDisabled()`" }, output: tab(`;`) }],
+            }],
         },
         {
-            name: "removing a heading whose class or parent is computed with a side effect is a suggestion",
-            code: tab(`
-                new Setting(this.containerEl).setName("General").setHeading().setClass(this.headingClass());
-                new Setting(this.containerEl).setName("General").setHeading().setClass(\`heading-\${this.nextId()}\`);
-                new Setting(this.sections[this.index++]).setName("General").setHeading();`),
+            name: "a heading with a template literal class is removed",
+            code: tab(`new Setting(this.containerEl).setName("General").setHeading().setClass(\`heading-\${this.id}\`);`),
+            output: tab(`;`),
+            errors: [{ messageId: "general" }],
+        },
+        {
+            name: "removing a heading whose class is computed with a side effect is a suggestion",
+            code: tab(`new Setting(this.containerEl).setName("General").setHeading().setClass(this.headingClass());`),
             output: null,
-            errors: [
-                {
-                    messageId: "general",
-                    suggestions: [{ messageId: "removeHeading", output: tab(`
-                ;
-                new Setting(this.containerEl).setName("General").setHeading().setClass(\`heading-\${this.nextId()}\`);
-                new Setting(this.sections[this.index++]).setName("General").setHeading();`) }],
-                },
-                {
-                    messageId: "general",
-                    suggestions: [{ messageId: "removeHeading", output: tab(`
-                new Setting(this.containerEl).setName("General").setHeading().setClass(this.headingClass());
-                ;
-                new Setting(this.sections[this.index++]).setName("General").setHeading();`) }],
-                },
-                {
-                    messageId: "general",
-                    suggestions: [{ messageId: "removeHeading", output: tab(`
-                new Setting(this.containerEl).setName("General").setHeading().setClass(this.headingClass());
-                new Setting(this.containerEl).setName("General").setHeading().setClass(\`heading-\${this.nextId()}\`);
-                ;`) }],
-                },
-            ],
+            errors: [{ messageId: "general", suggestions: [{ messageId: "removeHeading", output: tab(`;`) }] }],
+        },
+        {
+            name: "removing a heading whose class template has a side effect is a suggestion",
+            code: tab(`new Setting(this.containerEl).setName("General").setHeading().setClass(\`heading-\${this.nextId()}\`);`),
+            output: null,
+            errors: [{ messageId: "general", suggestions: [{ messageId: "removeHeading", output: tab(`;`) }] }],
+        },
+        {
+            name: "removing a heading whose parent is computed with a side effect is a suggestion",
+            code: tab(`new Setting(this.sections[this.index++]).setName("General").setHeading();`),
+            output: null,
+            errors: [{ messageId: "general", suggestions: [{ messageId: "removeHeading", output: tab(`;`) }] }],
         },
         {
             name: "a heading whose method is passed on is not removed",
@@ -412,16 +480,12 @@ ruleTester.run("no-problematic-settings-headings", rule, {
             errors: [{ messageId: "general" }],
         },
         {
-            name: "a heading in a callback or a nested function of the tab is reported",
+            name: "'settings' in a heading in a callback or a nested function of the tab is reported",
             code: tab(`
                 class Inner {}
-                [1].forEach(() => { new Setting(this.containerEl).setName("General").setHeading(); });
+                [1].forEach(() => { new Setting(this.containerEl).setName("Display options").setHeading(); });
                 function renderSection(el: HTMLElement) { new Setting(el).setName("Display options").setHeading(); }`),
-            output: tab(`
-                class Inner {}
-                [1].forEach(() => { ; });
-                function renderSection(el: HTMLElement) { new Setting(el).setName("Display options").setHeading(); }`),
-            errors: [{ messageId: "general" }, { messageId: "settings" }],
+            errors: [{ messageId: "settings" }, { messageId: "settings" }],
         },
         {
             name: "a settings tab written as a class expression is checked",
@@ -462,13 +526,16 @@ ruleTester.run("no-problematic-settings-headings", rule, {
         // setName() after setHeading() names the heading as well.
         {
             name: "a heading named after setHeading() is reported and removed",
-            code: tab(`
-                new Setting(this.containerEl).setHeading().setName("General");
-                new Setting(this.containerEl).setHeading().setName("Sample Plugin").setClass("x");`),
-            output: tab(`
-                ;
-                ;`),
-            errors: [{ messageId: "general" }, { messageId: "pluginName" }],
+            code: tab(`new Setting(this.containerEl).setHeading().setName("General");`),
+            output: tab(`;`),
+            errors: [{ messageId: "general" }],
+        },
+        {
+            name: "a plugin-name heading named after setHeading() is reported and removed",
+            code: tab(`new Setting(this.containerEl).setHeading().setName("Sample Plugin").setClass("x");`),
+            options: [{ pluginName: "Sample Plugin" }],
+            output: tab(`;`),
+            errors: [{ messageId: "pluginName" }],
         },
         {
             name: "a heading named after setHeading() with 'settings' is reported without a fix",
@@ -525,6 +592,10 @@ describe("no-problematic-settings-headings suggestion description", () => {
             class MyTab extends PluginSettingTab {
                 display() {
                     new Setting(this.containerEl).setName("General").setDesc("Applies everywhere.").setTooltip("All").setDesc("Everywhere").setHeading()
+                }
+            }
+            class OtherTab extends PluginSettingTab {
+                display() {
                     new Setting(this.containerEl.createDiv()).setName("General").setHeading()
                 }
             }
