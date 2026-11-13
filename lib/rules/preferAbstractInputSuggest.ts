@@ -1,9 +1,10 @@
 import { TSESTree } from "@typescript-eslint/utils";
 import { type MinAppVersionOptions, minAppVersionSchema, supportsVersion } from "../minAppVersion.js";
+import { API_SINCE } from "../obsidianApiVersions.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 // The Obsidian version that added AbstractInputSuggest.
-const ABSTRACT_INPUT_SUGGEST_SINCE = "1.4.10";
+const ABSTRACT_INPUT_SUGGEST_SINCE = API_SINCE.AbstractInputSuggest;
 
 export default ruleCreator<MinAppVersionOptions, "preferAbstractInputSuggest">({
     meta: {

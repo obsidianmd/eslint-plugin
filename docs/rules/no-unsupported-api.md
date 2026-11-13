@@ -19,6 +19,7 @@ The uses checked are:
 
 - reading a property or calling a method, such as `this.app.renderContext`
 - calling a function or creating an instance, such as `displayTooltip()` or `new SecretComponent(app, el)`
+- reading a global or an exported variable, such as `activeDocument` or `apiVersion`
 - extending a class, such as `class MySuggest extends AbstractInputSuggest`, also in a class
   expression such as `const MySuggest = class extends AbstractInputSuggest {}`, and calling methods
   inherited from it through `super`
@@ -40,15 +41,17 @@ The `@since` of some overloads names the release that changed the signature, not
 the call. `workspace.on("editor-change", …)` is `@since 1.1.1`, which widened the callback's view to
 `MarkdownView | MarkdownFileInfo`, but the event is in the 0.12.17 typings, and a callback written for
 the new signature runs on the older versions too. For those overloads the rule needs the version of
-the first published `obsidian` typings that have the same overload, from a table built from every
-release on npm:
+the first `obsidian` typings that have the same overload, from a table built from every version in
+the history of the [obsidian-api](https://github.com/obsidianmd/obsidian-api) repository, from 0.9.7
+on, and every release on npm:
 
 | Overload | `@since` | Needs |
 | :-- | :-- | :-- |
-| `Workspace.on("editor-menu", …)` | 1.1.0 | 0.12.11 |
+| `Workspace.on("file-open", …)` | 0.10.9 | 0.9.7 |
+| `Workspace.on("editor-menu", …)` | 1.1.0 | 0.12.6 |
 | `Workspace.on("editor-change", …)` | 1.1.1 | 0.12.17 |
 | `Workspace.on("editor-paste", …)`, `Workspace.on("editor-drop", …)` | 1.1.0 | 0.12.17 |
-| `Workspace.duplicateLeaf(leaf, direction?)` | 0.13.8 | 0.11.13 |
+| `Workspace.duplicateLeaf(leaf, direction?)` | 0.13.8 | 0.9.7 |
 
 The table only lowers a version; an overload it does not list keeps its `@since`. It matches an
 overload by its string literal parameters, or else by its parameter types.
@@ -65,16 +68,16 @@ version. The settings classes, such as `SettingPage` and `SettingGroup`, are sti
 runtime exports, and extending one on an older Obsidian fails when the plugin loads.
 
 The rule needs type information, so the recommended config runs it on TypeScript files only. It does
-not apply the rule to [test files](../configuration.md#test-files), which never run in an older
+not apply the rule to [test files and tool configs](../configuration.md#test-files), which never run in an older
 Obsidian.
 
 ### Members older than their `@since`
 
 The `@since` of a whole member can name a later release than the one that added it too, as for the
 overloads above, most often for a member with a single signature. `setDisabled(disabled: boolean)` is
-`@since 1.2.3` and `Menu.addItem(cb)` `@since 0.15.3`, but both are in the 0.11.13 typings, the oldest
-on npm, written as they are today. So for each member, function and class whose name the published
-typings had before its `@since`, the rule has a second table built from the same releases: each signature the member had, and the releases that had it. A use needs the lower of
+`@since 1.2.3` and `Menu.addItem(cb)` `@since 0.15.3`, but they are in the 0.10.3 and 0.9.12
+typings, written as they are today. So for each member, function and class whose name the typings
+had before its `@since`, the rule has a second table built from the same versions: each signature the member had, and the releases that had it. A use needs the lower of
 its `@since` and the first release from which on every release, up to your `obsidian` version, had a
 signature the use fits:
 
@@ -84,10 +87,10 @@ signature the use fits:
   that one requires and no more than it takes, and each argument is one the older parameter takes
   too. That is the same type; or a parameter of `string`, `number`, `boolean`, `null`, `undefined`,
   literals and types declared then as in your typings, which the argument's type fits, as
-  `getLeaf(false)` fits `getLeaf(newLeaf?: boolean)` of 0.11.13 and `showAtPosition({ x, y })` fits
+  `getLeaf(false)` fits `getLeaf(newLeaf?: boolean)` of 0.9.7 and `showAtPosition({ x, y })` fits
   `showAtPosition(position: Point)`; or a callback the older release calls with the parameters it
   declares, of types the callback takes, and whose result that release ignores. The call's result must be typed the same, or unused:
-  `revealLeaf(leaf);` and `await revealLeaf(leaf);` fit the 0.11.13 `revealLeaf(leaf): void`, but
+  `revealLeaf(leaf);` and `await revealLeaf(leaf);` fit the 0.9.7 `revealLeaf(leaf): void`, but
   `revealLeaf(leaf).then(…)` needs the Promise of 1.7.2.
 
 Anything the rule cannot tell keeps the `@since`: a call that needs a newer signature, such as
@@ -95,11 +98,71 @@ Anything the rule cannot tell keeps the `@since`: a call that needs a newer sign
 of 1.1.1), a spread argument, a generic or rest parameter, and passing a method as a value, which
 needs today's signature. The first typings that declare a member are an upper bound of when the app
 had it: a typings release describes the app release of the same version and is published with it or
-later, the app may have had the member undeclared before, and there are no typings before 0.11.13. So
-the table can make the rule ask for a later version than the app needed, never one older than the
-typings show. For the same reason, a member that is in the 0.11.13 typings before its `@since` is not
-reported at all: those typings only show that the app had it by then, not since when, so a plugin
-with a lower `minAppVersion` is not told that it needs 0.11.13.
+later, the app may have had the member undeclared before, and there are no typings before 0.9.7,
+the first release with a plugin API. So the table can make the rule ask for a later version than the
+app needed, never one older than the typings show. For the same reason, a member that is in the 0.9.7
+typings before its `@since` is not reported at all: those typings only show that the app had it by
+then, not since when, so a plugin with a lower `minAppVersion` is not told that it needs 0.9.7.
+
+A version of the repository's history counts with the typings of its last commit, so a declaration
+counts from the first version that any commit declares it in, and a prerelease such as 1.10.2-1
+counts as its release. A version on npm counts with the typings published there.
+
+### Declarations without `@since`
+
+About 600 declarations of the 1.14.4 typings have no `@since`. Those the first typings, 0.9.7,
+already declare are not reported. The others, 137 in 1.14.4, need the first typings that declare
+them, by the same table: a use needs the first release from which on every release, up to your
+`obsidian` version, declared it in a form the use fits (as above), or else declared it at all. As
+there is no `@since` to fall back on, a use counts as fitting an older form unless it is known not
+to: a call with more or fewer arguments than that form takes, an argument of a type the older
+parameter, whose types the table knows, does not take, or a result the older form types otherwise.
+`null` or `undefined` where the older parameter leaves them out counts as fitting: without
+`strictNullChecks` the older type took them too. So `scope.register([], "Enter", cb)` and
+`scope.register(null, null, cb)` need 0.10.3, the first typings with `Scope.register`, though
+`KeymapEventListener` changed since, and `modifiers` takes `null` only from the 1.7.2 typings on.
+They include:
+
+| API | Needs |
+| :-- | :-- |
+| `activeWindow`, `activeDocument`, `window.activeDocument`, `HTMLElement.innerWidth` / `innerHeight` | 0.15.0 |
+| `UIEvent.targetNode`, `.win`, `.doc`, `Node.instanceOf()`, `Node.doc`, `Node.win` | 0.15.3 |
+| `createSvg()`, `el.createSvg()`, `Array.combine()` | 1.1.0 |
+| `el.setCssStyles()`, `el.setCssProps()`, `nextFrame()` | 1.1.7 |
+| `sleep()`, `DocumentFragment.find()` | 0.14.3 |
+| `Array.prototype.unique()` | 0.14.4 |
+| `apiVersion`, `requireApiVersion()` | 0.13.21 |
+| `requestUrl()` (with a URL string: 0.16.0) | 0.13.26 |
+| `Modal.setTitle()`, `Modal.setContent()` | 1.5.1 |
+| `normalizePath()`, `createFragment()` | 0.9.11 |
+| `Menu`, `MenuItem` | 0.9.12 |
+| `createDiv()`, `createSpan()`, `el.createDiv()`, `el.createSpan()` | 0.10.0 |
+| `debounce()` | 0.10.12 |
+| `parseYaml()`, `moment` | 0.11.11 |
+
+The first typings that declare an API are only an upper bound of when the app had it: the app may
+have had it undeclared before. Here that bound is the version reported, so a plugin that relies on
+the app having had the API earlier can be told it needs a later version than it does.
+
+Not reported, as they exist on every version or are the plugin's own:
+
+- a declaration in the 0.9.7 typings, such as `el.createEl()` or `el.empty()`;
+- a name the plugin declares itself, such as its own `sleep()` function or a property of its own
+  type named `innerWidth`, and a member lib.dom declares too;
+- a member of an interface of the obsidian module, such as `RequestUrlParam.url` or
+  `CachedMetadata.sections`, or of a global interface only `obsidian.d.ts` declares, such as the
+  `DomElementInfo` options of `createEl()`: the plugin or the app supplies that data;
+- a member a base class declared in earlier typings, such as `FileView.navigation` (from `View`);
+- a field or accessor of one of Obsidian's classes that the typings declare later than the class,
+  such as `leaf.parent`, `modal.scope` or `this.app` in an `EditorSuggest`: the instances had that
+  state before the typings described it;
+- a write to a property, such as `node.doc = …`;
+- a use in a type, such as `typeof activeDocument`;
+- a use behind a `requireApiVersion()` check or a feature check, as described below:
+  `typeof activeDocument !== "undefined" ? activeDocument : document` or `el.setCssStyles?.(…)`.
+
+With a `minAppVersion` below 0.15.0, [`prefer-active-doc`](prefer-active-doc.md) does not report
+`document`, so the two rules do not ask for opposite changes.
 
 ## Guarding with `requireApiVersion`
 
