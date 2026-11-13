@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- `validate-manifest` checks the words in the `id`, `name` and `description` without the invisible characters that could hide them, such as a zero-width space, a soft hyphen or a bidi control, so `"Obs\u200Bidian Sync"` is reported as using "Obsidian" ([#TBD](https://github.com/obsidianmd/eslint-plugin/pull/TBD)).
+- `validate-manifest` checks the words in the `id`, `name` and `description` without the invisible characters that could hide them, such as a zero-width space, a soft hyphen or a bidi control, so `"Obs\u200Bidian Sync"` is reported as using "Obsidian" ([#269](https://github.com/obsidianmd/eslint-plugin/pull/269)).
 
 ## [0.5.1] - 2026-11-06
 
