@@ -50,7 +50,7 @@ import {
     referencedTypeNames,
     typeHashes,
 } from "../lib/rules/obsidianDeclarations.js";
-import { getOverloadKey, getSinceTag } from "../lib/rules/obsidianOverloads.js";
+import { getOverloadKey, getReturnTypeText, getSinceTag } from "../lib/rules/obsidianOverloads.js";
 
 export interface Typings {
     version: string;
@@ -62,16 +62,24 @@ export interface OverloadRow {
     key: string;
     since: string | undefined;
     firstPublished: string | undefined;
+    // The first typings whose overload also returned what it returns now.
+    resultFirstPublished?: string | undefined;
+}
+
+export interface OverloadEntry {
+    since: string;
+    firstPublished: string;
+    resultFirstPublished?: string;
 }
 
 // Each method of each class and interface, and each function, by qualified
-// name, with the key and @since of every declaration.
-function collectOverloads(text: string): Map<string, { key: string; since: string | undefined }[]> {
+// name, with the key, return type and @since of every declaration.
+function collectOverloads(text: string): Map<string, { key: string; returns: string; since: string | undefined }[]> {
     const sourceFile = ts.createSourceFile("obsidian.d.ts", text, ts.ScriptTarget.Latest, true);
-    const members = new Map<string, { key: string; since: string | undefined }[]>();
+    const members = new Map<string, { key: string; returns: string; since: string | undefined }[]>();
     const add = (name: string, declaration: ts.SignatureDeclaration) => {
         const list = members.get(name) ?? [];
-        list.push({ key: getOverloadKey(declaration), since: getSinceTag(declaration) });
+        list.push({ key: getOverloadKey(declaration), returns: getReturnTypeText(declaration), since: getSinceTag(declaration) });
         members.set(name, list);
     };
     const visit = (node: ts.Node): void => {
@@ -93,7 +101,10 @@ function collectOverloads(text: string): Map<string, { key: string; since: strin
 
 // Every overload of every member the last (latest) typings declare more than
 // once, with the first of the typings, in the order given, that has an overload
-// of the same member with the same key.
+// of the same member with the same key, and the first that also has its return
+// type: `Workspace.duplicateLeaf(leaf)` is in the 0.9.7 typings, which return
+// `Promise<void>`, and returns `Promise<WorkspaceLeaf>` from 0.13.8 on, so a
+// call that uses the result needs 0.13.8.
 export function buildOverloadHistory(typings: Typings[]): OverloadRow[] {
     const parsed = typings.map(({ version, text }) => ({ version, members: collectOverloads(text) }));
     const latest = parsed[parsed.length - 1];
@@ -102,28 +113,40 @@ export function buildOverloadHistory(typings: Typings[]): OverloadRow[] {
         if (overloads.length < 2) {
             continue;
         }
-        for (const { key, since } of overloads) {
+        for (const { key, returns, since } of overloads) {
             const first = parsed.find((entry) => entry.members.get(member)?.some((overload) => overload.key === key));
-            rows.push({ member, key, since, firstPublished: first?.version });
+            const sameResult = parsed.find((entry) =>
+                entry.members.get(member)?.some((overload) => overload.key === key && overload.returns === returns),
+            );
+            rows.push({ member, key, since, firstPublished: first?.version, resultFirstPublished: sameResult?.version });
         }
     }
     return rows;
 }
 
 // The rows the rule needs: an overload published before the version its
-// @since names.
-export function historyEntries(rows: OverloadRow[]): [string, { since: string; firstPublished: string }][] {
-    return rows.flatMap(({ member, key, since, firstPublished }) =>
-        since && firstPublished && valid(since) && lt(firstPublished, since)
-            ? [[`${member}${key}`, { since, firstPublished }] as [string, { since: string; firstPublished: string }]]
-            : [],
-    );
+// @since names, with the first typings that also have its return type where
+// those are later.
+export function historyEntries(rows: OverloadRow[]): [string, OverloadEntry][] {
+    return rows.flatMap(({ member, key, since, firstPublished, resultFirstPublished }): [string, OverloadEntry][] => {
+        if (!since || !firstPublished || !valid(since) || !lt(firstPublished, since)) {
+            return [];
+        }
+        const entry: OverloadEntry = { since, firstPublished };
+        if (resultFirstPublished !== firstPublished) {
+            // An overload the latest typings have, so some typings have its return type.
+            entry.resultFirstPublished = resultFirstPublished ?? since;
+        }
+        return [[`${member}${key}`, entry]];
+    });
 }
 
 export function renderHistoryModule(source: string, versions: string[], rows: OverloadRow[]): string {
     const entries = historyEntries(rows)
-        .map(([key, { since, firstPublished }]) =>
-            `    ${JSON.stringify(key)}: { since: ${JSON.stringify(since)}, firstPublished: ${JSON.stringify(firstPublished)} },`,
+        .map(([key, { since, firstPublished, resultFirstPublished }]) =>
+            `    ${JSON.stringify(key)}: { since: ${JSON.stringify(since)}, firstPublished: ${JSON.stringify(firstPublished)}${
+                resultFirstPublished === undefined ? "" : `, resultFirstPublished: ${JSON.stringify(resultFirstPublished)}`
+            } },`,
         )
         .join("\n");
     return `// Generated by scripts/obsidian-overload-history.ts from the obsidian typings
@@ -133,11 +156,15 @@ export function renderHistoryModule(source: string, versions: string[], rows: Ov
 // The overloads of an Obsidian method, in the ${source} typings, that were published
 // before the version their @since names, as \`Class.member\` and the overload's key
 // (see getOverloadKey), with the first typings that have them.
-// no-unsupported-api requires the lower of the two versions.
+// no-unsupported-api requires the lower of the two versions. Where older typings
+// returned something else, resultFirstPublished is the first typings with
+// today's return type, which a call that uses the result needs instead.
 
 export const OVERLOAD_HISTORY_SOURCE = ${JSON.stringify(source)};
 
-export const OVERLOAD_HISTORY: Readonly<Record<string, { since: string; firstPublished: string }>> = {
+export const OVERLOAD_HISTORY: Readonly<
+    Record<string, { since: string; firstPublished: string; resultFirstPublished?: string }>
+> = {
 ${entries}
 };
 `;
@@ -387,6 +414,16 @@ function downloadTypings(cache: string): Typings[] {
 
 export const API_REPOSITORY = "https://github.com/obsidianmd/obsidian-api.git";
 
+// Commits of the obsidian-api repository whose package.json names an older
+// version than the typings describe, with the version they belong to.
+// 7c7a0f4 ("Update API for upcoming mobile release", 2021-03-19) still names
+// 0.11.0 but adds the typings of 0.11.7, such as `Editor`; 55946e5, the next
+// commit, the same day, names 0.11.7. As the last commit naming 0.11.0, it
+// would date those additions 0.11.0, released in February.
+export const COMMIT_VERSIONS: Readonly<Record<string, string>> = {
+    "7c7a0f4a5c9b51b202ab72bd12937f388800e78a": "0.11.7",
+};
+
 function git(repository: string, args: string[]): string {
     return execFileSync("git", ["--git-dir", repository, ...args], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
 }
@@ -397,7 +434,8 @@ function git(repository: string, args: string[]): string {
 // Each commit has the version its package.json names; a version's typings are
 // those of its last commit, so a declaration counts from the first version
 // any commit declares it in. A prerelease such as 1.10.2-1 counts as its
-// release.
+// release. COMMIT_VERSIONS overrides the version of a commit whose
+// package.json names the wrong one.
 function repositoryTypings(cache: string): Typings[] {
     const repository = path.join(cache, "obsidian-api.git");
     if (fs.existsSync(repository)) {
@@ -411,7 +449,9 @@ function repositoryTypings(cache: string): Typings[] {
         let version: string | null;
         let text: string;
         try {
-            version = valid((JSON.parse(git(repository, ["show", `${commit}:package.json`])) as { version?: string }).version);
+            version =
+                COMMIT_VERSIONS[commit] ??
+                valid((JSON.parse(git(repository, ["show", `${commit}:package.json`])) as { version?: string }).version);
             text = git(repository, ["show", `${commit}:obsidian.d.ts`]);
         } catch {
             continue;

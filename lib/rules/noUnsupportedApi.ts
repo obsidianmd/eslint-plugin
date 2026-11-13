@@ -74,7 +74,7 @@ function readPluginVersion(): string | undefined {
 let cachedSinceMap: SinceMap | undefined;
 let cachedDtsPath: string | undefined;
 
-export default ruleCreator<Options, "apiNotAvailable">({
+export default ruleCreator<Options, MessageId>({
     meta: {
         type: "problem",
         docs: {
@@ -98,7 +98,13 @@ export default ruleCreator<Options, "apiNotAvailable">({
         ],
         messages: {
             apiNotAvailable:
-                "'{{qualifiedName}}' requires Obsidian v{{sinceVersion}}, but minAppVersion is {{minAppVersion}}.",
+                "'{{qualifiedName}}' requires Obsidian v{{sinceVersion}}, but minAppVersion is {{minAppVersion}}. Raise minAppVersion to {{sinceVersion}}, or guard this use with requireApiVersion(\"{{sinceVersion}}\").",
+            // Below the version that has requireApiVersion() itself.
+            apiNotAvailableCheck:
+                "'{{qualifiedName}}' requires Obsidian v{{sinceVersion}}, but minAppVersion is {{minAppVersion}}. Raise minAppVersion to {{sinceVersion}}, or check that it exists before using it.",
+            // A superclass, or a use no check of the member's existence can guard.
+            apiNotAvailableRaise:
+                "'{{qualifiedName}}' requires Obsidian v{{sinceVersion}}, but minAppVersion is {{minAppVersion}}. Raise minAppVersion to {{sinceVersion}}.",
         },
     },
     defaultOptions: [{}],
@@ -126,6 +132,11 @@ export default ruleCreator<Options, "apiNotAvailable">({
         }
         const sinceMap = buildSinceMap(dtsPath);
         const history = getDeclarationHistory(dtsPath);
+        // requireApiVersion() is first in the 0.13.21 typings: below that, a
+        // plugin cannot call it to guard a use.
+        const requireApiVersionSince = history.firstDeclared("requireApiVersion", () => true) ?? "0.13.21";
+        const canRequireApiVersion =
+            !gt(requireApiVersionSince, minVersion);
         const reported = new WeakSet<TSESTree.Node>();
         const declaredTypes = new WeakMap<ts.SourceFile, Map<string, ts.Type | undefined>>();
         const earlyExits = new WeakMap<TSESTree.Node, EarlyExit[]>();
@@ -284,7 +295,13 @@ export default ruleCreator<Options, "apiNotAvailable">({
                     reported.add(node);
                     context.report({
                         node,
-                        messageId: "apiNotAvailable",
+                        messageId: isSuperClass(node)
+                            ? "apiNotAvailableRaise"
+                            : canRequireApiVersion
+                              ? "apiNotAvailable"
+                              : feature !== undefined
+                                ? "apiNotAvailableCheck"
+                                : "apiNotAvailableRaise",
                         data: {
                             qualifiedName,
                             sinceVersion,
@@ -708,20 +725,22 @@ export default ruleCreator<Options, "apiNotAvailable">({
         // or none, needs the member to exist, which it does from its earliest
         // overload on. An overload without @since needs no version, and one
         // published before its @since (see obsidianOverloadHistory.ts) needs
-        // only the version that first had it. `called` is the overload a call
-        // calls, where that is known.
+        // only the version that first had it, or, for a call that uses the
+        // result, the first that had its return type. `called` is the overload
+        // a call calls, where that is known.
         function requiredVersion(
             qualifiedName: QualifiedName,
             entry: SinceEntry,
             overloads: ts.Declaration[],
             call: TSESTree.CallExpression | undefined,
         ): { version: Version | undefined; called: ts.Declaration | undefined } {
+            const resultUsed = call !== undefined && !isResultUnused(call);
             // A declaration the entry does not list, as when the cache was built
             // from another copy of the file, counts as the entry's earliest.
             const sinceOf = (declaration: ts.Declaration): Version | null => {
                 const listed = entry.find(([position]) => position === declaration.pos);
                 const since = listed ? toSince(listed[1]) : earliestOf(entry.map(([, value]) => toSince(value)));
-                return since && firstPublishedSince(qualifiedName, declaration, since);
+                return since && firstPublishedSince(qualifiedName, declaration, since, resultUsed);
             };
             const versions = overloads.map(sinceOf);
             const earliest = earliestOf(versions);
@@ -1571,6 +1590,19 @@ function isFeatureTest(node: TSESTree.Node): boolean {
 // `this.editor.transaction` for `this.editor?.transaction` and
 // `this.editor!.transaction`. Undefined for anything else, such as a computed
 // access with a variable.
+type MessageId = "apiNotAvailable" | "apiNotAvailableCheck" | "apiNotAvailableRaise";
+
+// `class X extends AbstractInputSuggest` or `extends obsidian.AbstractInputSuggest`:
+// the class is defined when the module loads, so no runtime check guards it.
+function isSuperClass(node: TSESTree.Node): boolean {
+    const parent = node.parent;
+    return (
+        parent !== undefined &&
+        (parent.type === AST_NODE_TYPES.ClassDeclaration || parent.type === AST_NODE_TYPES.ClassExpression) &&
+        parent.superClass === node
+    );
+}
+
 function featureKey(node: TSESTree.Node): string | undefined {
     switch (node.type) {
         case AST_NODE_TYPES.Identifier:
@@ -1613,13 +1645,21 @@ function memberName(node: TSESTree.MemberExpression): string | undefined {
 const HISTORY_MEMBERS = new Set(Object.keys(OVERLOAD_HISTORY).map((key) => key.slice(0, key.indexOf("("))));
 
 // The version an overload needs: its @since, or the first typings
-// that had it, if those are older. An overload the table does not list, as in
+// that had it, if those are older. A call that uses the result needs the first
+// typings that also had its return type: `await workspace.duplicateLeaf(leaf)`
+// resolved to nothing before 0.13.8. An overload the table does not list, as in
 // typings newer than the table, keeps its @since.
-function firstPublishedSince(qualifiedName: QualifiedName, declaration: ts.Declaration, since: Version): Version {
+function firstPublishedSince(
+    qualifiedName: QualifiedName,
+    declaration: ts.Declaration,
+    since: Version,
+    resultUsed: boolean,
+): Version {
     if (!HISTORY_MEMBERS.has(qualifiedName) || !ts.isFunctionLike(declaration)) {
         return since;
     }
-    const firstPublished = OVERLOAD_HISTORY[`${qualifiedName}${getOverloadKey(declaration)}`]?.firstPublished;
+    const row = OVERLOAD_HISTORY[`${qualifiedName}${getOverloadKey(declaration)}`];
+    const firstPublished = resultUsed ? (row?.resultFirstPublished ?? row?.firstPublished) : row?.firstPublished;
     return firstPublished && lt(firstPublished, since) ? firstPublished : since;
 }
 

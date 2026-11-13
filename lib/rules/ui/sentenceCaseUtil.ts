@@ -407,13 +407,15 @@ function acronymCasing(acronym: string): string {
 }
 
 // Normalizes and prepares options with defaults for sentence case evaluation
+// An empty brand, acronym or word in the options names nothing, and an empty
+// brand matched an empty string forever.
 function normalizeOptions(options?: EvaluatorOptions) {
-    const brands = (options?.brands ?? DEFAULT_BRANDS).slice().sort((a, b) => b.length - a.length);
+    const brands = (options?.brands ?? DEFAULT_BRANDS).filter((s) => s !== "").sort((a, b) => b.length - a.length);
     const ambiguousBrands = new Set(DEFAULT_AMBIGUOUS_BRANDS);
     // Acronyms in upper case, mapped to the casing they are written in
-    const acronyms = new Map((options?.acronyms ?? DEFAULT_ACRONYMS).map((s) => [s.toUpperCase(), acronymCasing(s)]));
+    const acronyms = new Map((options?.acronyms ?? DEFAULT_ACRONYMS).filter((s) => s !== "").map((s) => [s.toUpperCase(), acronymCasing(s)]));
     const caseAgnosticAcronyms = new Set(DEFAULT_CASE_AGNOSTIC_ACRONYMS);
-    const ignoreWords = new Set((options?.ignoreWords ?? []).map((s) => s));
+    const ignoreWords = new Set((options?.ignoreWords ?? []).filter((s) => s !== ""));
     const ignoreRegex = (options?.ignoreRegex ?? []).map((p) => new RegExp(p));
     const mode: Mode = options?.mode ?? "loose";
     const enforceCamelCaseLower = options?.enforceCamelCaseLower === true;
