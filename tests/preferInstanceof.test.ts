@@ -1,7 +1,8 @@
 import { RuleTester } from "@typescript-eslint/rule-tester";
+import { atMinAppVersion } from "./atMinAppVersion.js";
 import preferInstanceofRule from "../lib/rules/preferInstanceof.js";
 
-const ruleTester = new RuleTester();
+const ruleTester = atMinAppVersion(new RuleTester(), "1.5.0");
 
 // Obsidian's declarations of instanceOf() on the DOM's own Node and UIEvent,
 // from TypeScript's lib.dom.d.ts. Only those are reported: a class of the
@@ -853,9 +854,9 @@ ruleTester.run("prefer-instanceof with strictNullChecks", preferInstanceofRule, 
 
 // Without strictNullChecks no type includes null, so `Element | null` reads as
 // `Element`. Whether a value may be null comes from its declaration then.
-const nonStrictRuleTester = new RuleTester({
+const nonStrictRuleTester = atMinAppVersion(new RuleTester({
     languageOptions: { parserOptions: { project: "./tests/fixtures/tsconfig.non-strict.json" } },
-});
+}), "1.5.0");
 
 nonStrictRuleTester.run("prefer-instanceof without strictNullChecks", preferInstanceofRule, {
     valid: [],
@@ -1615,11 +1616,11 @@ ruleTester.run("prefer-instanceof on types named like the DOM's", preferInstance
 // narrowing of `e.target` is kept. With the obsidian typings, which declare
 // UIEvent's targetNode and Node's instanceOf(). Shapes from the
 // community-plugin run (sweep051 analysis/eventtarget.tsv).
-const obsidianRuleTester = new RuleTester({
+const obsidianRuleTester = atMinAppVersion(new RuleTester({
     languageOptions: {
         parserOptions: { project: "./tsconfig.json", tsconfigRootDir: `${process.cwd()}/tests/fixtures/obsidian-project` },
     },
-});
+}), "1.5.0");
 
 const eventTargetError = (operand: string, className: string, suggestions: { messageId: "useTargetNode" | "castToNode"; output: string }[] = []) => ({
     messageId: "preferInstanceofOnEventTarget" as const,
@@ -1789,6 +1790,140 @@ el.addEventListener("click", (e) => { if (e.targetNode?.instanceOf(Element) && e
 export function onClick(e: React.MouseEvent) { if (e.target instanceof HTMLElement) {} }`,
             output: null,
             errors: [eventTargetError("e.target", "HTMLElement")],
+        },
+    ],
+});
+
+// Popout windows came with Obsidian 0.15.0, and instanceOf() and targetNode
+// with 0.15.3: below 0.15.0 nothing is reported, and below 0.15.3 nothing is
+// fixed or suggested. With no version known, the fix stays, and a suggestion
+// says which version it needs.
+const versionRuleTester = new RuleTester();
+const versionObsidianRuleTester = new RuleTester({
+    languageOptions: {
+        parserOptions: { project: "./tsconfig.json", tsconfigRootDir: `${process.cwd()}/tests/fixtures/obsidian-project` },
+    },
+});
+const at = (minAppVersion: string): [{ minAppVersion: string }] => [{ minAppVersion }];
+const NODE_CHECK = `${OBSIDIAN_INSTANCEOF}
+                declare const el: Node;
+                if (el instanceof HTMLElement) {}
+            `;
+const NULLABLE_CHECK = `${OBSIDIAN_INSTANCEOF}
+                declare const el: HTMLElement;
+                if (el.parentElement instanceof HTMLDivElement) {}
+            `;
+
+versionRuleTester.run("prefer-instanceof and minAppVersion", preferInstanceofRule, {
+    valid: [
+        { name: "below 0.15.0, which has no popout windows, nothing is reported", code: NODE_CHECK, options: at("0.14.9") },
+    ],
+    invalid: [
+        {
+            name: "at 0.15.0 it is reported without a fix",
+            code: NODE_CHECK,
+            options: at("0.15.0"),
+            output: null,
+            errors: [{ messageId: "preferInstanceof", suggestions: [] }],
+        },
+        {
+            name: "at 0.15.2 a nullable value gets no suggestion",
+            code: NULLABLE_CHECK,
+            options: at("0.15.2"),
+            output: null,
+            errors: [{ messageId: "preferInstanceof", suggestions: [] }],
+        },
+        {
+            name: "with the repository's manifest.json at 0.15.0 it is reported without a fix",
+            code: NODE_CHECK,
+            output: null,
+            errors: [{ messageId: "preferInstanceof", suggestions: [] }],
+        },
+        {
+            name: "at 0.15.3 it is fixed",
+            code: NODE_CHECK,
+            options: at("0.15.3"),
+            output: NODE_CHECK.replace("el instanceof HTMLElement", "el.instanceOf(HTMLElement)"),
+            errors: [{ messageId: "preferInstanceof" }],
+        },
+        {
+            name: "with an unknown version it is fixed as before",
+            code: NODE_CHECK,
+            options: at("latest"),
+            output: NODE_CHECK.replace("el instanceof HTMLElement", "el.instanceOf(HTMLElement)"),
+            errors: [{ messageId: "preferInstanceof" }],
+        },
+        {
+            name: "with an unknown version a suggestion says it needs 0.15.3",
+            code: NULLABLE_CHECK,
+            options: at("latest"),
+            output: null,
+            errors: [
+                {
+                    messageId: "preferInstanceof",
+                    suggestions: [
+                        {
+                            messageId: "preferInstanceofOptionalSuggestionSince",
+                            data: { className: "HTMLDivElement", since: "0.15.3" },
+                            output: NULLABLE_CHECK.replace("el.parentElement instanceof HTMLDivElement", "el.parentElement?.instanceOf(HTMLDivElement)"),
+                        },
+                    ],
+                },
+            ],
+        },
+    ],
+});
+
+const TARGET_CHECK = "export function f(e: MouseEvent) { if (e.target instanceof HTMLElement) {} }";
+const RELATED_CHECK = "export function f(e: MouseEvent) { if (e.relatedTarget instanceof Node) {} }";
+
+versionObsidianRuleTester.run("prefer-instanceof on event targets and minAppVersion", preferInstanceofRule, {
+    valid: [{ name: "below 0.15.0 an event target is not reported", code: TARGET_CHECK, options: at("0.14.9") }],
+    invalid: [
+        {
+            name: "at 0.15.2 an event target is reported without a suggestion",
+            code: TARGET_CHECK,
+            options: at("0.15.2"),
+            output: null,
+            errors: [{ messageId: "preferInstanceofOnEventTarget", suggestions: [] }],
+        },
+        {
+            name: "at 0.15.3 targetNode is suggested",
+            code: TARGET_CHECK,
+            options: at("0.15.3"),
+            output: null,
+            errors: [
+                {
+                    messageId: "preferInstanceofOnEventTarget",
+                    suggestions: [{ messageId: "useTargetNode", output: TARGET_CHECK.replace("e.target instanceof HTMLElement", "e.targetNode?.instanceOf(HTMLElement)") }],
+                },
+            ],
+        },
+        {
+            name: "with an unknown version targetNode and the cast say they need 0.15.3",
+            code: `${TARGET_CHECK} ${RELATED_CHECK.replace("function f", "function g")}`,
+            options: at("latest"),
+            output: null,
+            errors: [
+                {
+                    messageId: "preferInstanceofOnEventTarget",
+                    suggestions: [
+                        {
+                            messageId: "useTargetNodeSince",
+                            output: `${TARGET_CHECK.replace("e.target instanceof HTMLElement", "e.targetNode?.instanceOf(HTMLElement)")} ${RELATED_CHECK.replace("function f", "function g")}`,
+                        },
+                    ],
+                },
+                {
+                    messageId: "preferInstanceofOnEventTarget",
+                    suggestions: [
+                        {
+                            messageId: "castToNodeSince",
+                            output: `${TARGET_CHECK} ${RELATED_CHECK.replace("function f", "function g").replace("e.relatedTarget instanceof Node", "(e.relatedTarget as Node | null)?.instanceOf(Node)")}`,
+                        },
+                    ],
+                },
+            ],
         },
     ],
 });

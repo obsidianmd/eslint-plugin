@@ -9,21 +9,18 @@ const ruleTester = new RuleTester();
 ruleTester.run("no-unsupported-api: the first typings that declare a member", rule, {
     valid: [
         {
-            // Older than their @since, these are in the 0.11.13 typings, the
-            // oldest on npm, which cannot tell how much older they are: a plugin
-            // with a lower minAppVersion is not told it needs 0.11.13.
-            name: "members in the oldest published typings, below that version",
+            // Older than their @since, these are in the 0.9.7 typings, the
+            // first in the obsidian-api history, which cannot tell how much
+            // older they are: a plugin with a lower minAppVersion is not told
+            // it needs 0.9.7.
+            name: "members in the oldest typings, below that version",
             code: `
-                import { App, BaseComponent, Menu } from 'obsidian';
-                declare const app: App;
-                declare const component: BaseComponent;
-                declare const menu: Menu;
-                app.workspace.getLeaf(false);
-                const duplicate = app.workspace.duplicateLeaf;
-                component.setDisabled(true);
-                menu.addItem((item) => item.setIcon("trash"));
+                import { Workspace } from 'obsidian';
+                declare const workspace: Workspace;
+                workspace.getLeaf(false);
+                const duplicate = workspace.duplicateLeaf;
             `,
-            options: [{ minAppVersion: "0.9.11" }],
+            options: [{ minAppVersion: "0.9.0" }],
         },
         {
             // setDisabled @since 1.2.3, Menu.addItem 0.15.3, MenuItem.setIcon
@@ -168,6 +165,24 @@ ruleTester.run("no-unsupported-api: the first typings that declare a member", ru
         },
     ],
     invalid: [
+        {
+            // Older than their @since, and newer than the 0.9.7 typings: each
+            // needs the first typings in the obsidian-api history that have it.
+            name: "members first declared after the oldest typings, below that version",
+            code: `
+                import { BaseComponent, Menu } from 'obsidian';
+                declare const component: BaseComponent;
+                declare const menu: Menu;
+                component.setDisabled(true);
+                menu.addItem((item) => item.setIcon("trash"));
+            `,
+            options: [{ minAppVersion: "0.9.11" }],
+            errors: [
+                { messageId: "apiNotAvailable", line: 5, data: { qualifiedName: "BaseComponent.setDisabled", sinceVersion: "0.10.3", minAppVersion: "0.9.11" } },
+                { messageId: "apiNotAvailable", line: 6, data: { qualifiedName: "Menu.addItem", sinceVersion: "0.9.12", minAppVersion: "0.9.11" } },
+                { messageId: "apiNotAvailable", line: 6, data: { qualifiedName: "MenuItem.setIcon", sinceVersion: "0.9.12", minAppVersion: "0.9.11" } },
+            ],
+        },
         {
             // obsidian-weread-plugin: `getLeaf('tab')` needs the PaneType
             // overload, first in the 0.16.0 typings.

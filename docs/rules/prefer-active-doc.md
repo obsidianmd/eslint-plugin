@@ -93,7 +93,7 @@ not.
 There is no autofix; see [Suggestion](#suggestion).
 
 The recommended config switches this rule off for web worker files, which have no `activeDocument`,
-and for test files, which do not run in Obsidian; see
+and for test files and tool configs, which do not run in Obsidian; see
 [Web worker files](../configuration.md#web-worker-files) and [Test files](../configuration.md#test-files).
 
 ### Calls left to `prefer-create-el`
@@ -112,7 +112,9 @@ document.createEl("div");                                          // createDiv(
 are the files the
 recommended config runs `prefer-create-el` on; anywhere else, such as a JavaScript file, this rule
 still reports them. A call `prefer-create-el` leaves alone, such as
-`document.createElement("div", { is: "my-div" })`, is reported here as before.
+`document.createElement("div", { is: "my-div" })`, is reported here as before, and so is a call
+inside an implementation of a DOM helper, such as a polyfill, which `prefer-create-el` leaves alone
+(see [Helper implementations](prefer-create-el.md#helper-implementations)).
 
 Where a comment turns `prefer-create-el` off for the call (`eslint-disable-next-line`,
 `eslint-disable-line`, or an `eslint-disable` range naming it), this rule reports `document` there
@@ -181,6 +183,7 @@ Nothing is offered where `activeDocument` would not exist, or would not be what 
   typings are not part of it;
 - a web worker file, by the paths the recommended config uses (`*.worker.*`, `*-worker.*`, `*_worker.*`, or any
   file under a `workers` directory), or a file whose config turns the `activeDocument` global `"off"`;
+- a file of Emscripten output, which reads `ENVIRONMENT_IS_WORKER` or `ENVIRONMENT_IS_NODE`;
 - code that also runs outside Obsidian, as a check before it in the same function, or one that
   decides whether it runs, shows: `typeof document`, `typeof window`, `"window" in globalThis`, a
   check of `activeDocument` or `activeWindow` themselves, such as

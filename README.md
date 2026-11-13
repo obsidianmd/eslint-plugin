@@ -1,6 +1,6 @@
 # eslint-plugin-obsidianmd
 
-> Upgrading from 0.4? See [Upgrading to 0.5.0](docs/configuration.md#upgrading-to-050) and the [changelog](CHANGELOG.md).
+> Upgrading from 0.5.0? See [Upgrading to 0.5.1](docs/configuration.md#upgrading-to-051). From 0.4? See [Upgrading to 0.5.0](docs/configuration.md#upgrading-to-050). Both are summed up in the [changelog](CHANGELOG.md).
 
 ## Installation
 

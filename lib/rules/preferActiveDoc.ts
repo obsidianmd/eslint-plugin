@@ -3,6 +3,7 @@ import ts from "typescript";
 import { disableDirectives, isDisabled, problemStart } from "../disableDirectives.js";
 import { getTypeInfo, hasLocalBinding, mayRunOutsideObsidianAt } from "../globalWindow.js";
 import { type MinAppVersionOptions, minAppVersionSchema, supportsVersion } from "../minAppVersion.js";
+import { API_SINCE } from "../obsidianApiVersions.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 import { isWorkerFile } from "../workerGlobals.js";
 import { isReportedOnGlobalDocument } from "./preferCreateEl.js";
@@ -18,7 +19,7 @@ const REPLACEMENTS: Record<string, string> = {
 const TYPESCRIPT_FILE = /\.(?:ts|cts|mts|tsx)$/;
 
 // The Obsidian version that added popout windows, and `activeDocument` with them.
-const ACTIVE_DOCUMENT_SINCE = "0.15.0";
+const ACTIVE_DOCUMENT_SINCE = API_SINCE.activeDocument;
 
 // The objects a property set on lives as long as the plugin: the global
 // object, and a CommonJS module's exports.

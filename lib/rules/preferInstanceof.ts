@@ -1,6 +1,8 @@
 import { ESLintUtils, type TSESLint, TSESTree } from "@typescript-eslint/utils";
 import type { ParserServices } from "@typescript-eslint/utils";
 import ts from "typescript";
+import { type MinAppVersionOptions, minAppVersionSchema, supportsVersion } from "../minAppVersion.js";
+import { API_SINCE } from "../obsidianApiVersions.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 const INSTANCEABLE_BASE_TYPES = new Set(["Node", "UIEvent"]);
@@ -111,7 +113,28 @@ const NODE_TARGET_EVENTS = new Set([
 
 const EQUALITY_OPERATORS = new Set(["===", "!==", "==", "!="]);
 
-export default ruleCreator({
+// Popout windows came with Obsidian 0.15.0; before that there is one window,
+// and `instanceof` is right. Node's and UIEvent's instanceOf(), and
+// UIEvent's targetNode, are first declared in the 0.15.3 typings.
+const POPOUT_SINCE = API_SINCE.activeWindow;
+const INSTANCE_OF_SINCE = API_SINCE["Node.instanceOf"];
+
+const SINCE_MESSAGE = " (needs Obsidian {{since}} or later)";
+
+// Each suggestion's message, ending in a period, and the same message saying
+// which Obsidian version it needs, under the id with "Since" after it.
+function withSince<T extends Record<SuggestionId, string>>(messages: T): Record<SuggestionId | `${SuggestionId}Since`, string> {
+    const all: Record<string, string> = {};
+    for (const [id, text] of Object.entries(messages)) {
+        all[id] = `${text}.`;
+        all[`${id}Since`] = `${text}${SINCE_MESSAGE}.`;
+    }
+    return all as Record<SuggestionId | `${SuggestionId}Since`, string>;
+}
+
+type SuggestionId = "preferInstanceofSuggestion" | "preferInstanceofOptionalSuggestion" | "useTargetNode" | "castToNode";
+
+export default ruleCreator<MinAppVersionOptions, SuggestionId | `${SuggestionId}Since` | "preferInstanceof" | "preferInstanceofOnEventTarget">({
     meta: {
         type: "suggestion" as const,
         docs: {
@@ -120,28 +143,45 @@ export default ruleCreator({
             url: docsUrl("prefer-instanceof"),
             requiresTypeChecking: true,
         },
-        schema: [],
+        schema: minAppVersionSchema,
         fixable: "code" as const,
         hasSuggestions: true as const,
         messages: {
             preferInstanceof:
                 "Use '.instanceOf({{className}})' instead of 'instanceof {{className}}' for cross-window safe type checking.",
-            preferInstanceofSuggestion:
-                "Replace 'instanceof {{className}}' with '.instanceOf({{className}})'.",
-            preferInstanceofOptionalSuggestion:
-                "Replace 'instanceof {{className}}' with '?.instanceOf({{className}})', which is falsy for a null or undefined value.",
+            ...withSince({
+                preferInstanceofSuggestion:
+                    "Replace 'instanceof {{className}}' with '.instanceOf({{className}})'",
+                preferInstanceofOptionalSuggestion:
+                    "Replace 'instanceof {{className}}' with '?.instanceOf({{className}})', which is falsy for a null or undefined value",
+                useTargetNode:
+                    "Replace with '{{object}}.targetNode?.instanceOf({{className}})', and read '{{object}}.target' as '{{object}}.targetNode', the same value typed as a Node, in the rest of the function",
+                castToNode:
+                    "Replace with '({{operand}} as Node | null)?.instanceOf({{className}})'",
+            }),
             preferInstanceofOnEventTarget:
                 "'{{operand}} instanceof {{className}}' is false for a node of a popout window, which has its own '{{className}}'. Check the node with '.instanceOf({{className}})', which works in every window.",
-            useTargetNode:
-                "Replace with '{{object}}.targetNode?.instanceOf({{className}})', and read '{{object}}.target' as '{{object}}.targetNode', the same value typed as a Node, in the rest of the function.",
-            castToNode:
-                "Replace with '({{operand}} as Node | null)?.instanceOf({{className}})'.",
         },
     },
-    defaultOptions: [],
+    defaultOptions: [{}],
     create(context) {
         const services = ESLintUtils.getParserServices(context);
         const checker = services.program.getTypeChecker();
+        const minAppVersion = context.options[0]?.minAppVersion;
+        // Without popout windows, there is no other window to check against.
+        if (supportsVersion(minAppVersion, POPOUT_SINCE) === false) {
+            return {};
+        }
+        // false: reported without a fix or a suggestion, as instanceOf() and
+        // targetNode do not exist yet; undefined: no version is known, so the
+        // suggestions say which one they need.
+        const instanceOfSupported = supportsVersion(minAppVersion, INSTANCE_OF_SINCE);
+        const suggestion = (
+            messageId: SuggestionId,
+        ): { messageId: SuggestionId | `${SuggestionId}Since`; since: Record<string, string> } =>
+            instanceOfSupported === undefined
+                ? { messageId: `${messageId}Since` as const, since: { since: INSTANCE_OF_SINCE } }
+                : { messageId, since: {} };
 
         return {
             BinaryExpression(node: TSESTree.BinaryExpression) {
@@ -184,6 +224,11 @@ export default ruleCreator({
                     : rightText;
                 const replacement = `${leftText}${nullable ? "?." : "."}instanceOf(${argumentText})`;
                 const canAutofix = hasInstanceOfMethod(leftType) && !nullable;
+                if (instanceOfSupported === false) {
+                    context.report({ node, messageId: "preferInstanceof", data: { className: argumentText } });
+                    return;
+                }
+                const suggested = suggestion(nullable ? "preferInstanceofOptionalSuggestion" : "preferInstanceofSuggestion");
 
                 context.report({
                     node,
@@ -200,10 +245,8 @@ export default ruleCreator({
                         : {
                             suggest: [
                                 {
-                                    messageId: nullable
-                                        ? "preferInstanceofOptionalSuggestion" as const
-                                        : "preferInstanceofSuggestion" as const,
-                                    data: { className: argumentText },
+                                    messageId: suggested.messageId,
+                                    data: { className: argumentText, ...suggested.since },
                                     fix(fixer) {
                                         return fixer.replaceText(node, replacement);
                                     },
@@ -372,27 +415,29 @@ export default ruleCreator({
             const className = node.right.type === TSESTree.AST_NODE_TYPES.SequenceExpression ? `(${rightText})` : rightText;
             const objectText = context.sourceCode.getText(left.object);
             const suggest: {
-                messageId: "useTargetNode" | "castToNode";
+                messageId: SuggestionId | `${SuggestionId}Since`;
                 data: Record<string, string>;
                 fix: TSESLint.ReportFixFunction;
             }[] = [];
             // `e.targetNode?.instanceOf(C)` is `boolean | undefined`, so only
             // where the result is a condition.
-            if (hasInstanceOfMethod(nodeClass) && isOnlyTested(node)) {
+            if (instanceOfSupported !== false && hasInstanceOfMethod(nodeClass) && isOnlyTested(node)) {
                 const targetNodeFix = property === "target" ? targetNodeRewrite(node, left) : undefined;
                 if (targetNodeFix) {
+                    const suggested = suggestion("useTargetNode");
                     suggest.push({
-                        messageId: "useTargetNode",
-                        data: { object: objectText, className },
+                        messageId: suggested.messageId,
+                        data: { object: objectText, className, ...suggested.since },
                         fix: (fixer) => [
                             fixer.replaceText(node, `${objectText}.targetNode?.instanceOf(${className})`),
                             ...targetNodeFix.map((reference) => fixer.replaceText(reference, "targetNode")),
                         ],
                     });
                 } else if (property === "relatedTarget" && !isNarrowedElsewhere(node, left, leftType)) {
+                    const suggested = suggestion("castToNode");
                     suggest.push({
-                        messageId: "castToNode",
-                        data: { operand, className },
+                        messageId: suggested.messageId,
+                        data: { operand, className, ...suggested.since },
                         fix: (fixer) => fixer.replaceText(node, `(${operand} as Node | null)?.instanceOf(${className})`),
                     });
                 }

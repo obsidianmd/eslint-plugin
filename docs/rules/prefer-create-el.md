@@ -25,14 +25,17 @@ tag that has a shorter helper:
 
 The document decides where the replacement is called: the global `document` uses the global
 helpers, `activeDocument` uses `activeWindow.`, and any other value typed as a `Document`, such as
-`el.doc`, uses its window, `el.doc.win.`. A document that may be null or undefined counts too, such
+`el.doc`, uses its window, `el.doc.win.`, where that window's type declares the helpers (see
+[Popout window documents](#popout-window-documents)). A document that may be null or undefined counts too, such
 as `node.ownerDocument` (typed `Document | null`) or an optional `doc?: Document` parameter.
 
 [`prefer-active-doc`](prefer-active-doc.md) does not report the global `document` in a call this rule
 reports, as the replacement drops `document`; see
 [Calls left to `prefer-create-el`](prefer-active-doc.md#calls-left-to-prefer-create-el). Where a
 comment turns this rule off for a call, `prefer-active-doc` reports `document` there; if you switch
-this rule off in your config, neither rule reports these calls.
+this rule off in your config, neither rule reports these calls. Inside an implementation of the
+helpers (see [Helper implementations](#helper-implementations)), where this rule reports nothing,
+`prefer-active-doc` reports `document`.
 
 Not reported:
 
@@ -44,7 +47,7 @@ Not reported:
 - code inside an implementation of the helpers; see [Helper implementations](#helper-implementations)
 
 The rule needs type information, so the recommended config runs it on TypeScript files only. It
-switches the rule off for worker and test files, which have no Obsidian DOM helpers; see
+switches the rule off for worker files, test files and tool configs, which have no Obsidian DOM helpers; see
 [Web worker files](../configuration.md#web-worker-files) and [Test files](../configuration.md#test-files).
 
 ### Fix or suggestion
@@ -81,7 +84,8 @@ did, as it does with Obsidian's types. Otherwise:
   `createDiv()` that returns an `HTMLDivElement`) or a spread argument: a suggestion. A call that is
   a statement of its own, whose result is not used, is still fixed when only the result type differs.
 
-On an `any` value, or with no helper declared anywhere, the replacement is fixed as before. An
+On an `any` value, or with no helper declared anywhere, the `createEl("div")` shorthand is fixed as
+before. An
 optional chain is kept: `el?.createEl("div")` becomes `el?.createDiv()`, and `doc?.createElement("p")`
 becomes `doc?.win.createEl("p")`, also when `doc` may be null or is read through a chain, as in
 `view?.doc.createElement("p")`.
@@ -118,6 +122,7 @@ Element.prototype.createEl = function (tag, o) { return document.createElement(t
 ```
 
 There the replacement would call the function it is in, or the polyfill being defined, and recurse.
+[`prefer-active-doc`](prefer-active-doc.md) still reports the global `document` in such code.
 
 ### Iframe documents
 
@@ -135,3 +140,25 @@ if (doc) doc.head.appendChild(doc.createElement("style"));
 
 A detached element still belongs in the main document, so `document.createElement("canvas")` is
 still reported in favour of `createEl("canvas")`.
+
+### Minimum app version
+
+Some replacements need a newer Obsidian than the plugin may support, by the first typings that
+declare what they call: `createFragment()` 0.9.11, `createDiv()` and `createSpan()` (also as
+`el.createDiv()` and `el.createSpan()`) 0.10.0, `createSvg()` (and `el.createSvg()`) 1.1.0,
+`activeWindow` 0.15.0, and a document's `win` 0.15.3. Where the plugin's minimum app version (the
+`minAppVersion` option, else `minAppVersion` in `manifest.json`) is older than that, the native call
+or `createEl()` is the right one there, and it is not reported. `createEl()` is in every version, so
+`document.createElement("p")` is reported whatever the version. Where no version is
+known (no option and no `manifest.json` `minAppVersion`, or the one that applies is not a version,
+such as `latest`), the fix is applied as before, and a suggestion says which version it needs.
+
+## Options
+
+<!-- begin auto-generated rule options list -->
+
+| Name            | Description                                                                        | Type   |
+| :-------------- | :--------------------------------------------------------------------------------- | :----- |
+| `minAppVersion` | The minimum app version to check against. Defaults to manifest.json minAppVersion. | String |
+
+<!-- end auto-generated rule options list -->
