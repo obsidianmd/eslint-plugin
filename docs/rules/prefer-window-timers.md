@@ -34,8 +34,8 @@ change with it:
 - `clearTimeout()` and `clearInterval()` are fixed when their argument is a `number`, `undefined` or
   `any`, or is left out (without type information: a number literal or `undefined`). A
   `NodeJS.Timeout` argument gets a suggestion.
-- `requestAnimationFrame()` and `cancelAnimationFrame()` are DOM functions either way and are always
-  fixed.
+- `requestAnimationFrame()` and `cancelAnimationFrame()` are DOM functions either way, so their type
+  never changes.
 - Calls on `activeWindow` are fixed: both are a `Window`.
 
 `activeWindow.requestAnimationFrame()` and `activeWindow.cancelAnimationFrame()` are not reported. A
@@ -133,5 +133,5 @@ recommended config switches this rule off, or disable the rule for it.
 
 A web worker has no `window`, so `globalThis` and the bare timer functions are correct there. The
 recommended config switches this rule off for files matching `**/*.worker.*`, `**/*-worker.*` or
-`**/*_worker.*` and anything under a `workers/` directory, and for test files; see [Web worker files](../configuration.md#web-worker-files)
+`**/*_worker.*` and anything under a `workers/` directory, and for test files and tool configs; see [Web worker files](../configuration.md#web-worker-files)
 and [Test files](../configuration.md#test-files).

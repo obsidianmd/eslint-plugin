@@ -723,7 +723,7 @@ ruleTester.run("no-unsupported-api", rule, {
                 declare const app: App;
                 // @since 1.1.0 and 1.1.1 mark the widening of the view to
                 // MarkdownView | MarkdownFileInfo; the events are in the
-                // 0.12.11 and 0.12.17 typings.
+                // 0.12.6 and 0.12.17 typings.
                 app.workspace.on('editor-menu', (menu, editor, info) => {});
                 app.workspace.on('editor-change', (editor, info) => {});
                 app.workspace.on('editor-paste', (evt, editor, info) => {});
@@ -858,7 +858,7 @@ ruleTester.run("no-unsupported-api", rule, {
             `,
             options: [{ minAppVersion: "0.12.0" }],
             errors: [
-                { messageId: "apiNotAvailable", line: 4, data: { qualifiedName: "Workspace.on", sinceVersion: "0.12.11", minAppVersion: "0.12.0" } },
+                { messageId: "apiNotAvailable", line: 4, data: { qualifiedName: "Workspace.on", sinceVersion: "0.12.6", minAppVersion: "0.12.0" } },
                 { messageId: "apiNotAvailable", line: 5, data: { qualifiedName: "Workspace.on", sinceVersion: "0.12.17", minAppVersion: "0.12.0" } },
                 { messageId: "apiNotAvailable", line: 6, data: { qualifiedName: "Workspace.on", sinceVersion: "0.12.17", minAppVersion: "0.12.0" } },
                 { messageId: "apiNotAvailable", line: 7, data: { qualifiedName: "Workspace.on", sinceVersion: "0.12.17", minAppVersion: "0.12.0" } },
