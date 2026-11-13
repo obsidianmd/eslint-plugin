@@ -1,6 +1,8 @@
-import { ASTUtils, TSESTree } from "@typescript-eslint/utils";
+import { ASTUtils, TSESLint, TSESTree } from "@typescript-eslint/utils";
 import ts from "typescript";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
+
+const { DefinitionType } = TSESLint.Scope;
 
 // We want to catch patterns like:
 //
@@ -245,7 +247,7 @@ export default ruleCreator({
                     annotation.typeName.name === "ShadowRoot"
                 );
             }
-            if (def.type !== "Variable" || def.node.id !== def.name) {
+            if (def.type !== DefinitionType.Variable || def.node.id !== def.name) {
                 // A parameter, or a name destructured or imported.
                 return byName;
             }
@@ -319,7 +321,7 @@ export default ruleCreator({
             const variable = ASTUtils.findVariable(context.sourceCode.getScope(node), node);
             const def = variable?.defs.length === 1 ? variable.defs[0] : undefined;
             return (
-                def?.type === "Variable" &&
+                def?.type === DefinitionType.Variable &&
                 def.node.id === def.name &&
                 def.parent.kind === "const" &&
                 def.node.init !== null &&

@@ -2118,7 +2118,7 @@ function buildSinceMap(dtsPath: string): SinceMap {
     const sinceMap: SinceMap = new Map();
     // Without a byte order mark, as TypeScript reads the file for the program,
     // so the positions here are those of the program's declarations.
-    const content = readFileSync(dtsPath, "utf8").replace(/^﻿/, "");
+    const content = readFileSync(dtsPath, "utf8").replace(/^\uFEFF/, "");
     const sourceFile = ts.createSourceFile(
         "obsidian.d.ts",
         content,

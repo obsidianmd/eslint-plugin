@@ -1,9 +1,11 @@
-import { ASTUtils, ESLintUtils, TSESTree } from "@typescript-eslint/utils";
+import { ASTUtils, ESLintUtils, TSESLint, TSESTree } from "@typescript-eslint/utils";
 import ts from "typescript";
 import { mayRunOutsideObsidianAt } from "../globalWindow.js";
 import { type MinAppVersionOptions, minAppVersionSchema, supportsVersion } from "../minAppVersion.js";
 import { API_SINCE, laterVersion } from "../obsidianApiVersions.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
+
+const { DefinitionType } = TSESLint.Scope;
 
 const TAG_SHORTHANDS: Record<string, string> = {
     div: "createDiv",
@@ -682,7 +684,7 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
             }
             const def = variable.defs[0];
             if (
-                def.type !== "Variable" ||
+                def.type !== DefinitionType.Variable ||
                 def.parent.kind !== "const" ||
                 def.node.init === null
             ) {
