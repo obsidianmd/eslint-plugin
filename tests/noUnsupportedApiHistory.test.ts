@@ -239,9 +239,9 @@ ruleTester.run("no-unsupported-api: the first typings that declare a member", ru
             `,
             options: [{ minAppVersion: "0.9.11" }],
             errors: [
-                { messageId: "apiNotAvailable", line: 5, data: { qualifiedName: "BaseComponent.setDisabled", sinceVersion: "0.10.3", minAppVersion: "0.9.11" } },
-                { messageId: "apiNotAvailable", line: 6, data: { qualifiedName: "Menu.addItem", sinceVersion: "0.9.12", minAppVersion: "0.9.11" } },
-                { messageId: "apiNotAvailable", line: 6, data: { qualifiedName: "MenuItem.setIcon", sinceVersion: "0.9.12", minAppVersion: "0.9.11" } },
+                { messageId: "apiNotAvailableCheck", line: 5, data: { qualifiedName: "BaseComponent.setDisabled", sinceVersion: "0.10.3", minAppVersion: "0.9.11" } },
+                { messageId: "apiNotAvailableCheck", line: 6, data: { qualifiedName: "Menu.addItem", sinceVersion: "0.9.12", minAppVersion: "0.9.11" } },
+                { messageId: "apiNotAvailableCheck", line: 6, data: { qualifiedName: "MenuItem.setIcon", sinceVersion: "0.9.12", minAppVersion: "0.9.11" } },
             ],
         },
         {

@@ -7,8 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `no-unsupported-api` names the fix in its report: raise `minAppVersion` to the version the API needs, or guard the use with `requireApiVersion()` and that version. Below 0.13.21, which first has `requireApiVersion()`, it suggests a check that the API exists instead, and for a superclass, such as `class extends AbstractInputSuggest`, or a newer signature that no such check proves, only raising `minAppVersion` ([#250](https://github.com/obsidianmd/eslint-plugin/pull/250)).
+
 ### Fixed
 
+- `settings-tab/no-problematic-settings-headings` no longer stops the whole ESLint run when `manifest.json` has a `name` that is not a string, such as `"name": 123`. It threw `TypeError: pluginName.toLowerCase is not a function`; now it skips only the plugin-name check, and the "settings" and "general" checks still report ([#251](https://github.com/obsidianmd/eslint-plugin/pull/251)).
 - `no-unsupported-api` reports a call to `Workspace.duplicateLeaf(leaf)` whose result is used, such as `const copy = await workspace.duplicateLeaf(leaf)`, below 0.13.8. The overload is in the 0.9.7 typings, which allowed it from there, but it returned `Promise<void>` until 0.13.8, so the result was `undefined`. A call that discards the result, and a use of the method as a value, still need only 0.9.7 ([#259](https://github.com/obsidianmd/eslint-plugin/pull/259)).
 - `no-unsupported-api` reports `Editor` and the other declarations first in the 0.11.7 typings, such as `MarkdownEditView`, below 0.11.7 instead of 0.11.0. The obsidian-api commit that added them still named 0.11.0 in its `package.json`, so as that version's last commit it dated them 0.11.0, released a month earlier ([#259](https://github.com/obsidianmd/eslint-plugin/pull/259)).
 
