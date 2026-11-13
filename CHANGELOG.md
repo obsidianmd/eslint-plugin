@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `no-static-styles-assignment` no longer stops the whole ESLint run on `el.style.setProperty()` called without arguments, which threw `TypeError: Cannot read properties of undefined (reading 'type')`.
+
 ## [0.5.1] - 2026-11-06
 
 Fixes for findings on correct code, and for fixes and suggestions that changed what correct
