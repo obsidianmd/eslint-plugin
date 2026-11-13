@@ -44,10 +44,10 @@ export const browserOnlyGlobalsOff: Linter.Globals = Object.fromEntries(
 );
 
 // The paths the recommended config treats as web worker code, as its
-// WORKER_FILES globs match them: a `*.worker.<ext>`, `*-worker.<ext>` or
-// `*_worker.<ext>` file, or any file under a `workers` directory. Kept in step
-// with WORKER_FILES in index.ts.
-const WORKER_FILE = /(?:^|\/)(?:[^/.][^/]*[._-]worker|workers\/(?:[^/]+\/)*[^/.][^/]*)\.(?:ts|cts|mts|tsx|js|cjs|mjs|jsx)$/;
+// WORKER_FILES globs match them: a `worker.<ext>`, `*.worker.<ext>`,
+// `*-worker.<ext>` or `*_worker.<ext>` file, or any file under a `workers`
+// directory. Kept in step with WORKER_FILES in index.ts.
+const WORKER_FILE = /(?:^|\/)(?:worker|[^/.][^/]*[._-]worker|workers\/(?:[^/]+\/)*[^/.][^/]*)\.(?:ts|cts|mts|tsx|js|cjs|mjs|jsx)$/;
 
 /** Whether `filename`, relative to `cwd`, is a web worker file by its path. */
 export function isWorkerFile(filename: string, cwd: string): boolean {

@@ -229,6 +229,13 @@ const cases: Record<string, Case[]> = {
         ["Use foo bar", "Use Foo Bar", { brands: ["Foo Bar"] }],
         ["Use c++ tools", "Use C++ tools", { brands: ["C++"] }],
     ],
+    // An empty brand matched an empty string at the start of such a text
+    // forever, and the lint run never finished.
+    "an empty brand, acronym or ignored word names nothing": [
+        ["(Open) Settings", null, { brands: [""] }],
+        ["", null, { brands: [""] }],
+        ["- Open Settings", "- Open settings", { brands: ["", "Foo"], acronyms: [""], ignoreWords: [""] }],
+    ],
     "camelCase and PascalCase words are kept in loose mode only": [
         ["Use myVariable here", null],
         ["Use myVariable here", "Use myvariable here", { mode: "strict" }],

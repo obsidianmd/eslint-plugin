@@ -163,8 +163,69 @@ ruleTester.run("no-unsupported-api: the first typings that declare a member", ru
             `,
             options: [{ minAppVersion: "0.12.17" }],
         },
+        {
+            // duplicateLeaf(leaf) is in the 0.9.7 typings, returning
+            // Promise<void> until 0.13.8: a call that discards the result, and
+            // the method as a value, work on those versions too.
+            name: "duplicateLeaf() with its result unused",
+            code: `
+                import { Workspace, WorkspaceLeaf } from 'obsidian';
+                declare const workspace: Workspace;
+                declare const leaf: WorkspaceLeaf;
+                async function split() {
+                    await workspace.duplicateLeaf(leaf);
+                    void workspace.duplicateLeaf(leaf, "vertical");
+                    workspace.duplicateLeaf(leaf);
+                    const later = workspace.duplicateLeaf;
+                }
+            `,
+            options: [{ minAppVersion: "0.12.0" }],
+        },
+        {
+            // Editor is first in the 0.11.7 typings (see COMMIT_VERSIONS in
+            // scripts/obsidian-overload-history.ts).
+            name: "Editor at 0.11.7",
+            code: `
+                import { Editor } from 'obsidian';
+                declare const editor: Editor;
+                editor.getValue();
+                editor.replaceSelection("x");
+            `,
+            options: [{ minAppVersion: "0.11.7" }],
+        },
     ],
     invalid: [
+        {
+            name: "duplicateLeaf() with its result used, below 0.13.8",
+            code: `
+                import { Workspace, WorkspaceLeaf } from 'obsidian';
+                declare const workspace: Workspace;
+                declare const leaf: WorkspaceLeaf;
+                async function split() {
+                    const copy = await workspace.duplicateLeaf(leaf);
+                    (await workspace.duplicateLeaf(leaf, "vertical")).detach();
+                    return workspace.duplicateLeaf(leaf);
+                }
+            `,
+            options: [{ minAppVersion: "0.12.0" }],
+            errors: [
+                { messageId: "apiNotAvailableRaise", line: 6, data: { qualifiedName: "Workspace.duplicateLeaf", sinceVersion: "0.13.8", minAppVersion: "0.12.0" } },
+                { messageId: "apiNotAvailableRaise", line: 7, data: { qualifiedName: "Workspace.duplicateLeaf", sinceVersion: "0.13.8", minAppVersion: "0.12.0" } },
+                { messageId: "apiNotAvailableRaise", line: 8, data: { qualifiedName: "Workspace.duplicateLeaf", sinceVersion: "0.13.8", minAppVersion: "0.12.0" } },
+            ],
+        },
+        {
+            name: "Editor below 0.11.7",
+            code: `
+                import { Editor } from 'obsidian';
+                declare const editor: Editor;
+                editor.getValue();
+            `,
+            options: [{ minAppVersion: "0.11.0" }],
+            errors: [
+                { messageId: "apiNotAvailableCheck", line: 4, data: { qualifiedName: "Editor.getValue", sinceVersion: "0.11.7", minAppVersion: "0.11.0" } },
+            ],
+        },
         {
             // Older than their @since, and newer than the 0.9.7 typings: each
             // needs the first typings in the obsidian-api history that have it.
@@ -178,9 +239,9 @@ ruleTester.run("no-unsupported-api: the first typings that declare a member", ru
             `,
             options: [{ minAppVersion: "0.9.11" }],
             errors: [
-                { messageId: "apiNotAvailable", line: 5, data: { qualifiedName: "BaseComponent.setDisabled", sinceVersion: "0.10.3", minAppVersion: "0.9.11" } },
-                { messageId: "apiNotAvailable", line: 6, data: { qualifiedName: "Menu.addItem", sinceVersion: "0.9.12", minAppVersion: "0.9.11" } },
-                { messageId: "apiNotAvailable", line: 6, data: { qualifiedName: "MenuItem.setIcon", sinceVersion: "0.9.12", minAppVersion: "0.9.11" } },
+                { messageId: "apiNotAvailableCheck", line: 5, data: { qualifiedName: "BaseComponent.setDisabled", sinceVersion: "0.10.3", minAppVersion: "0.9.11" } },
+                { messageId: "apiNotAvailableCheck", line: 6, data: { qualifiedName: "Menu.addItem", sinceVersion: "0.9.12", minAppVersion: "0.9.11" } },
+                { messageId: "apiNotAvailableCheck", line: 6, data: { qualifiedName: "MenuItem.setIcon", sinceVersion: "0.9.12", minAppVersion: "0.9.11" } },
             ],
         },
         {

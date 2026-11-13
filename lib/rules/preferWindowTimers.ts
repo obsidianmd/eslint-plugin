@@ -104,7 +104,12 @@ export default ruleCreator({
                     const fix = (fixer: TSESLint.RuleFixer) => fixer.replaceText(object, "window");
                     if (!isGlobalWindowAt(context, object)) {
                         context.report({ node: callee, messageId: "noActiveWindowTimer", data: { name } });
-                    } else if (mayLackWindowAt(context, object)) {
+                    } else if (mayLackWindowAt(context, object) || name.startsWith("clear")) {
+                        // A timer ID belongs to the window that set it:
+                        // `window.clearTimeout(id)` clears only a timer
+                        // `window` set, and the one `activeWindow` set may
+                        // still be pending. Only a suggestion, for the code
+                        // that sets the timer to change with it.
                         context.report({
                             node: callee,
                             messageId: "noActiveWindowTimer",

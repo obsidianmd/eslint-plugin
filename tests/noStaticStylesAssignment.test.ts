@@ -6,6 +6,16 @@ const ruleTester = new RuleTester();
 ruleTester.run("no-static-styles-assignment", noInlineStylesRule, {
     valid: [
         {
+            // It threw a TypeError and stopped the whole ESLint run.
+            name: "style.setProperty() without arguments",
+            code: `
+                declare const el: HTMLElement;
+                el.style.setProperty();
+                el.setAttribute();
+                el.setCssProps();
+            `,
+        },
+        {
             name: "classList.add is allowed",
             code: "el.classList.add('my-class');",
         },
