@@ -25,7 +25,8 @@ literal without expressions (`` createEl(`style`) ``), also with a type assertio
 A tag name held in a variable or built in a template literal (`` `${tag}` ``) is not checked. A
 document is only recognised by the expressions above, also with `!` or a type assertion such as
 `as Document`: one stored in a variable first (`const doc = el.doc; doc.createElement("style")`) or
-returned by a call is not followed, and an iframe's `contentDocument` is not the plugin's document.
+returned by a call is not followed, and an iframe's `contentDocument` or `contentWindow.document` is
+not the plugin's document.
 
 ### Shadow roots
 
@@ -50,6 +51,24 @@ may be a shadow root. `const shadowRoot = document.head`, a `shadowRoot: HTMLEle
 with type information, a `shadowRoot` whose type is an element is not a shadow root.
 
 A shadow root held in a class property (`this.shadowHead.createEl("style")`) is not followed.
+
+### Iframes
+
+`styles.css` does not reach an iframe's document either, so a `<style>` or `<link>` there is not
+reported, by the same rules as a shadow root: created on an iframe's document or an element in it,
+or created elsewhere and only ever inserted into one. An iframe's document is
+`iframe.contentDocument` or `iframe.contentWindow.document`, also with `!` or `?.`, and an element
+in it is a member of one, such as `iframe.contentDocument.head`, what a method called on one
+returns, such as `querySelector("head")` or `createEl("div")`, or a `const` holding any of these:
+
+```ts
+const style = document.createElement("style");
+style.textContent = css;
+iframe.contentDocument!.head.appendChild(style);
+```
+
+A window or document reached from the iframe's, such as its `defaultView.parent.document`, is not
+the iframe's.
 
 Put the plugin's CSS in `styles.css` instead, which Obsidian loads for you. The [community scanner](../configuration.md#community-plugin-scanner-configuration)
 keeps this rule at `error`.

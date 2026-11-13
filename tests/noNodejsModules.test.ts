@@ -315,6 +315,20 @@ ruleTester.run("no-nodejs-modules", noNodejsModules, {
             `,
         },
         {
+            name: "an early exit before the call in the same switch case",
+            code: `
+                function load(kind: string) {
+                    switch (kind) {
+                        case "a":
+                            if (Platform.isMobile) return;
+                            return require("fs");
+                        default:
+                            return null;
+                    }
+                }
+            `,
+        },
+        {
             name: "an early exit on a mobile check anywhere before the call, also with || on the left (juggl)",
             code: `
                 import { Platform } from "obsidian";
@@ -740,6 +754,26 @@ ruleTester.run("no-nodejs-modules", noNodejsModules, {
                 { messageId: "noNodejs", data: { module: "fs" } },
                 { messageId: "noNodejs", data: { module: "path" } },
                 { messageId: "noNodejs", data: { module: "os" } },
+            ],
+        },
+        {
+            name: "an early exit in another switch case, or in the case test, is not a guard",
+            code: `
+                function load(kind: string) {
+                    switch (kind) {
+                        case "a":
+                            if (Platform.isMobile) return;
+                        case "b":
+                            return require("fs");
+                        case require("path"):
+                            if (Platform.isMobile) return;
+                            return null;
+                    }
+                }
+            `,
+            errors: [
+                { messageId: "noNodejs", data: { module: "fs" } },
+                { messageId: "noNodejs", data: { module: "path" } },
             ],
         },
         {

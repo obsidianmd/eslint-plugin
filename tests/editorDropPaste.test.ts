@@ -121,6 +121,31 @@ ruleTester.run("editor-drop-paste", editorDropPasteRule, {
             `,
         },
         {
+            name: "a handler that writes to its editor only later lets Obsidian insert the content",
+            code: `
+                workspace.on('editor-paste', (evt, editor) => {
+                    window.setTimeout(() => {
+                        editor.setValue(tidy(editor.getValue()));
+                    }, 0);
+                });
+                workspace.on('editor-paste', (evt, editor) => {
+                    activeWindow.requestAnimationFrame(function () { editor.replaceSelection(''); });
+                    queueMicrotask(() => editor.setLine(0, ''));
+                    Promise.resolve().then(() => editor.cm?.dispatch({}));
+                });
+                workspace.on('editor-drop', async (evt, editor) => {
+                    await sleep(10);
+                    lines.forEach((line, i) => editor.setLine(i, line.trim()));
+                });
+                workspace.on('editor-paste', (evt, editor) => {
+                    void (async () => {
+                        await sleep(10);
+                        editor.replaceRange('', from, to);
+                    })();
+                });
+            `,
+        },
+        {
             name: "a parameter written with a type annotation is the same parameter",
             code: `
                 workspace.on('editor-paste', (evt: ClipboardEvent, editor: Editor) => {
@@ -258,6 +283,50 @@ ruleTester.run("editor-drop-paste", editorDropPasteRule, {
             ],
         },
         {
+            name: "a write that runs while the handler does is reported, also in a nested function or before an await",
+            code: `
+                workspace.on('editor-paste', (evt, editor) => {
+                    lines.forEach((line, i) => editor.setLine(i, line));
+                });
+                workspace.on('editor-paste', async (evt, editor) => {
+                    editor.replaceSelection(await Promise.resolve('x'));
+                });
+                workspace.on('editor-paste', (evt, editor) => {
+                    setTimeout(() => {}, 0);
+                    editor.replaceSelection('x');
+                    const later = async () => { await sleep(1); };
+                    editor.setValue('y');
+                });
+            `,
+            errors: [
+                { messageId: "missingDefaultPrevented", data: { eventName: "editor-paste" } },
+                { messageId: "missingPreventDefault", data: { eventName: "editor-paste" } },
+                { messageId: "missingDefaultPrevented", data: { eventName: "editor-paste" } },
+                { messageId: "missingPreventDefault", data: { eventName: "editor-paste" } },
+                { messageId: "missingDefaultPrevented", data: { eventName: "editor-paste" } },
+                { messageId: "missingPreventDefault", data: { eventName: "editor-paste" } },
+            ],
+        },
+        {
+            name: "a handler that reads the pasted or dropped content and inserts it later is reported",
+            code: `
+                workspace.on('editor-paste', async (evt, editor) => {
+                    const url = await upload(evt.clipboardData?.files[0]);
+                    editor.replaceSelection(url);
+                });
+                workspace.on('editor-drop', (evt, editor) => {
+                    const files = evt.dataTransfer!.files;
+                    setTimeout(() => editor.replaceSelection(link(files)), 0);
+                });
+            `,
+            errors: [
+                { messageId: "missingDefaultPrevented", line: 2 },
+                { messageId: "missingPreventDefault", line: 2 },
+                { messageId: "missingDefaultPrevented", line: 6 },
+                { messageId: "missingPreventDefault", line: 6 },
+            ],
+        },
+        {
             name: "editor-paste missing both checks is forbidden",
             code: `
                 workspace.on('editor-paste', (evt, editor, info) => {
@@ -311,7 +380,7 @@ ruleTester.run("editor-drop-paste", editorDropPasteRule, {
                 workspace.on('editor-paste', (evt, editor) => { editor.transaction({ replaceSelection: 'x' }); });
                 workspace.on('editor-drop', (evt, editor) => { (editor as any).cm.dispatch({ changes }); });
                 workspace.on('editor-paste', (evt, editor) => { editor?.replaceRange('x', from); });
-                workspace.on('editor-drop', (evt, editor) => { void insert().then(() => editor.setLine(0, 'x')); });
+                workspace.on('editor-drop', (evt, editor) => { void upload(evt.dataTransfer?.files).then(() => editor.setLine(0, 'x')); });
             `,
             errors: [
                 { messageId: "missingDefaultPrevented", line: 2 },
