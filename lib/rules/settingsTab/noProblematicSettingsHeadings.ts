@@ -129,7 +129,7 @@ export default ruleCreator<Options, "settings" | "general" | "pluginName" | "rem
                 if (subject === "general") {
                     reportRemoval(node, "general", removal);
                 }
-                if (pluginName && subject === headingSubject(pluginName)) {
+                if (typeof pluginName === "string" && pluginName !== "" && subject === headingSubject(pluginName)) {
                     reportRemoval(node, "pluginName", removal);
                 }
             },

@@ -2,6 +2,7 @@ import { ESLintUtils, type TSESLint, type TSESTree } from "@typescript-eslint/ut
 import type ts from "typescript";
 import tseslint from "typescript-eslint";
 import { type DisableDirectives, disableDirectives, isDisabled, problemStart } from "../disableDirectives.js";
+import { declaredInObsidian, declaredOnlyInObsidian, isObsidianChainingThen } from "../obsidianChaining.js";
 import { docsUrl, isJsProgram, type PluginDocs } from "../ruleCreator.js";
 
 type RuleModule = TSESLint.RuleModule<string, readonly unknown[]>;
@@ -204,33 +205,6 @@ function checkerIgnoringObsidianChaining(checker: ts.TypeChecker): ts.TypeChecke
     const typeChecker = copy as unknown as ts.TypeChecker;
     checkersIgnoringObsidianChaining.set(checker, typeChecker);
     return typeChecker;
-}
-
-// A `then` whose every declaration is in the obsidian package's obsidian.d.ts.
-// Merged or overriding declarations elsewhere disqualify it.
-function isObsidianChainingThen(symbol: ts.Symbol): boolean {
-    if (symbol.getName() !== "then") {
-        return false;
-    }
-    return declaredOnlyInObsidian(symbol);
-}
-
-// Every declaration of `symbol` is in the obsidian package's obsidian.d.ts.
-function declaredOnlyInObsidian(symbol: ts.Symbol): boolean {
-    const declarations = symbol.getDeclarations();
-    return declarations !== undefined && declarations.length > 0 && declarations.every(isInObsidian);
-}
-
-// The obsidian package's obsidian.d.ts declares `symbol`, which a
-// `declare module "obsidian"` augmentation may merge into.
-function declaredInObsidian(symbol: ts.Symbol): boolean {
-    return symbol.getDeclarations()?.some(isInObsidian) ?? false;
-}
-
-function isInObsidian(declaration: ts.Declaration): boolean {
-    return /(^|\/)node_modules\/obsidian\/obsidian\.d\.ts$/.test(
-        declaration.getSourceFile().fileName.replace(/\\/g, "/"),
-    );
 }
 
 // A stand-in for `target` with some members replaced. Every other member is read
