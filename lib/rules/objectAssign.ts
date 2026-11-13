@@ -109,6 +109,7 @@ export default ruleCreator({
             if (
                 isResultDiscarded(node) ||
                 isDiscardedChain(node) ||
+                isDiscardedArrowBody(node) ||
                 node.typeArguments ||
                 isClassInstance(node.arguments[0])
             ) {
@@ -124,6 +125,42 @@ export default ruleCreator({
                 data: { target: sourceCode.getText(node.arguments[0]) },
                 fix: (fixer) => fixer.insertTextBefore(first, "{}, "),
             }];
+        }
+
+        // `overrides.forEach((o) => Object.assign(DEFAULTS, o))`: the call is
+        // the body of an arrow function whose caller throws its result away.
+        // With type information, that is a callback whose type returns
+        // `void`; without it, one passed to `forEach()`.
+        function isDiscardedArrowBody(node: TSESTree.CallExpression): boolean {
+            let expression: TSESTree.Node = node.parent.type === TSESTree.AST_NODE_TYPES.ChainExpression ? node.parent : node;
+            while (
+                expression.parent?.type === TSESTree.AST_NODE_TYPES.TSAsExpression ||
+                expression.parent?.type === TSESTree.AST_NODE_TYPES.TSSatisfiesExpression ||
+                expression.parent?.type === TSESTree.AST_NODE_TYPES.TSNonNullExpression ||
+                expression.parent?.type === TSESTree.AST_NODE_TYPES.TSTypeAssertion
+            ) {
+                expression = expression.parent;
+            }
+            const arrow = expression.parent;
+            if (arrow?.type !== TSESTree.AST_NODE_TYPES.ArrowFunctionExpression || arrow.body !== expression) {
+                return false;
+            }
+            if (types) {
+                const contextual = types.checker.getContextualType(types.toTs(arrow) as ts.Expression);
+                const signatures = contextual?.getCallSignatures() ?? [];
+                if (signatures.length > 0) {
+                    return signatures.every((signature) => (signature.getReturnType().flags & ts.TypeFlags.Void) !== 0);
+                }
+            }
+            const call = arrow.parent;
+            return (
+                call.type === TSESTree.AST_NODE_TYPES.CallExpression &&
+                call.arguments.includes(arrow) &&
+                call.callee.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
+                !call.callee.computed &&
+                call.callee.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
+                call.callee.property.name === "forEach"
+            );
         }
 
         // `Object.assign?.(A, b);`, whose result a chain holds.
