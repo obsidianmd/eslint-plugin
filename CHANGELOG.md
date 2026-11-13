@@ -9,8 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- `no-unsupported-api` reports a call to `Workspace.duplicateLeaf(leaf)` whose result is used, such as `const copy = await workspace.duplicateLeaf(leaf)`, below 0.13.8. The overload is in the 0.9.7 typings, which allowed it from there, but it returned `Promise<void>` until 0.13.8, so the result was `undefined`. A call that discards the result, and a use of the method as a value, still need only 0.9.7 ([#TBD](https://github.com/obsidianmd/eslint-plugin/pull/TBD)).
-- `no-unsupported-api` reports `Editor` and the other declarations first in the 0.11.7 typings, such as `MarkdownEditView`, below 0.11.7 instead of 0.11.0. The obsidian-api commit that added them still named 0.11.0 in its `package.json`, so as that version's last commit it dated them 0.11.0, released a month earlier ([#TBD](https://github.com/obsidianmd/eslint-plugin/pull/TBD)).
+- `no-unsupported-api` reports a call to `Workspace.duplicateLeaf(leaf)` whose result is used, such as `const copy = await workspace.duplicateLeaf(leaf)`, below 0.13.8. The overload is in the 0.9.7 typings, which allowed it from there, but it returned `Promise<void>` until 0.13.8, so the result was `undefined`. A call that discards the result, and a use of the method as a value, still need only 0.9.7 ([#](https://github.com/obsidianmd/eslint-plugin/pull/)).
+- `no-unsupported-api` reports `Editor` and the other declarations first in the 0.11.7 typings, such as `MarkdownEditView`, below 0.11.7 instead of 0.11.0. The obsidian-api commit that added them still named 0.11.0 in its `package.json`, so as that version's last commit it dated them 0.11.0, released a month earlier ([#](https://github.com/obsidianmd/eslint-plugin/pull/)).
 
 ## [0.5.1] - 2026-11-06
 
