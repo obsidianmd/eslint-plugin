@@ -221,7 +221,7 @@ export default ruleCreator<Options, MessageId>({
             symbol?: ts.Symbol,
             call?: TSESTree.CallExpression,
         ): void {
-            if (!symbol || reported.has(node) || isFeatureTest(node)) {
+            if (!symbol || reported.has(node) || (isFeatureTest(node) && !isBareGlobal(node))) {
                 return;
             }
             const resolved = resolveSymbol(symbol);
@@ -287,7 +287,7 @@ export default ruleCreator<Options, MessageId>({
                     const existence = history.firstDeclared(qualifiedName, () => true) ?? sinceVersion;
                     const feature = existence === sinceVersion ? featureKey(node) : undefined;
                     if (
-                        (feature !== undefined && call?.optional === true && call.callee === node) ||
+                        (feature !== undefined && call?.optional === true && call.callee === node && !isBareGlobal(node)) ||
                         isGuardedByRequireApiVersion(node, sinceVersion, feature)
                     ) {
                         return;
@@ -945,15 +945,24 @@ export default ruleCreator<Options, MessageId>({
         ): Version | undefined {
             switch (expr.type) {
                 case AST_NODE_TYPES.CallExpression:
-                    if (
-                        truthy &&
-                        expr.callee.type === AST_NODE_TYPES.Identifier &&
-                        expr.callee.name === "requireApiVersion" &&
-                        expr.arguments.length >= 1
-                    ) {
+                    if (truthy && isRequireApiVersion(expr.callee) && expr.arguments.length >= 1) {
                         return getArgumentVersion(expr.arguments[0]);
                     }
                     return undefined;
+                case AST_NODE_TYPES.BinaryExpression: {
+                    const compared = comparedWithBoolean(expr, truthy);
+                    return compared && versionWhen(compared.operand, compared.truthy, seen);
+                }
+                case AST_NODE_TYPES.MemberExpression: {
+                    const init = getReadonlyFieldInitializer(expr);
+                    if (!init || seen.has(init)) {
+                        return undefined;
+                    }
+                    seen.add(init);
+                    const version = versionWhen(init, truthy, seen);
+                    seen.delete(init);
+                    return version;
+                }
                 case AST_NODE_TYPES.UnaryExpression:
                     return expr.operator === "!"
                         ? versionWhen(expr.argument, !truthy, seen)
@@ -990,16 +999,31 @@ export default ruleCreator<Options, MessageId>({
         // falsy), by featureKey: `typeof x.m === "function"`, `typeof x.m !==
         // "undefined"`, `x.m != null`, `"m" in x` and `x.m` itself, also negated
         // and combined with `&&` and `||`.
-        function featuresWhen(expr: TSESTree.Expression, truthy: boolean): Set<string> {
+        function featuresWhen(
+            expr: TSESTree.Expression,
+            truthy: boolean,
+            seen: Set<TSESTree.Node> = new Set(),
+        ): Set<string> {
             switch (expr.type) {
                 case AST_NODE_TYPES.UnaryExpression:
-                    return expr.operator === "!" ? featuresWhen(expr.argument, !truthy) : new Set();
+                    return expr.operator === "!" ? featuresWhen(expr.argument, !truthy, seen) : new Set();
+                case AST_NODE_TYPES.Identifier: {
+                    // `const canX = typeof x.m === "function"`, tested later.
+                    const init = getConstInitializer(expr);
+                    if (!init || seen.has(init)) {
+                        return new Set();
+                    }
+                    seen.add(init);
+                    const features = featuresWhen(init, truthy, seen);
+                    seen.delete(init);
+                    return features;
+                }
                 case AST_NODE_TYPES.LogicalExpression: {
                     if (expr.operator === "??") {
                         return new Set();
                     }
-                    const left = featuresWhen(expr.left, truthy);
-                    const right = featuresWhen(expr.right, truthy);
+                    const left = featuresWhen(expr.left, truthy, seen);
+                    const right = featuresWhen(expr.right, truthy, seen);
                     // As in versionWhen: both sides held, or only one of them.
                     return (expr.operator === "&&") === truthy
                         ? new Set([...left, ...right])
@@ -1014,6 +1038,10 @@ export default ruleCreator<Options, MessageId>({
                             typeof expr.left.value === "string"
                             ? new Set([`${object}.${expr.left.value}`])
                             : new Set();
+                    }
+                    const compared = comparedWithBoolean(expr, truthy);
+                    if (compared) {
+                        return featuresWhen(compared.operand, compared.truthy, seen);
                     }
                     const negated = expr.operator === "!==" || expr.operator === "!=";
                     if (!negated && expr.operator !== "===" && expr.operator !== "==") {
@@ -1035,8 +1063,10 @@ export default ruleCreator<Options, MessageId>({
                             return exists === truthy ? new Set([typeOf]) : new Set();
                         }
                         // `x.m != null`, `x.m != undefined` and `x.m !== undefined`,
-                        // but not `x.m !== null`, which holds for a missing member.
-                        const key = featureKey(subject);
+                        // but not `x.m !== null`, which holds for a missing member,
+                        // nor `g != null` for a global `g`, which throws a
+                        // ReferenceError where the app does not declare it.
+                        const key = isBareGlobal(subject) ? undefined : featureKey(subject);
                         const loose = expr.operator === "==" || expr.operator === "!=";
                         const isUndefined = other.type === AST_NODE_TYPES.Identifier && other.name === "undefined";
                         const isNull = other.type === AST_NODE_TYPES.Literal && other.raw === "null";
@@ -1060,6 +1090,138 @@ export default ruleCreator<Options, MessageId>({
                 default:
                     return new Set();
             }
+        }
+
+        // Whether `callee` is Obsidian's requireApiVersion(), however the plugin
+        // names it: `requireApiVersion`, an alias such as `rav` from `import {
+        // requireApiVersion as rav }`, or `obsidian.requireApiVersion` from
+        // `import * as obsidian`.
+        function isRequireApiVersion(callee: TSESTree.Expression): boolean {
+            if (callee.type === AST_NODE_TYPES.Identifier && callee.name === "requireApiVersion") {
+                return true;
+            }
+            if (callee.type !== AST_NODE_TYPES.Identifier && callee.type !== AST_NODE_TYPES.MemberExpression) {
+                return false;
+            }
+            const symbol = checker.getSymbolAtLocation(services.esTreeNodeToTSNodeMap.get(callee));
+            if (!symbol) {
+                return false;
+            }
+            const resolved = resolveSymbol(symbol);
+            return (
+                resolved.getName() === "requireApiVersion" &&
+                (resolved.getDeclarations() ?? []).some(
+                    (declaration) => ts.isFunctionDeclaration(declaration) && isObsidianDeclaration(declaration),
+                )
+            );
+        }
+
+        // The initializer of a readonly field that `node` reads, as `this.hasX`
+        // reads `private readonly hasX = requireApiVersion("1.10.0")`: nothing
+        // assigns the field after, as long as the file assigns `.hasX` nowhere,
+        // not even in a constructor.
+        function getReadonlyFieldInitializer(node: TSESTree.MemberExpression): TSESTree.Expression | undefined {
+            const name = memberName(node);
+            if (name === undefined || node.object.type !== AST_NODE_TYPES.ThisExpression) {
+                return undefined;
+            }
+            const symbol = checker.getSymbolAtLocation(services.esTreeNodeToTSNodeMap.get(node));
+            const declarations = symbol?.getDeclarations() ?? [];
+            const [declaration] = declarations;
+            if (
+                declarations.length !== 1 ||
+                !ts.isPropertyDeclaration(declaration) ||
+                !declaration.initializer ||
+                declaration.getSourceFile() !== services.program.getSourceFile(context.filename) ||
+                !declaration.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ReadonlyKeyword) ||
+                declaration.modifiers.some((modifier) => modifier.kind === ts.SyntaxKind.StaticKeyword)
+            ) {
+                return undefined;
+            }
+            const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            if (new RegExp(`\\.\\s*${escaped}\\s*(?:[-+*/%&|^]|\\*\\*|<<|>>>?|&&|\\|\\||\\?\\?)?=(?!=)`).test(context.sourceCode.text)) {
+                return undefined;
+            }
+            const init = services.tsNodeToESTreeNodeMap.get(declaration.initializer);
+            return init as TSESTree.Expression | undefined;
+        }
+
+        // The version the use `node` proves by running at all, from an earlier
+        // optional link of its chain: `app.secretStorage?.getSecret()` calls
+        // getSecret() only where `app.secretStorage` exists, so on a release
+        // that has App.secretStorage. The lowest version that has the member
+        // the link tests, as with versionOfOverride.
+        function optionalChainVersion(node: TSESTree.Node): Version | undefined {
+            let proven: Version | undefined;
+            let link: TSESTree.Node = node;
+            for (;;) {
+                let inner: TSESTree.Node;
+                if (link.type === AST_NODE_TYPES.MemberExpression) {
+                    inner = link.object;
+                } else if (link.type === AST_NODE_TYPES.CallExpression) {
+                    inner = link.callee;
+                } else if (link.type === AST_NODE_TYPES.TSNonNullExpression) {
+                    link = link.expression;
+                    continue;
+                } else {
+                    return proven;
+                }
+                const optional =
+                    (link.type === AST_NODE_TYPES.MemberExpression || link.type === AST_NODE_TYPES.CallExpression) &&
+                    link.optional;
+                if (optional && inner.type === AST_NODE_TYPES.MemberExpression) {
+                    const version = existenceVersion(inner);
+                    if (version && (!proven || gt(version, proven))) {
+                        proven = version;
+                    }
+                }
+                link = inner;
+            }
+        }
+
+        // The first release that has the Obsidian member `node` reads: the
+        // lowest of its @since and the first typings that declare it, for each
+        // declaration it stands for.
+        function existenceVersion(node: TSESTree.MemberExpression): Version | undefined {
+            const symbol = checker.getSymbolAtLocation(services.esTreeNodeToTSNodeMap.get(node));
+            if (!symbol) {
+                return undefined;
+            }
+            const resolved = resolveSymbol(symbol);
+            let lowest: Version | undefined;
+            for (const declaration of resolved.getDeclarations() ?? []) {
+                const parentName = getParentTypeName(declaration);
+                if (!parentName || !isObsidianDeclaration(declaration) || isPluginSuppliedMember(declaration)) {
+                    return undefined;
+                }
+                const qualifiedName = `${parentName}.${resolved.getName()}`;
+                const entry = sinceMap.get(qualifiedName);
+                const since = entry && earliestOf(entry.map(([, value]) => toSince(value)));
+                const declared = history.firstDeclared(qualifiedName, () => true);
+                const version = since && declared ? (lt(declared, since) ? declared : since) : since ?? declared;
+                if (!version) {
+                    return undefined;
+                }
+                if (!lowest || lt(version, lowest)) {
+                    lowest = version;
+                }
+            }
+            return lowest;
+        }
+
+        // Whether `node` is a global variable or function the app declares,
+        // such as `activeDocument` or `createDiv`, not a module import or a
+        // variable of the plugin's: reading it throws a ReferenceError on a
+        // release that does not have it, so only `typeof` tests it safely.
+        function isBareGlobal(node: TSESTree.Node): boolean {
+            if (node.type !== AST_NODE_TYPES.Identifier) {
+                return false;
+            }
+            if (node.parent?.type === AST_NODE_TYPES.UnaryExpression && node.parent.operator === "typeof") {
+                return false;
+            }
+            const variable = ASTUtils.findVariable(context.sourceCode.getScope(node), node);
+            return !variable || variable.defs.length === 0;
         }
 
         // The version an override of one of the OBSIDIAN_CALLED_HOOKS proves
@@ -1132,6 +1294,10 @@ export default ruleCreator<Options, MessageId>({
             const proves = (test: TSESTree.Expression, truthy: boolean) =>
                 covers(versionWhen(test, truthy)) ||
                 (feature !== undefined && provesFeature(featuresWhen(test, truthy), feature));
+
+            if (covers(optionalChainVersion(node))) {
+                return true;
+            }
 
             let current: TSESTree.Node | undefined = node.parent;
             let prevChild: TSESTree.Node = node;
@@ -1543,18 +1709,26 @@ function isPropertyWrite(node: TSESTree.Node, declarations: ts.Declaration[]): b
 
 // Whether `node` is only tested, which works where it is missing too: `typeof
 // x.m`, `x.m == null`, `!x.m`, and `x.m` as the condition of an `if`, a loop or
-// a ternary, or as an operand of `&&` or `||` there or on its left; also as the
-// object of an optional access that is tested, the `x.m` of `typeof x.m?.n`.
+// a ternary, or as an operand of `&&`, `||` or `??` there or on its left; also
+// as the object of an optional access, the `x.m` of `x.m?.n`. Not for
+// a global the app declares, `activeDocument` (see isBareGlobal).
 function isFeatureTest(node: TSESTree.Node): boolean {
     let current = node;
     while (
-        current.parent?.type === AST_NODE_TYPES.ChainExpression ||
         current.parent?.type === AST_NODE_TYPES.TSNonNullExpression ||
-        (current.parent?.type === AST_NODE_TYPES.MemberExpression &&
-            current.parent.object === current &&
-            current.parent.optional)
+        (current.parent?.type === AST_NODE_TYPES.ChainExpression && current.parent.expression === current)
     ) {
         current = current.parent;
+    }
+    // `x.m?.n` reads `x.m` and goes no further where it is missing. Not
+    // `x.m?.()`, which calls it where it exists, with the arguments of today's
+    // signature.
+    if (
+        current.parent?.type === AST_NODE_TYPES.MemberExpression &&
+        current.parent.object === current &&
+        current.parent.optional
+    ) {
+        return true;
     }
     const parent = current.parent;
     if (!parent) {
@@ -1580,10 +1754,33 @@ function isFeatureTest(node: TSESTree.Node): boolean {
         case AST_NODE_TYPES.ForStatement:
             return parent.test === current;
         case AST_NODE_TYPES.LogicalExpression:
-            return parent.operator !== "??" && (parent.left === current || isFeatureTest(parent));
+            // `x.m ?? fallback` and `x.m || fallback` as well as `x.m && x.m()`.
+            return parent.left === current || isFeatureTest(parent);
         default:
             return false;
     }
+}
+
+// The operand of a comparison with `true` or `false`, and whether it is truthy
+// when the comparison evaluates `truthy`: `requireApiVersion("1.10.0") ===
+// true`, `canX !== false`.
+function comparedWithBoolean(
+    expr: TSESTree.BinaryExpression,
+    truthy: boolean,
+): { operand: TSESTree.Expression; truthy: boolean } | undefined {
+    const equal = expr.operator === "===" || expr.operator === "==";
+    if (!equal && expr.operator !== "!==" && expr.operator !== "!=") {
+        return undefined;
+    }
+    for (const [operand, other] of [
+        [expr.left, expr.right],
+        [expr.right, expr.left],
+    ] as const) {
+        if (other.type === AST_NODE_TYPES.Literal && typeof other.value === "boolean") {
+            return { operand: operand as TSESTree.Expression, truthy: (truthy === equal) === other.value };
+        }
+    }
+    return undefined;
 }
 
 // What a feature check names, written the same way wherever it appears:
