@@ -369,11 +369,41 @@ ruleTester.run("no-nodejs-modules", noNodejsModules, {
             `,
         },
         {
-            name: "an optional call of require is guarded (remove-empty-assets)",
+            name: "an optional call of the global object's require is guarded (remove-empty-assets)",
             code: `
                 const fs = window.require?.("fs");
-                const path = require?.("path");
                 const os = (window as any).require?.("os");
+            `,
+        },
+        {
+            name: "a catch that handles the failure before or instead of throwing is a guard",
+            code: `
+                export function load(strict: boolean) {
+                    try {
+                        return require("fs");
+                    } catch (e) {
+                        if (!strict) {
+                            return null;
+                        }
+                        throw e;
+                    }
+                }
+                export function open() {
+                    try {
+                        return require("path");
+                    } catch (e) {
+                        if (e instanceof TypeError) throw e;
+                        return undefined;
+                    }
+                }
+                export function run() {
+                    try {
+                        return require("os");
+                    } catch (e) {
+                        const report = () => { return e; };
+                        console.warn(report());
+                    }
+                }
             `,
         },
         {
@@ -741,6 +771,41 @@ ruleTester.run("no-nodejs-modules", noNodejsModules, {
                 { messageId: "noNodejs", data: { module: "crypto" } },
                 { messageId: "noNodejs", data: { module: "child_process" } },
                 { messageId: "noNodejs", data: { module: "net" } },
+            ],
+        },
+        {
+            name: "a bare optional call of require is not guarded: the bundle's require exists on mobile",
+            code: `
+                const path = require?.("path");
+                const fs = require?.("node:fs");
+            `,
+            errors: [
+                { messageId: "noNodejs", data: { module: "path" } },
+                { messageId: "noNodejs", data: { module: "node:fs" } },
+            ],
+        },
+        {
+            name: "a catch that always throws is not a guard",
+            code: `
+                export function load() {
+                    try {
+                        return require("fs");
+                    } catch (e) {
+                        throw e;
+                    }
+                }
+                export async function read() {
+                    try {
+                        return await import("path");
+                    } catch (e) {
+                        console.error(e);
+                        throw new Error("This plugin needs the desktop app");
+                    }
+                }
+            `,
+            errors: [
+                { messageId: "noNodejs", data: { module: "fs" } },
+                { messageId: "noNodejs", data: { module: "path" } },
             ],
         },
         {
