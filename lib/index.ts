@@ -89,6 +89,7 @@ const plugin: ObsidianmdPlugin = {
         "plain-text": PlainTextLanguage
     },
     rules: {
+        "commands/check-callback-uses-checking": commands.checkCallbackUsesChecking,
         "commands/no-command-in-command-id": commands.noCommandInCommandId,
         "commands/no-command-in-command-name": commands.noCommandInCommandName,
         "commands/no-default-hotkeys": commands.noDefaultHotkeys,
@@ -183,6 +184,7 @@ const recommendedPluginRulesConfigTypeChecked: RulesConfig = {
 };
 
 const recommendedPluginRulesConfigBase: RulesConfig = {
+    "obsidianmd/commands/check-callback-uses-checking": "warn",
     "obsidianmd/commands/no-command-in-command-id": "warn",
     "obsidianmd/commands/no-command-in-command-name": "warn",
     "obsidianmd/commands/no-default-hotkeys": "warn",
