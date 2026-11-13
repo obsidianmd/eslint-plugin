@@ -50,6 +50,15 @@ const WINDOW_ELEMENT_MUTATORS = new Set([
     "appendChild", "append", "prepend", "insertBefore", "removeChild", "replaceChild", "replaceChildren",
     "insertAdjacentElement", "insertAdjacentHTML", "insertAdjacentText",
 ]);
+// The calls that put an element in `body`, with the index of the argument that
+// is the element, and the call that takes one out. An element the code both
+// puts there and removes again, such as a download link or a textarea for
+// copying text, is no state of the window: it belongs in the active window's
+// body like any other use of `document`.
+const CHILD_ADDERS: Record<string, number> = {
+    appendChild: 0, append: 0, prepend: 0, insertBefore: 0, insertAdjacentElement: 1,
+};
+const CHILD_REMOVERS = new Set(["removeChild"]);
 // Obsidian's helpers that create an element in `<head>`, such as a `<style>`.
 const CREATE_METHODS = new Set(["createEl", "createDiv", "createSpan", "createSvg"]);
 const CLASS_LIST_MUTATORS = new Set(["add", "remove", "toggle", "replace"]);
@@ -72,7 +81,7 @@ const GLOBAL_HOSTS = new Set(["window", "globalThis", "self"]);
 // The document properties that hold a document, for `[document, win.document]`.
 const DOCUMENT_PROPERTIES = new Set(["doc", "document", "ownerDocument", "activeDocument"]);
 
-type MessageIds = "preferActive" | "perWindowState" | "useActiveDocument" | "useActiveDocumentSince" | "useIsConnected";
+type MessageIds = "preferActive" | "preferActiveBody" | "perWindowState" | "useActiveDocument" | "useActiveDocumentSince" | "useIsConnected";
 
 // Each scope's references by the identifier that makes them.
 const referencesByScope = new WeakMap<object, Map<TSESTree.Node, TSESLint.Scope.Reference>>();
@@ -93,6 +102,8 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
         messages: {
             preferActive:
                 "Use '{{replacement}}' instead of '{{original}}' for popout window compatibility.",
+            preferActiveBody:
+                "Use 'activeDocument.body' instead of 'document.body', so the element is put in the window that has focus, for popout window compatibility.",
             perWindowState:
                 "'document.{{element}}' is the main window's, so this change does not reach popout windows. Make it, and undo it, in each window's document, for example from `workspace.on(\"window-open\")`.",
             useActiveDocument: "Replace with `activeDocument`, the document of the window that has focus.",
@@ -263,6 +274,11 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
                     return;
                 }
 
+                if (node.name === "document" && isTransientBodyUse(node)) {
+                    context.report({ node, messageId: "preferActiveBody", suggest: suggestionsFor(node) });
+                    return;
+                }
+
                 context.report({
                     node,
                     messageId: "preferActive",
@@ -374,6 +390,9 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
                 return null;
             }
             let mutates = false;
+            if (movesTransientElementIn(element.name, inner.member, inner.name)) {
+                return null;
+            }
             if (isCalled(inner.member)) {
                 mutates =
                     WINDOW_ELEMENT_MUTATORS.has(inner.name) || (element.name === "head" && CREATE_METHODS.has(inner.name));
@@ -398,6 +417,77 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
                 }
             }
             return mutates ? element.name : null;
+        }
+
+        // Whether `call`, `body.<method>(…)`, puts in or takes out an element
+        // that the code both puts somewhere and removes again, as in
+        // `document.body.appendChild(a); a.click(); a.remove();`.
+        // Whether `node` is the `document` of `document.body.<method>(…)` that
+        // puts in or takes out an element only there for a moment.
+        function isTransientBodyUse(node: TSESTree.Identifier): boolean {
+            const element = propertyOf(outerValue(node));
+            const inner = element?.name === "body" ? propertyOf(element.member) : undefined;
+            return !!inner?.name && movesTransientElementIn("body", inner.member, inner.name);
+        }
+
+        function movesTransientElementIn(element: string, member: TSESTree.MemberExpression, method: string): boolean {
+            return element === "body" && isCalled(member) && movesTransientElement(member.parent as TSESTree.CallExpression, method);
+        }
+
+        function movesTransientElement(call: TSESTree.CallExpression, method: string): boolean {
+            const index = Object.hasOwn(CHILD_ADDERS, method)
+                ? CHILD_ADDERS[method]
+                : CHILD_REMOVERS.has(method)
+                  ? 0
+                  : undefined;
+            const arg = index === undefined ? undefined : call.arguments[index];
+            if (arg?.type !== TSESTree.AST_NODE_TYPES.Identifier) {
+                return false;
+            }
+            let scope: TSESLint.Scope.Scope | null = context.sourceCode.getScope(arg);
+            let variable: TSESLint.Scope.Variable | undefined;
+            for (; scope && !variable; scope = scope.upper) {
+                variable = scope.set.get(arg.name);
+            }
+            if (!variable) {
+                return false;
+            }
+            let added = false;
+            let removed = false;
+            for (const reference of variable.references) {
+                const id = reference.identifier;
+                const parent = id.parent;
+                if (!parent) {
+                    continue;
+                }
+                // `a.remove()`, `a.detach()`
+                if (
+                    parent.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
+                    parent.object === id &&
+                    !parent.computed &&
+                    parent.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
+                    REMOVE_METHODS.has(parent.property.name) &&
+                    isCalled(parent)
+                ) {
+                    removed = true;
+                    continue;
+                }
+                // `x.appendChild(a)`, `x.removeChild(a)`
+                if (
+                    parent.type === TSESTree.AST_NODE_TYPES.CallExpression &&
+                    parent.callee.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
+                    !parent.callee.computed &&
+                    parent.callee.property.type === TSESTree.AST_NODE_TYPES.Identifier
+                ) {
+                    const name = parent.callee.property.name;
+                    if (Object.hasOwn(CHILD_ADDERS, name) && parent.arguments[CHILD_ADDERS[name]] === id) {
+                        added = true;
+                    } else if (CHILD_REMOVERS.has(name) && parent.arguments[0] === id) {
+                        removed = true;
+                    }
+                }
+            }
+            return added && removed;
         }
 
         // Whether `document` finds an element there to remove it, as in

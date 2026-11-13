@@ -328,19 +328,24 @@ function isGuardedByPlatformIsDesktop(node: TSESTree.CallExpression | TSESTree.I
             if (current.operator === "||" && desktopWhenFalse(current.left)) {
                 return true;
             }
-        } else if (current.type === AST_NODE_TYPES.BlockStatement) {
+        } else if (current.type === AST_NODE_TYPES.BlockStatement || current.type === AST_NODE_TYPES.SwitchCase) {
             // if (!Platform.isDesktop) return; anywhere before the statement.
             // That covers a block only: default parameter values, also inside a
             // destructuring pattern, are evaluated before the body runs. A
             // function declaration is hoisted, so the statements before the
             // early exit can call it: it is guarded only by an early exit that
-            // is the block's first statement.
-            const index = current.body.indexOf(prevChild as TSESTree.Statement);
+            // is the block's first statement. The statements of a switch case
+            // are a block of their own here: a case falls through into the next
+            // one only after its own statements, early exit included, ran, and
+            // one entered directly skips them. A case's own test runs before
+            // its statements.
+            const body = current.type === AST_NODE_TYPES.SwitchCase ? current.consequent : current.body;
+            const index = body.indexOf(prevChild as TSESTree.Statement);
             const before =
                 prevChild.type === AST_NODE_TYPES.FunctionDeclaration
-                    ? current.body.slice(0, Math.min(index, 1))
-                    : current.body.slice(0, index);
-            if (before.some(isEarlyExitGuard)) {
+                    ? body.slice(0, Math.min(index, 1))
+                    : body.slice(0, index);
+            if (index >= 0 && before.some(isEarlyExitGuard)) {
                 return true;
             }
         } else if (current.type === AST_NODE_TYPES.TryStatement) {

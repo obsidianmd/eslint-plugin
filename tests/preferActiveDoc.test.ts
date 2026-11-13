@@ -1256,6 +1256,44 @@ ruleTester.run("prefer-active-doc and code that handles popout windows", preferA
             ],
         },
         {
+            name: "a download link put in the body and removed again gets the suggestion",
+            code: "export function download(a: HTMLAnchorElement) { document.body.appendChild(a); a.click(); a.remove(); }",
+            errors: [{ messageId: "preferActiveBody", suggestions: offered("export function download(a: HTMLAnchorElement) { activeDocument.body.appendChild(a); a.click(); a.remove(); }") }],
+        },
+        {
+            name: "a textarea put in the body to copy its text gets the suggestion",
+            code: "export function copy(t: HTMLTextAreaElement) { document.body.append(t); t.select(); t.remove(); }",
+            errors: [{ messageId: "preferActiveBody", suggestions: offered("export function copy(t: HTMLTextAreaElement) { activeDocument.body.append(t); t.select(); t.remove(); }") }],
+        },
+        {
+            name: "an element put in the body and taken out with removeChild gets the suggestion on both",
+            code: "export function copy(t: HTMLTextAreaElement) { document.body.appendChild(t); t.select(); document.body.removeChild(t); }",
+            errors: [
+                { messageId: "preferActiveBody", suggestions: offered("export function copy(t: HTMLTextAreaElement) { activeDocument.body.appendChild(t); t.select(); document.body.removeChild(t); }") },
+                { messageId: "preferActiveBody", suggestions: offered("export function copy(t: HTMLTextAreaElement) { document.body.appendChild(t); t.select(); activeDocument.body.removeChild(t); }") },
+            ],
+        },
+        {
+            name: "an element removed later in a callback gets the suggestion",
+            code: "export function flash(el: HTMLElement) { document.body.insertBefore(el, null); window.setTimeout(() => el.detach(), 1000); }",
+            errors: [{ messageId: "preferActiveBody", suggestions: offered("export function flash(el: HTMLElement) { activeDocument.body.insertBefore(el, null); window.setTimeout(() => el.detach(), 1000); }") }],
+        },
+        {
+            name: "an element put in the body and never removed is the window's state",
+            code: "declare const panel: HTMLElement;\nexport function onload() { document.body.appendChild(panel); }",
+            errors: [{ messageId: "perWindowState", data: { element: "body" }, suggestions: [] }],
+        },
+        {
+            name: "an element removed but put in the body through a call that is not followed is the window's state",
+            code: "declare const el: HTMLElement;\nexport function f() { document.body.appendChild(el.cloneNode()); el.remove(); }",
+            errors: [{ messageId: "perWindowState", data: { element: "body" }, suggestions: [] }],
+        },
+        {
+            name: "a transient element in the head is still the window's state",
+            code: "export function f(s: HTMLStyleElement) { document.head.appendChild(s); s.remove(); }",
+            errors: [{ messageId: "perWindowState", data: { element: "head" }, suggestions: [] }],
+        },
+        {
             name: "a div created in the body keeps the suggestion",
             code: "export const f = () => document.body.createDiv('my-tooltip');",
             errors: [{ messageId: "preferActive", suggestions: offered("export const f = () => activeDocument.body.createDiv('my-tooltip');") }],
@@ -1269,6 +1307,16 @@ ruleTester.run("prefer-active-doc and code that handles popout windows", preferA
         {
             name: "document.body after a check of activeDocument is reported, without a suggestion",
             code: "export const f = () => typeof activeDocument !== 'undefined' ? activeDocument.body : document.body;",
+            errors: [{ messageId: "preferActive", suggestions: [] }],
+        },
+        {
+            name: "document.body after a check of one of Obsidian's DOM helpers is reported, without a suggestion",
+            code: "export const f = () => typeof createDiv === 'function' ? createDiv() : document.body;",
+            errors: [{ messageId: "preferActive", suggestions: [] }],
+        },
+        {
+            name: "document.body in the catch of a try that calls a helper is reported, without a suggestion",
+            code: "export function f() { try { return createDiv(); } catch (e) { console.error(e); return document.body; } }",
             errors: [{ messageId: "preferActive", suggestions: [] }],
         },
         {

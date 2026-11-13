@@ -29,14 +29,22 @@ The fix rewrites the check to `value.instanceOf(SomeClass)` when the value's typ
 `instanceOf()`, as it does with Obsidian's types. Without them it is offered as a suggestion only.
 A value that is not a name, a property access, a call, a non-null assertion or `this` is put in
 parentheses, so `(await getEl()) instanceof HTMLElement` becomes
-`(await getEl()).instanceOf(HTMLElement)`.
+`(await getEl()).instanceOf(HTMLElement)`. A check with a comment outside its two operands, as in
+`el /* note */ instanceof HTMLElement`, is offered as a suggestion only, since the rewrite would drop
+the comment.
 
 A value that may be null or undefined, such as `el.parentElement`, is reported too, with a
 suggestion; see [Values that may be null or undefined](#values-that-may-be-null-or-undefined).
 
 An event's target is reported too, without a fix; see [Event targets](#event-targets).
 
-Not reported: `instanceof` on any other type, such as a `TFile` or your own classes, on an `any` or
+Not reported: a check against a class that `instanceOf()` cannot take: an abstract class, or, for a
+`Node`, one whose constructor needs arguments, such as
+`class Widget extends HTMLElement { constructor(id: string) { super(); } }`. Obsidian declares
+`Node.instanceOf(type: { new (): T })`, so `el.instanceOf(Widget)` would not compile. Such a class is
+the plugin's own, not one each window has, so `instanceof` finds its instances in every window.
+
+Nor is `instanceof` on any other type, such as a `TFile` or your own classes, on an `any` or
 `unknown` value, and on a union of more than one type besides `null` and `undefined`, such as
 `Node | string` or `HTMLElement | SVGElement`. Nor is a check against a constructor read from a
 window object, such as `focus instanceof el.ownerDocument.defaultView!.HTMLElement` or
@@ -73,14 +81,20 @@ With `strictNullChecks`, the type tells: a value whose type includes `null` or `
 `el.parentElement`, a `Node | undefined`, an optional chain or a type parameter constrained to
 `HTMLElement | null`, gets that suggestion. So does a value read through an index signature, such as
 `list[0]` or `record.key`: unless `noUncheckedIndexedAccess` is on, it is typed as present even past
-the end of the list. A value narrowed by a check, such as `parent && parent instanceof HTMLElement`,
-or asserted with `!`, is fixed.
+the end of the list. So does a value cast to a type without `null` from one that may be null, such
+as `e.relatedTarget as HTMLElement`, written in the check or in the `const` it reads: the cast changes
+the type, not the value, and `relatedTarget` is still `null` when focus leaves the window. A value
+narrowed by a check, such as `parent && parent instanceof HTMLElement`, or asserted with `!`, is
+fixed.
 
 Without `strictNullChecks` no type includes `null`, so the value's declaration tells instead: a
 property or call declared as `null` or `undefined` (`el.parentElement`, `el.querySelector()`,
-`list.find()`), an optional property or parameter, an optional chain, an index signature, or a
-`const` set from one of them. Everything else, and a value with a non-null assertion
-(`el.parentElement!`), is still fixed.
+`list.find()`), an optional property or parameter, an optional chain, an index signature, a cast of
+one of them, or a variable set from one of them, even with a type annotation, as in
+`const input: Element = root.querySelector("input")`. So does a class field without an initializer,
+such as `inputEl: Element;`, unless the constructor sets it (`this.inputEl = …`) or it is declared
+with `!` or `declare`: until it is set, it is `undefined`. Everything else, and a value with a
+non-null assertion (`el.parentElement!`), is still fixed.
 
 ## Event targets
 
