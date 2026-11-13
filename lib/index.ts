@@ -146,8 +146,8 @@ const plugin: ObsidianmdPlugin = {
         recommendedWithLocalesEn: []
     },
     ruleConfigs: {
-        recommended: {} as RulesConfig,
-        recommendedTypeChecked: {} as RulesConfig,
+        recommended: {},
+        recommendedTypeChecked: {},
     },
     withCustomMessages,
 };
@@ -529,7 +529,7 @@ const flatRecommendedConfig: Config[] = defineConfig([
     {
         files: ['package.json'],
         language: 'json/json',
-        extends: [tseslint.configs.disableTypeChecked as Config],
+        extends: [tseslint.configs.disableTypeChecked],
         plugins: {
             depend,
             json
@@ -547,7 +547,7 @@ const flatRecommendedConfig: Config[] = defineConfig([
     {
         files: ['manifest.json'],
         language: 'json/json',
-        extends: [tseslint.configs.disableTypeChecked as Config],
+        extends: [tseslint.configs.disableTypeChecked],
         plugins: {
             json,
             obsidianmd: plugin
@@ -561,7 +561,7 @@ const flatRecommendedConfig: Config[] = defineConfig([
     {
         files: ['LICENSE', 'LICENSE.md', 'LICENSE.txt'],
         language: 'obsidianmd/plain-text',
-        extends: [tseslint.configs.disableTypeChecked as Config],
+        extends: [tseslint.configs.disableTypeChecked],
         plugins: {
             obsidianmd: plugin
         },
@@ -698,8 +698,8 @@ const recommendedWithLocalesEn: Config[] = defineConfig([
 ]);
 
 plugin.configs = {
-    recommended: flatRecommendedConfig as Linter.Config[],
-    recommendedWithLocalesEn: recommendedWithLocalesEn as Linter.Config[]
+    recommended: flatRecommendedConfig,
+    recommendedWithLocalesEn
 };
 
 plugin.ruleConfigs = {

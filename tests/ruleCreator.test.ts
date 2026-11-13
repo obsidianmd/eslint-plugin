@@ -50,7 +50,7 @@ const reportIdentifiers = ruleCreator<[{ prefix?: string }], "found">({
             Document() {
                 context.report({ loc: { line: 1, column: 0 }, messageId: "found", data: { prefix: "", name: "Document" } });
             },
-        } as never;
+        };
     },
 });
 

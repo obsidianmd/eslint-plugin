@@ -51,7 +51,10 @@ export default [
     {
         files: ["package.json"],
         rules: {
-            "depend/ban-dependencies": ["error", { allowed: ["eslint-plugin-import"] }],
+            "depend/ban-dependencies": [
+                "error",
+                { presets: ["native", "microutilities", "preferred"], allowed: ["eslint-plugin-import"] },
+            ],
         },
     },
     // This repo is the plugin, not an Obsidian plugin. Its manifest.json is a

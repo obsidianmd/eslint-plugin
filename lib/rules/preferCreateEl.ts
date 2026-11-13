@@ -650,7 +650,7 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
         function dropsComments(node: TSESTree.CallExpression, replacement: string): boolean {
             return context.sourceCode
                 .getCommentsInside(node)
-                .some((comment) => !replacement.includes(context.sourceCode.getText(comment as unknown as TSESTree.Node)));
+                .some((comment) => !replacement.includes(context.sourceCode.getText(comment)));
         }
 
         // An iframe's document belongs to the iframe's own window, which Obsidian

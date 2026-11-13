@@ -423,7 +423,7 @@ export default ruleCreator<Options, MessageId>({
                 // was not a signature then, cannot be told.
                 return lenient;
             }
-            const fits = callFits(shape.node as ts.FunctionTypeNode, declaration as ts.SignatureDeclaration, call as TSESTree.CallExpression, at);
+            const fits = callFits(shape.node as ts.FunctionTypeNode, declaration, call, at);
             return fits === true || (lenient && fits === undefined);
         }
 
@@ -1885,7 +1885,7 @@ function comparedWithBoolean(
         [expr.right, expr.left],
     ] as const) {
         if (other.type === AST_NODE_TYPES.Literal && typeof other.value === "boolean") {
-            return { operand: operand as TSESTree.Expression, truthy: (truthy === equal) === other.value };
+            return { operand, truthy: (truthy === equal) === other.value };
         }
     }
     return undefined;
@@ -2031,7 +2031,7 @@ function getStatements(container: TSESTree.Node): TSESTree.Statement[] {
         case AST_NODE_TYPES.StaticBlock:
             return container.body;
         case AST_NODE_TYPES.Program:
-            return container.body as TSESTree.Statement[];
+            return container.body;
         case AST_NODE_TYPES.SwitchCase:
             return container.consequent;
         default:

@@ -143,11 +143,11 @@ export default ruleCreator<[NoNodejsModulesOptions?], "noNodejs">({
                     !isRequireCallee(node.callee) ||
                     node.arguments.length === 0 ||
                     node.arguments[0].type !== AST_NODE_TYPES.Literal ||
-                    typeof (node.arguments[0] as TSESTree.Literal).value !== "string"
+                    typeof node.arguments[0].value !== "string"
                 ) {
                     return;
                 }
-                const source = (node.arguments[0] as TSESTree.StringLiteral).value;
+                const source = node.arguments[0].value;
                 if (!isBuiltin(source)) {
                     return;
                 }

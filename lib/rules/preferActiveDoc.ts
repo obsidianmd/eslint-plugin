@@ -431,7 +431,7 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
         }
 
         function movesTransientElementIn(element: string, member: TSESTree.MemberExpression, method: string): boolean {
-            return element === "body" && isCalled(member) && movesTransientElement(member.parent as TSESTree.CallExpression, method);
+            return element === "body" && isCalled(member) && movesTransientElement(member.parent, method);
         }
 
         function movesTransientElement(call: TSESTree.CallExpression, method: string): boolean {
