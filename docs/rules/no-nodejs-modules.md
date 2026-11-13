@@ -29,7 +29,9 @@ works the other way: in the `else` of `if (Platform.isMobile)` or `if (!Platform
 second branch of `Platform.isMobileApp ? … : …`, and to the right of `Platform.isMobile || …`. It
 also counts as guarded after an early exit in the same block or an enclosing one, at any position
 before it: an `if` without an `else` whose test is such a negated check, also on one side of `||`,
-and whose branch is a `return` or `throw` or reaches one:
+and whose branch is a `return` or `throw` or reaches one. The statements of a `switch` case count as
+a block: an early exit guards the rest of its own case, but not the cases after it, which `switch`
+can enter directly:
 
 ```ts
 if (Platform.isDesktopApp) {
