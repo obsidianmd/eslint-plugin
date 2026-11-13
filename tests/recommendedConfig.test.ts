@@ -424,6 +424,7 @@ const ESCALATED_TYPE_CHECKED_RULES = [
 	"obsidianmd/no-unsupported-api",
 ];
 const WARN_RULES = [
+	"obsidianmd/commands/check-callback-uses-checking",
 	"obsidianmd/commands/no-command-in-command-id",
 	"obsidianmd/commands/no-command-in-command-name",
 	"obsidianmd/commands/no-default-hotkeys",

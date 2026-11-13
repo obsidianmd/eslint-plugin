@@ -63,4 +63,4 @@ whole heading setting: the `new Setting(…)` statement and every call in it, in
 
 ## Options
 
-- **`pluginName`** (`string`, optional): The plugin name to check against. Defaults to `manifest.json` `name`.
+- **`pluginName`** (`string`, optional): The plugin name to check against. Defaults to `manifest.json` `name`. An empty name, or a `name` that is not a string, turns off the plugin-name check.
