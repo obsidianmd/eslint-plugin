@@ -63,9 +63,9 @@ function isReplacedMethodCall(
  * implementation of the helpers themselves, such as a polyfill, this rule
  * reports nothing, so prefer-active-doc reports `document` there. Nor where
  * `minAppVersion` is known to be older than the helper, as `createSvg()`
- * (1.1.0) is for a plugin that supports 1.0.0.
+ * (1.1.0) is for a plugin that supports 1.0.0; `null` skips that check.
  */
-export function isReportedOnGlobalDocument(call: TSESTree.CallExpression, minAppVersion?: string): boolean {
+export function isReportedOnGlobalDocument(call: TSESTree.CallExpression, minAppVersion?: string | null): boolean {
     const method = Object.keys(REPLACED_METHODS).find((name) => isReplacedMethodCall(call, name));
     if (method === undefined || isInHelperImplementation(call)) {
         return false;
@@ -77,7 +77,7 @@ export function isReportedOnGlobalDocument(call: TSESTree.CallExpression, minApp
               ? "createFragment"
               : getTagShorthand(call.arguments[0]);
     const since = helper === undefined ? undefined : HELPER_SINCE[helper];
-    return since === undefined || supportsVersion(minAppVersion, since) !== false;
+    return since === undefined || minAppVersion === null || supportsVersion(minAppVersion, since) !== false;
 }
 
 // Whether `node` is inside a function named after one of Obsidian's DOM

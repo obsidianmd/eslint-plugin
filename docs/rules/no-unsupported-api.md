@@ -161,8 +161,8 @@ Not reported, as they exist on every version or are the plugin's own:
 - a use behind a `requireApiVersion()` check or a feature check, as described below:
   `typeof activeDocument !== "undefined" ? activeDocument : document` or `el.setCssStyles?.(…)`.
 
-With a `minAppVersion` below 0.15.0, [`prefer-active-doc`](prefer-active-doc.md) does not report
-`document`, so the two rules do not ask for opposite changes.
+With a `minAppVersion` below 0.15.0, [`prefer-active-doc`](prefer-active-doc.md) offers no
+suggestion to use `activeDocument`, so the two rules do not ask for opposite changes.
 
 ## Guarding with `requireApiVersion`
 

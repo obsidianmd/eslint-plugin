@@ -205,6 +205,12 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
             options: [{ minAppVersion: "1.1.0" }],
         },
         {
+            // Below 0.15.0 neither activeDocument nor createSvg() can be used.
+            name: "document.createElementNS() for SVG below 0.15.0 is left alone",
+            code: "document.createElementNS('http://www.w3.org/2000/svg', 'path'); document.createElement('div');",
+            options: [{ minAppVersion: "0.9.12" }],
+        },
+        {
             name: "document.createDocumentFragment() is left to prefer-create-el",
             code: "const fragment = document.createDocumentFragment();",
         },

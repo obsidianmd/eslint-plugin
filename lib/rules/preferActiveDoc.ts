@@ -244,7 +244,10 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
                     node.parent.object === node &&
                     node.parent.parent.type === TSESTree.AST_NODE_TYPES.CallExpression &&
                     node.parent.parent.callee === node.parent &&
-                    isReportedOnGlobalDocument(node.parent.parent, context.options[0]?.minAppVersion) &&
+                    // Below 0.15.0, which has no activeDocument, the call is
+                    // left alone even where prefer-create-el's helper is too
+                    // new: neither replacement can be used there.
+                    isReportedOnGlobalDocument(node.parent.parent, supported === false ? null : context.options[0]?.minAppVersion) &&
                     !createElDisabledAt(node.parent.parent)
                 ) {
                     return;

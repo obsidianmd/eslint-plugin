@@ -112,7 +112,7 @@ document.createEl("div");                                          // createDiv(
 are the files the recommended config runs `prefer-create-el` on; anywhere else, such as a JavaScript
 file, this rule still reports them. So it does where `minAppVersion` is older than the helper the
 replacement needs, as `createSvg()` (1.1.0) is for 1.0.0, since `prefer-create-el` leaves the call
-alone there. A rule cannot see another's configuration: if your config turns
+alone there; not below 0.15.0, which has no `activeDocument` either. A rule cannot see another's configuration: if your config turns
 `prefer-create-el` off for those files, neither rule reports these calls. A call `prefer-create-el` leaves alone, such as
 `document.createElement("div", { is: "my-div" })`, is reported here as before, and so is a call
 inside an implementation of a DOM helper, such as a polyfill, which `prefer-create-el` leaves alone
