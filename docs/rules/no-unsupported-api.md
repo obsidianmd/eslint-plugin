@@ -97,6 +97,10 @@ signature the use fits:
   declares, of types the callback takes, and whose result that release ignores. The call's result must be typed the same, or unused:
   `revealLeaf(leaf);` and `await revealLeaf(leaf);` fit the 0.9.7 `revealLeaf(leaf): void`, but
   `revealLeaf(leaf).then(…)` needs the Promise of 1.7.2.
+- a call to a property of a callable type that passes no arguments and ignores the result fits an
+  older function type that requires no arguments, or a type written the same as today's:
+  `workspace.requestSaveLayout();` fits the `() => void` it was before 0.16.0 typed it a
+  `Debouncer`, while `workspace.requestSaveLayout.cancel()` needs 0.16.0.
 
 Anything the rule cannot tell keeps the `@since`: a call that needs a newer signature, such as
 `getLeaf("tab")` (the PaneType overload of 0.16.0) or `setTooltip(text, { placement })` (the options

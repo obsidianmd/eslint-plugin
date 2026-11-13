@@ -18,7 +18,9 @@ A call to `setTimeout`, `setInterval`, `clearTimeout`, `clearInterval`, `request
   it. The fix replaces `activeWindow` with `window`. A timer ID belongs to the window that set the
   timer, so `window.clearTimeout(id)` clears only a timer `window` set. The fix is therefore applied
   automatically only to an `activeWindow.setTimeout()` or `activeWindow.setInterval()` whose ID is
-  not used (a statement on its own, or `void`), which nothing can clear. One whose ID is stored,
+  not used (a statement on its own, `void`, or the body of an arrow function whose caller ignores
+  its result, such as a Promise executor in `new Promise((resolve) => activeWindow.setTimeout(resolve, ms))`),
+  which nothing can clear. One whose ID is stored,
   returned or passed on, and every `activeWindow.clearTimeout()` and `activeWindow.clearInterval()`,
   get the rewrite as a suggestion only, for the code that sets the timer and the code that clears it
   to change together. Not `activeWindow.requestAnimationFrame()` and

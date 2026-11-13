@@ -30,6 +30,8 @@ and nested functions, whose name:
 A "General" or plugin-name heading is at the top of the tab when it is the first thing `display()`
 adds to it: nothing before it in `display()` creates anything or calls anything other than
 `empty()`, the class and attribute methods (`addClass()`, `setAttr()`, …) and `console` logging.
+What runs before `display()` empties the tab, with `containerEl.empty()` or
+`this.containerEl.empty()` as a statement of its own, does not count: it is not in the tab any more.
 Lower down it starts a section of its own, and removing it would put that section's settings under
 the heading before it, so it is not reported. Nor is one whose place cannot be told: in a loop, in a
 callback or another function, or in a method other than `display()`.

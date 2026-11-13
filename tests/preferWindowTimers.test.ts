@@ -168,6 +168,28 @@ ruleTester.run("prefer-window-timers", preferWindowTimersRule, {
             ],
         },
         {
+            // A Promise executor's result is thrown away, so the ID is too.
+            name: "activeWindow.setTimeout as the body of a Promise executor is fixed",
+            code: "export const wait = (ms: number) => new Promise((resolve) => activeWindow.setTimeout(resolve, ms));",
+            output: "export const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));",
+            errors: [{ messageId: "noActiveWindowTimer", data: { name: "setTimeout" } }],
+        },
+        {
+            // map() keeps each ID, which activeWindow.clearTimeout() may clear.
+            name: "activeWindow.setTimeout as the body of a map() callback gets a suggestion",
+            code: "export const ids = [1, 2].map((ms) => activeWindow.setTimeout(() => {}, ms));",
+            output: null,
+            errors: [
+                {
+                    messageId: "noActiveWindowTimer",
+                    data: { name: "setTimeout" },
+                    suggestions: [
+                        { messageId: "useWindowTimer", output: "export const ids = [1, 2].map((ms) => window.setTimeout(() => {}, ms));" },
+                    ],
+                },
+            ],
+        },
+        {
             name: 'activeWindow.setTimeout whose ID is stored in a variable gets a suggestion',
             code: 'const id = activeWindow.setTimeout(() => {}, 100);',
             output: null,
@@ -718,6 +740,12 @@ const untypedRuleTester = new RuleTester({
 untypedRuleTester.run("prefer-window-timers without type information", preferWindowTimersRule, {
     valid: [],
     invalid: [
+        {
+            name: "activeWindow.setTimeout as the body of a Promise executor is fixed without type information",
+            code: "const wait = (ms) => new Promise((resolve) => activeWindow.setTimeout(resolve, ms));",
+            output: "const wait = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));",
+            errors: [{ messageId: "noActiveWindowTimer", data: { name: "setTimeout" } }],
+        },
         {
             name: "clearTimeout with a variable gets a suggestion without type information",
             code: "clearTimeout(timer);",
