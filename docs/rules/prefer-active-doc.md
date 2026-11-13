@@ -120,12 +120,9 @@ inside an implementation of a DOM helper, such as a polyfill, which `prefer-crea
 
 Where a comment turns `prefer-create-el` off for the call (`eslint-disable-next-line`,
 `eslint-disable-line`, or an `eslint-disable` range naming it), this rule reports `document` there
-as before:
-
-```ts
-// eslint-disable-next-line obsidianmd/prefer-create-el -- the canvas is sized before use
-const canvas = document.createElement("canvas"); // reported: use activeDocument
-```
+as before. The recommended config does not allow such a comment: its
+`eslint-comments/no-restricted-disable` reports any disable comment for an `obsidianmd/` rule. This
+applies only to a config that lifts that restriction.
 
 A rule cannot see the config of another, so if you switch `prefer-create-el` off for TypeScript files
 in your config, neither rule reports these calls.
@@ -178,13 +175,27 @@ of the element itself (`className`); `appendChild()`, `append()`, `prepend()`, `
 `document.body.hasClass()` or `classList.contains()`, and `document.body.createDiv()`, whose element
 the code removes itself, keep the suggestion.
 
+So does an element the code puts in `document.body` only for a moment: one it passes, as a variable,
+to `appendChild()`, `append()`, `prepend()`, `insertBefore()` or `insertAdjacentElement()` and also
+removes, with `remove()`, `detach()` or `removeChild()`, anywhere in its scope. A download link or a
+textarea for copying text is no state of the window, and belongs in the active window's body:
+
+```ts
+document.body.appendChild(link); link.click(); link.remove(); // reported, suggestion: activeDocument.body
+document.body.appendChild(panel); // reported, nothing offered: never removed, so the window's state
+```
+
+On `document.head` such an element is still the window's state, like a `<style>`.
+
 Nothing is offered where `activeDocument` would not exist, or would not be what the code means:
 
 - a local binding named `activeDocument` shadows the global, such as a parameter;
 - with type information, the program does not declare `activeDocument`, because the `obsidian`
   typings are not part of it;
-- a web worker file, by the paths the recommended config uses (`*.worker.*`, `*-worker.*`, `*_worker.*`, or any
-  file under a `workers` directory), or a file whose config turns the `activeDocument` global `"off"`;
+- a web worker file, by the paths the recommended config uses: a `.ts`, `.cts`, `.mts`, `.tsx`, `.js`, `.cjs`, `.mjs` or `.jsx` file matching
+  `**/worker.*`, `**/*.worker.*`, `**/*-worker.*` or `**/*_worker.*`, or any such file under a
+  `workers` directory (not a `worker` directory); or a file whose config turns the `activeDocument`
+  global `"off"`;
 - a file of Emscripten output, which reads `ENVIRONMENT_IS_WORKER` or `ENVIRONMENT_IS_NODE`;
 - code that also runs outside Obsidian, as a check before it in the same function, or one that
   decides whether it runs, shows: `typeof document`, `typeof window`, `"window" in globalThis`, a
