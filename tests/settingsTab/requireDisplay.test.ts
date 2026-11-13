@@ -103,7 +103,7 @@ ruleTester.run("require-display", requireDisplayRule, {
         },
         {
             name: "an unknown minAppVersion option is a no-op",
-            options: [{ minAppVersion: "1.12" }],
+            options: [{ minAppVersion: "latest" }],
             code: `
                 ${MOCK_CLASS}
                 class MyTab extends PluginSettingTab {}
