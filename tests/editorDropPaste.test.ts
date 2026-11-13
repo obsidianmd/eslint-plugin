@@ -216,6 +216,16 @@ ruleTester.run("editor-drop-paste", editorDropPasteRule, {
             `,
         },
         {
+            name: "a local variable named console may check the event",
+            code: `
+                declare const console: { log(evt: ClipboardEvent): void };
+                workspace.on('editor-paste', (evt, editor) => {
+                    console.log(evt);
+                    editor.replaceSelection('pasted');
+                });
+            `,
+        },
+        {
             name: "a handler without an editor parameter that does not cancel the event is not checked",
             code: `
                 workspace.on('editor-paste', (evt) => {
@@ -233,6 +243,20 @@ ruleTester.run("editor-drop-paste", editorDropPasteRule, {
         },
     ],
     invalid: [
+        {
+            name: "logging the event is not handing it on",
+            code: `
+                workspace.on('editor-paste', (evt, editor) => {
+                    console.log(evt);
+                    console.debug("paste", evt as ClipboardEvent);
+                    editor.replaceSelection('pasted');
+                });
+            `,
+            errors: [
+                { messageId: "missingDefaultPrevented", data: { eventName: "editor-paste" } },
+                { messageId: "missingPreventDefault", data: { eventName: "editor-paste" } },
+            ],
+        },
         {
             name: "editor-paste missing both checks is forbidden",
             code: `

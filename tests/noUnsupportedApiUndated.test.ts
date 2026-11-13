@@ -3,8 +3,14 @@ import rule from "../lib/rules/noUnsupportedApi.js";
 
 const ruleTester = new RuleTester();
 
-const error = (line: number, qualifiedName: string, sinceVersion: string, minAppVersion: string) => ({
-    messageId: "apiNotAvailable" as const,
+const error = (
+    line: number,
+    qualifiedName: string,
+    sinceVersion: string,
+    minAppVersion: string,
+    messageId: "apiNotAvailable" | "apiNotAvailableCheck" | "apiNotAvailableRaise" = "apiNotAvailable",
+) => ({
+    messageId,
     line,
     data: { qualifiedName, sinceVersion, minAppVersion },
 });
@@ -163,10 +169,10 @@ ruleTester.run("no-unsupported-api: declarations without @since", rule, {
             `,
             options: [{ minAppVersion: "0.13.0" }],
             errors: [
-                error(3, "activeDocument", "0.15.0", "0.13.0"),
-                error(4, "Window.activeWindow", "0.15.0", "0.13.0"),
-                error(5, "activeDocument", "0.15.0", "0.13.0"),
-                error(6, "apiVersion", "0.13.21", "0.13.0"),
+                error(3, "activeDocument", "0.15.0", "0.13.0", "apiNotAvailableCheck"),
+                error(4, "Window.activeWindow", "0.15.0", "0.13.0", "apiNotAvailableCheck"),
+                error(5, "activeDocument", "0.15.0", "0.13.0", "apiNotAvailableCheck"),
+                error(6, "apiVersion", "0.13.21", "0.13.0", "apiNotAvailableCheck"),
             ],
         },
         {
@@ -206,9 +212,9 @@ ruleTester.run("no-unsupported-api: declarations without @since", rule, {
             `,
             options: [{ minAppVersion: "0.12.0" }],
             errors: [
-                error(5, "Modal.setTitle", "1.5.1", "0.12.0"),
-                error(8, "requestUrl", "0.16.0", "0.12.0"),
-                error(10, "requestUrl", "0.13.26", "0.12.0"),
+                error(5, "Modal.setTitle", "1.5.1", "0.12.0", "apiNotAvailableCheck"),
+                error(8, "requestUrl", "0.16.0", "0.12.0", "apiNotAvailableRaise"),
+                error(10, "requestUrl", "0.13.26", "0.12.0", "apiNotAvailableCheck"),
             ],
         },
     ],

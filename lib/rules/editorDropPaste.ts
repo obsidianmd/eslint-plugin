@@ -1,4 +1,4 @@
-import { TSESTree } from "@typescript-eslint/utils";
+import { ASTUtils, TSESTree } from "@typescript-eslint/utils";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 const EVENTS = new Set(["editor-drop", "editor-paste"]);
@@ -164,7 +164,8 @@ export default ruleCreator({
                 } else if (
                     (parent.type === TSESTree.AST_NODE_TYPES.CallExpression ||
                         parent.type === TSESTree.AST_NODE_TYPES.NewExpression) &&
-                    parent.arguments.includes(target as TSESTree.CallExpressionArgument)
+                    parent.arguments.includes(target as TSESTree.CallExpressionArgument) &&
+                    !isConsoleCall(parent)
                 ) {
                     passesEvent = true;
                 }
@@ -190,6 +191,21 @@ export default ruleCreator({
                     identifier.range[0] >= body.range[0] &&
                     identifier.range[1] <= body.range[1],
                 );
+        }
+
+        // `console.log(evt)` and the other console methods only print the
+        // event: they neither check nor cancel it. Not a local `console`.
+        function isConsoleCall(node: TSESTree.CallExpression | TSESTree.NewExpression): boolean {
+            const callee = node.callee;
+            if (
+                callee.type !== TSESTree.AST_NODE_TYPES.MemberExpression ||
+                callee.object.type !== TSESTree.AST_NODE_TYPES.Identifier ||
+                callee.object.name !== "console"
+            ) {
+                return false;
+            }
+            const variable = ASTUtils.findVariable(context.sourceCode.getScope(callee.object), "console");
+            return !variable || variable.defs.length === 0;
         }
 
         // Whether the handler calls a method that changes the document on its

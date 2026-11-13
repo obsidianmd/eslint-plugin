@@ -61,13 +61,23 @@ function isReplacedMethodCall(
  * The replacement calls a global helper (`createEl(tag)`, `createDiv()`, …),
  * which leaves no `document` for prefer-active-doc to report. Inside an
  * implementation of the helpers themselves, such as a polyfill, this rule
- * reports nothing, so prefer-active-doc reports `document` there.
+ * reports nothing, so prefer-active-doc reports `document` there. Nor where
+ * `minAppVersion` is known to be older than the helper, as `createSvg()`
+ * (1.1.0) is for a plugin that supports 1.0.0; `null` skips that check.
  */
-export function isReportedOnGlobalDocument(call: TSESTree.CallExpression): boolean {
-    return (
-        !isInHelperImplementation(call) &&
-        Object.keys(REPLACED_METHODS).some((method) => isReplacedMethodCall(call, method))
-    );
+export function isReportedOnGlobalDocument(call: TSESTree.CallExpression, minAppVersion?: string | null): boolean {
+    const method = Object.keys(REPLACED_METHODS).find((name) => isReplacedMethodCall(call, name));
+    if (method === undefined || isInHelperImplementation(call)) {
+        return false;
+    }
+    const helper =
+        method === "createElementNS"
+            ? "createSvg"
+            : method === "createDocumentFragment"
+              ? "createFragment"
+              : getTagShorthand(call.arguments[0]);
+    const since = helper === undefined ? undefined : HELPER_SINCE[helper];
+    return since === undefined || minAppVersion === null || supportsVersion(minAppVersion, since) !== false;
 }
 
 // Whether `node` is inside a function named after one of Obsidian's DOM

@@ -33,13 +33,21 @@ returned by a call is not followed, and an iframe's `contentDocument` is not the
 style its contents, and is not reported:
 
 - `createEl("style")` called on a shadow root or an element created in one: `el.attachShadow(…)`,
-  `el.shadowRoot`, a variable or parameter named `shadowRoot` or typed `ShadowRoot`, a `const`
-  holding one of these, and the result of `createEl()`, `createDiv()` or `createSpan()` on one, as
-  in `const head = shadowRoot.createEl("head"); head.createEl("style", { text: css })`;
+  `el.shadowRoot`, `x as ShadowRoot`, a variable or parameter typed `ShadowRoot` (in its annotation
+  or, with type information, its type), a `const` holding one of these or a `let` only ever set to
+  one, and the result of `createEl()`, `createDiv()` or `createSpan()` on one, as in
+  `const head = shadowRoot.createEl("head"); head.createEl("style", { text: css })`. Unless the
+  element is then moved out of the shadow root: a `const` holding it that is passed to an insertion
+  below into anything else is reported;
 - an element created on a document and passed straight to a shadow root's `appendChild()`,
-  `append()`, `prepend()` or `insertBefore()`, or held in a `const` that every such call in the file
-  passes to a shadow root. An element that is never inserted in the file, or is also inserted
-  elsewhere, is still reported.
+  `append()`, `prepend()`, `insertBefore()` or `insertAdjacentElement()`, or held in a `const` that
+  every such call in the file passes to a shadow root. An element that is never inserted in the
+  file, or is also inserted elsewhere, is still reported.
+
+A variable or parameter counts as a shadow root by its name, `shadowRoot`, only where nothing else
+tells what it holds: a global, an untyped parameter, or a value such as `el.getRootNode()`, which
+may be a shadow root. `const shadowRoot = document.head`, a `shadowRoot: HTMLElement` parameter or,
+with type information, a `shadowRoot` whose type is an element is not a shadow root.
 
 A shadow root held in a class property (`this.shadowHead.createEl("style")`) is not followed.
 
