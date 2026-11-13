@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `settings-tab/no-problematic-settings-headings` no longer stops the whole ESLint run when `manifest.json` has a `name` that is not a string, such as `"name": 123`. It threw `TypeError: pluginName.toLowerCase is not a function`; now it skips only the plugin-name check, and the "settings" and "general" checks still report ([#251](https://github.com/obsidianmd/eslint-plugin/pull/251)).
+- `no-static-styles-assignment` no longer stops the whole ESLint run on `el.style.setProperty()` called without arguments, which threw `TypeError: Cannot read properties of undefined (reading 'type')` ([#264](https://github.com/obsidianmd/eslint-plugin/pull/264)).
 
 ## [0.5.1] - 2026-11-06
 
