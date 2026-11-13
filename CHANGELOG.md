@@ -7,8 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `commands/check-callback-uses-checking` reports a `checkCallback` or `editorCheckCallback` in `addCommand()` that never reads its `checking` parameter. Obsidian calls it with `checking` set to `true` to ask whether the command is available, for example while the command palette is open, so such a callback runs its action on every check. It warns in the `recommended` config ([#248](https://github.com/obsidianmd/eslint-plugin/pull/248)).
+- `no-await-chainable` reports `await` of a `Setting` or a UI component (`ButtonComponent`, `TextComponent` and the other `BaseComponent` subclasses), and returning one from an async function. Their `then(cb)` is for chaining: it calls `cb` with the object and returns the object, so promise resolution calls it again forever, the `await` never settles and the app stops responding. `@typescript-eslint/await-thenable` does not catch it, because the objects are thenables. It is an error in the `recommended` config, for TypeScript files ([#249](https://github.com/obsidianmd/eslint-plugin/pull/249)).
+
+### Changed
+
+- `no-unsupported-api` names the fix in its report: raise `minAppVersion` to the version the API needs, or guard the use with `requireApiVersion()` and that version. Below 0.13.21, which first has `requireApiVersion()`, it suggests a check that the API exists instead, and for a superclass, such as `class extends AbstractInputSuggest`, or a newer signature that no such check proves, only raising `minAppVersion` ([#250](https://github.com/obsidianmd/eslint-plugin/pull/250)).
+
 ### Fixed
 
+- `settings-tab/no-problematic-settings-headings` no longer stops the whole ESLint run when `manifest.json` has a `name` that is not a string, such as `"name": 123`. It threw `TypeError: pluginName.toLowerCase is not a function`; now it skips only the plugin-name check, and the "settings" and "general" checks still report ([#251](https://github.com/obsidianmd/eslint-plugin/pull/251)).
+- `no-static-styles-assignment` no longer stops the whole ESLint run on `el.style.setProperty()` called without arguments, which threw `TypeError: Cannot read properties of undefined (reading 'type')` ([#264](https://github.com/obsidianmd/eslint-plugin/pull/264)).
+- `ui/sentence-case`, `ui/sentence-case-json` and `ui/sentence-case-locale-module` ignore an empty string in the `brands`, `acronyms` and `ignoreWords` options. With `brands: [""]`, a text that is empty or starts with a character other than a letter or digit, such as `"(Open) settings"`, made the rule loop forever, and the lint run never finished ([#265](https://github.com/obsidianmd/eslint-plugin/pull/265)).
+- `prefer-window-timers` no longer rewrites `activeWindow.clearTimeout(id)` and `activeWindow.clearInterval(id)` to `window` automatically, and offers it as a suggestion instead. A timer ID belongs to the window that set the timer: where `activeWindow.setTimeout()` in a popout window set it, `window.clearTimeout(id)` did not clear it ([#266](https://github.com/obsidianmd/eslint-plugin/pull/266)).
+- The recommended config treats a file named `worker.ts` (or `worker.js` and the other extensions), such as `src/worker.ts`, as web worker code, like `*.worker.ts`. `prefer-window-timers` rewrote its `setTimeout()` to `window.setTimeout()`, and `no-global-this` its `globalThis` to `window`, which a worker does not have ([#267](https://github.com/obsidianmd/eslint-plugin/pull/267)).
+- `settings-tab/no-deprecated-display`, `settings-tab/prefer-update-over-display` and `settings-tab/require-display` read a `minAppVersion` without a patch version, such as `"1.13"`, as `1.13.0`, as `no-unsupported-api` does. They did nothing for such a version ([#268](https://github.com/obsidianmd/eslint-plugin/pull/268)).
 - `validate-manifest` checks the words in the `id`, `name` and `description` without the invisible characters that could hide them, such as a zero-width space, a soft hyphen or a bidi control, so `"Obs\u200Bidian Sync"` is reported as using "Obsidian" ([#269](https://github.com/obsidianmd/eslint-plugin/pull/269)).
 
 ## [0.5.1] - 2026-11-06
