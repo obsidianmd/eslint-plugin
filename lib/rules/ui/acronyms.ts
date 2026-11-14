@@ -6,6 +6,7 @@ export const DEFAULT_ACRONYMS: string[] = [
     "HTTP",
     "HTTPS",
     "URL",
+    "URI",
     "DNS",
     "TCP",
     "IP",
@@ -29,6 +30,9 @@ export const DEFAULT_ACRONYMS: string[] = [
     "JPEG",
     "GIF",
     "SVG",
+    "EPUB",
+    "ICS",
+    "OPML",
     // Security
     "2FA",
     "MFA",
@@ -55,6 +59,21 @@ export const DEFAULT_ACRONYMS: string[] = [
     // Services
     "RSS",
     "S3",
+    "AWS",
+    "MCP",
+    // Time
+    "UTC",
+    "GMT",
+    "ISO",
+    // Text and speech
+    "OCR",
+    "TTS",
+    "RTL",
+    "LTR",
+    // Color
+    "RGB",
+    "RGBA",
+    "HSL",
     // Identifiers
     "ID",
     // Other
@@ -78,4 +97,6 @@ export const DEFAULT_ACRONYMS: string[] = [
 // so neither "Use the REST API" nor "Take a rest" is reported.
 export const DEFAULT_CASE_AGNOSTIC_ACRONYMS: string[] = [
     "REST",
+    // "Highlight TODO items", "Add a todo"
+    "TODO",
 ];

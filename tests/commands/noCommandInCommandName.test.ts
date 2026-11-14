@@ -27,15 +27,37 @@ const SEPARATED_NAMES = [
     "Run | command",
     "Run: command",
     "Run [command]",
-    "Run command",
 ];
-// Without the word these would not read, or would mean something else
+// "command" is a word of the name, not a label: without it these would not
+// read, or would mean something else
 const SENTENCE_NAMES = [
     "Command palette: open",
     "Toggle command palette",
     "Run command.",
     "Command-line tools",
     "Run (command) now",
+    "Open-command",
+    // obsidian-advanced-uri, obsidian-git, obsidian-meta-bind-plugin
+    "Copy URI for command",
+    "Raw command",
+    "Select and copy command ID",
+    // The object of the verb
+    "Run command",
+    "Run shell command",
+    "Execute the selected command",
+    "Add custom command",
+    // A last word after only a space: "command" may be the noun the command
+    // acts on, as in "Create slash command", and the words cannot tell
+    "Create slash command",
+    "Edit shell command",
+    "Start voice command",
+    "Open settings command",
+    "My Awesome Command",
+    // Nothing would be left
+    "Command",
+    "Command:",
+    "(command)",
+    "Command: command",
 ];
 
 ruleTester.run("no-command-in-command-name", noCommandInNameRule, {
@@ -89,11 +111,15 @@ ruleTester.run("no-command-in-command-name", noCommandInNameRule, {
             name: "command object passed by name is not checked",
             code: "const command = { name: 'Run command' }; this.addCommand(command);",
         },
+        {
+            name: "'command' that is a word of the name, not a label, is not reported",
+            code: commands(SENTENCE_NAMES),
+        },
     ],
     invalid: [
         {
-            name: "name with standalone 'Command' is forbidden",
-            code: "this.addCommand({ name: 'My Awesome Command' });",
+            name: "name with a 'Command' label is forbidden",
+            code: "this.addCommand({ name: 'My Awesome | Command' });",
             errors: [{ messageId: "commandInName", suggestions: [rename("My Awesome", "this.addCommand({ name: 'My Awesome' });")] }],
         },
         {
@@ -104,32 +130,30 @@ ruleTester.run("no-command-in-command-name", noCommandInNameRule, {
         },
         {
             name: "'command' next to punctuation is forbidden",
-            code: "this.addCommand({ name: 'Run (command)' }); this.addCommand({ name: 'Open-command' });",
+            code: "this.addCommand({ name: 'Run (command)' });",
             errors: [
-                { messageId: "commandInName", suggestions: [rename("Run", "this.addCommand({ name: 'Run' }); this.addCommand({ name: 'Open-command' });")] },
-                // "Open-command" is one word
-                { messageId: "commandInName", suggestions: [] },
+                { messageId: "commandInName", suggestions: [rename("Run", "this.addCommand({ name: 'Run' });")] },
             ],
         },
         {
             name: "a quoted name key is checked",
-            code: "this.addCommand({ \"id\": \"run\", \"name\": \"Run command\" }); this.addCommand({ 'name': 'Command: run' }); this.addCommand({ ['name']: 'Run command' });",
+            code: "this.addCommand({ \"id\": \"run\", \"name\": \"Open note - command\" }); this.addCommand({ 'name': 'Command: run' }); this.addCommand({ ['name']: 'Open note - command' });",
             errors: [
-                { messageId: "commandInName", suggestions: [rename("Run", "this.addCommand({ \"id\": \"run\", \"name\": \"Run\" }); this.addCommand({ 'name': 'Command: run' }); this.addCommand({ ['name']: 'Run command' });")] },
-                { messageId: "commandInName", suggestions: [rename("Run", "this.addCommand({ \"id\": \"run\", \"name\": \"Run command\" }); this.addCommand({ 'name': 'Run' }); this.addCommand({ ['name']: 'Run command' });")] },
-                { messageId: "commandInName", suggestions: [rename("Run", "this.addCommand({ \"id\": \"run\", \"name\": \"Run command\" }); this.addCommand({ 'name': 'Command: run' }); this.addCommand({ ['name']: 'Run' });")] },
+                { messageId: "commandInName", suggestions: [rename("Open note", "this.addCommand({ \"id\": \"run\", \"name\": \"Open note\" }); this.addCommand({ 'name': 'Command: run' }); this.addCommand({ ['name']: 'Open note - command' });")] },
+                { messageId: "commandInName", suggestions: [rename("Run", "this.addCommand({ \"id\": \"run\", \"name\": \"Open note - command\" }); this.addCommand({ 'name': 'Run' }); this.addCommand({ ['name']: 'Open note - command' });")] },
+                { messageId: "commandInName", suggestions: [rename("Open note", "this.addCommand({ \"id\": \"run\", \"name\": \"Open note - command\" }); this.addCommand({ 'name': 'Command: run' }); this.addCommand({ ['name']: 'Open note' });")] },
             ],
         },
         {
             name: "a spread in the command object is skipped, and the name still checked",
-            code: "this.addCommand({ ...base, name: 'Run command' });",
+            code: "this.addCommand({ ...base, name: 'Open note - command' });",
             errors: [{
                 messageId: "commandInName",
                 line: 1,
                 column: 28,
                 endLine: 1,
-                endColumn: 47,
-                suggestions: [rename("Run", "this.addCommand({ ...base, name: 'Run' });")],
+                endColumn: 55,
+                suggestions: [rename("Open note", "this.addCommand({ ...base, name: 'Open note' });")],
             }],
         },
         {
@@ -147,29 +171,19 @@ ruleTester.run("no-command-in-command-name", noCommandInNameRule, {
         },
         {
             name: "the suggestion keeps the quotes and the escapes",
-            code: "this.addCommand({ name: \"Say \\\"hi\\\" command\" }); this.addCommand({ name: 'Command \\u2014 don\\'t run' });",
+            code: "this.addCommand({ name: \"Say \\\"hi\\\": command\" }); this.addCommand({ name: 'Command \\u2014 don\\'t run' });",
             errors: [
                 { messageId: "commandInName", suggestions: [rename("Say \"hi\"", "this.addCommand({ name: \"Say \\\"hi\\\"\" }); this.addCommand({ name: 'Command \\u2014 don\\'t run' });")] },
-                { messageId: "commandInName", suggestions: [rename("Don't run", "this.addCommand({ name: \"Say \\\"hi\\\" command\" }); this.addCommand({ name: 'Don\\'t run' });")] },
+                { messageId: "commandInName", suggestions: [rename("Don't run", "this.addCommand({ name: \"Say \\\"hi\\\": command\" }); this.addCommand({ name: 'Don\\'t run' });")] },
             ],
         },
         {
             name: "the suggestion keeps comments, parentheses and ?. around the name",
-            code: "this?.addCommand({\r\n    id: 'run',\r\n    // the name\r\n    name: /* old */ ('Run command'),\r\n});",
+            code: "this?.addCommand({\r\n    id: 'run',\r\n    // the name\r\n    name: /* old */ ('Open note - command'),\r\n});",
             errors: [{
                 messageId: "commandInName",
-                suggestions: [rename("Run", "this?.addCommand({\r\n    id: 'run',\r\n    // the name\r\n    name: /* old */ ('Run'),\r\n});")],
+                suggestions: [rename("Open note", "this?.addCommand({\r\n    id: 'run',\r\n    // the name\r\n    name: /* old */ ('Open note'),\r\n});")],
             }],
-        },
-        {
-            name: "no suggestion where nothing but 'command' is left",
-            code: commands(["Command", "Command:", "(command)", "Command: command"]),
-            errors: renamedLines([], [null, null, null, null]),
-        },
-        {
-            name: "no suggestion where 'command' is part of the sentence",
-            code: commands(SENTENCE_NAMES),
-            errors: renamedLines(SENTENCE_NAMES, SENTENCE_NAMES.map(() => null)),
         },
     ],
 });
@@ -179,10 +193,10 @@ new EslintRuleTester().run("no-command-in-command-name in a JavaScript file", no
     invalid: [
         {
             name: "the suggestion works with ESLint's own parser",
-            code: "this.addCommand({\n    id: \"run\",\n    name: \"Run command\",\n});",
+            code: "this.addCommand({\n    id: \"run\",\n    name: \"Open note - command\",\n});",
             errors: [{
                 messageId: "commandInName",
-                suggestions: [{ messageId: "removeCommand", data: { name: "Run" }, output: "this.addCommand({\n    id: \"run\",\n    name: \"Run\",\n});" }],
+                suggestions: [{ messageId: "removeCommand", data: { name: "Open note" }, output: "this.addCommand({\n    id: \"run\",\n    name: \"Open note\",\n});" }],
             }],
         },
     ],

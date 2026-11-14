@@ -11,7 +11,7 @@
 ## What is reported
 
 The `id` of a command passed to `addCommand()` as an object literal, when it is a string literal that
-contains the words of the plugin ID, together and in order, in any case; the key may be quoted
+starts with the words of the plugin ID, together and in order, in any case; the key may be quoted
 (`"id": …`). The plugin ID is the `pluginId` option, or else the `id` in the `manifest.json` of the
 directory ESLint runs from:
 
@@ -24,12 +24,20 @@ this.addCommand({ id: "count", name: "Count words", callback });
 
 IDs are identifiers rather than prose, so their words are what separators such as `-`, `_`, `:`,
 `.` and `/` split them into, split again at camelCase humps: `word-tally`, `word_tally:count` and
-`wordTallyCount` all hold the words "word" and "tally". Not reported, therefore: the plugin ID
-inside a longer word, so a plugin with the ID `git` does not get `open-digital-garden` or `legit`
-reported, and its words apart or changed, as in `word-count-tally` or `word-tallies`. Nor are an ID
+`wordTallyCount` all start with the words "word" and "tally". A plugin ID in front of the command
+ID repeats the namespace Obsidian adds itself; anywhere else its words name what the command acts
+on, as in `show-calendar-view` of a plugin with the ID `calendar`, or `count-word-tally`. Not
+reported, therefore: the plugin ID after the start of the command ID, the plugin ID inside a longer
+word, so a plugin with the ID `git` does not get `legit-check` reported, and its words apart or
+changed, as in `word-count-tally` or `word-tallies-count`. Nor are an ID
 built from a template literal or a variable, and a command object defined elsewhere and passed to
 `addCommand()` by name. With no plugin ID to compare with, because there is neither the option nor
 a `manifest.json`, or with one that has no words, such as `-`, nothing is reported.
+
+Nor is an ID whose command's `name`, a string written out, starts with the plugin ID's words as a
+word of the sentence, as no-plugin-name-in-command-name has it, as in
+`{ id: "zoom-in", name: "Zoom in" }` of the plugin `zoom`: the ID follows the name, whose verb the
+plugin ID is.
 
 Changing the ID of a command you already ship resets any hotkey your users assigned to it, so the
 [community scanner](../../configuration.md#community-plugin-scanner-configuration) only checks this
@@ -37,24 +45,27 @@ for the most recently submitted plugins.
 
 ## Suggestion
 
-Your editor offers to remove the plugin ID from the command ID, never `--fix`, since a user who set
-a hotkey for the command loses it. Obsidian puts the plugin ID in front of the command ID itself:
+Your editor offers to remove the plugin ID from the command ID, never `--fix`: a user who set a
+hotkey for the command loses it, and `executeCommandById()` calls, `obsidian://` URIs and other
+plugins that run the command by its old ID stop working. Obsidian puts the plugin ID in front of
+the command ID itself:
 
 ```ts
 // manifest.json: { "id": "word-tally", ... }
 this.addCommand({ id: "word-tally:count", name: "Count words", callback }); // suggests id: "count"
-this.addCommand({ id: "count-word-tally", name: "Count words", callback }); // suggests id: "count"
 this.addCommand({ id: "wordTallyCountAll", name: "Count all words", callback }); // suggests id: "countAll"
 ```
 
-The separator after the plugin ID goes with it, or the one before it at the end of the command ID:
-`-`, `_`, `:`, `.`, `/` or a space, all of them where there are several. Every occurrence of the
-plugin ID goes. A camelCase ID stays camelCase: where the plugin ID began it, the next word now
+The separator after the plugin ID goes with it: `-`, `_`, `:`, `.`, `/` or a space, all of them
+where there are several. The plugin ID goes as often as it starts the command ID, as in
+`word-tally-word-tally-count`; elsewhere it stays. A camelCase ID stays camelCase: where the plugin ID began it, the next word now
 does, in lower case. The string keeps its quotes and its escapes.
 
 Not offered where:
 
 - nothing would be left, as for `word-tally` or `word-tally:`;
+- only a word that names no command on its own would be left, such as `in`, `out`, `up`, `down`,
+  `on`, `off` or `back`, as for `zoom-in` of the plugin `zoom`;
 - the plugin ID is next to something other than a separator or another word, as in
   `word-tally#count`;
 - another command in the same file has that ID already: an object passed to `addCommand()`, or

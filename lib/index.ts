@@ -5,6 +5,7 @@ import { vault } from "./rules/vault/index.js";
 import detachLeaves from "./rules/detachLeaves.js";
 import editorDropPaste from "./rules/editorDropPaste.js";
 import hardcodedConfigPath from "./rules/hardcodedConfigPath.js";
+import noAwaitChainable from "./rules/noAwaitChainable.js";
 import noForbiddenElements from "./rules/noForbiddenElements.js";
 import noGlobalThis from "./rules/noGlobalThis.js";
 import noSampleCode from "./rules/noSampleCode.js";
@@ -89,6 +90,7 @@ const plugin: ObsidianmdPlugin = {
         "plain-text": PlainTextLanguage
     },
     rules: {
+        "commands/check-callback-uses-checking": commands.checkCallbackUsesChecking,
         "commands/no-command-in-command-id": commands.noCommandInCommandId,
         "commands/no-command-in-command-name": commands.noCommandInCommandName,
         "commands/no-default-hotkeys": commands.noDefaultHotkeys,
@@ -110,6 +112,7 @@ const plugin: ObsidianmdPlugin = {
         "detach-leaves": detachLeaves,
         "editor-drop-paste": editorDropPaste,
         "hardcoded-config-path": hardcodedConfigPath,
+        "no-await-chainable": noAwaitChainable,
         "no-forbidden-elements": noForbiddenElements,
         "no-global-this": noGlobalThis,
         "no-plugin-as-component": noPluginAsComponent,
@@ -143,10 +146,29 @@ const plugin: ObsidianmdPlugin = {
         recommendedWithLocalesEn: []
     },
     ruleConfigs: {
-        recommended: {} as RulesConfig,
-        recommendedTypeChecked: {} as RulesConfig,
+        recommended: {},
+        recommendedTypeChecked: {},
     },
     withCustomMessages,
+};
+
+// The rules obsidianmd/rule-custom-message runs, each with its message. Only
+// no-console is about code that runs in Obsidian (the guidelines ask plugins
+// not to fill the developer console); no-new-func is a security rule.
+const CUSTOM_MESSAGE_NO_CONSOLE = {
+    "no-console": {
+        messages: {
+            "Unexpected console statement. Only these console methods are allowed: warn, error, debug.": "Avoid unnecessary logging to console. See https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#Avoid+unnecessary+logging+to+console",
+        },
+        options: [{ allow: ["warn", "error", "debug"] }],
+    },
+};
+const CUSTOM_MESSAGE_NO_NEW_FUNC = {
+    "no-new-func": {
+        messages: {
+            "The Function constructor is eval": "Using the `Function` constructor is dangerous because it executes arbitrary code, similar to `eval()`",
+        },
+    },
 };
 
 // Rules that require type information (call getParserServices).
@@ -154,6 +176,7 @@ const plugin: ObsidianmdPlugin = {
 // which extends recommendedTypeChecked). Applying them to plain JS files
 // throws "you have used a rule which requires type information".
 const recommendedPluginRulesConfigTypeChecked: RulesConfig = {
+    "obsidianmd/no-await-chainable": "error",
     "obsidianmd/no-plugin-as-component": "error",
     "obsidianmd/no-view-references-in-plugin": "error",
     "obsidianmd/no-unsupported-api": "error",
@@ -164,6 +187,7 @@ const recommendedPluginRulesConfigTypeChecked: RulesConfig = {
 };
 
 const recommendedPluginRulesConfigBase: RulesConfig = {
+    "obsidianmd/commands/check-callback-uses-checking": "warn",
     "obsidianmd/commands/no-command-in-command-id": "warn",
     "obsidianmd/commands/no-command-in-command-name": "warn",
     "obsidianmd/commands/no-default-hotkeys": "warn",
@@ -194,22 +218,7 @@ const recommendedPluginRulesConfigBase: RulesConfig = {
     "obsidianmd/prefer-window-timers": "warn",
     "obsidianmd/prefer-active-doc": "warn",
     "obsidianmd/regex-lookbehind": "error",
-    "obsidianmd/rule-custom-message": [
-        "error",
-        {
-            "no-console": {
-                messages: {
-                    "Unexpected console statement. Only these console methods are allowed: warn, error, debug.": "Avoid unnecessary logging to console. See https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines#Avoid+unnecessary+logging+to+console",
-                },
-                options: [{ allow: ["warn", "error", "debug"] }],
-            },
-            "no-new-func": {
-                messages: {
-                    "The Function constructor is eval": "Using the `Function` constructor is dangerous because it executes arbitrary code, similar to `eval()`",
-                },
-            },
-        }
-    ],
+    "obsidianmd/rule-custom-message": ["error", { ...CUSTOM_MESSAGE_NO_CONSOLE, ...CUSTOM_MESSAGE_NO_NEW_FUNC }],
     "obsidianmd/sample-names": "error",
     // validate-manifest and validate-license are NOT here: they lint
     // manifest.json and LICENSE, neither of which can match the JS/TS globs this
@@ -249,18 +258,27 @@ const recommendedPluginRulesConfig: RulesConfig = {
 // Web worker code runs without a window: `window`, `activeWindow`,
 // `activeDocument` and Obsidian's DOM helpers do not exist there, so these
 // rules' advice cannot be followed and their autofixes (`globalThis` ->
-// `window`, `setTimeout` -> `window.setTimeout`) break it. They apply to every
-// JS/TS file except worker code. A file path is all it takes to match
+// `window`, `setTimeout` -> `window.setTimeout`) break it. Nor can a worker
+// import Obsidian's Platform API, which obsidianmd/platform asks for. They apply
+// to every JS/TS file except worker code. A file path is all it takes to match
 // WORKER_FILES, so no security rule may be listed here.
 const WINDOW_ONLY_RULES = new Set([
     "obsidianmd/no-global-this",
+    "obsidianmd/platform",
     "obsidianmd/prefer-active-doc",
     "obsidianmd/prefer-create-el",
     "obsidianmd/prefer-instanceof",
     "obsidianmd/prefer-window-timers",
 ]);
+// Worker code is named `worker.ts`, `*.worker.ts`, `*-worker.ts` or
+// `*_worker.ts`, or sits in a `workers/` directory. Not a `worker/` directory:
+// one can hold the main-thread code that starts the worker, such as
+// `src/worker/loader.ts` beside `src/worker/image.worker.ts`.
 const WORKER_FILES = [
+    '**/worker.{ts,cts,mts,tsx,js,cjs,mjs,jsx}',
     '**/*.worker.{ts,cts,mts,tsx,js,cjs,mjs,jsx}',
+    '**/*-worker.{ts,cts,mts,tsx,js,cjs,mjs,jsx}',
+    '**/*_worker.{ts,cts,mts,tsx,js,cjs,mjs,jsx}',
     '**/workers/**/*.{ts,cts,mts,tsx,js,cjs,mjs,jsx}',
 ];
 
@@ -288,34 +306,64 @@ const obsidianGlobals = {
 
 // Tests run in Node or a DOM emulation, not inside Obsidian, so the rules about
 // code that runs in Obsidian do not apply to them: there is no popout window,
-// Node.js modules are available, mocks cast to TFile, fixtures name `.obsidian`,
-// and the code never runs in an older Obsidian (no-unsupported-api) or on iOS
-// before 16.4 (regex-lookbehind). They are the window-only rules plus these. A
-// file path is all it takes to match TEST_FILES, so no security rule may be
-// listed here; the community scanner does not lint tests at all.
+// Node.js modules are available, mocks cast to TFile and delete files outright,
+// fixtures name `.obsidian`, set styles and add stylesheets, there is no user to
+// read a console, language setting or OS, and the code never runs in an older
+// Obsidian (no-unsupported-api) or on iOS before 16.4 (regex-lookbehind). They
+// are the window-only rules plus these, and rule-custom-message's no-console,
+// which the blocks below handle. A file path is all it takes to match
+// TEST_FILES, so no security rule may be listed here. no-forbidden-elements
+// and regex-lookbehind are not: they keep CSS in styles.css and code working on
+// older iOS, which tests and tools need not. The community scanner, which does
+// not lint tests at all, reports both in every other file whatever its name.
 const OBSIDIAN_RUNTIME_RULES = new Set([
     ...WINDOW_ONLY_RULES,
     "obsidianmd/hardcoded-config-path",
+    "obsidianmd/no-forbidden-elements",
     "obsidianmd/no-nodejs-modules",
+    "obsidianmd/no-static-styles-assignment",
     "obsidianmd/no-tfile-tfolder-cast",
     "obsidianmd/no-unsupported-api",
+    "obsidianmd/prefer-file-manager-trash-file",
+    "obsidianmd/prefer-get-language",
     "obsidianmd/regex-lookbehind",
 ]);
 // The test files the community scanner leaves out (its ignores.json), plus the
 // end-to-end tests, which drive Obsidian from Node: `e2e/` and `e2e-tests/` hold
 // them, `*.e2e.*` names them (wdio-obsidian-service's convention), and
 // `wdio.conf.*`, `wdio.<name>.conf.*` and `playwright.config.*` configure their
-// runners. Each name is only used for tests; end-to-end encryption code (`e2ee`)
-// does not match. These are only ever `ignores`, in blocks that already apply to
-// JS and TS files alone.
+// runners. Also the test runners' setup files (`vitest.setup.ts`,
+// `jest.setup.js`, `src/test-setup.ts`, `setupTests.ts`, `global-setup.ts`),
+// fakes named `*.testing.*`, and the helper directories of tests kept beside
+// them. Each name is only used for tests; end-to-end encryption code (`e2ee`),
+// `src/commands/gym-log-setup.ts` and `src/testing/`, which may hold code that
+// runs in Obsidian, do not match. These are `ignores` in blocks that already
+// apply to JS and TS files alone, and `files` only paired with those.
 const TEST_FILES = [
-    '**/*.{test,tests,spec,specs,e2e}.*',
+    '**/*.{test,tests,spec,specs,e2e,setup,testing}.*',
     '**/{test,tests,__tests__,mocks,__mocks__,e2e,e2e-tests}/**',
+    '**/{test-helpers,test_helpers,test-support,test-utils,test_utils}/**',
+    '**/{test-setup,setupTests,global-setup,*-global-setup}.*',
     '**/testUtils*',
     '**/testUtils*/**',
     '{automation,test-vault}/**',
     '**/{wdio.conf,wdio.*.conf,playwright.config}.*',
 ];
+// Build, test and lint tool configs and scripts, which run in Node and never in
+// Obsidian, as the community scanner leaves them out (its ignores.json): the
+// configs named after their tool, as `vite.config.ts`, `vitest.e2e.config.mts`
+// or `.eslintrc.js` (a plugin's own `config.ts` or `settings.config.ts` is not
+// one), the sample plugin's `esbuild.config.mjs` and `version-bump.mjs` and
+// other esbuild scripts, and `scripts/` directories. They get the same
+// exemptions as tests.
+const TOOLING_FILES = [
+    '**/{astro,babel,commitlint,docusaurus,esbuild,eslint,jest,oxlint,postcss,prettier,rolldown,rollup,stylelint,svelte,tailwind,tsdown,tsup,uno,vite,vitest,webpack}.config.*',
+    '**/{eslint,jest,vite,vitest}.*.config.*',
+    '**/.{babelrc,eslintrc,mocharc,prettierrc}.*',
+    '**/{esbuild,version-bump}.*',
+    '**/scripts/**',
+];
+const NOT_RUN_IN_OBSIDIAN = [...TEST_FILES, ...TOOLING_FILES];
 
 // The rules of `config` that `keep` accepts. The window-only and Obsidian-runtime
 // rules go in their own blocks with `ignores` rather than being switched off in
@@ -327,6 +375,17 @@ function pickRules(config: RulesConfig, keep: (rule: string) => boolean): RulesC
 const isRuntimeOnly = (rule: string) => OBSIDIAN_RUNTIME_RULES.has(rule);
 const isWindowOnly = (rule: string) => WINDOW_ONLY_RULES.has(rule);
 const isRuntimeNotWindowOnly = (rule: string) => isRuntimeOnly(rule) && !isWindowOnly(rule);
+
+// rule-custom-message runs no-console and no-new-func, and only no-console is
+// about code that runs in Obsidian. One rule cannot be left out of the test and
+// tooling files in part, so the JS and TS blocks give every file the rule with
+// no-new-func alone, and the blocks for code that runs in Obsidian restate it
+// with both. Anything reading the config's rules without regard to `files` sees
+// the full rule last, as it sees the other Obsidian-runtime rules on.
+const CUSTOM_MESSAGE_RULE = "obsidianmd/rule-custom-message";
+const customMessageEverywhere: RulesConfig = {
+    [CUSTOM_MESSAGE_RULE]: ["error", CUSTOM_MESSAGE_NO_NEW_FUNC],
+};
 
 import { fixDryRunConfigs } from "./singleRun.js";
 import { restrictedGlobalsOptions, restrictedImportsOptions, noUnusedExpressionsOptions, noUnusedVarsOptions, noDeprecatedOptions } from "./ruleOptions.js";
@@ -378,6 +437,7 @@ const flatRecommendedGeneralRules: RulesConfig = {
 // (tools/update-eslint-recommended.js), so this is that config for the
 // installed version.
 const coreRecommendedRules: RulesConfig = Object.fromEntries(
+    // eslint-disable-next-line @typescript-eslint/no-deprecated -- ESLint has no other way to list its core rules
     [...builtinRules]
         .filter(([, rule]) => !rule.meta?.deprecated && rule.meta?.docs?.recommended === true)
         .map(([ruleId]) => [ruleId, "error" as const]),
@@ -417,7 +477,8 @@ const flatRecommendedConfig: Config[] = defineConfig([
         extends: [...(tseslint.configs.recommended as Config[]), noUnsanitizedPlugin.configs.recommended],
         rules: {
             ...flatRecommendedGeneralRules,
-            ...pickRules(recommendedPluginRulesConfigBase, (rule) => !isRuntimeOnly(rule))
+            ...pickRules(recommendedPluginRulesConfigBase, (rule) => !isRuntimeOnly(rule)),
+            ...customMessageEverywhere,
         }
     },
     {
@@ -434,34 +495,42 @@ const flatRecommendedConfig: Config[] = defineConfig([
         rules: {
             ...flatRecommendedGeneralRules,
             ...recommendedTypeCheckedGeneralRules,
-            ...pickRules(recommendedPluginRulesConfig, (rule) => !isRuntimeOnly(rule))
+            ...pickRules(recommendedPluginRulesConfig, (rule) => !isRuntimeOnly(rule)),
+            ...customMessageEverywhere,
         },
     },
     ...fixDryRunConfigs(process.argv),
     {
         files: ['**/*.{js,cjs,mjs,jsx}'],
-        ignores: [...WORKER_FILES, ...TEST_FILES],
+        ignores: [...WORKER_FILES, ...NOT_RUN_IN_OBSIDIAN],
         rules: pickRules(recommendedPluginRulesConfigBase, isWindowOnly),
     },
     {
         files: ['**/*.{ts,cts,mts,tsx}'],
-        ignores: [...WORKER_FILES, ...TEST_FILES],
+        ignores: [...WORKER_FILES, ...NOT_RUN_IN_OBSIDIAN],
         rules: pickRules(recommendedPluginRulesConfig, isWindowOnly),
     },
+    // The full rule-custom-message, with no-console, comes back here.
     {
         files: ['**/*.{js,cjs,mjs,jsx}'],
-        ignores: TEST_FILES,
-        rules: pickRules(recommendedPluginRulesConfigBase, isRuntimeNotWindowOnly),
+        ignores: NOT_RUN_IN_OBSIDIAN,
+        rules: {
+            ...pickRules(recommendedPluginRulesConfigBase, isRuntimeNotWindowOnly),
+            ...pickRules(recommendedPluginRulesConfigBase, (rule) => rule === CUSTOM_MESSAGE_RULE),
+        },
     },
     {
         files: ['**/*.{ts,cts,mts,tsx}'],
-        ignores: TEST_FILES,
-        rules: pickRules(recommendedPluginRulesConfig, isRuntimeNotWindowOnly),
+        ignores: NOT_RUN_IN_OBSIDIAN,
+        rules: {
+            ...pickRules(recommendedPluginRulesConfig, isRuntimeNotWindowOnly),
+            ...pickRules(recommendedPluginRulesConfig, (rule) => rule === CUSTOM_MESSAGE_RULE),
+        },
     },
     {
         files: ['package.json'],
         language: 'json/json',
-        extends: [tseslint.configs.disableTypeChecked as Config],
+        extends: [tseslint.configs.disableTypeChecked],
         plugins: {
             depend,
             json
@@ -479,7 +548,7 @@ const flatRecommendedConfig: Config[] = defineConfig([
     {
         files: ['manifest.json'],
         language: 'json/json',
-        extends: [tseslint.configs.disableTypeChecked as Config],
+        extends: [tseslint.configs.disableTypeChecked],
         plugins: {
             json,
             obsidianmd: plugin
@@ -493,7 +562,7 @@ const flatRecommendedConfig: Config[] = defineConfig([
     {
         files: ['LICENSE', 'LICENSE.md', 'LICENSE.txt'],
         language: 'obsidianmd/plain-text',
-        extends: [tseslint.configs.disableTypeChecked as Config],
+        extends: [tseslint.configs.disableTypeChecked],
         plugins: {
             obsidianmd: plugin
         },
@@ -542,6 +611,38 @@ const flatRecommendedConfig: Config[] = defineConfig([
                 } : {}),
                 ...obsidianGlobals,
             }
+        },
+    },
+    // Test files and tool configs run in Node, not in Obsidian, so they get
+    // the Node globals even where the plugin is not desktop-only:
+    // `module.exports` in `jest.config.js` and `process` in a script. Each
+    // pattern is paired with the JS and TS files, as flat config reads a
+    // nested array as patterns that must all match, so that no other
+    // language, such as JSON, gets JavaScript's language options.
+    {
+        files: NOT_RUN_IN_OBSIDIAN.map((pattern) => ['**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx}', pattern]),
+        languageOptions: {
+            globals: {
+                ...globals.node,
+                NodeJS: "readonly",
+            },
+        },
+    },
+    // A `.cjs` file is CommonJS, where `module` and `exports` are defined
+    // (`require` is declared above). ESLint reads it so by default, but the
+    // typescript-eslint base config the JS block extends sets
+    // `sourceType: "module"` for it. Declaring the two globals restores them
+    // without `sourceType: "commonjs"`, under which `no-redeclare` checks the
+    // file's top level against the built-in globals, and
+    // `const { Plugin } = require("obsidian")` is reported, because `Plugin`
+    // is also a browser global.
+    {
+        files: ['**/*.cjs'],
+        languageOptions: {
+            globals: {
+                module: "writable",
+                exports: "writable",
+            },
         },
     },
     // After the block above, which gives every file the browser and Obsidian
@@ -598,8 +699,8 @@ const recommendedWithLocalesEn: Config[] = defineConfig([
 ]);
 
 plugin.configs = {
-    recommended: flatRecommendedConfig as Linter.Config[],
-    recommendedWithLocalesEn: recommendedWithLocalesEn as Linter.Config[]
+    recommended: flatRecommendedConfig,
+    recommendedWithLocalesEn
 };
 
 plugin.ruleConfigs = {

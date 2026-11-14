@@ -22,6 +22,12 @@ const pluginEntry = pathToFileURL(path.join(repoRoot, "lib/index.ts")).href;
 const tsxLoader = pathToFileURL(createRequire(import.meta.url).resolve("tsx")).href;
 const eslintBin = path.join(repoRoot, "node_modules/eslint/bin/eslint.js");
 
+// A linted file's path relative to the fixture, with "/" separators on every
+// platform, so the expected lists below can be written once.
+function toPosixRelative(dir: string, filePath: string): string {
+	return path.relative(dir, filePath).split(path.sep).join("/");
+}
+
 // The first `// eslint.config.mjs` example in the section under `heading`, up to
 // the next heading of the same or a higher level, so an example that loses its
 // header comment fails here instead of the next section's being tested.
@@ -130,7 +136,7 @@ for (const [file, heading, linted] of [
 		});
 
 		it("lints the plugin source, but not the build output or scripts", () => {
-			const lintedFiles = results.map((result) => path.relative(dir, result.filePath)).sort();
+			const lintedFiles = results.map((result) => toPosixRelative(dir, result.filePath)).sort();
 			assert.deepStrictEqual(lintedFiles, [...linted]);
 		});
 	});
@@ -140,10 +146,11 @@ for (const [file, heading, linted] of [
 // jsconfig.json for the second example. The first example has no parserOptions,
 // so no file can fail with "was not found by the project service"; the second
 // turns the type-aware rules on, which the JSDoc type below lets
-// prefer-file-manager-trash-file see.
+// prefer-file-manager-trash-file see. That rule reports nothing below
+// minAppVersion 1.6.6, which added trashFile().
 const JS_PLUGIN: Record<string, string> = {
 	"package.json": JSON.stringify({ name: "js-plugin", version: "1.0.0", main: "main.js", type: "module" }),
-	"manifest.json": SAMPLE_PLUGIN["manifest.json"],
+	"manifest.json": JSON.stringify({ ...JSON.parse(SAMPLE_PLUGIN["manifest.json"]) as object, minAppVersion: "1.6.6" }),
 	"jsconfig.json": JSON.stringify({
 		compilerOptions: { module: "ESNext", target: "ES2021", moduleResolution: "bundler", lib: ["ES2021", "DOM"] },
 		include: ["src/**/*.js"],
@@ -216,12 +223,12 @@ describe("docs/configuration.md ## Plugins written in JavaScript examples on a J
 			});
 
 			it("lints the plugin source, but not the build output or scripts", () => {
-				const lintedFiles = results.map((result) => path.relative(dir, result.filePath)).sort();
+				const lintedFiles = results.map((result) => toPosixRelative(dir, result.filePath)).sort();
 				assert.deepStrictEqual(lintedFiles, ["eslint.config.mjs", "manifest.json", "package.json", "src/main.js"]);
 			});
 
 			it(typed ? "runs the type-aware rules on the source" : "does not run the type-aware rules", () => {
-				const source = results.find((result) => path.relative(dir, result.filePath) === "src/main.js");
+				const source = results.find((result) => toPosixRelative(dir, result.filePath) === "src/main.js");
 				const ruleIds = (source?.messages ?? []).map((message) => (message as { ruleId?: string }).ruleId);
 				assert.strictEqual(ruleIds.includes("obsidianmd/prefer-file-manager-trash-file"), typed);
 			});

@@ -23,6 +23,10 @@ There is no fix. Other `navigator` properties, such as `navigator.clipboard`, ar
 neither is `navigator.userAgentData`, a computed access by a variable such as `navigator[key]`, or the
 navigator of another window, such as `activeWindow.navigator`.
 
+The recommended config does not apply this rule to [web worker files](../configuration.md#web-worker-files),
+which cannot import the `Platform` API, nor to [test files and tool configs](../configuration.md#test-files), which never run in
+Obsidian.
+
 ## Further reading
 
 - [Platform-specific features - Mobile development](https://docs.obsidian.md/Plugins/Getting+started/Mobile+development#Platform-specific+features)

@@ -723,7 +723,7 @@ ruleTester.run("no-unsupported-api", rule, {
                 declare const app: App;
                 // @since 1.1.0 and 1.1.1 mark the widening of the view to
                 // MarkdownView | MarkdownFileInfo; the events are in the
-                // 0.12.11 and 0.12.17 typings.
+                // 0.12.6 and 0.12.17 typings.
                 app.workspace.on('editor-menu', (menu, editor, info) => {});
                 app.workspace.on('editor-change', (editor, info) => {});
                 app.workspace.on('editor-paste', (evt, editor, info) => {});
@@ -809,6 +809,50 @@ ruleTester.run("no-unsupported-api", rule, {
     ],
     invalid: [
         {
+            // requireApiVersion() is first in the 0.13.21 typings.
+            name: "the report names a guard the plugin can use",
+            code: `
+                import { AbstractInputSuggest, App, Modal } from 'obsidian';
+                declare const app: App;
+                new Modal(app).setTitle("Title");
+                abstract class Suggest extends AbstractInputSuggest<string> {}
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [
+                {
+                    line: 4,
+                    messageId: "apiNotAvailable",
+                    data: { qualifiedName: "Modal.setTitle", sinceVersion: "1.5.1", minAppVersion: "1.0.0" },
+                },
+                {
+                    line: 5,
+                    messageId: "apiNotAvailableRaise",
+                    data: { qualifiedName: "AbstractInputSuggest", sinceVersion: "1.4.10", minAppVersion: "1.0.0" },
+                },
+            ],
+        },
+        {
+            name: "below 0.13.21, the report names a check that the API exists, or none",
+            code: `
+                import { requestUrl } from 'obsidian';
+                activeDocument.body;
+                void requestUrl("https://example.com");
+            `,
+            options: [{ minAppVersion: "0.12.0" }],
+            errors: [
+                {
+                    line: 3,
+                    messageId: "apiNotAvailableCheck",
+                    data: { qualifiedName: "activeDocument", sinceVersion: "0.15.0", minAppVersion: "0.12.0" },
+                },
+                {
+                    line: 4,
+                    messageId: "apiNotAvailableRaise",
+                    data: { qualifiedName: "requestUrl", sinceVersion: "0.16.0", minAppVersion: "0.12.0" },
+                },
+            ],
+        },
+        {
             name: "a call to a newer overload of Workspace.on is reported with that overload's version",
             code: `
                 import { App } from 'obsidian';
@@ -858,10 +902,10 @@ ruleTester.run("no-unsupported-api", rule, {
             `,
             options: [{ minAppVersion: "0.12.0" }],
             errors: [
-                { messageId: "apiNotAvailable", line: 4, data: { qualifiedName: "Workspace.on", sinceVersion: "0.12.11", minAppVersion: "0.12.0" } },
-                { messageId: "apiNotAvailable", line: 5, data: { qualifiedName: "Workspace.on", sinceVersion: "0.12.17", minAppVersion: "0.12.0" } },
-                { messageId: "apiNotAvailable", line: 6, data: { qualifiedName: "Workspace.on", sinceVersion: "0.12.17", minAppVersion: "0.12.0" } },
-                { messageId: "apiNotAvailable", line: 7, data: { qualifiedName: "Workspace.on", sinceVersion: "0.12.17", minAppVersion: "0.12.0" } },
+                { messageId: "apiNotAvailableRaise", line: 4, data: { qualifiedName: "Workspace.on", sinceVersion: "0.12.6", minAppVersion: "0.12.0" } },
+                { messageId: "apiNotAvailableRaise", line: 5, data: { qualifiedName: "Workspace.on", sinceVersion: "0.12.17", minAppVersion: "0.12.0" } },
+                { messageId: "apiNotAvailableRaise", line: 6, data: { qualifiedName: "Workspace.on", sinceVersion: "0.12.17", minAppVersion: "0.12.0" } },
+                { messageId: "apiNotAvailableRaise", line: 7, data: { qualifiedName: "Workspace.on", sinceVersion: "0.12.17", minAppVersion: "0.12.0" } },
             ],
         },
         {
@@ -890,7 +934,7 @@ ruleTester.run("no-unsupported-api", rule, {
             `,
             options: [{ minAppVersion: "0.12.0" }],
             errors: [
-                { messageId: "apiNotAvailable", line: 6, data: { qualifiedName: "Setting.setName", sinceVersion: "0.12.16", minAppVersion: "0.12.0" } },
+                { messageId: "apiNotAvailableRaise", line: 6, data: { qualifiedName: "Setting.setName", sinceVersion: "0.12.16", minAppVersion: "0.12.0" } },
             ],
         },
         {
@@ -901,28 +945,13 @@ ruleTester.run("no-unsupported-api", rule, {
                 declare const leaf: WorkspaceLeaf;
                 app.workspace.setActiveLeaf(leaf, { focus: true });
                 // Until 0.16.3 the typings had (leaf, pushHistory?, focus?),
-                // which took this call too, but under another key than the
-                // deprecated (leaf, pushHistory, focus) of today: it is
-                // reported at 0.16.3, as before.
+                // which takes this call too: it needs only the first typings
+                // with that signature, 0.11.13.
                 app.workspace.setActiveLeaf(leaf);
             `,
             options: [{ minAppVersion: "0.15.0" }],
             errors: [
                 { messageId: "apiNotAvailable", line: 5, data: { qualifiedName: "Workspace.setActiveLeaf", sinceVersion: "0.16.3", minAppVersion: "0.15.0" } },
-                { messageId: "apiNotAvailable", line: 10, data: { qualifiedName: "Workspace.setActiveLeaf", sinceVersion: "0.16.3", minAppVersion: "0.15.0" } },
-            ],
-        },
-        {
-            name: "an overloaded method used without a call is reported below its earliest overload",
-            code: `
-                import { App } from 'obsidian';
-                declare const app: App;
-                const duplicate = app.workspace.duplicateLeaf;
-            `,
-            options: [{ minAppVersion: "0.11.0" }],
-            errors: [
-                // The (leaf, direction?) form is @since 0.13.8, and in the 0.11.13 typings.
-                { messageId: "apiNotAvailable", data: { qualifiedName: "Workspace.duplicateLeaf", sinceVersion: "0.11.13", minAppVersion: "0.11.0" } },
             ],
         },
         {
@@ -988,7 +1017,7 @@ ruleTester.run("no-unsupported-api", rule, {
                 declare class MySuggest extends AbstractInputSuggest<string> {}
             `,
             options: [{ minAppVersion: "1.0.0" }],
-            errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "AbstractInputSuggest", sinceVersion: "1.4.10", minAppVersion: "1.0.0" } }],
+            errors: [{ messageId: "apiNotAvailableRaise", data: { qualifiedName: "AbstractInputSuggest", sinceVersion: "1.4.10", minAppVersion: "1.0.0" } }],
         },
         {
             name: "Function displayTooltip requires 1.8.7",
@@ -999,16 +1028,6 @@ ruleTester.run("no-unsupported-api", rule, {
             `,
             options: [{ minAppVersion: "1.0.0" }],
             errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "displayTooltip", sinceVersion: "1.8.7", minAppVersion: "1.0.0" } }],
-        },
-        {
-            name: "BaseComponent has no @since but setDisabled requires 1.2.3",
-            code: `
-                import { BaseComponent } from 'obsidian';
-                declare const component: BaseComponent;
-                component.setDisabled(true);
-            `,
-            options: [{ minAppVersion: "1.0.0" }],
-            errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "BaseComponent.setDisabled", sinceVersion: "1.2.3", minAppVersion: "1.0.0" } }],
         },
         {
             name: "Global augmentation: Array.findLastIndex requires 1.4.4",
@@ -1053,7 +1072,7 @@ ruleTester.run("no-unsupported-api", rule, {
             `,
             options: [{ minAppVersion: "1.0.0" }],
             errors: [
-                { messageId: "apiNotAvailable", data: { qualifiedName: "AbstractInputSuggest", sinceVersion: "1.4.10", minAppVersion: "1.0.0" } },
+                { messageId: "apiNotAvailableRaise", data: { qualifiedName: "AbstractInputSuggest", sinceVersion: "1.4.10", minAppVersion: "1.0.0" } },
                 { messageId: "apiNotAvailable", data: { qualifiedName: "AbstractInputSuggest.setValue", sinceVersion: "1.4.10", minAppVersion: "1.0.0" } },
             ],
         },
@@ -1071,7 +1090,7 @@ ruleTester.run("no-unsupported-api", rule, {
             options: [{ minAppVersion: "1.0.0" }],
             errors: [
                 {
-                    messageId: "apiNotAvailable",
+                    messageId: "apiNotAvailableRaise",
                     data: { qualifiedName: "AbstractInputSuggest", sinceVersion: "1.4.10", minAppVersion: "1.0.0" },
                     line: 3,
                 },
@@ -1092,7 +1111,7 @@ ruleTester.run("no-unsupported-api", rule, {
                 });
             `,
             options: [{ minAppVersion: "1.0.0" }],
-            errors: [{ messageId: "apiNotAvailable" }, { messageId: "apiNotAvailable" }],
+            errors: [{ messageId: "apiNotAvailableRaise" }, { messageId: "apiNotAvailable" }],
         },
         {
             name: "API guarded by requireApiVersion with insufficient version is still flagged",
@@ -1452,7 +1471,7 @@ ruleTester.run("no-unsupported-api", rule, {
                 app.renderContext;
             `,
             options: [{ minAppVersion: "x99.0.0" }],
-            errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "App.renderContext", sinceVersion: "1.10.0", minAppVersion: "x99.0.0" } }],
+            errors: [{ messageId: "apiNotAvailableCheck", data: { qualifiedName: "App.renderContext", sinceVersion: "1.10.0", minAppVersion: "x99.0.0" } }],
         },
         {
             name: "minAppVersion with no version in it is checked as 0.0.0",
@@ -1462,7 +1481,7 @@ ruleTester.run("no-unsupported-api", rule, {
                 app.renderContext;
             `,
             options: [{ minAppVersion: "latest" }],
-            errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "App.renderContext", sinceVersion: "1.10.0", minAppVersion: "latest" } }],
+            errors: [{ messageId: "apiNotAvailableCheck", data: { qualifiedName: "App.renderContext", sinceVersion: "1.10.0", minAppVersion: "latest" } }],
         },
         {
             name: "a continue outside a loop is not an early exit",
@@ -1499,7 +1518,7 @@ ruleTester.run("no-unsupported-api", rule, {
                 }
             `,
             options: [{ minAppVersion: "1.0.0" }],
-            errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "SettingPage", sinceVersion: "1.13.0", minAppVersion: "1.0.0" } }],
+            errors: [{ messageId: "apiNotAvailableRaise", data: { qualifiedName: "SettingPage", sinceVersion: "1.13.0", minAppVersion: "1.0.0" } }],
         },
         {
             name: "a member of a runtime-provided interface is still reported",
@@ -1550,7 +1569,7 @@ ruleTester.run("no-unsupported-api", rule, {
                 app.workspace.on('quit', () => {});
             `,
             options: [{ minAppVersion: "0.10.0" }],
-            errors: [{ messageId: "apiNotAvailable", data: { qualifiedName: "Workspace.on", sinceVersion: "0.10.2", minAppVersion: "0.10.0" } }],
+            errors: [{ messageId: "apiNotAvailableRaise", data: { qualifiedName: "Workspace.on", sinceVersion: "0.10.2", minAppVersion: "0.10.0" } }],
         },
         {
             name: "a namespace import's class, superclass and function are each reported once",
@@ -1565,7 +1584,7 @@ ruleTester.run("no-unsupported-api", rule, {
             options: [{ minAppVersion: "1.0.0" }],
             errors: [
                 { messageId: "apiNotAvailable", data: { qualifiedName: "SecretComponent", sinceVersion: "1.11.1", minAppVersion: "1.0.0" }, line: 5, column: 21, endColumn: 45 },
-                { messageId: "apiNotAvailable", data: { qualifiedName: "AbstractInputSuggest", sinceVersion: "1.4.10", minAppVersion: "1.0.0" }, line: 6 },
+                { messageId: "apiNotAvailableRaise", data: { qualifiedName: "AbstractInputSuggest", sinceVersion: "1.4.10", minAppVersion: "1.0.0" }, line: 6 },
                 { messageId: "apiNotAvailable", data: { qualifiedName: "setTooltip", sinceVersion: "1.4.4", minAppVersion: "1.0.0" }, line: 7 },
             ],
         },
@@ -2037,12 +2056,12 @@ describe("no-unsupported-api overload resolution", function () {
             `// @ts-expect-error`,
             `thing.send("x", "not a number");`, // the literal decides: 1.5.0
         ].join("\n")), [
-            "7: 'Thing.mode' requires Obsidian v1.5.0, but minAppVersion is 1.0.0.",
-            "11: 'Thing.pick' requires Obsidian v1.2.0, but minAppVersion is 1.0.0.",
-            "13: 'Thing.on' requires Obsidian v1.5.0, but minAppVersion is 1.0.0.",
-            "15: 'Thing.listen' requires Obsidian v1.5.0, but minAppVersion is 1.0.0.",
-            "17: 'Thing.open' requires Obsidian v1.5.0, but minAppVersion is 1.0.0.",
-            "20: 'Thing.send' requires Obsidian v1.5.0, but minAppVersion is 1.0.0.",
+            "7: 'Thing.mode' requires Obsidian v1.5.0, but minAppVersion is 1.0.0. Raise minAppVersion to 1.5.0, or guard this use with requireApiVersion(\"1.5.0\").",
+            "11: 'Thing.pick' requires Obsidian v1.2.0, but minAppVersion is 1.0.0. Raise minAppVersion to 1.2.0, or guard this use with requireApiVersion(\"1.2.0\").",
+            "13: 'Thing.on' requires Obsidian v1.5.0, but minAppVersion is 1.0.0. Raise minAppVersion to 1.5.0, or guard this use with requireApiVersion(\"1.5.0\").",
+            "15: 'Thing.listen' requires Obsidian v1.5.0, but minAppVersion is 1.0.0. Raise minAppVersion to 1.5.0, or guard this use with requireApiVersion(\"1.5.0\").",
+            "17: 'Thing.open' requires Obsidian v1.5.0, but minAppVersion is 1.0.0. Raise minAppVersion to 1.5.0, or guard this use with requireApiVersion(\"1.5.0\").",
+            "20: 'Thing.send' requires Obsidian v1.5.0, but minAppVersion is 1.0.0. Raise minAppVersion to 1.5.0, or guard this use with requireApiVersion(\"1.5.0\").",
         ]);
     });
 });

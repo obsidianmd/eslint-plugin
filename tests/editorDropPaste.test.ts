@@ -121,6 +121,31 @@ ruleTester.run("editor-drop-paste", editorDropPasteRule, {
             `,
         },
         {
+            name: "a handler that writes to its editor only later lets Obsidian insert the content",
+            code: `
+                workspace.on('editor-paste', (evt, editor) => {
+                    window.setTimeout(() => {
+                        editor.setValue(tidy(editor.getValue()));
+                    }, 0);
+                });
+                workspace.on('editor-paste', (evt, editor) => {
+                    activeWindow.requestAnimationFrame(function () { editor.replaceSelection(''); });
+                    queueMicrotask(() => editor.setLine(0, ''));
+                    Promise.resolve().then(() => editor.cm?.dispatch({}));
+                });
+                workspace.on('editor-drop', async (evt, editor) => {
+                    await sleep(10);
+                    lines.forEach((line, i) => editor.setLine(i, line.trim()));
+                });
+                workspace.on('editor-paste', (evt, editor) => {
+                    void (async () => {
+                        await sleep(10);
+                        editor.replaceRange('', from, to);
+                    })();
+                });
+            `,
+        },
+        {
             name: "a parameter written with a type annotation is the same parameter",
             code: `
                 workspace.on('editor-paste', (evt: ClipboardEvent, editor: Editor) => {
@@ -176,8 +201,131 @@ ruleTester.run("editor-drop-paste", editorDropPasteRule, {
                 });
             `,
         },
+        {
+            // obsidian-paste-image-rename: preventDefault() would cancel
+            // Obsidian's own paste or drop.
+            name: "a handler that only observes the event is not checked",
+            code: `
+                this.registerEvent(this.app.workspace.on('editor-paste', (event, editor, info) => {
+                    const files = event.clipboardData?.files;
+                    if (files?.length) { this.pending.push({ path: info.file?.path, count: files.length }); }
+                }));
+            `,
+        },
+        {
+            // obsidian-map-view: changes the note's frontmatter, not the
+            // pasted text, and lets the paste go through.
+            name: "an observer that changes something other than its editor is not checked",
+            code: `
+                workspace.on('editor-paste', async (evt, editor, view) => {
+                    const text = evt.clipboardData?.getData('text/plain');
+                    if (text && isGeolocation(text) && view.file) {
+                        await this.app.fileManager.processFrontMatter(view.file, (fm) => { fm.locations = []; });
+                    }
+                });
+            `,
+        },
+        {
+            // obsidian-link-embed, obsidian-local-images-plus, obsidian-linter:
+            // the callee may check and cancel the event.
+            name: "a handler that passes the event to another function is not checked",
+            code: `
+                workspace.on('editor-paste', (evt, editor) => { handleEditorPaste(evt, editor, this); });
+                workspace.on('editor-drop', async (evt, editor, info) => { await this.onPasteFunc(evt, editor, info); });
+                workspace.on('editor-paste', (clipboardEv, editor) => {
+                    if (clipboardEv.defaultPrevented) return;
+                    void this.modifyPasteEvent(clipboardEv as ClipboardEvent, editor);
+                    editor.replaceSelection('');
+                });
+                workspace.on('editor-drop', (evt, editor) => { new DropHandler(evt).run(editor); });
+            `,
+        },
+        {
+            name: "a local variable named console may check the event",
+            code: `
+                declare const console: { log(evt: ClipboardEvent): void };
+                workspace.on('editor-paste', (evt, editor) => {
+                    console.log(evt);
+                    editor.replaceSelection('pasted');
+                });
+            `,
+        },
+        {
+            name: "a handler without an editor parameter that does not cancel the event is not checked",
+            code: `
+                workspace.on('editor-paste', (evt) => {
+                    this.app.workspace.activeEditor?.editor?.replaceSelection('x');
+                });
+            `,
+        },
+        {
+            name: "reading from the editor is not writing to it",
+            code: `
+                workspace.on('editor-paste', (evt, editor) => {
+                    record(editor.getCursor(), editor.getSelection(), evt.clipboardData);
+                });
+            `,
+        },
     ],
     invalid: [
+        {
+            name: "logging the event is not handing it on",
+            code: `
+                workspace.on('editor-paste', (evt, editor) => {
+                    console.log(evt);
+                    console.debug("paste", evt as ClipboardEvent);
+                    editor.replaceSelection('pasted');
+                });
+            `,
+            errors: [
+                { messageId: "missingDefaultPrevented", data: { eventName: "editor-paste" } },
+                { messageId: "missingPreventDefault", data: { eventName: "editor-paste" } },
+            ],
+        },
+        {
+            name: "a write that runs while the handler does is reported, also in a nested function or before an await",
+            code: `
+                workspace.on('editor-paste', (evt, editor) => {
+                    lines.forEach((line, i) => editor.setLine(i, line));
+                });
+                workspace.on('editor-paste', async (evt, editor) => {
+                    editor.replaceSelection(await Promise.resolve('x'));
+                });
+                workspace.on('editor-paste', (evt, editor) => {
+                    setTimeout(() => {}, 0);
+                    editor.replaceSelection('x');
+                    const later = async () => { await sleep(1); };
+                    editor.setValue('y');
+                });
+            `,
+            errors: [
+                { messageId: "missingDefaultPrevented", data: { eventName: "editor-paste" } },
+                { messageId: "missingPreventDefault", data: { eventName: "editor-paste" } },
+                { messageId: "missingDefaultPrevented", data: { eventName: "editor-paste" } },
+                { messageId: "missingPreventDefault", data: { eventName: "editor-paste" } },
+                { messageId: "missingDefaultPrevented", data: { eventName: "editor-paste" } },
+                { messageId: "missingPreventDefault", data: { eventName: "editor-paste" } },
+            ],
+        },
+        {
+            name: "a handler that reads the pasted or dropped content and inserts it later is reported",
+            code: `
+                workspace.on('editor-paste', async (evt, editor) => {
+                    const url = await upload(evt.clipboardData?.files[0]);
+                    editor.replaceSelection(url);
+                });
+                workspace.on('editor-drop', (evt, editor) => {
+                    const files = evt.dataTransfer!.files;
+                    setTimeout(() => editor.replaceSelection(link(files)), 0);
+                });
+            `,
+            errors: [
+                { messageId: "missingDefaultPrevented", line: 2 },
+                { messageId: "missingPreventDefault", line: 2 },
+                { messageId: "missingDefaultPrevented", line: 6 },
+                { messageId: "missingPreventDefault", line: 6 },
+            ],
+        },
         {
             name: "editor-paste missing both checks is forbidden",
             code: `
@@ -227,6 +375,37 @@ ruleTester.run("editor-drop-paste", editorDropPasteRule, {
             ],
         },
         {
+            name: "a write through the editor's transaction, CodeMirror or optional chaining counts",
+            code: `
+                workspace.on('editor-paste', (evt, editor) => { editor.transaction({ replaceSelection: 'x' }); });
+                workspace.on('editor-drop', (evt, editor) => { (editor as any).cm.dispatch({ changes }); });
+                workspace.on('editor-paste', (evt, editor) => { editor?.replaceRange('x', from); });
+                workspace.on('editor-drop', (evt, editor) => { void upload(evt.dataTransfer?.files).then(() => editor.setLine(0, 'x')); });
+            `,
+            errors: [
+                { messageId: "missingDefaultPrevented", line: 2 },
+                { messageId: "missingPreventDefault", line: 2 },
+                { messageId: "missingDefaultPrevented", line: 3 },
+                { messageId: "missingPreventDefault", line: 3 },
+                { messageId: "missingDefaultPrevented", line: 4 },
+                { messageId: "missingPreventDefault", line: 4 },
+                { messageId: "missingDefaultPrevented", line: 5 },
+                { messageId: "missingPreventDefault", line: 5 },
+            ],
+        },
+        {
+            name: "a handler that cancels the event without writing must still check defaultPrevented",
+            code: `
+                workspace.on('editor-drop', (evt) => {
+                    evt.preventDefault();
+                    void this.upload(evt.dataTransfer?.files);
+                });
+            `,
+            errors: [
+                { messageId: "missingDefaultPrevented" },
+            ],
+        },
+        {
             name: "editor-paste with function expression missing checks is forbidden",
             code: `
                 workspace.on('editor-paste', function(evt, editor, info) {
@@ -243,9 +422,10 @@ ruleTester.run("editor-drop-paste", editorDropPasteRule, {
             // string contains "e.preventDefault()".
             name: "another object's defaultPrevented and a string do not count",
             code: `
-                workspace.on("editor-paste", (e) => {
+                workspace.on("editor-paste", (e, editor) => {
                     if (type.defaultPrevented) return;
                     log("e.preventDefault()");
+                    editor.replaceSelection(text);
                 });
             `,
             errors: [
@@ -256,11 +436,11 @@ ruleTester.run("editor-drop-paste", editorDropPasteRule, {
         {
             name: "a comment does not count",
             code: `
-                workspace.on("editor-drop", (evt) => {
+                workspace.on("editor-drop", (evt, editor) => {
                     if (ready) {
                         /* evt.defaultPrevented */
                         // evt.preventDefault()
-                        handle(evt);
+                        editor.replaceSelection(text);
                     }
                 });
             `,
@@ -272,11 +452,12 @@ ruleTester.run("editor-drop-paste", editorDropPasteRule, {
         {
             name: "a shadowing parameter of the same name in a nested function does not count",
             code: `
-                workspace.on("editor-paste", (evt) => {
+                workspace.on("editor-paste", (evt, editor) => {
                     other.on("x", (evt) => {
                         if (evt.defaultPrevented) return;
                         evt.preventDefault();
                     });
+                    editor.replaceSelection(text);
                 });
             `,
             errors: [
@@ -287,9 +468,10 @@ ruleTester.run("editor-drop-paste", editorDropPasteRule, {
         {
             name: "a shadowing variable of the same name in a nested block does not count",
             code: `
-                workspace.on("editor-drop", (evt) => {
+                workspace.on("editor-drop", (evt, editor) => {
                     if (evt.defaultPrevented) return;
                     for (const evt of queue) { evt.preventDefault(); }
+                    editor.replaceSelection(text);
                 });
             `,
             errors: [
@@ -299,9 +481,10 @@ ruleTester.run("editor-drop-paste", editorDropPasteRule, {
         {
             name: "preventDefault read but not called does not count",
             code: `
-                workspace.on("editor-paste", (evt) => {
+                workspace.on("editor-paste", (evt, editor) => {
                     if (evt.defaultPrevented) return;
                     const handled = evt.preventDefault;
+                    editor.replaceSelection(text);
                 });
             `,
             errors: [
@@ -311,9 +494,10 @@ ruleTester.run("editor-drop-paste", editorDropPasteRule, {
         {
             name: "a property of the event's property does not count",
             code: `
-                workspace.on("editor-drop", (evt) => {
+                workspace.on("editor-drop", (evt, editor) => {
                     if (evt.detail.defaultPrevented) return;
                     evt.target.preventDefault();
+                    editor.replaceSelection(text);
                 });
             `,
             errors: [
@@ -324,8 +508,8 @@ ruleTester.run("editor-drop-paste", editorDropPasteRule, {
         {
             name: "a default value of a later parameter is not the handler's body",
             code: `
-                workspace.on("editor-paste", (evt, done = evt.defaultPrevented, stop = evt.preventDefault()) => {
-                    use(done, stop);
+                workspace.on("editor-paste", (evt, editor, done = evt.defaultPrevented, stop = evt.preventDefault()) => {
+                    editor.replaceSelection(String(done && stop));
                 });
             `,
             errors: [
@@ -336,9 +520,10 @@ ruleTester.run("editor-drop-paste", editorDropPasteRule, {
         {
             name: "preventDefault passed as an argument is not a call of it",
             code: `
-                workspace.on("editor-drop", (evt) => {
+                workspace.on("editor-drop", (evt, editor) => {
                     if (evt.defaultPrevented) return;
                     later(evt.preventDefault);
+                    editor.replaceSelection(text);
                 });
             `,
             errors: [
@@ -361,9 +546,10 @@ ruleTester.run("editor-drop-paste", editorDropPasteRule, {
         {
             name: "a property of another name, plain or computed, does not count",
             code: `
-                workspace.on("editor-drop", (evt) => {
+                workspace.on("editor-drop", (evt, editor) => {
                     if (evt.prevented || evt[defaultPrevented]) return;
                     evt[preventDefault]();
+                    editor.replaceSelection(text);
                 });
             `,
             errors: [
@@ -374,7 +560,7 @@ ruleTester.run("editor-drop-paste", editorDropPasteRule, {
         {
             // The third argument of on() is the `this` of the handler.
             name: "the handler is the second argument, with a context after it",
-            code: "workspace.on('editor-drop', (evt) => { use(evt); }, this);",
+            code: "workspace.on('editor-drop', (evt, editor) => { editor.setValue(evt.type); }, this);",
             errors: [
                 { messageId: "missingDefaultPrevented" },
                 { messageId: "missingPreventDefault" },
@@ -382,10 +568,10 @@ ruleTester.run("editor-drop-paste", editorDropPasteRule, {
         },
         {
             name: "both problems are reported on the handler",
-            code: "workspace.on('editor-paste', (evt) => { use(evt); });",
+            code: "workspace.on('editor-paste', (evt, editor) => { editor.setValue(''); });",
             errors: [
-                { messageId: "missingDefaultPrevented", line: 1, column: 30, endLine: 1, endColumn: 52 },
-                { messageId: "missingPreventDefault", line: 1, column: 30, endLine: 1, endColumn: 52 },
+                { messageId: "missingDefaultPrevented", line: 1, column: 30, endLine: 1, endColumn: 71 },
+                { messageId: "missingPreventDefault", line: 1, column: 30, endLine: 1, endColumn: 71 },
             ],
         },
     ],

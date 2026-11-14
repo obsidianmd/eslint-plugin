@@ -10,8 +10,10 @@
 
 ## What is reported
 
-A `detachLeavesOfType()` call, on any object, made as a statement directly in the body of an
-`onunload()` method:
+A `detachLeavesOfType()` call, on any object, made as a statement directly in the body of the
+`onunload()` method of a plugin class: one that extends Obsidian's `Plugin` (`Plugin` or
+`obsidian.Plugin` imported from `"obsidian"`), directly or through classes declared in the same
+file, or, with type information, through any class:
 
 ```ts
 onunload() {
@@ -22,10 +24,13 @@ onunload() {
 Detaching the leaves here makes them reopen in their default location the next time the plugin
 loads, even if the user had moved them elsewhere.
 
-The method may be written `onunload()`, `"onunload"()` or `["onunload"]()`. Not reported: a call
-nested inside a block such as an `if`, a call made through a helper method, an `onunload` written as
-an arrow-function property, and a method whose computed name is not a string literal, such as
-`[name]()`, which is named by whatever `name` holds.
+The method may be written `onunload()`, `"onunload"()` or `["onunload"]()`. Not reported: the
+`onunload()` of any other class, such as a `Component` that the plugin unloads while it keeps
+running and that detaches the leaves of a view type it registered itself; a call nested inside a
+block such as an `if`, a call made through a helper method, an `onunload` written as an
+arrow-function property, and a method whose computed name is not a string literal, such as
+`[name]()`, which is named by whatever `name` holds. Without type information, a plugin class whose
+base class comes from another file is not recognised.
 
 ### Fix
 
@@ -51,7 +56,7 @@ export default class MyPlugin extends Plugin {
 ```
 
 Otherwise the method stays, with an empty body `{}`, or with just the comments its body held: when
-the class extends a class of your own, whose `onunload()` the method overrides; when a comment is
+the class extends a plugin class of your own, whose `onunload()` the method overrides; when a comment is
 in, above or after the method, as the fix removes no comment outside the call; for an `async`,
 `static`, computed or decorated `onunload()`, one with parameters, or one with overloads; in a
 class with another member whose computed name may be `onunload` (`[KEY]() {}` with `KEY` imported),
