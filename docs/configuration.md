@@ -498,6 +498,35 @@ the same overrides for its path, or leave the directory out with `globalIgnores`
 `no-console` there, restate `rule-custom-message` with its `no-new-func` entry alone, as in
 [Disabling rules for specific files](#disabling-rules-for-specific-files).
 
+## Upgrading to 0.6.0
+
+0.6.0 fixes findings on correct code, and fixes and suggestions that changed what correct code
+does or did not compile, found by linting the community plugins, about 10,300, with 0.5.1. The
+number of findings barely changes. What to expect:
+
+- **`acronyms` adds to the built-in acronyms.** In `ui/sentence-case`, `ui/sentence-case-json` and
+  `ui/sentence-case-locale-module`, the `acronyms` option no longer replaces the built-in list. A
+  config that listed the built-in acronyms again only to add one can drop them. A config that used
+  `acronyms` to leave some built-in ones out needs `replaceDefaultAcronyms: true` to keep doing
+  that (see [`ui/sentence-case`](rules/ui/sentence-case.md#options)).
+- **Two new rules in the recommended config.**
+  [`no-await-chainable`](rules/no-await-chainable.md) is an error, for TypeScript files: `await` of
+  a `Setting` or UI component never settles, and the app stops responding.
+  [`commands/check-callback-uses-checking`](rules/commands/check-callback-uses-checking.md) warns
+  about a `checkCallback` or `editorCheckCallback` that never reads `checking`, so it runs its
+  action whenever Obsidian only asks whether the command is available.
+- **`--fix` changes less.** Some rewrites it made are now suggestions, so after `eslint --fix` a
+  few findings stay to resolve by hand: `prefer-window-timers` on an `activeWindow` timer whose ID
+  is kept or cleared, `prefer-instanceof` on a value that may be null behind a type assertion, and
+  `prefer-create-el` on a call with comments in its arguments. `no-global-this` and
+  `prefer-window-timers` only report where TypeScript has narrowed `window`, since the rewrite to
+  `window` did not compile there. `settings-tab/no-problematic-settings-headings` no longer removes
+  a "General" or plugin-name heading below the top of the tab.
+- **`prefer-active-doc` offers `activeDocument.body`** for an element put in `document.body` only
+  for a moment, such as a download link, instead of telling you to set it up in each window.
+
+The [changelog](../CHANGELOG.md#060---2026-11-14) lists every change.
+
 ## Upgrading to 0.5.1
 
 0.5.1 fixes findings on correct code, and fixes and suggestions that changed what correct code
