@@ -239,6 +239,48 @@ ruleTester.run("no-global-this", noGlobalThisRule, {
             errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" } }],
         },
         {
+            name: "in the else of a check for a key Window declares, where window is never, nothing is offered",
+            code: "export function idle(cb: () => void) { if ('requestIdleCallback' in window) { window.requestIdleCallback(cb); } else { globalThis.setTimeout(cb, 100); } }",
+            output: null,
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" }, suggestions: [] }],
+        },
+        {
+            name: "after an early return on a check for a key Window declares, nothing is offered",
+            code: "export function idle(cb: () => void) { if ('requestIdleCallback' in window) return; globalThis.setTimeout(cb, 100); }",
+            output: null,
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" }, suggestions: [] }],
+        },
+        {
+            name: "on the false side of a ternary on such a check, nothing is offered",
+            code: "export const later = (cb: () => void) => ('requestIdleCallback' in window ? window.requestIdleCallback(cb) : globalThis.setTimeout(cb, 100));",
+            output: null,
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" }, suggestions: [] }],
+        },
+        {
+            name: "where window instanceof narrows it, nothing is offered",
+            code: "declare class Frame {} export function f(cb: () => void) { if (!(window instanceof Frame)) return; globalThis.setTimeout(cb, 1); }",
+            output: null,
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" }, suggestions: [] }],
+        },
+        {
+            name: "where a check for a key Window declares is true, window is still a Window, and it is fixed",
+            code: "export function idle(cb: () => void) { if ('requestIdleCallback' in window) { globalThis.setTimeout(cb, 100); } }",
+            output: "export function idle(cb: () => void) { if ('requestIdleCallback' in window) { window.setTimeout(cb, 100); } }",
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" } }],
+        },
+        {
+            name: "in the else of a check for a key Window does not declare, window is still a Window, and it is fixed",
+            code: "export function idle(cb: () => void) { if ('myPluginReady' in window) { cb(); } else { globalThis.setTimeout(cb, 100); } }",
+            output: "export function idle(cb: () => void) { if ('myPluginReady' in window) { cb(); } else { window.setTimeout(cb, 100); } }",
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" } }],
+        },
+        {
+            name: "in a callback inside such an else, TypeScript no longer narrows window, and it is fixed",
+            code: "export function idle(cb: () => void) { if ('requestIdleCallback' in window) { window.requestIdleCallback(cb); } else { [1].forEach(() => { globalThis.setTimeout(cb, 100); }); } }",
+            output: "export function idle(cb: () => void) { if ('requestIdleCallback' in window) { window.requestIdleCallback(cb); } else { [1].forEach(() => { window.setTimeout(cb, 100); }); } }",
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" } }],
+        },
+        {
             name: "in the branch where window exists, it is fixed",
             code: "export const id = typeof window !== 'undefined' ? globalThis.crypto.randomUUID() : '';",
             output: "export const id = typeof window !== 'undefined' ? window.crypto.randomUUID() : '';",
@@ -887,6 +929,12 @@ const untypedRuleTester = new RuleTester({
 untypedRuleTester.run("no-global-this without type information", noGlobalThisRule, {
     valid: [],
     invalid: [
+        {
+            name: "without type information, the else of any key check on window is taken as narrowed",
+            code: "export function idle(cb) { if ('myPluginReady' in window) { cb(); } else { globalThis.setTimeout(cb, 100); } }",
+            output: null,
+            errors: [{ messageId: "avoidGlobal", data: { name: "globalThis" }, suggestions: [] }],
+        },
         {
             name: "a global this file declares is reported only without type information",
             code: "declare global { var DEFAULT_DROPBOX_APP_KEY: string; } declare var BUILD_TIME: number; export const k = [global.DEFAULT_DROPBOX_APP_KEY, globalThis.BUILD_TIME];",

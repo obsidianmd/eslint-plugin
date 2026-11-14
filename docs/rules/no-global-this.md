@@ -88,6 +88,13 @@ Neither a fix nor a suggestion is offered where `window` would be wrong:
   runtime. Without type information, only the declarations in the same file are seen. A write, such
   as `globalThis.registry = new Map()`, still gets a suggestion. A read through a cast, such as
   `(globalThis as any).DEFAULT_APP_KEY`, which a bundler does not replace, is rewritten as above
+- TypeScript has narrowed `window` there to a type without the property, so `window.setTimeout`
+  would not compile (TS2339). In the `else` of `if ("requestIdleCallback" in window)`, or after
+  `if ("requestIdleCallback" in window) return;`, `window` is `never`, because `Window` declares
+  `requestIdleCallback`. The same goes for `typeof window` and `window instanceof X` checks that
+  rule the window out where the code runs. Where `window` is still a `Window`, as where such a check
+  is true, after a check for a key `Window` does not declare (with type information), or in a
+  callback, which TypeScript does not narrow, the rules above apply
 - an earlier [window check](prefer-window-timers.md#window-checks) shows that the code also runs
   without a window, as in `typeof window !== "undefined" ? window : globalThis`, or after
   `if (typeof window !== "undefined") return window;`. Where the check proves that the window

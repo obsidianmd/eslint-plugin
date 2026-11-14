@@ -72,6 +72,24 @@ ruleTester.run("prefer-window-timers", preferWindowTimersRule, {
     ],
     invalid: [
         {
+            name: "in the else of a check for a key Window declares, where window is never, nothing is offered",
+            code: "export function idle(cb: () => void) { if ('requestIdleCallback' in window) { window.requestIdleCallback(cb); } else { setTimeout(cb, 100); } }",
+            output: null,
+            errors: [{ messageId: "preferWindowTimer", data: { name: "setTimeout" }, suggestions: [] }],
+        },
+        {
+            name: "an activeWindow timer in such an else is not moved to window either",
+            code: "export function idle(cb: () => void) { if ('requestIdleCallback' in window) { window.requestIdleCallback(cb); } else { activeWindow.setTimeout(cb, 100); } }",
+            output: null,
+            errors: [{ messageId: "noActiveWindowTimer", data: { name: "setTimeout" }, suggestions: [] }],
+        },
+        {
+            name: "where such a check is true, window is still a Window, and it is fixed",
+            code: "export function idle(cb: () => void) { if ('requestIdleCallback' in window) { setTimeout(cb, 100); } }",
+            output: "export function idle(cb: () => void) { if ('requestIdleCallback' in window) { window.setTimeout(cb, 100); } }",
+            errors: [{ messageId: "preferWindowTimer", data: { name: "setTimeout" } }],
+        },
+        {
             name: "bare setTimeout is forbidden",
             code: "setTimeout(() => {}, 100);",
             output: "window.setTimeout(() => {}, 100);",
