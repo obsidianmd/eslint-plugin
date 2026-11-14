@@ -185,6 +185,19 @@ document.body.appendChild(link); link.click(); link.remove(); // reported, sugge
 document.body.appendChild(panel); // reported, nothing offered: never removed, so the window's state
 ```
 
+The code that puts such an element in the body, takes it out and checks for it has to use the same
+body: with `activeDocument.body` for the `appendChild()` alone, a later
+`document.body.removeChild(el)` would throw in a popout window, and `document.body.contains(el)`
+would be false. So the suggestion rewrites the `document` of every `document.body.appendChild(el)`,
+`removeChild(el)`, `contains(el)` and the like for that element at once, and is offered on each of
+them. Where one of them cannot be rewritten, none of them gets it.
+
+```ts
+document.body.appendChild(c);
+try { await render(c); } finally { document.body.removeChild(c); }
+// both reported, the same suggestion on each: activeDocument.body in both places
+```
+
 On `document.head` such an element is still the window's state, like a `<style>`.
 
 Nothing is offered where `activeDocument` would not exist, or would not be what the code means:
@@ -217,7 +230,8 @@ Nothing is offered where `activeDocument` would not exist, or would not be what 
   whichever had focus. A fallback such as `const doc = el?.doc ?? document` keeps the suggestion;
 - `document.body.contains(node)` and `document.documentElement.contains(node)`, as in
   `document.body.contains(el) && document.body.removeChild(el)`: the node was put in a given
-  window, and `activeDocument` would check another one;
+  window, and `activeDocument` would check another one. A `document.body.contains(el)` for an
+  element the code itself puts in the body only for a moment moves with it, as above;
 - an element looked up to be removed, as in `document.getElementById("my-style")?.remove()` or
   `document.head.querySelector("style.x")?.detach()`: it was put in the main window, where the
   removal has to look for it;

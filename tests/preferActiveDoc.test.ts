@@ -1269,8 +1269,33 @@ ruleTester.run("prefer-active-doc and code that handles popout windows", preferA
             name: "an element put in the body and taken out with removeChild gets the suggestion on both",
             code: "export function copy(t: HTMLTextAreaElement) { document.body.appendChild(t); t.select(); document.body.removeChild(t); }",
             errors: [
-                { messageId: "preferActiveBody", suggestions: offered("export function copy(t: HTMLTextAreaElement) { activeDocument.body.appendChild(t); t.select(); document.body.removeChild(t); }") },
-                { messageId: "preferActiveBody", suggestions: offered("export function copy(t: HTMLTextAreaElement) { document.body.appendChild(t); t.select(); activeDocument.body.removeChild(t); }") },
+                { messageId: "preferActiveBody", suggestions: offered("export function copy(t: HTMLTextAreaElement) { activeDocument.body.appendChild(t); t.select(); activeDocument.body.removeChild(t); }") },
+                { messageId: "preferActiveBody", suggestions: offered("export function copy(t: HTMLTextAreaElement) { activeDocument.body.appendChild(t); t.select(); activeDocument.body.removeChild(t); }") },
+            ],
+        },
+        {
+            name: "a removeChild in a finally moves with the appendChild, in one suggestion on each",
+            code: "export async function shot(c: HTMLDivElement, render: () => Promise<void>) { document.body.appendChild(c); try { await render(); } finally { document.body.removeChild(c); } }",
+            errors: [
+                { messageId: "preferActiveBody", suggestions: offered("export async function shot(c: HTMLDivElement, render: () => Promise<void>) { activeDocument.body.appendChild(c); try { await render(); } finally { activeDocument.body.removeChild(c); } }") },
+                { messageId: "preferActiveBody", suggestions: offered("export async function shot(c: HTMLDivElement, render: () => Promise<void>) { activeDocument.body.appendChild(c); try { await render(); } finally { activeDocument.body.removeChild(c); } }") },
+            ],
+        },
+        {
+            name: "a contains check on the body moves with the appendChild and removeChild",
+            code: "export function pick(input: HTMLInputElement) { document.body.appendChild(input); const cleanup = () => { if (document.body.contains(input)) document.body.removeChild(input); }; input.addEventListener('blur', cleanup); }",
+            errors: [
+                { messageId: "preferActiveBody", suggestions: offered("export function pick(input: HTMLInputElement) { activeDocument.body.appendChild(input); const cleanup = () => { if (activeDocument.body.contains(input)) activeDocument.body.removeChild(input); }; input.addEventListener('blur', cleanup); }") },
+                { messageId: "preferActiveBody", suggestions: offered("export function pick(input: HTMLInputElement) { activeDocument.body.appendChild(input); const cleanup = () => { if (activeDocument.body.contains(input)) activeDocument.body.removeChild(input); }; input.addEventListener('blur', cleanup); }") },
+                { messageId: "preferActiveBody", suggestions: offered("export function pick(input: HTMLInputElement) { activeDocument.body.appendChild(input); const cleanup = () => { if (activeDocument.body.contains(input)) activeDocument.body.removeChild(input); }; input.addEventListener('blur', cleanup); }") },
+            ],
+        },
+        {
+            name: "where one use of the element's body cannot be rewritten, none of them gets the suggestion",
+            code: "export function show(el: HTMLElement, done: (f: (activeDocument: unknown) => void) => void) { document.body.appendChild(el); done((activeDocument) => { document.body.removeChild(el); }); }",
+            errors: [
+                { messageId: "preferActiveBody", suggestions: [] },
+                { messageId: "preferActiveBody", suggestions: [] },
             ],
         },
         {
