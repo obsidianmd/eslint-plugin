@@ -1,11 +1,14 @@
-import { type TSESLint, TSESTree } from "@typescript-eslint/utils";
+import { TSESLint, TSESTree } from "@typescript-eslint/utils";
 import ts from "typescript";
 import { getTypeInfo } from "../globalWindow.js";
 import { type MinAppVersionOptions, minAppVersionSchema, supportsVersion } from "../minAppVersion.js";
+import { API_SINCE } from "../obsidianApiVersions.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
+const { DefinitionType } = TSESLint.Scope;
+
 // The Obsidian version that added getLanguage().
-const GET_LANGUAGE_SINCE = "1.8.7";
+const GET_LANGUAGE_SINCE = API_SINCE.getLanguage;
 
 type MessageIds = "localStorageLanguage" | "i18nextDetector" | "useGetLanguage" | "useGetLanguageSince";
 type Scope = TSESLint.Scope.Scope;
@@ -52,6 +55,12 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
         const sourceCode = context.sourceCode;
         const supported = supportsVersion(context.options[0]?.minAppVersion, GET_LANGUAGE_SINCE);
 
+        // Below 1.8.7 there is no getLanguage(), and reading the language
+        // from localStorage, which getLanguage() wraps, is the way to do it.
+        if (supported === false) {
+            return {};
+        }
+
         return {
             CallExpression(node: TSESTree.CallExpression) {
                 if (!isLocalStorageGetItemLanguage(node)) {
@@ -95,7 +104,6 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
         function suggestion(node: TSESTree.CallExpression): TSESLint.SuggestionReportDescriptor<MessageIds>[] {
             const callee = node.callee as TSESTree.MemberExpression;
             if (
-                supported === false ||
                 // Dropping the storage, or another argument, must drop no side effect.
                 node.arguments.length !== 1 ||
                 !isPlainReceiver(callee.object) ||
@@ -151,7 +159,7 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
                     const def = variable.defs[0];
                     const isObsidiansOwn =
                         variable.defs.length === 1 &&
-                        def.type === "ImportBinding" &&
+                        def.type === DefinitionType.ImportBinding &&
                         def.node.type === TSESTree.AST_NODE_TYPES.ImportSpecifier &&
                         importedName(def.node) === "getLanguage" &&
                         def.node.importKind !== "type" &&
@@ -197,7 +205,7 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
             // After a comment that ends the line of the last import.
             const next = sourceCode.getTokenAfter(lastImport, { includeComments: true });
             const anchor =
-                next && next.type === "Line" && next.loc.start.line === lastImport.loc.end.line ? next : lastImport;
+                next && next.type === TSESTree.AST_TOKEN_TYPES.Line && next.loc.start.line === lastImport.loc.end.line ? next : lastImport;
             const text = `${lineBreakAfter(anchor)}import { getLanguage } from ${quote}obsidian${quote}${semicolon}`;
             return (fixer) => fixer.insertTextAfter(anchor, text);
         }

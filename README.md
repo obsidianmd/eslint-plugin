@@ -1,6 +1,6 @@
 # eslint-plugin-obsidianmd
 
-> Upgrading from 0.4? See [Upgrading to 0.5.0](docs/configuration.md#upgrading-to-050) and the [changelog](CHANGELOG.md).
+> Upgrading from 0.5.0? See [Upgrading to 0.5.1](docs/configuration.md#upgrading-to-051). From 0.4? See [Upgrading to 0.5.0](docs/configuration.md#upgrading-to-050). Both are summed up in the [changelog](CHANGELOG.md).
 
 ## Installation
 
@@ -75,7 +75,7 @@ The recommended config also lints files that are not source, matching `package.j
 For advanced usage, see the [configuration guide](docs/configuration.md):
 
 - [layering stricter typescript-eslint configs](docs/configuration.md#using-alongside-stricter-typescript-eslint-configs), [ignoring files](docs/configuration.md#ignoring-files) and [disabling rules for non-plugin code](docs/configuration.md#disabling-rules-for-specific-files)
-- how the recommended config handles [test files](docs/configuration.md#test-files) and [web worker files](docs/configuration.md#web-worker-files)
+- how the recommended config handles [test files and tool configs](docs/configuration.md#test-files) and [web worker files](docs/configuration.md#web-worker-files)
 - [using only obsidianmd rules](docs/configuration.md#using-only-obsidianmd-rules-without-the-recommended-config) through `ruleConfigs`, without the recommended config
 - the [community plugin scanner's configuration](docs/configuration.md#community-plugin-scanner-configuration)
 - [plugins written in JavaScript](docs/configuration.md#plugins-written-in-javascript)
@@ -111,6 +111,7 @@ To give another plugin's rule a message of your own, wrap it with [`obsidianmd.w
 
 | Name                                                                                                         | Description                                                                                                                                           | 💼     | ⚠️     | 🚫     | 🔧 | 💡 | 💭 |
 | :----------------------------------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------- | :----- | :----- | :----- | :- | :- | :- |
+| [commands/check-callback-uses-checking](docs/rules/commands/check-callback-uses-checking.md)                 | Require `checkCallback` and `editorCheckCallback` to use their `checking` parameter.                                                                  |        | ✅ 🇬🇧 |        |    |    |    |
 | [commands/no-command-in-command-id](docs/rules/commands/no-command-in-command-id.md)                         | Disallow using the word 'command' in a command ID.                                                                                                    |        | ✅ 🇬🇧 |        |    | 💡 |    |
 | [commands/no-command-in-command-name](docs/rules/commands/no-command-in-command-name.md)                     | Disallow using the word 'command' in a command name.                                                                                                  |        | ✅ 🇬🇧 |        |    | 💡 |    |
 | [commands/no-default-hotkeys](docs/rules/commands/no-default-hotkeys.md)                                     | Discourage providing default hotkeys for commands.                                                                                                    |        | ✅ 🇬🇧 |        |    | 💡 |    |
@@ -119,6 +120,7 @@ To give another plugin's rule a message of your own, wrap it with [`obsidianmd.w
 | [detach-leaves](docs/rules/detach-leaves.md)                                                                 | Don't detach leaves in onunload.                                                                                                                      | ✅ 🇬🇧 |        |        | 🔧 |    |    |
 | [editor-drop-paste](docs/rules/editor-drop-paste.md)                                                         | Require checking `evt.defaultPrevented` and calling `evt.preventDefault()` in editor-drop/editor-paste handlers.                                      |        | ✅ 🇬🇧 |        |    |    |    |
 | [hardcoded-config-path](docs/rules/hardcoded-config-path.md)                                                 | Disallow hardcoded `.obsidian` config paths. Use `Vault#configDir` instead.                                                                           |        | ✅ 🇬🇧 |        |    |    |    |
+| [no-await-chainable](docs/rules/no-await-chainable.md)                                                       | Disallow awaiting `Setting` and UI components, whose `then` is for chaining and never settles a promise.                                              | ✅ 🇬🇧 |        |        |    |    | 💭 |
 | [no-forbidden-elements](docs/rules/no-forbidden-elements.md)                                                 | Disallow attachment of forbidden elements to the DOM in Obsidian plugins.                                                                             | ✅ 🇬🇧 |        |        |    |    |    |
 | [no-global-this](docs/rules/no-global-this.md)                                                               | Disallow `global` and `globalThis`. Use `window` or `activeWindow` for popout window compatibility.                                                   |        | ✅ 🇬🇧 |        | 🔧 | 💡 |    |
 | [no-misused-promises](docs/rules/no-misused-promises.md)                                                     | Disallow Promises in places not designed to handle them, without treating Obsidian's chaining `then` as a Promise                                     | ✅ 🇬🇧 |        |        |    |    | 💭 |

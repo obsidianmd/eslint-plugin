@@ -3,7 +3,7 @@ import { getManifest } from "../../manifest.js";
 import { docsUrl, ruleCreator } from "../../ruleCreator.js";
 import { removePhrase } from "./nameRemoval.js";
 import { isCommandProperty } from "./property.js";
-import { phrasePattern } from "./words.js";
+import { hasPhraseOnlyAsWord, phrasePattern, startsWithPhraseAsWord } from "./words.js";
 
 type Options = [{ pluginName?: string }?];
 
@@ -57,13 +57,21 @@ export default ruleCreator<Options, "pluginName" | "removePluginName">({
                         isCommandProperty(property, "name") &&
                         property.value.type === TSESTree.AST_NODE_TYPES.Literal &&
                         typeof property.value.value === "string" &&
-                        pluginNamePattern.test(property.value.value)
+                        pluginNamePattern.test(property.value.value) &&
+                        // "Zoom in" of the plugin "Zoom": the plugin name is
+                        // the verb of the sentence, not a label
+                        !hasPhraseOnlyAsWord(property.value.value, pluginNamePattern)
                     ) {
                         const value = property.value;
-                        const edit = removePhrase(value.value, pluginNamePattern, {
-                            prefixAfterSpace: true,
-                            suffixAfterSpace: false,
-                        });
+                        // The plugin name starts the name as a word and is a
+                        // label elsewhere, as in "Zoom in (Zoom)": removing
+                        // the label would take the verb too
+                        const edit = startsWithPhraseAsWord(value.value, pluginNamePattern)
+                            ? null
+                            : removePhrase(value.value, pluginNamePattern, {
+                                prefixAfterSpace: true,
+                                suffixAfterSpace: false,
+                            });
                         const source = edit?.toSource(value.raw);
                         context.report({
                             node: property,

@@ -226,6 +226,36 @@ ruleTester.run("no-deprecated-display", noDeprecatedDisplayRule, {
     ],
     invalid: [
         {
+            // As no-unsupported-api reads it, "1.13" is 1.13.0.
+            name: "a minAppVersion without a patch version",
+            options: [{ minAppVersion: "1.13" }],
+            code: `
+                ${MOCK_CLASS}
+                class MyTab extends PluginSettingTab {
+                    display() {}
+                    ${DEFINITIONS}
+                }
+            `,
+            output: null,
+            errors: [
+                {
+                    messageId: "deprecatedDisplay",
+                    data: { minAppVersion: "1.13.0" },
+                    suggestions: [
+                        {
+                            messageId: "removeDisplay",
+                            output: `
+                ${MOCK_CLASS}
+                class MyTab extends PluginSettingTab {
+                    ${DEFINITIONS}
+                }
+            `,
+                        },
+                    ],
+                },
+            ],
+        },
+        {
             name: "both methods at 1.13 flags the bypassed display(), with a suggestion to remove it",
             options: [{ minAppVersion: "1.13.0" }],
             code: `

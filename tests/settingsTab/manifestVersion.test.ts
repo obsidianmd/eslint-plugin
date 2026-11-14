@@ -55,7 +55,7 @@ describe("settings-tab rules: minAppVersion and name from manifest.json", () => 
         [declarative, preDeclarative, malformed, noManifest] = await Promise.all([
             runWithManifest(JSON.stringify({ name: "Word Count", minAppVersion: "1.13.0" })),
             runWithManifest(JSON.stringify({ name: "Word Count", minAppVersion: "1.12.7" })),
-            runWithManifest(JSON.stringify({ name: "Word Count", minAppVersion: "1.13" })),
+            runWithManifest(JSON.stringify({ name: "Word Count", minAppVersion: "latest" })),
             runWithManifest(null),
         ]);
     });
@@ -76,7 +76,7 @@ describe("settings-tab rules: minAppVersion and name from manifest.json", () => 
             assert.deepStrictEqual(preDeclarative.requireDisplay.declarative, []);
         });
 
-        it("is quiet when the manifest's minAppVersion is not a full version, or there is no manifest", () => {
+        it("is quiet when the manifest's minAppVersion is not a version, or there is no manifest", () => {
             assert.deepStrictEqual(malformed.requireDisplay.unset, []);
             assert.deepStrictEqual(noManifest.requireDisplay.unset, []);
         });
@@ -107,7 +107,7 @@ describe("settings-tab rules: minAppVersion and name from manifest.json", () => 
             assert.deepStrictEqual(declarative.noDeprecatedDisplay.invalid, []);
         });
 
-        it("is quiet when the manifest's minAppVersion is not a full version, or there is no manifest", () => {
+        it("is quiet when the manifest's minAppVersion is not a version, or there is no manifest", () => {
             assert.deepStrictEqual(malformed.noDeprecatedDisplay.unset, []);
             assert.deepStrictEqual(noManifest.noDeprecatedDisplay.unset, []);
         });
@@ -127,7 +127,7 @@ describe("settings-tab rules: minAppVersion and name from manifest.json", () => 
             assert.strictEqual(preDeclarative.preferUpdateOverDisplay.declarative.length, 1);
         });
 
-        it("is quiet when the manifest's minAppVersion is not a full version, or there is no manifest", () => {
+        it("is quiet when the manifest's minAppVersion is not a version, or there is no manifest", () => {
             assert.deepStrictEqual(malformed.preferUpdateOverDisplay.unset, []);
             assert.deepStrictEqual(noManifest.preferUpdateOverDisplay.unset, []);
         });

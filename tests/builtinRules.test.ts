@@ -1328,6 +1328,7 @@ type TestedBuiltinRule =
     | "valid-typeof";
 
 function getBuiltinRule(name: TestedBuiltinRule): Rule.RuleModule {
+    // eslint-disable-next-line @typescript-eslint/no-deprecated -- ESLint has no other way to reach its core rules
     const rule = builtinRules.get(name);
     if (!rule) {
         throw new Error(`Rule "${name}" not found`);

@@ -87,7 +87,11 @@ export default ruleCreator({
                     acronyms: {
                         type: "array",
                         items: { type: "string" },
-                        description: "Acronyms that should remain uppercase.",
+                        description: "Acronyms that should remain uppercase, in addition to the built-in ones.",
+                    },
+                    replaceDefaultAcronyms: {
+                        type: "boolean",
+                        description: "Whether `acronyms` replaces the built-in acronyms instead of adding to them.",
                     },
                     ignoreWords: {
                         type: "array",

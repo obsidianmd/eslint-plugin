@@ -1,31 +1,27 @@
 import { RuleTester } from "@typescript-eslint/rule-tester";
+import { atMinAppVersion } from "./atMinAppVersion.js";
 import preferInstanceofRule from "../lib/rules/preferInstanceof.js";
 
-const ruleTester = new RuleTester();
+const ruleTester = atMinAppVersion(new RuleTester(), "1.5.0");
 
+// Obsidian's declarations of instanceOf() on the DOM's own Node and UIEvent,
+// from TypeScript's lib.dom.d.ts. Only those are reported: a class of the
+// same name declared elsewhere, such as React's UIEvent, is not.
 const MOCK_DOM = `
-    declare class Node {
-        instanceOf<T>(type: { new(): T }): this is T;
+    declare global {
+        interface Node {
+            instanceOf<T>(type: { new(): T }): this is T;
+        }
+        interface UIEvent {
+            instanceOf<T>(type: { new(...data: any[]): T }): this is T;
+        }
     }
-    declare class Element extends Node {}
-    declare class HTMLElement extends Element {}
-    declare class HTMLDivElement extends HTMLElement {}
-
-    declare class UIEvent {
-        instanceOf<T>(type: { new(...data: any[]): T }): this is T;
-    }
-    declare class MouseEvent extends UIEvent {}
-    declare class KeyboardEvent extends UIEvent {}
+    export {};
 `;
 
-// DOM types WITHOUT the instanceOf method (standard browser types, no Obsidian augmentation)
+// The DOM types WITHOUT the instanceOf method: lib.dom.d.ts without Obsidian's typings.
 const MOCK_DOM_NO_INSTANCEOF = `
-    declare class Node {}
-    declare class Element extends Node {}
-    declare class HTMLElement extends Element {}
-
-    declare class UIEvent {}
-    declare class MouseEvent extends UIEvent {}
+    export {};
 `;
 
 ruleTester.run("prefer-instanceof", preferInstanceofRule, {
@@ -858,9 +854,9 @@ ruleTester.run("prefer-instanceof with strictNullChecks", preferInstanceofRule, 
 
 // Without strictNullChecks no type includes null, so `Element | null` reads as
 // `Element`. Whether a value may be null comes from its declaration then.
-const nonStrictRuleTester = new RuleTester({
+const nonStrictRuleTester = atMinAppVersion(new RuleTester({
     languageOptions: { parserOptions: { project: "./tests/fixtures/tsconfig.non-strict.json" } },
-});
+}), "1.5.0");
 
 nonStrictRuleTester.run("prefer-instanceof without strictNullChecks", preferInstanceofRule, {
     valid: [],
@@ -1314,21 +1310,30 @@ nonStrictRuleTester.run("prefer-instanceof without strictNullChecks", preferInst
             };
         }),
 
-        // --- Declared without null or undefined: still fixed ---
+        // --- A cast that leaves out null: the value may still be null ---
         {
-            name: "a value cast to a type without null is fixed",
+            name: "a value cast from one declared nullable to a type without null gets the ?. suggestion",
             code: `${OBSIDIAN_INSTANCEOF}
                 declare const el: HTMLElement;
                 const child = el.firstElementChild as Element;
                 if (child instanceof HTMLElement) {}
             `,
-            output: `${OBSIDIAN_INSTANCEOF}
+            errors: [{
+                messageId: "preferInstanceof",
+                data: { className: "HTMLElement" },
+                suggestions: [{
+                    messageId: "preferInstanceofOptionalSuggestion",
+                    data: { className: "HTMLElement" },
+                    output: `${OBSIDIAN_INSTANCEOF}
                 declare const el: HTMLElement;
                 const child = el.firstElementChild as Element;
-                if (child.instanceOf(HTMLElement)) {}
+                if (child?.instanceOf(HTMLElement)) {}
             `,
-            errors: [{ messageId: "preferInstanceof", data: { className: "HTMLElement" } }],
+                }],
+            }],
         },
+
+        // --- Declared without null or undefined: still fixed ---
         {
             name: "a value declared as a Node is fixed",
             code: `${OBSIDIAN_INSTANCEOF}
@@ -1462,6 +1467,695 @@ ruleTester.run("prefer-instanceof with a constructor from a window object", pref
                 if (node.instanceOf(dom.HTMLElement)) {}
             `,
             errors: [{ messageId: "preferInstanceof", data: { className: "dom.HTMLElement" } }],
+        },
+    ],
+});
+
+// I1: a constructor from the node's own window, kept in a const first
+// (tile-line-base RenderedLinkNavigation.ts, taskchute-plus registerTaskCommands.ts).
+ruleTester.run("prefer-instanceof with a constructor kept in a const", preferInstanceofRule, {
+    valid: [
+        {
+            name: "a const set from the element's own defaultView is followed",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare const el: HTMLElement;
+                declare const link: Node;
+                const HTMLElementCtor = el.ownerDocument.defaultView?.HTMLElement;
+                if (HTMLElementCtor && link instanceof HTMLElementCtor) {}
+            `,
+        },
+        {
+            name: "a const set from a window's constructor ?? the main one is followed",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare const node: Node;
+                declare const doc: Document;
+                const Ctor = doc.defaultView?.HTMLElement ?? HTMLElement;
+                if (node instanceof Ctor) {}
+                if (node instanceof (doc.defaultView?.HTMLElement || HTMLElement)) {}
+            `,
+        },
+        {
+            name: "a const set from another const is followed",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare const el: HTMLElement;
+                declare const node: Node;
+                const win = el.ownerDocument.defaultView!;
+                const Ctor = win.HTMLElement;
+                const Same = Ctor;
+                if (node instanceof Same) {}
+            `,
+        },
+    ],
+    invalid: [
+        {
+            name: "a const set from the main window's constructor is still reported",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare const node: Node;
+                const Ctor = window.HTMLElement;
+                if (node instanceof Ctor) {}
+            `,
+            output: `${OBSIDIAN_INSTANCEOF}
+                declare const node: Node;
+                const Ctor = window.HTMLElement;
+                if (node.instanceOf(Ctor)) {}
+            `,
+            errors: [{ messageId: "preferInstanceof", data: { className: "Ctor" } }],
+        },
+        {
+            name: "a let is not followed",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare const el: HTMLElement;
+                declare const node: Node;
+                let Ctor = el.ownerDocument.defaultView!.HTMLElement;
+                if (node instanceof Ctor) {}
+            `,
+            output: `${OBSIDIAN_INSTANCEOF}
+                declare const el: HTMLElement;
+                declare const node: Node;
+                let Ctor = el.ownerDocument.defaultView!.HTMLElement;
+                if (node.instanceOf(Ctor)) {}
+            `,
+            errors: [{ messageId: "preferInstanceof", data: { className: "Ctor" } }],
+        },
+    ],
+});
+
+// I2: in an instanceOf() polyfill, `this instanceof type` is the check itself,
+// and `this.instanceOf(type)` would call the polyfill again, without end
+// (rss-dashboard test_files/unit/test-dom-polyfills.ts).
+ruleTester.run("prefer-instanceof in an instanceOf() implementation", preferInstanceofRule, {
+    valid: [
+        {
+            name: "a function assigned to Node.prototype.instanceOf is not reported",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare const scope: { Node: typeof Node };
+                scope.Node.prototype.instanceOf = function <T>(this: Node, type: { new (): T }): this is T {
+                    if (this instanceof type) return true;
+                    return this instanceof HTMLElement && [type].some((t) => this instanceof t);
+                };
+            `,
+        },
+        {
+            name: "a method named instanceOf is not reported",
+            code: `${OBSIDIAN_INSTANCEOF}
+                class FakeNode {
+                    instanceOf(this: Node, type: typeof HTMLElement) { return this instanceof type; }
+                }
+                const helpers = { instanceOf(node: Node) { return node instanceof HTMLElement; } };
+            `,
+        },
+        {
+            name: "a function named instanceOf, or defined as instanceOf, is not reported",
+            code: `${OBSIDIAN_INSTANCEOF}
+                function instanceOf(node: Node, type: typeof HTMLElement) { return node instanceof type; }
+                Object.defineProperty(Node.prototype, "instanceOf", {
+                    value: function (this: Node, type: typeof HTMLElement) { return this instanceof type; },
+                });
+            `,
+        },
+    ],
+    invalid: [
+        {
+            name: "a function of another name is still fixed",
+            code: `${OBSIDIAN_INSTANCEOF}
+                function isElement(node: Node) { return node instanceof HTMLElement; }
+            `,
+            output: `${OBSIDIAN_INSTANCEOF}
+                function isElement(node: Node) { return node.instanceOf(HTMLElement); }
+            `,
+            errors: [{ messageId: "preferInstanceof", data: { className: "HTMLElement" } }],
+        },
+    ],
+});
+
+// I3: only the DOM's own Node and UIEvent have instanceOf(). React's synthetic
+// UIEvent shares the name (task-board TaskBoardViewContent.tsx:682).
+ruleTester.run("prefer-instanceof on types named like the DOM's", preferInstanceofRule, {
+    valid: [
+        {
+            name: "a React synthetic event is not reported",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare namespace React {
+                    interface SyntheticEvent<T = Element, E = Event> { nativeEvent: E; currentTarget: T; }
+                    interface UIEvent<T = Element, E = globalThis.UIEvent> extends SyntheticEvent<T, E> {}
+                    interface MouseEvent<T = Element, E = globalThis.MouseEvent> extends UIEvent<T, E> {}
+                }
+                declare const menu: { showAtMouseEvent(evt: MouseEvent): void };
+                export function openMenu(event: React.MouseEvent<HTMLButtonElement, MouseEvent>) {
+                    menu.showAtMouseEvent(event instanceof MouseEvent ? event : event.nativeEvent);
+                }
+            `,
+        },
+        {
+            name: "a syntax tree Node of another package is not reported",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare namespace Unist { interface Node { type: string } interface Parent extends Node { children: Node[] } }
+                class TextNode implements Unist.Node { type = "text"; }
+                declare const node: Unist.Parent;
+                if (node instanceof TextNode) {}
+            `,
+        },
+    ],
+    invalid: [],
+});
+
+// EventTarget operands: `e.target` is typed EventTarget, but in a handler it
+// holds a node of the window the event happened in, so `instanceof` the main
+// window's class is false in a popout. Never fixed; suggested only where the
+// narrowing of `e.target` is kept. With the obsidian typings, which declare
+// UIEvent's targetNode and Node's instanceOf(). Shapes from the
+// community-plugin run (sweep051 analysis/eventtarget.tsv).
+const obsidianRuleTester = atMinAppVersion(new RuleTester({
+    languageOptions: {
+        parserOptions: { project: "./tsconfig.json", tsconfigRootDir: `${process.cwd()}/tests/fixtures/obsidian-project` },
+    },
+}), "1.5.0");
+
+const eventTargetError = (operand: string, className: string, suggestions: { messageId: "useTargetNode" | "castToNode"; output: string }[] = []) => ({
+    messageId: "preferInstanceofOnEventTarget" as const,
+    data: { operand, className },
+    suggestions,
+});
+
+obsidianRuleTester.run("prefer-instanceof on an event's EventTarget", preferInstanceofRule, {
+    valid: [
+        {
+            name: "targetNode?.instanceOf() is not reported",
+            code: "export function f(e: MouseEvent) { if (e.targetNode?.instanceOf(HTMLElement)) {} }",
+        },
+        {
+            name: "a class that is not a Node is not reported",
+            code: "class Widget {} export function f(e: MouseEvent) { if (e.target instanceof Window || e.target instanceof Widget) {} }",
+        },
+        {
+            name: "a constructor of the target's own window is not reported",
+            code: "export function f(e: MouseEvent, el: HTMLElement) { if (e.target instanceof el.win.HTMLElement) {} }",
+        },
+        {
+            name: "an EventTarget that is not an event's property is not reported",
+            code: "export function f(target: EventTarget) { if (target instanceof HTMLElement) {} }",
+        },
+        {
+            name: "a check that falls back to instanceOf() is not reported (operon)",
+            code: "export function f(event: PointerEvent) { const target = event.target instanceof Element || (event.target as Node | null)?.instanceOf?.(Element); return target; }",
+        },
+    ],
+    invalid: [
+        {
+            name: "a guard on a MouseEvent's target suggests targetNode, rewriting the reads after it (IconPicker)",
+            code: `export function onClick(event: MouseEvent) {
+    if (!(event.target instanceof HTMLElement)) return;
+    const icon = event.target.closest(".icon");
+    return icon;
+}`,
+            output: null,
+            errors: [
+                eventTargetError("event.target", "HTMLElement", [
+                    {
+                        messageId: "useTargetNode",
+                        output: `export function onClick(event: MouseEvent) {
+    if (!(event.targetNode?.instanceOf(HTMLElement))) return;
+    const icon = event.targetNode.closest(".icon");
+    return icon;
+}`,
+                    },
+                ]),
+            ],
+        },
+        {
+            name: "a check followed by && in a listener's arrow function suggests targetNode",
+            code: `declare const el: HTMLElement;
+el.addEventListener("click", (e) => { if (e.target instanceof Element && e.target.closest(".ponly")) e.stopPropagation(); });`,
+            output: null,
+            errors: [
+                eventTargetError("e.target", "Element", [
+                    {
+                        messageId: "useTargetNode",
+                        output: `declare const el: HTMLElement;
+el.addEventListener("click", (e) => { if (e.targetNode?.instanceOf(Element) && e.targetNode.closest(".ponly")) e.stopPropagation(); });`,
+                    },
+                ]),
+            ],
+        },
+        {
+            name: "a ?: on a DragEvent's target suggests targetNode in both places",
+            code: "export function onDrop(e: DragEvent) { const target = e.target instanceof HTMLElement ? e.target : null; return target; }",
+            output: null,
+            errors: [
+                eventTargetError("e.target", "HTMLElement", [
+                    {
+                        messageId: "useTargetNode",
+                        output: "export function onDrop(e: DragEvent) { const target = e.targetNode?.instanceOf(HTMLElement) ? e.targetNode : null; return target; }",
+                    },
+                ]),
+            ],
+        },
+        {
+            name: "two checks of a KeyboardEvent's target each suggest targetNode for every read",
+            code: "export function onKey(e: KeyboardEvent) { if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return; }",
+            output: null,
+            errors: [
+                eventTargetError("e.target", "HTMLInputElement", [
+                    {
+                        messageId: "useTargetNode",
+                        output: "export function onKey(e: KeyboardEvent) { if (e.targetNode?.instanceOf(HTMLInputElement) || e.targetNode instanceof HTMLTextAreaElement) return; }",
+                    },
+                ]),
+                eventTargetError("e.target", "HTMLTextAreaElement", [
+                    {
+                        messageId: "useTargetNode",
+                        output: "export function onKey(e: KeyboardEvent) { if (e.targetNode instanceof HTMLInputElement || e.targetNode?.instanceOf(HTMLTextAreaElement)) return; }",
+                    },
+                ]),
+            ],
+        },
+        {
+            name: "relatedTarget whose narrowing is not used again suggests a cast to Node",
+            code: "declare function clear(): void; export function onLeave(event: DragEvent) { if (!(event.relatedTarget instanceof Node)) clear(); }",
+            output: null,
+            errors: [
+                eventTargetError("event.relatedTarget", "Node", [
+                    {
+                        messageId: "castToNode",
+                        output: "declare function clear(): void; export function onLeave(event: DragEvent) { if (!((event.relatedTarget as Node | null)?.instanceOf(Node))) clear(); }",
+                    },
+                ]),
+            ],
+        },
+        {
+            name: "relatedTarget narrowed for a later read gets no suggestion (boardmd)",
+            code: "export function onLeave(event: DragEvent, list: HTMLElement) { if (!(event.relatedTarget instanceof Node) || !list.contains(event.relatedTarget)) list.empty(); }",
+            output: null,
+            errors: [eventTargetError("event.relatedTarget", "Node")],
+        },
+        {
+            name: "a FocusEvent's target, which may be the window, gets no suggestion",
+            code: "export function onFocus(e: FocusEvent) { if (e.target instanceof HTMLElement) {} }",
+            output: null,
+            errors: [eventTargetError("e.target", "HTMLElement")],
+        },
+        {
+            name: "a plain Event's target, which has no targetNode, gets no suggestion",
+            code: "export function onChange(ev: Event) { if (!(ev.target instanceof HTMLInputElement)) return; return ev.target.value; }",
+            output: null,
+            errors: [eventTargetError("ev.target", "HTMLInputElement")],
+        },
+        {
+            name: "currentTarget and srcElement get no suggestion",
+            code: "export function f(event: MouseEvent) { if (event.currentTarget instanceof HTMLElement || event.srcElement instanceof Text) {} }",
+            output: null,
+            errors: [eventTargetError("event.currentTarget", "HTMLElement"), eventTargetError("event.srcElement", "Text")],
+        },
+        {
+            name: "a check whose value is returned gets no suggestion, as ?. makes it undefined",
+            code: "export function f(e: MouseEvent): boolean { return e.target instanceof Node; }",
+            output: null,
+            errors: [eventTargetError("e.target", "Node")],
+        },
+        {
+            name: "a target also compared to the window gets no suggestion",
+            code: "export function f(e: MouseEvent) { if (e.target === window) return; if (e.target instanceof SVGElement) {} }",
+            output: null,
+            errors: [eventTargetError("e.target", "SVGElement")],
+        },
+        {
+            name: "a target also kept in a let gets no suggestion",
+            code: "export function f(e: MouseEvent) { let t = e.target; if (e.target instanceof HTMLElement) t = window; return t; }",
+            output: null,
+            errors: [eventTargetError("e.target", "HTMLElement")],
+        },
+        {
+            name: "an event parameter that is reassigned gets no suggestion",
+            code: "declare const other: MouseEvent; export function f(e: MouseEvent) { if (e.target instanceof HTMLElement) {} e = other; }",
+            output: null,
+            errors: [eventTargetError("e.target", "HTMLElement")],
+        },
+        {
+            name: "a React synthetic event's target is reported without a suggestion",
+            code: `declare namespace React {
+    interface SyntheticEvent<E = Event> { nativeEvent: E; target: EventTarget; }
+    interface MouseEvent extends SyntheticEvent<globalThis.MouseEvent> {}
+}
+export function onClick(e: React.MouseEvent) { if (e.target instanceof HTMLElement) {} }`,
+            output: null,
+            errors: [eventTargetError("e.target", "HTMLElement")],
+        },
+    ],
+});
+
+// Popout windows came with Obsidian 0.15.0, and instanceOf() and targetNode
+// with 0.15.3: below 0.15.0 nothing is reported, and below 0.15.3 nothing is
+// fixed or suggested. With no version known, the fix stays, and a suggestion
+// says which version it needs.
+const versionRuleTester = new RuleTester();
+const versionObsidianRuleTester = new RuleTester({
+    languageOptions: {
+        parserOptions: { project: "./tsconfig.json", tsconfigRootDir: `${process.cwd()}/tests/fixtures/obsidian-project` },
+    },
+});
+const at = (minAppVersion: string): [{ minAppVersion: string }] => [{ minAppVersion }];
+const NODE_CHECK = `${OBSIDIAN_INSTANCEOF}
+                declare const el: Node;
+                if (el instanceof HTMLElement) {}
+            `;
+const NULLABLE_CHECK = `${OBSIDIAN_INSTANCEOF}
+                declare const el: HTMLElement;
+                if (el.parentElement instanceof HTMLDivElement) {}
+            `;
+
+versionRuleTester.run("prefer-instanceof and minAppVersion", preferInstanceofRule, {
+    valid: [
+        { name: "below 0.15.0, which has no popout windows, nothing is reported", code: NODE_CHECK, options: at("0.14.9") },
+    ],
+    invalid: [
+        {
+            name: "at 0.15.0 it is reported without a fix",
+            code: NODE_CHECK,
+            options: at("0.15.0"),
+            output: null,
+            errors: [{ messageId: "preferInstanceof", suggestions: [] }],
+        },
+        {
+            name: "at 0.15.2 a nullable value gets no suggestion",
+            code: NULLABLE_CHECK,
+            options: at("0.15.2"),
+            output: null,
+            errors: [{ messageId: "preferInstanceof", suggestions: [] }],
+        },
+        {
+            name: "with the repository's manifest.json at 0.15.0 it is reported without a fix",
+            code: NODE_CHECK,
+            output: null,
+            errors: [{ messageId: "preferInstanceof", suggestions: [] }],
+        },
+        {
+            name: "at 0.15.3 it is fixed",
+            code: NODE_CHECK,
+            options: at("0.15.3"),
+            output: NODE_CHECK.replace("el instanceof HTMLElement", "el.instanceOf(HTMLElement)"),
+            errors: [{ messageId: "preferInstanceof" }],
+        },
+        {
+            name: "with an unknown version it is fixed as before",
+            code: NODE_CHECK,
+            options: at("latest"),
+            output: NODE_CHECK.replace("el instanceof HTMLElement", "el.instanceOf(HTMLElement)"),
+            errors: [{ messageId: "preferInstanceof" }],
+        },
+        {
+            name: "with an unknown version a suggestion says it needs 0.15.3",
+            code: NULLABLE_CHECK,
+            options: at("latest"),
+            output: null,
+            errors: [
+                {
+                    messageId: "preferInstanceof",
+                    suggestions: [
+                        {
+                            messageId: "preferInstanceofOptionalSuggestionSince",
+                            data: { className: "HTMLDivElement", since: "0.15.3" },
+                            output: NULLABLE_CHECK.replace("el.parentElement instanceof HTMLDivElement", "el.parentElement?.instanceOf(HTMLDivElement)"),
+                        },
+                    ],
+                },
+            ],
+        },
+    ],
+});
+
+const TARGET_CHECK = "export function f(e: MouseEvent) { if (e.target instanceof HTMLElement) {} }";
+const RELATED_CHECK = "export function f(e: MouseEvent) { if (e.relatedTarget instanceof Node) {} }";
+
+versionObsidianRuleTester.run("prefer-instanceof on event targets and minAppVersion", preferInstanceofRule, {
+    valid: [{ name: "below 0.15.0 an event target is not reported", code: TARGET_CHECK, options: at("0.14.9") }],
+    invalid: [
+        {
+            name: "at 0.15.2 an event target is reported without a suggestion",
+            code: TARGET_CHECK,
+            options: at("0.15.2"),
+            output: null,
+            errors: [{ messageId: "preferInstanceofOnEventTarget", suggestions: [] }],
+        },
+        {
+            name: "at 0.15.3 targetNode is suggested",
+            code: TARGET_CHECK,
+            options: at("0.15.3"),
+            output: null,
+            errors: [
+                {
+                    messageId: "preferInstanceofOnEventTarget",
+                    suggestions: [{ messageId: "useTargetNode", output: TARGET_CHECK.replace("e.target instanceof HTMLElement", "e.targetNode?.instanceOf(HTMLElement)") }],
+                },
+            ],
+        },
+        {
+            name: "with an unknown version targetNode and the cast say they need 0.15.3",
+            code: `${TARGET_CHECK} ${RELATED_CHECK.replace("function f", "function g")}`,
+            options: at("latest"),
+            output: null,
+            errors: [
+                {
+                    messageId: "preferInstanceofOnEventTarget",
+                    suggestions: [
+                        {
+                            messageId: "useTargetNodeSince",
+                            output: `${TARGET_CHECK.replace("e.target instanceof HTMLElement", "e.targetNode?.instanceOf(HTMLElement)")} ${RELATED_CHECK.replace("function f", "function g")}`,
+                        },
+                    ],
+                },
+                {
+                    messageId: "preferInstanceofOnEventTarget",
+                    suggestions: [
+                        {
+                            messageId: "castToNodeSince",
+                            output: `${TARGET_CHECK} ${RELATED_CHECK.replace("function f", "function g").replace("e.relatedTarget instanceof Node", "(e.relatedTarget as Node | null)?.instanceOf(Node)")}`,
+                        },
+                    ],
+                },
+            ],
+        },
+    ],
+});
+
+const optional = (className: string, output: string) => [{
+    messageId: "preferInstanceofOptionalSuggestion" as const,
+    data: { className },
+    output,
+}];
+
+// `e.relatedTarget as HTMLElement` leaves `null` out of the type but not out
+// of the value: `next.instanceOf()` threw where `instanceof` was false.
+ruleTester.run("prefer-instanceof with a type assertion that leaves out null", preferInstanceofRule, {
+    valid: [],
+    invalid: [
+        {
+            name: "a const set to a cast of a nullable value",
+            code: `${OBSIDIAN_INSTANCEOF}
+                export function onBlur(e: FocusEvent, box: HTMLElement) {
+                    const next = e.relatedTarget as HTMLElement;
+                    if (next instanceof HTMLElement && box.contains(next)) return;
+                }`,
+            output: null,
+            errors: [{
+                messageId: "preferInstanceof",
+                suggestions: optional("HTMLElement", `${OBSIDIAN_INSTANCEOF}
+                export function onBlur(e: FocusEvent, box: HTMLElement) {
+                    const next = e.relatedTarget as HTMLElement;
+                    if (next?.instanceOf(HTMLElement) && box.contains(next)) return;
+                }`),
+            }],
+        },
+        {
+            name: "a cast in the check, with <T> and through unknown",
+            code: `${OBSIDIAN_INSTANCEOF}
+                export function onBlur(e: FocusEvent) {
+                    if ((e.relatedTarget as Node) instanceof HTMLElement) {}
+                    if ((e.relatedTarget as unknown as Node) instanceof HTMLElement) {}
+                }`,
+            output: null,
+            errors: [
+                {
+                    messageId: "preferInstanceof",
+                    suggestions: optional("HTMLElement", `${OBSIDIAN_INSTANCEOF}
+                export function onBlur(e: FocusEvent) {
+                    if ((e.relatedTarget as Node)?.instanceOf(HTMLElement)) {}
+                    if ((e.relatedTarget as unknown as Node) instanceof HTMLElement) {}
+                }`),
+                },
+                {
+                    messageId: "preferInstanceof",
+                    suggestions: optional("HTMLElement", `${OBSIDIAN_INSTANCEOF}
+                export function onBlur(e: FocusEvent) {
+                    if ((e.relatedTarget as Node) instanceof HTMLElement) {}
+                    if ((e.relatedTarget as unknown as Node)?.instanceOf(HTMLElement)) {}
+                }`),
+                },
+            ],
+        },
+        {
+            name: "a cast of a value that is never null, and a non-null assertion, are still fixed",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare const target: EventTarget;
+                declare const el: HTMLElement;
+                const node = target as Node;
+                if (node instanceof HTMLElement) {}
+                if (el.parentElement! instanceof HTMLElement) {}`,
+            output: `${OBSIDIAN_INSTANCEOF}
+                declare const target: EventTarget;
+                declare const el: HTMLElement;
+                const node = target as Node;
+                if (node.instanceOf(HTMLElement)) {}
+                if (el.parentElement!.instanceOf(HTMLElement)) {}`,
+            errors: [{ messageId: "preferInstanceof" }, { messageId: "preferInstanceof" }],
+        },
+    ],
+});
+
+nonStrictRuleTester.run("prefer-instanceof without strictNullChecks, past an annotation or a field", preferInstanceofRule, {
+    valid: [],
+    invalid: [
+        {
+            name: "an annotated variable set from a nullable call",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare const root: HTMLElement;
+                const input: Element = root.querySelector("input");
+                if (input instanceof HTMLInputElement) {}`,
+            output: null,
+            errors: [{
+                messageId: "preferInstanceof",
+                suggestions: optional("HTMLInputElement", `${OBSIDIAN_INSTANCEOF}
+                declare const root: HTMLElement;
+                const input: Element = root.querySelector("input");
+                if (input?.instanceOf(HTMLInputElement)) {}`),
+            }],
+        },
+        {
+            name: "a cast of a nullable value",
+            code: `${OBSIDIAN_INSTANCEOF}
+                export function onBlur(e: FocusEvent) {
+                    if ((e.relatedTarget as Node) instanceof HTMLElement) {}
+                }`,
+            output: null,
+            errors: [{
+                messageId: "preferInstanceof",
+                suggestions: optional("HTMLElement", `${OBSIDIAN_INSTANCEOF}
+                export function onBlur(e: FocusEvent) {
+                    if ((e.relatedTarget as Node)?.instanceOf(HTMLElement)) {}
+                }`),
+            }],
+        },
+        {
+            name: "a class field without an initializer, set later",
+            code: `${OBSIDIAN_INSTANCEOF}
+                export class V {
+                    inputEl: Element;
+                    check() { if (this.inputEl instanceof HTMLInputElement) {} }
+                }`,
+            output: null,
+            errors: [{
+                messageId: "preferInstanceof",
+                suggestions: optional("HTMLInputElement", `${OBSIDIAN_INSTANCEOF}
+                export class V {
+                    inputEl: Element;
+                    check() { if (this.inputEl?.instanceOf(HTMLInputElement)) {} }
+                }`),
+            }],
+        },
+        {
+            name: "a field with an initializer, a !, or set in the constructor is still fixed",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare function make(): Element;
+                export class V {
+                    a: Element = make();
+                    b!: Element;
+                    c: Element;
+                    constructor() { this.c = make(); }
+                    check() { return [this.a instanceof HTMLElement, this.b instanceof HTMLElement, this.c instanceof HTMLElement]; }
+                }`,
+            output: `${OBSIDIAN_INSTANCEOF}
+                declare function make(): Element;
+                export class V {
+                    a: Element = make();
+                    b!: Element;
+                    c: Element;
+                    constructor() { this.c = make(); }
+                    check() { return [this.a.instanceOf(HTMLElement), this.b.instanceOf(HTMLElement), this.c.instanceOf(HTMLElement)]; }
+                }`,
+            errors: [{ messageId: "preferInstanceof" }, { messageId: "preferInstanceof" }, { messageId: "preferInstanceof" }],
+        },
+    ],
+});
+
+// Node.instanceOf() takes a `new () => T`: `el.instanceOf(Base)` did not
+// compile for an abstract class or one whose constructor needs arguments.
+// Such a class is the plugin's own, which `instanceof` finds in every window.
+ruleTester.run("prefer-instanceof against a class instanceOf() cannot take", preferInstanceofRule, {
+    valid: [
+        {
+            name: "an abstract class, and a constructor with a required parameter",
+            code: `${OBSIDIAN_INSTANCEOF}
+                abstract class Base extends HTMLElement {}
+                class Widget extends HTMLElement { constructor(public id2: string) { super(); } }
+                declare const el: Node;
+                declare const evt: UIEvent;
+                abstract class BaseEvent extends MouseEvent {}
+                if (el instanceof Base || el instanceof Widget || evt instanceof BaseEvent) {}`,
+        },
+    ],
+    invalid: [
+        {
+            name: "an optional parameter, an inherited constructor, and an event class with arguments",
+            code: `${OBSIDIAN_INSTANCEOF}
+                class Widget extends HTMLElement { constructor(public id2?: string) { super(); } }
+                class Plain extends HTMLElement {}
+                declare const el: Node;
+                declare const evt: UIEvent;
+                if (el instanceof Widget || el instanceof Plain || evt instanceof MouseEvent) {}`,
+            output: `${OBSIDIAN_INSTANCEOF}
+                class Widget extends HTMLElement { constructor(public id2?: string) { super(); } }
+                class Plain extends HTMLElement {}
+                declare const el: Node;
+                declare const evt: UIEvent;
+                if (el.instanceOf(Widget) || el.instanceOf(Plain) || evt.instanceOf(MouseEvent)) {}`,
+            errors: [{ messageId: "preferInstanceof" }, { messageId: "preferInstanceof" }, { messageId: "preferInstanceof" }],
+        },
+    ],
+});
+
+ruleTester.run("prefer-instanceof with a comment outside the operands", preferInstanceofRule, {
+    valid: [],
+    invalid: [
+        {
+            name: "is offered as a suggestion only, and a comment inside an operand is kept by the fix",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare const el: Node;
+                if (el /* popout-safe? */ instanceof HTMLElement) {}
+                if (el instanceof /* the class */ HTMLElement) {}
+                if ((el /* kept */ as Node) instanceof HTMLElement) {}`,
+            output: `${OBSIDIAN_INSTANCEOF}
+                declare const el: Node;
+                if (el /* popout-safe? */ instanceof HTMLElement) {}
+                if (el instanceof /* the class */ HTMLElement) {}
+                if ((el /* kept */ as Node).instanceOf(HTMLElement)) {}`,
+            errors: [
+                {
+                    messageId: "preferInstanceof",
+                    suggestions: [{ messageId: "preferInstanceofSuggestion", data: { className: "HTMLElement" }, output: `${OBSIDIAN_INSTANCEOF}
+                declare const el: Node;
+                if (el.instanceOf(HTMLElement)) {}
+                if (el instanceof /* the class */ HTMLElement) {}
+                if ((el /* kept */ as Node) instanceof HTMLElement) {}` }],
+                },
+                {
+                    messageId: "preferInstanceof",
+                    suggestions: [{ messageId: "preferInstanceofSuggestion", data: { className: "HTMLElement" }, output: `${OBSIDIAN_INSTANCEOF}
+                declare const el: Node;
+                if (el /* popout-safe? */ instanceof HTMLElement) {}
+                if (el.instanceOf(HTMLElement)) {}
+                if ((el /* kept */ as Node) instanceof HTMLElement) {}` }],
+                },
+                { messageId: "preferInstanceof" },
+            ],
         },
     ],
 });

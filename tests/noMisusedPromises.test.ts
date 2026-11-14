@@ -1,4 +1,6 @@
 import assert from "node:assert";
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { RuleTester } from "@typescript-eslint/rule-tester";
 import tseslint from "typescript-eslint";
@@ -129,6 +131,15 @@ ruleTester.run("no-misused-promises", noMisusedPromisesRule, {
             `,
         },
         {
+            name: "an async onload in a Plugin, which 1.7.2 and later typings declare as Promise<void> | void, as upstream",
+            code: `
+                import { Plugin } from "obsidian";
+                export default class MyPlugin extends Plugin {
+                    async onload(): Promise<void> { await Promise.resolve(); }
+                }
+            `,
+        },
+        {
             name: "checksConditionals: false still turns the check off",
             code: `
                 declare const promise: Promise<void>;
@@ -253,6 +264,16 @@ ruleTester.run("no-misused-promises", noMisusedPromisesRule, {
                     async onunload(): Promise<void> {
                         await Promise.resolve();
                     }
+                }
+            `,
+            errors: [{ messageId: "voidReturnInheritedMethod" }],
+        },
+        {
+            name: "an async onunload in a Plugin, which Obsidian does not await",
+            code: `
+                import { Plugin } from "obsidian";
+                export default class MyPlugin extends Plugin {
+                    async onunload(): Promise<void> { await Promise.resolve(); }
                 }
             `,
             errors: [{ messageId: "voidReturnInheritedMethod" }],
@@ -708,3 +729,157 @@ function standIn<T extends object>(target: T, overrides: Record<string, unknown>
         },
     });
 }
+
+// Typings before 1.7.2 declare no Plugin.onload, so a plugin's onload overrides
+// Component.onload(): void. Obsidian awaits it all the same, and the sample
+// plugin's `async onload()` is not reported. Each project here has an obsidian
+// package of its own with such typings, in the two shapes they came in.
+describe("no-misused-promises with obsidian typings older than 1.7.2", function () {
+    this.timeout(60000);
+    const dirs: string[] = [];
+
+    after(() => {
+        for (const dir of dirs) {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    const component = `
+        export class Component {
+            load(): void;
+            onload(): void;
+            unload(): void;
+            onunload(): void;
+        }
+        export class Modal {
+            onOpen(): void;
+        }
+    `;
+    const typings = {
+        // 1.6.6 and earlier
+        Plugin: `${component}
+            export abstract class Plugin extends Component {
+                loadData(): Promise<any>;
+            }
+        `,
+        // Some releases name the class Plugin_2 and export it as Plugin.
+        Plugin_2: `${component}
+            abstract class Plugin_2 extends Component {
+                loadData(): Promise<any>;
+            }
+            export { Plugin_2 as Plugin }
+        `,
+    };
+
+    function project(obsidianDts: string): string {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), "no-misused-promises-old-obsidian-"));
+        dirs.push(dir);
+        const obsidian = path.join(dir, "node_modules", "obsidian");
+        fs.mkdirSync(obsidian, { recursive: true });
+        fs.writeFileSync(
+            path.join(obsidian, "package.json"),
+            JSON.stringify({ name: "obsidian", version: "1.6.6", types: "obsidian.d.ts" }),
+        );
+        fs.writeFileSync(path.join(obsidian, "obsidian.d.ts"), obsidianDts);
+        fs.writeFileSync(path.join(dir, "tsconfig.json"), JSON.stringify({
+            compilerOptions: { strict: true, target: "es2022", module: "commonjs", lib: ["es2022"], types: [] },
+            include: ["main.ts"],
+        }));
+        return dir;
+    }
+
+    function lint(dir: string, code: string): string[] {
+        fs.writeFileSync(path.join(dir, "main.ts"), code);
+        const messages = new Linter({ cwd: dir }).verify(
+            code,
+            [{
+                files: ["**/*.ts"],
+                languageOptions: {
+                    parser: tseslint.parser,
+                    parserOptions: { project: "./tsconfig.json", tsconfigRootDir: dir, disallowAutomaticSingleRunInference: true },
+                },
+                plugins: { obsidianmd: { rules: { "no-misused-promises": noMisusedPromisesRule } } as unknown as ESLint.Plugin },
+                rules: { "obsidianmd/no-misused-promises": "error" },
+            }],
+            path.join(dir, "main.ts"),
+        );
+        assert.deepStrictEqual(messages.filter((m) => m.fatal).map((m) => m.message), []);
+        return messages.map((m) => `${m.line}: ${m.message}`);
+    }
+
+    for (const [name, dts] of Object.entries(typings)) {
+        describe(`with the class declared as ${name}`, () => {
+            let dir: string;
+            before(() => {
+                dir = project(dts);
+            });
+
+            it("does not report an async onload in a Plugin, as a method or an arrow-function property, in a class declaration or expression", () => {
+                assert.deepStrictEqual(lint(dir, [
+                    `import { Plugin } from "obsidian";`,
+                    `export default class MyPlugin extends Plugin {`,
+                    `    async onload() { await this.loadData(); }`,
+                    `}`,
+                    `export class Other extends Plugin {`,
+                    `    onload = async (): Promise<void> => { await this.loadData(); };`,
+                    `}`,
+                    `export const Anonymous = class extends Plugin {`,
+                    `    async onload() { await this.loadData(); }`,
+                    `};`,
+                ].join("\n")), []);
+            });
+
+            it("does not report an async onload in a subclass of a Plugin subclass that leaves onload alone", () => {
+                assert.deepStrictEqual(lint(dir, [
+                    `import { Plugin } from "obsidian";`,
+                    `abstract class Base extends Plugin {`,
+                    `    settings = {};`,
+                    `}`,
+                    `export default class MyPlugin extends Base {`,
+                    `    async onload() { await this.loadData(); }`,
+                    `}`,
+                ].join("\n")), []);
+            });
+
+            it("still reports onunload, other methods and onload outside a Plugin", () => {
+                const heritage = name === "Plugin" ? "Plugin" : "Plugin_2";
+                assert.deepStrictEqual(lint(dir, [
+                    `import { Component, Modal, Plugin } from "obsidian";`,
+                    `export default class MyPlugin extends Plugin {`,
+                    `    async onload() { await this.loadData(); }`,
+                    `    async onunload() { await this.loadData(); }`,
+                    `}`,
+                    `export class Child extends Component {`,
+                    `    async onload() { await Promise.resolve(); }`,
+                    `}`,
+                    `export class Dialog extends Modal {`,
+                    `    async onOpen() { await Promise.resolve(); }`,
+                    `}`,
+                ].join("\n")), [
+                    `4: Promise-returning method provided where a void return was expected by extended/implemented type '${heritage}'.`,
+                    "7: Promise-returning method provided where a void return was expected by extended/implemented type 'Component'.",
+                    "10: Promise-returning method provided where a void return was expected by extended/implemented type 'Modal'.",
+                ]);
+            });
+
+            it("still reports an onload that your own class or interface declares as void", () => {
+                assert.deepStrictEqual(lint(dir, [
+                    `import { Plugin } from "obsidian";`,
+                    `abstract class Base extends Plugin {`,
+                    `    onload(): void {}`,
+                    `}`,
+                    `export default class MyPlugin extends Base {`,
+                    `    async onload() { await this.loadData(); }`,
+                    `}`,
+                    `interface Loadable { onload(): void; }`,
+                    `export class Other extends Plugin implements Loadable {`,
+                    `    async onload() { await this.loadData(); }`,
+                    `}`,
+                ].join("\n")), [
+                    "6: Promise-returning method provided where a void return was expected by extended/implemented type 'Base'.",
+                    "10: Promise-returning method provided where a void return was expected by extended/implemented type 'Loadable'.",
+                ]);
+            });
+        });
+    }
+});

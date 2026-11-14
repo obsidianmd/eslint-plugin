@@ -5,6 +5,9 @@ import detachLeavesRule from "../lib/rules/detachLeaves.js";
 const ruleTester = new RuleTester();
 
 const IMPORT = 'import { Plugin } from "obsidian";\n';
+// A plugin whose base class is the file's own: the method that is left
+// empty stays, as it overrides the base's.
+const BASE = IMPORT + "class Base extends Plugin {}\n";
 
 ruleTester.run("detach-leaves", detachLeavesRule, {
     valid: [
@@ -41,19 +44,53 @@ ruleTester.run("detach-leaves", detachLeavesRule, {
             name: "a computed string other than onunload is not checked",
             code: 'class MyPlugin { ["onload"]() { this.app.workspace.detachLeavesOfType("foo"); } }',
         },
+        {
+            // metadata-menu's FileClassViewManager: a Component the plugin
+            // unloads while it keeps running, which detaches the leaves of a
+            // view type it then unregisters.
+            name: "the onunload of a Component, or of a class that extends nothing, is not checked",
+            code: [
+                'import * as obsidian from "obsidian";',
+                'import { Component } from "obsidian";',
+                "class Helper extends obsidian.Component {",
+                "    onunload() {",
+                '        this.app.workspace.detachLeavesOfType("foo");',
+                "    }",
+                "}",
+                "export class FileClassViewManager extends Component {",
+                "    onunload(): void {",
+                "        this.plugin.app.workspace.detachLeavesOfType(this.fileClassViewType);",
+                "        this.plugin.app.viewRegistry.unregisterView(this.fileClassViewType);",
+                "    }",
+                "}",
+                'class Cache { onunload() { this.app.workspace.detachLeavesOfType("foo"); } }',
+            ].join("\n"),
+        },
+        {
+            name: "a Plugin that is not obsidian's is not checked",
+            code: 'import { Plugin } from "./base";\nclass MyPlugin extends Plugin { onunload() { this.app.workspace.detachLeavesOfType("foo"); } }',
+        },
+        {
+            name: "a Plugin that is not declared is not checked",
+            code: 'class MyPlugin extends Plugin { onunload() { this.app.workspace.detachLeavesOfType("foo"); } }',
+        },
+        {
+            name: "a class of the file's own that extends a Component is not checked",
+            code: 'import { Component } from "obsidian";\nclass Base extends Component {}\nclass Child extends Base { onunload() { this.app.workspace.detachLeavesOfType("foo"); } }',
+        },
     ],
     invalid: [
         {
             name: "detachLeavesOfType in onunload is forbidden",
-            code: 'class MyPlugin { onunload() { this.detachLeavesOfType("foo"); } }',
+            code: BASE + 'class MyPlugin extends Base { onunload() { this.detachLeavesOfType("foo"); } }',
             errors: [{ messageId: "onunload" }],
-            output: "class MyPlugin { onunload() {} }",
+            output: BASE + "class MyPlugin extends Base { onunload() {} }",
         },
         {
             name: "detachLeavesOfType on the workspace in onunload is forbidden",
-            code: 'class MyPlugin { onunload() { this.app.workspace.detachLeavesOfType("foo"); } }',
+            code: BASE + 'class MyPlugin extends Base { onunload() { this.app.workspace.detachLeavesOfType("foo"); } }',
             errors: [{ messageId: "onunload" }],
-            output: "class MyPlugin { onunload() {} }",
+            output: BASE + "class MyPlugin extends Base { onunload() {} }",
         },
 
         // Removing the whole method: the class extends Obsidian's Plugin, whose
@@ -280,8 +317,8 @@ ruleTester.run("detach-leaves", detachLeavesRule, {
         },
         {
             name: "the call's line goes when other statements precede it",
-            code: [
-                "class MyPlugin {",
+            code: BASE + [
+                "class MyPlugin extends Base {",
                 "\tonunload() {",
                 "\t\tthis.saveSettings();",
                 '\t\tthis.app.workspace.detachLeavesOfType("foo");',
@@ -289,8 +326,8 @@ ruleTester.run("detach-leaves", detachLeavesRule, {
                 "}",
             ].join("\n"),
             errors: [{ messageId: "onunload" }],
-            output: [
-                "class MyPlugin {",
+            output: BASE + [
+                "class MyPlugin extends Base {",
                 "\tonunload() {",
                 "\t\tthis.saveSettings();",
                 "\t}",
@@ -305,21 +342,21 @@ ruleTester.run("detach-leaves", detachLeavesRule, {
         },
         {
             name: "a call followed by code on its line goes with the space after it",
-            code: 'class MyPlugin { onunload() { this.app.workspace.detachLeavesOfType("foo"); this.saveSettings(); } }',
+            code: BASE + 'class MyPlugin extends Base { onunload() { this.app.workspace.detachLeavesOfType("foo"); this.saveSettings(); } }',
             errors: [{ messageId: "onunload" }],
-            output: "class MyPlugin { onunload() { this.saveSettings(); } }",
+            output: BASE + "class MyPlugin extends Base { onunload() { this.saveSettings(); } }",
         },
         {
             name: "a call after code on its line goes with the space before it",
-            code: 'class MyPlugin { onunload() { this.saveSettings(); this.app.workspace.detachLeavesOfType("foo"); } }',
+            code: BASE + 'class MyPlugin extends Base { onunload() { this.saveSettings(); this.app.workspace.detachLeavesOfType("foo"); } }',
             errors: [{ messageId: "onunload" }],
-            output: "class MyPlugin { onunload() { this.saveSettings(); } }",
+            output: BASE + "class MyPlugin extends Base { onunload() { this.saveSettings(); } }",
         },
         {
             name: "a call that ends a line after other code leaves the line break",
-            code: 'class MyPlugin { onunload() { this.saveSettings(); this.app.workspace.detachLeavesOfType("foo");\n} }',
+            code: BASE + 'class MyPlugin extends Base { onunload() { this.saveSettings(); this.app.workspace.detachLeavesOfType("foo");\n} }',
             errors: [{ messageId: "onunload" }],
-            output: "class MyPlugin { onunload() { this.saveSettings();\n} }",
+            output: BASE + "class MyPlugin extends Base { onunload() { this.saveSettings();\n} }",
         },
 
         // Comments are never removed, and the method that holds them stays.
@@ -420,18 +457,6 @@ ruleTester.run("detach-leaves", detachLeavesRule, {
             ].join("\n"),
         },
         {
-            name: "a Plugin that is not obsidian's keeps the method",
-            code: 'import { Plugin } from "./base";\nclass MyPlugin extends Plugin {\n    onunload() {\n        this.app.workspace.detachLeavesOfType("foo");\n    }\n}',
-            errors: [{ messageId: "onunload" }],
-            output: 'import { Plugin } from "./base";\nclass MyPlugin extends Plugin {\n    onunload() {}\n}',
-        },
-        {
-            name: "a Plugin that is not imported keeps the method",
-            code: 'class MyPlugin extends Plugin {\n    onunload() {\n        this.app.workspace.detachLeavesOfType("foo");\n    }\n}',
-            errors: [{ messageId: "onunload" }],
-            output: "class MyPlugin extends Plugin {\n    onunload() {}\n}",
-        },
-        {
             name: "an async onunload keeps the method, which returns a promise",
             code: IMPORT + 'class MyPlugin extends Plugin {\n    async onunload() {\n        this.app.workspace.detachLeavesOfType("foo");\n    }\n}',
             errors: [{ messageId: "onunload" }],
@@ -514,44 +539,6 @@ ruleTester.run("detach-leaves", detachLeavesRule, {
             output: IMPORT + 'class MyPlugin extends Plugin {\n    "onunload"(): void;\n    onunload() {}\n}',
         },
         {
-            name: "a Component from obsidian, or a type-only Plugin import, keeps the method",
-            code: [
-                'import * as obsidian from "obsidian";',
-                'import { Component } from "obsidian";',
-                'import type { Plugin } from "obsidian";',
-                "class Helper extends obsidian.Component {",
-                "    onunload() {",
-                '        this.app.workspace.detachLeavesOfType("foo");',
-                "    }",
-                "}",
-                "class Child extends Component {",
-                "    onunload() {",
-                '        this.app.workspace.detachLeavesOfType("foo");',
-                "    }",
-                "}",
-                "class MyPlugin extends Plugin {",
-                "    onunload() {",
-                '        this.app.workspace.detachLeavesOfType("foo");',
-                "    }",
-                "}",
-            ].join("\n"),
-            errors: [{ messageId: "onunload" }, { messageId: "onunload" }, { messageId: "onunload" }],
-            output: [
-                'import * as obsidian from "obsidian";',
-                'import { Component } from "obsidian";',
-                'import type { Plugin } from "obsidian";',
-                "class Helper extends obsidian.Component {",
-                "    onunload() {}",
-                "}",
-                "class Child extends Component {",
-                "    onunload() {}",
-                "}",
-                "class MyPlugin extends Plugin {",
-                "    onunload() {}",
-                "}",
-            ].join("\n"),
-        },
-        {
             name: "a field ended by a semicolon, or a static block, before the method lets it go",
             code: IMPORT + [
                 "class FieldPlugin extends Plugin {",
@@ -589,9 +576,9 @@ ruleTester.run("detach-leaves", detachLeavesRule, {
         },
         {
             name: "a quoted onunload is onunload",
-            code: 'class MyPlugin { "onunload"() { this.app.workspace.detachLeavesOfType("foo"); } }',
+            code: BASE + 'class MyPlugin extends Base { "onunload"() { this.app.workspace.detachLeavesOfType("foo"); } }',
             errors: [{ messageId: "onunload" }],
-            output: 'class MyPlugin { "onunload"() {} }',
+            output: BASE + 'class MyPlugin extends Base { "onunload"() {} }',
         },
         {
             name: "a quoted onunload in a Plugin goes like an unquoted one",
@@ -663,6 +650,11 @@ new EslintRuleTester().run("detach-leaves with ESLint's default parser", detachL
         },
         { name: "a private #onunload", code: 'class MyPlugin { #onunload() { this.app.workspace.detachLeavesOfType("foo"); } }' },
         { name: "an arrow-function property", code: 'class MyPlugin { onunload = () => { this.app.workspace.detachLeavesOfType("foo"); }; }' },
+        { name: "a class that does not extend Plugin", code: 'class MyPlugin { onunload() { this.app.workspace.detachLeavesOfType("foo"); } }' },
+        {
+            name: "a Component from obsidian",
+            code: 'import { Component } from "obsidian";\nclass Child extends Component { onunload() { this.app.workspace.detachLeavesOfType("foo"); } }',
+        },
     ],
     invalid: [
         {
@@ -672,10 +664,10 @@ new EslintRuleTester().run("detach-leaves with ESLint's default parser", detachL
             output: IMPORT + "class MyPlugin extends Plugin {}",
         },
         {
-            name: "the call goes, and the method stays, in a class that does not extend Plugin",
-            code: 'class MyPlugin { onunload() { this.app.workspace.detachLeavesOfType("foo"); } }',
+            name: "the call goes, and the method stays, in a class that extends a plugin class of the file's own",
+            code: BASE + 'class MyPlugin extends Base { onunload() { this.app.workspace.detachLeavesOfType("foo"); } }',
             errors: [{ messageId: "onunload" }],
-            output: "class MyPlugin { onunload() {} }",
+            output: BASE + "class MyPlugin extends Base { onunload() {} }",
         },
         {
             name: "a quoted onunload goes like an unquoted one",
@@ -718,6 +710,29 @@ new EslintRuleTester().run("detach-leaves with ESLint's default parser", detachL
                 "class D extends Plugin {\n    *onunload() {}\n}",
                 "class E extends Plugin {\n    onunload(reason = this.track()) {}\n}",
             ].join("\n"),
+        },
+    ],
+});
+
+// With type information, a plugin class from another file counts: its base
+// class is found by type.
+ruleTester.run("detach-leaves with type information", detachLeavesRule, {
+    valid: [
+        {
+            name: "a class of another file that extends Component is not a plugin",
+            code: 'import { Component } from "obsidian";\ndeclare const Base: typeof Component;\nclass Child extends Base { onunload() { this.app.workspace.detachLeavesOfType("foo"); } }',
+        },
+        {
+            name: "a class named Plugin of another package is not obsidian's",
+            code: 'declare class Plugin { app: any }\ndeclare const Base: typeof Plugin;\nclass MyPlugin extends Base { onunload() { this.app.workspace.detachLeavesOfType("foo"); } }',
+        },
+    ],
+    invalid: [
+        {
+            name: "a plugin whose base class comes from elsewhere is found by type, and keeps the method",
+            code: 'import { Plugin } from "obsidian";\ndeclare class BasePlugin extends Plugin {}\ndeclare const Mixed: typeof BasePlugin;\nclass MyPlugin extends Mixed {\n    onunload() {\n        this.app.workspace.detachLeavesOfType("foo");\n    }\n}',
+            errors: [{ messageId: "onunload" }],
+            output: 'import { Plugin } from "obsidian";\ndeclare class BasePlugin extends Plugin {}\ndeclare const Mixed: typeof BasePlugin;\nclass MyPlugin extends Mixed {\n    onunload() {}\n}',
         },
     ],
 });

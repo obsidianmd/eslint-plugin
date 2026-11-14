@@ -98,6 +98,19 @@ function removalRanges(
     return [[comma.range[0], comma.range[1]], [start, property.range[1]]];
 }
 
+// `hotkeys: []`, also as `[] as Hotkey[]`: no hotkey at all.
+function isEmptyArray(value: TSESTree.Node): boolean {
+    let current = value;
+    while (
+        current.type === TSESTree.AST_NODE_TYPES.TSAsExpression ||
+        current.type === TSESTree.AST_NODE_TYPES.TSSatisfiesExpression ||
+        current.type === TSESTree.AST_NODE_TYPES.TSTypeAssertion
+    ) {
+        current = current.expression;
+    }
+    return current.type === TSESTree.AST_NODE_TYPES.ArrayExpression && current.elements.length === 0;
+}
+
 export default ruleCreator({
     meta: {
         type: "suggestion" as const,
@@ -130,7 +143,8 @@ export default ruleCreator({
                 const commandObject = node.arguments[0];
                 for (const property of commandObject.properties) {
                     if (
-                        isCommandProperty(property, "hotkeys")
+                        isCommandProperty(property, "hotkeys") &&
+                        !isEmptyArray(property.value)
                     ) {
                         const ranges = propertyRemoval(context.sourceCode, commandObject, property);
                         context.report({

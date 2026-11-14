@@ -1,6 +1,11 @@
-import { ASTUtils, ESLintUtils, TSESTree } from "@typescript-eslint/utils";
+import { ASTUtils, ESLintUtils, TSESLint, TSESTree } from "@typescript-eslint/utils";
 import ts from "typescript";
+import { mayRunOutsideObsidianAt } from "../globalWindow.js";
+import { type MinAppVersionOptions, minAppVersionSchema, supportsVersion } from "../minAppVersion.js";
+import { API_SINCE, laterVersion } from "../obsidianApiVersions.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
+
+const { DefinitionType } = TSESLint.Scope;
 
 const TAG_SHORTHANDS: Record<string, string> = {
     div: "createDiv",
@@ -11,6 +16,11 @@ const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
 
 // A replacement that calls one of Obsidian's global helpers by its bare name.
 const BARE_HELPER_CALL = /^(createEl|createDiv|createSpan|createSvg|createFragment)(?:\?\.)?\(/;
+
+// Obsidian's DOM helpers. Code in a function by one of these names is taken for
+// an implementation of the helpers, such as a polyfill or a test fake, where
+// the native method is the only one to call.
+const HELPER_NAMES = new Set(["createEl", "createDiv", "createSpan", "createSvg", "createFragment"]);
 
 // The helper for a tag argument that has one of its own: `createDiv` for
 // `"div"`. An own key only, so that a tag such as `"constructor"` is not taken
@@ -52,10 +62,123 @@ function isReplacedMethodCall(
  * `document.createElementNS(svgNamespace, tag, …)`,
  * `document.createDocumentFragment()` and `document.createEl("div" | "span", …)`.
  * The replacement calls a global helper (`createEl(tag)`, `createDiv()`, …),
- * which leaves no `document` for prefer-active-doc to report.
+ * which leaves no `document` for prefer-active-doc to report. Inside an
+ * implementation of the helpers themselves, such as a polyfill, this rule
+ * reports nothing, so prefer-active-doc reports `document` there. Nor where
+ * `minAppVersion` is known to be older than the helper, as `createSvg()`
+ * (1.1.0) is for a plugin that supports 1.0.0; `null` skips that check.
  */
-export function isReportedOnGlobalDocument(call: TSESTree.CallExpression): boolean {
-    return Object.keys(REPLACED_METHODS).some((method) => isReplacedMethodCall(call, method));
+export function isReportedOnGlobalDocument(call: TSESTree.CallExpression, minAppVersion?: string | null): boolean {
+    const method = Object.keys(REPLACED_METHODS).find((name) => isReplacedMethodCall(call, name));
+    if (method === undefined || isInHelperImplementation(call)) {
+        return false;
+    }
+    const helper =
+        method === "createElementNS"
+            ? "createSvg"
+            : method === "createDocumentFragment"
+              ? "createFragment"
+              : getTagShorthand(call.arguments[0]);
+    const since = helper === undefined ? undefined : HELPER_SINCE[helper];
+    return since === undefined || minAppVersion === null || supportsVersion(minAppVersion, since) !== false;
+}
+
+// Whether `node` is inside a function named after one of Obsidian's DOM
+// helpers: `function createDiv() {}`, a method or property
+// (`createSpan(o) { return this.createEl("span", o); }`,
+// `{ createFragment: () => … }`), or a function assigned to one
+// (`window.createDiv = …`, `Element.prototype.createEl = function () {}`,
+// `Object.defineProperty(proto, "createEl", { value() {} })`). There the
+// replacement could call the function it is in, or the polyfill being
+// defined, and recurse forever.
+export function isInHelperImplementation(node: TSESTree.Node): boolean {
+    for (let current = node.parent; current; current = current.parent) {
+        if (
+            (current.type === TSESTree.AST_NODE_TYPES.FunctionDeclaration ||
+                current.type === TSESTree.AST_NODE_TYPES.FunctionExpression ||
+                current.type === TSESTree.AST_NODE_TYPES.ArrowFunctionExpression) &&
+            getFunctionNames(current).some((name) => HELPER_NAMES.has(name))
+        ) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// The names a function goes by: its own, and that of the variable,
+// property, method or member it is the value of.
+function getFunctionNames(
+    fn: TSESTree.FunctionDeclaration | TSESTree.FunctionExpression | TSESTree.ArrowFunctionExpression,
+): string[] {
+    const names: string[] = [];
+    if (fn.id) {
+        names.push(fn.id.name);
+    }
+    let child: TSESTree.Node = fn;
+    let parent = fn.parent;
+    while (
+        parent.type === TSESTree.AST_NODE_TYPES.TSAsExpression ||
+        parent.type === TSESTree.AST_NODE_TYPES.TSSatisfiesExpression ||
+        parent.type === TSESTree.AST_NODE_TYPES.TSNonNullExpression ||
+        parent.type === TSESTree.AST_NODE_TYPES.TSTypeAssertion
+    ) {
+        child = parent;
+        parent = parent.parent;
+    }
+    const keyName = (key: TSESTree.Node, computed: boolean) =>
+        !computed && key.type === TSESTree.AST_NODE_TYPES.Identifier ? key.name : getStringLiteralValue(key);
+    let name: string | undefined;
+    switch (parent.type) {
+        case TSESTree.AST_NODE_TYPES.VariableDeclarator:
+            if (parent.init === child && parent.id.type === TSESTree.AST_NODE_TYPES.Identifier) {
+                name = parent.id.name;
+            }
+            break;
+        case TSESTree.AST_NODE_TYPES.AssignmentExpression:
+            if (parent.right === child) {
+                name =
+                    parent.left.type === TSESTree.AST_NODE_TYPES.Identifier
+                        ? parent.left.name
+                        : parent.left.type === TSESTree.AST_NODE_TYPES.MemberExpression
+                            ? keyName(parent.left.property, parent.left.computed)
+                            : undefined;
+            }
+            break;
+        case TSESTree.AST_NODE_TYPES.MethodDefinition:
+        case TSESTree.AST_NODE_TYPES.PropertyDefinition:
+            name = keyName(parent.key, parent.computed);
+            break;
+        case TSESTree.AST_NODE_TYPES.Property:
+            if (parent.value === child) {
+                name = keyName(parent.key, parent.computed);
+                const descriptorName = getDefinedPropertyName(parent);
+                if (descriptorName !== undefined) {
+                    names.push(descriptorName);
+                }
+            }
+            break;
+    }
+    if (name !== undefined) {
+        names.push(name);
+    }
+    return names;
+}
+
+// For `value`, `get` or `set` in the descriptor of
+// `Object.defineProperty(target, "name", { value: … })`, the property's name.
+function getDefinedPropertyName(property: TSESTree.Property): string | undefined {
+    const descriptor = property.parent;
+    const call = descriptor.parent;
+    if (
+        call?.type !== TSESTree.AST_NODE_TYPES.CallExpression ||
+        call.arguments[2] !== descriptor ||
+        call.callee.type !== TSESTree.AST_NODE_TYPES.MemberExpression ||
+        call.callee.property.type !== TSESTree.AST_NODE_TYPES.Identifier ||
+        call.callee.property.name !== "defineProperty"
+    ) {
+        return undefined;
+    }
+    return getStringLiteralValue(call.arguments[1]);
 }
 
 function getStringLiteralValue(
@@ -70,7 +193,18 @@ function getStringLiteralValue(
     return undefined;
 }
 
-export default ruleCreator({
+// The version each helper a replacement calls needs (createEl() is in the
+// first typings), and activeWindow and `doc.win` for the window prefixes.
+const HELPER_SINCE: Readonly<Record<string, string>> = {
+    createDiv: API_SINCE.createDiv,
+    createSpan: API_SINCE.createSpan,
+    createFragment: API_SINCE.createFragment,
+    createSvg: API_SINCE.createSvg,
+};
+
+type MessageIds = "preferCreateEl" | "preferCreateElSuggestion" | "preferCreateElSuggestionSince";
+
+export default ruleCreator<MinAppVersionOptions, MessageIds>({
     meta: {
         type: "suggestion" as const,
         docs: {
@@ -79,7 +213,7 @@ export default ruleCreator({
             url: docsUrl("prefer-create-el"),
             requiresTypeChecking: true,
         },
-        schema: [],
+        schema: minAppVersionSchema,
         fixable: "code" as const,
         hasSuggestions: true as const,
         messages: {
@@ -87,10 +221,13 @@ export default ruleCreator({
                 "Use '{{replacement}}' instead of '{{original}}'.",
             preferCreateElSuggestion:
                 "Replace '{{original}}' with '{{replacement}}'.",
+            preferCreateElSuggestionSince:
+                "Replace '{{original}}' with '{{replacement}}' (needs Obsidian {{since}} or later).",
         },
     },
-    defaultOptions: [],
+    defaultOptions: [{}],
     create(context) {
+        const minAppVersion = context.options[0]?.minAppVersion;
         const services = ESLintUtils.getParserServices(context);
         const checker = services.program.getTypeChecker();
 
@@ -147,12 +284,22 @@ export default ruleCreator({
         }
 
         // Where the replacement is called, and whether `helper` is declared
-        // there, which decides between a fix and a suggestion.
+        // there, which decides between a fix and a suggestion. `canAutofix`
+        // returns undefined when the window the replacement is called on does
+        // not declare `helper`: the call is then not reported.
         function classifyDocumentTarget(
             callee: TSESTree.MemberExpression,
-        ): { prefix: string; canAutofix: (helper: string) => boolean } | null {
+        ): { prefix: string; since?: string; canAutofix: (helper: string) => boolean | undefined } | null {
             const obj = callee.object;
             if (isIframeDocument(obj)) {
+                return null;
+            }
+            // A fallback for where Obsidian's helpers are missing, as in a
+            // browser or under jsdom: `typeof createDiv === "function" ?
+            // createDiv() : document.createElement("div")`, the `catch` of
+            // `try { createEl("p"); }`, or code after a window check. The
+            // native call is the one that works there.
+            if (mayRunOutsideObsidianAt(context, callee)) {
                 return null;
             }
 
@@ -170,10 +317,12 @@ export default ruleCreator({
             if (isActiveDoc) {
                 // activeWindow is activeDocument.win, so the same check decides it:
                 // obsidian.d.ts types both as a plain Window, which has no DOM
-                // helpers, so a fix to activeWindow.createSpan() would not compile.
+                // helpers, so activeWindow.createSpan() would not compile, and
+                // the native call is the one that does.
                 return {
                     prefix: "activeWindow.",
-                    canAutofix: (helper) => winHasHelper(obj, helper),
+                    since: API_SINCE.activeWindow,
+                    canAutofix: (helper) => winHasHelper(obj, helper) || undefined,
                 };
             }
 
@@ -181,7 +330,8 @@ export default ruleCreator({
                 // `doc?.createElement()` keeps its `?.`: `doc?.win.createEl()`.
                 return {
                     prefix: `${getObjectText(obj)}${callee.optional ? "?." : "."}win.`,
-                    canAutofix: (helper) => winHasHelper(obj, helper),
+                    since: API_SINCE["Node.win"],
+                    canAutofix: (helper) => winHasHelper(obj, helper) || undefined,
                 };
             }
 
@@ -190,6 +340,9 @@ export default ruleCreator({
 
         return {
             CallExpression(node: TSESTree.CallExpression) {
+                if (isInHelperImplementation(node)) {
+                    return;
+                }
                 checkCreateElement(node);
                 checkCreateElementNS(node);
                 checkCreateElShorthand(node);
@@ -210,11 +363,15 @@ export default ruleCreator({
             const tagArg = node.arguments[0];
             const shorthand = getTagShorthand(tagArg);
 
+            const canAutofix = target.canAutofix(shorthand ?? "createEl");
+            if (canAutofix === undefined) {
+                return;
+            }
             const replacement = shorthand
                 ? `${target.prefix}${shorthand}()`
                 : `${target.prefix}createEl(${getText(tagArg)})`;
             const compiles = shorthand !== undefined || resolvesToTagMapOverload(node, "HTMLElementTagNameMap");
-            report(node, replacement, compiles ? target.canAutofix(shorthand ?? "createEl") : null);
+            report(node, replacement, compiles ? canAutofix : null, laterVersion(target.since, HELPER_SINCE[shorthand ?? "createEl"]));
         }
 
         function checkCreateElementNS(node: TSESTree.CallExpression): void {
@@ -227,12 +384,16 @@ export default ruleCreator({
                 return;
             }
 
+            const canAutofix = target.canAutofix("createSvg");
+            if (canAutofix === undefined) {
+                return;
+            }
             const tagArg = node.arguments[1];
             const remainingArgs = node.arguments.slice(2);
             const argsText = [getText(tagArg), ...remainingArgs.map((arg) => getText(arg))].join(", ");
             const replacement = `${target.prefix}createSvg(${argsText})`;
             const compiles = resolvesToTagMapOverload(node, "SVGElementTagNameMap");
-            report(node, replacement, compiles ? target.canAutofix("createSvg") : null);
+            report(node, replacement, compiles ? canAutofix : null, laterVersion(target.since, HELPER_SINCE.createSvg));
         }
 
         function checkCreateElShorthand(node: TSESTree.CallExpression): void {
@@ -260,7 +421,7 @@ export default ruleCreator({
                 .join(", ");
             const replacement = `${prefix}${shorthand}${node.optional ? "?.(" : "("}${argsText})`;
 
-            report(node, replacement, checkShorthand(node, shorthand, isDocGlobal ? undefined : obj));
+            report(node, replacement, checkShorthand(node, shorthand, isDocGlobal ? undefined : obj), HELPER_SINCE[shorthand]);
         }
 
         // Whether `createDiv(...)` or `el.createDiv(...)`, with the arguments
@@ -392,8 +553,12 @@ export default ruleCreator({
                 return;
             }
 
+            const canAutofix = target.canAutofix("createFragment");
+            if (canAutofix === undefined) {
+                return;
+            }
             const replacement = `${target.prefix}createFragment()`;
-            report(node, replacement, target.canAutofix("createFragment"));
+            report(node, replacement, canAutofix, laterVersion(target.since, HELPER_SINCE.createFragment));
         }
 
         // Whether `name`, called bare at `node`, resolves to a binding of the
@@ -426,7 +591,21 @@ export default ruleCreator({
 
         // `canAutofix` is null when the replacement would not compile at all: the
         // finding is reported without a fix or a suggestion.
-        function report(node: TSESTree.CallExpression, replacement: string, canAutofix: boolean | null): void {
+        //
+        // `since` is the Obsidian version the replacement needs. Below the
+        // plugin's minAppVersion the native call is the right one, so it is
+        // not reported; where no version is known, the replacement is offered
+        // as before, and a suggestion says which version it needs.
+        function report(
+            node: TSESTree.CallExpression,
+            replacement: string,
+            canAutofix: boolean | null,
+            since?: string,
+        ): void {
+            const supported = since === undefined ? true : supportsVersion(minAppVersion, since);
+            if (supported === false) {
+                return;
+            }
             const original = getText(node);
             const bareHelper = BARE_HELPER_CALL.exec(replacement)?.[1];
             if (bareHelper !== undefined && shadowsGlobalHelper(node, bareHelper)) {
@@ -436,6 +615,12 @@ export default ruleCreator({
             if (canAutofix === null) {
                 context.report({ node, messageId: "preferCreateEl", data: { replacement, original } });
                 return;
+            }
+            // The replacement is built from the text of the arguments it
+            // keeps, so a comment between or around them would be lost: a
+            // suggestion then, for the author to move it.
+            if (canAutofix && dropsComments(node, replacement)) {
+                canAutofix = false;
             }
             context.report({
                 node,
@@ -450,8 +635,10 @@ export default ruleCreator({
                     : {
                         suggest: [
                             {
-                                messageId: "preferCreateElSuggestion" as const,
-                                data: { replacement, original },
+                                messageId: supported === undefined
+                                    ? "preferCreateElSuggestionSince" as const
+                                    : "preferCreateElSuggestion" as const,
+                                data: { replacement, original, since: since ?? "" },
                                 fix(fixer) {
                                     return fixer.replaceText(node, replacement);
                                 },
@@ -459,6 +646,13 @@ export default ruleCreator({
                         ],
                     }),
             });
+        }
+
+        // Whether a comment in `node` is missing from `replacement`.
+        function dropsComments(node: TSESTree.CallExpression, replacement: string): boolean {
+            return context.sourceCode
+                .getCommentsInside(node)
+                .some((comment) => !replacement.includes(context.sourceCode.getText(comment)));
         }
 
         // An iframe's document belongs to the iframe's own window, which Obsidian
@@ -490,7 +684,7 @@ export default ruleCreator({
             }
             const def = variable.defs[0];
             if (
-                def.type !== "Variable" ||
+                def.type !== DefinitionType.Variable ||
                 def.parent.kind !== "const" ||
                 def.node.init === null
             ) {

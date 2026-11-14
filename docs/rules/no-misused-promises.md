@@ -47,6 +47,14 @@ Not reported: Obsidian's chaining `then` itself, as in the examples above: a `Se
 returned from a callback, used in a condition, negated, spread or returned from a predicate. The
 recommended config runs the rule on TypeScript files only, since it needs type information.
 
+Also not reported: an `async onload()` in a class extending `Plugin`, with `obsidian` typings older
+than 1.7.2. Those typings declare no `Plugin.onload`, so the method overrides
+`Component.onload(): void` and upstream reports it as `voidReturnInheritedMethod`. Obsidian handles
+the Promise a plugin's `onload` returns, and 1.7.2 and later declare it as
+`onload(): Promise<void> | void`, so upstream reports nothing there either. An `onload(): void` that
+your own base class or interface declares is still reported, and so is every other async override
+of a void method, such as `async onunload()`, which Obsidian does not await.
+
 ## Migrating
 
 This rule also honours disable comments that name the upstream rule. An `eslint-disable-next-line`,

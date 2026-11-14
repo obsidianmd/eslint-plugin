@@ -25,13 +25,14 @@ const OPTIONAL_SCHEMA = {
 // (obsidianmd/community-workers, src/worker/pluginManifest.ts), which decides
 // whether a submission passes, so this rule is never stricter than the review.
 // The id checks follow the developer docs' manifest reference, which the
-// scanner does not check itself.
+// scanner does not check itself. They are opt-in (`checkId`): a published
+// plugin's id can never change, as that would orphan every user's install,
+// settings and hotkeys, so for most plugins they could never be acted on.
 
 // The words the text checks single out: "obsidian" is the Obsidian trademark,
 // and "plugin" is redundant in the plugin directory. `allowedWords` can drop
 // either, per field.
-const FORBIDDEN_WORDS = ["obsidian", "plugin"] as const;
-type ForbiddenWord = (typeof FORBIDDEN_WORDS)[number];
+type ForbiddenWord = "obsidian" | "plugin";
 
 // The fields the word checks apply to, and the only ones `allowedWords` can
 // name.
@@ -59,6 +60,11 @@ const DESCRIPTION_MIN_LENGTH = 10;
 const DESCRIPTION_MAX_LENGTH = 250;
 
 interface ValidateManifestOptions {
+    /**
+     * Whether to check the id, which must not contain "obsidian" or end with
+     * "plugin". Off by default: only a plugin not yet published can act on it.
+     */
+    checkId?: boolean;
     /**
      * Words to drop from the forbidden list, per field. Some findings can never
      * be acted on -- a published plugin id can never change, so a plugin whose
@@ -132,6 +138,9 @@ function isCheckedWordField(key: string): key is CheckedWordField {
     return (CHECKED_WORD_FIELDS as readonly string[]).includes(key);
 }
 
+// Control and format characters (Unicode Cc and Cf), which display as nothing.
+const INVISIBLE_CHARACTERS = /[\p{Cc}\p{Cf}]/gu;
+
 // The word checks a field's value fails, as message ids. `allowed` holds the
 // words `allowedWords` drops for this field; matching is case-insensitive.
 function findWordProblems(
@@ -141,7 +150,10 @@ function findWordProblems(
 ): MessageIds[] {
     const allowedLower = new Set(allowed.map((word) => word.toLowerCase()));
     const checks = (word: ForbiddenWord) => !allowedLower.has(word);
-    const lower = value.toLowerCase();
+    // Without the invisible characters a word could hide behind, such as a
+    // zero-width space, soft hyphen or bidi control in "Obs\u200Bidian".
+    const visible = value.replace(INVISIBLE_CHARACTERS, "");
+    const lower = visible.toLowerCase();
     const problems: MessageIds[] = [];
     switch (field) {
         case "id":
@@ -171,7 +183,7 @@ function findWordProblems(
             if (checks("obsidian") && lower.includes("obsidian")) {
                 problems.push("descriptionObsidian");
             }
-            if (checks("plugin") && DESCRIPTION_SELF_REFERENCE.test(value)) {
+            if (checks("plugin") && DESCRIPTION_SELF_REFERENCE.test(visible)) {
                 problems.push("descriptionSelfReference");
             }
             break;
@@ -217,10 +229,15 @@ const rule: ValidateManifestRuleDefinition = {
             {
                 type: "object",
                 properties: {
+                    checkId: {
+                        type: "boolean",
+                        description:
+                            "Also check that the plugin id does not contain 'obsidian' or end with 'plugin', as the developer docs ask of a new plugin. Off by default: a published plugin's id can never change, and the community scanner does not check it.",
+                    },
                     allowedWords: {
                         type: "object",
                         description:
-                            "Words ('obsidian', 'plugin') to stop checking for, per field, matched case-insensitively. Use this for findings that can never be acted on, such as a published plugin id that will always contain 'obsidian'.",
+                            "Words ('obsidian', 'plugin') to stop checking for, per field, matched case-insensitively. The id is checked only with checkId.",
                         properties: Object.fromEntries(
                             CHECKED_WORD_FIELDS.map((field) => [
                                 field,
@@ -255,8 +272,10 @@ const rule: ValidateManifestRuleDefinition = {
             invalidFundingUrl:
                 "The 'fundingUrl' object must only contain string values.",
             mustBeRootObject: "The manifest must be a single JSON object.",
-            idObsidian: "The plugin id must not contain \"obsidian\".",
-            idEndsWithPlugin: "The plugin id must not end with \"plugin\".",
+            idObsidian:
+                "The plugin id must not contain \"obsidian\". Only a plugin that is not yet published can still change its id.",
+            idEndsWithPlugin:
+                "The plugin id must not end with \"plugin\". Only a plugin that is not yet published can still change its id.",
             nameObsidian: "Plugin name must not include the word \"Obsidian\".",
             nameObsidianFragment:
                 "Plugin name must not include parts of the name \"Obsidian\" (\"obsi\", \"sidian\" or a leading \"ob\").",
@@ -365,7 +384,8 @@ const rule: ValidateManifestRuleDefinition = {
                         if (
                             valueNode.type === "String" &&
                             !ignored.has("noForbiddenWords") &&
-                            isCheckedWordField(key)
+                            isCheckedWordField(key) &&
+                            (key !== "id" || options.checkId === true)
                         ) {
                             for (const messageId of findWordProblems(
                                 key,

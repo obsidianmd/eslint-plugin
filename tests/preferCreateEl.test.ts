@@ -1,8 +1,9 @@
 import { RuleTester } from "@typescript-eslint/rule-tester";
+import { atMinAppVersion } from "./atMinAppVersion.js";
 import globals from "globals";
 import preferCreateEl from "../lib/rules/preferCreateEl.js";
 
-const ruleTester = new RuleTester();
+const ruleTester = atMinAppVersion(new RuleTester(), "1.5.0");
 
 const MOCK_OBSIDIAN_DOM = `
     declare global {
@@ -77,6 +78,95 @@ const MOCK_ACTIVE_WINDOW_CREATE_EL_ONLY = `
 
 ruleTester.run("prefer-create-el", preferCreateEl, {
     valid: [
+        // --- An implementation of the helpers: the replacement could call itself ---
+        {
+            name: "a fake element's createSpan() calling this.createEl('span') is not reported",
+            code: `${MOCK_OBSIDIAN_DOM}\nclass FakeEl { createEl(tag: string, o?: any): HTMLElement { return document.createElement(tag); }\n  createSpan(options?: any) { return this.createEl('span', options); }\n  createDiv(options?: any) { return this.createEl('div', options); } }`,
+        },
+        {
+            name: "a polyfill assigned to window.createDiv is not reported",
+            code: `${MOCK_OBSIDIAN_DOM}\ndeclare const window: any;\nwindow.createDiv = (o: any, cb: any) => { const el = window.document.createElement('div'); cb?.(el); return el; };\nglobalThis.createSpan = function () { return document.createElement('span'); } as any;`,
+        },
+        {
+            name: "a shim on Element.prototype.createEl is not reported, nor callbacks inside it",
+            code: `${MOCK_OBSIDIAN_DOM}\n(Element.prototype as any).createEl = function (tag: any, o: any) { const el = document.createElement(tag); [1].forEach(() => el.append(document.createElement('span'))); return el; };`,
+        },
+        {
+            name: "an object property createFragment holding an arrow is not reported",
+            code: `${MOCK_OBSIDIAN_DOM}\nexport const domShim = { createFragment: () => document.createDocumentFragment(), 'createDiv': function () { return document.createElement('div'); } };`,
+        },
+        {
+            name: "a class field and Object.defineProperty named after a helper are not reported",
+            code: `${MOCK_OBSIDIAN_DOM}\nclass Shim { createSvg = (tag: 'svg') => document.createElementNS('http://www.w3.org/2000/svg', tag); }\nObject.defineProperty(Node.prototype, 'createDiv', { value(o?: any) { return document.createElement('div'); } });`,
+        },
+        {
+            name: "a variable holding a function named after a helper is not reported",
+            code: `${MOCK_ACTIVE_WINDOW_WITH_HELPERS}\nconst createSpan = () => activeDocument.createElement('span');`,
+        },
+        {
+            name: "inside a function named createDiv, its own implementation, createElement('div') is not reported",
+            code: `${MOCK_OBSIDIAN_DOM}\nfunction createDiv(): HTMLDivElement { return document.createElement('div'); }`,
+        },
+        {
+            name: "inside a function expression named createFragment, createDocumentFragment() is not reported",
+            code: `${MOCK_OBSIDIAN_DOM}\nconst make = function createFragment() { return document.createDocumentFragment(); };`,
+        },
+        {
+            name: "inside a class method named createDiv, createElement('div') is not reported",
+            code: `${MOCK_OBSIDIAN_DOM}\nclass View { createDiv() { return document.createElement('div'); } }`,
+        },
+        {
+            name: "inside an object method named createDiv, createElement('div') is not reported",
+            code: `${MOCK_OBSIDIAN_DOM}\nconst dom = { createDiv() { return document.createElement('div'); } };`,
+        },
+        {
+            name: "activeDocument.createElement(tag) is not reported with Obsidian's own types, where activeWindow.createEl() would not compile",
+            code: `${MOCK_ACTIVE_WINDOW_PLAIN}\nactiveDocument.createElement('p');`,
+        },
+        {
+            name: "activeDocument.createElement('div') is not reported with Obsidian's own types",
+            code: `${MOCK_ACTIVE_WINDOW_PLAIN}\nactiveDocument.createElement('div');`,
+        },
+        {
+            name: "activeDocument.createElement('span') is not reported with Obsidian's own types",
+            code: `${MOCK_ACTIVE_WINDOW_PLAIN}\nactiveDocument.createElement('span');`,
+        },
+        {
+            name: "activeDocument.createElementNS(SVG_NS, tag) is not reported with Obsidian's own types",
+            code: `${MOCK_ACTIVE_WINDOW_PLAIN}\nactiveDocument.createElementNS('http://www.w3.org/2000/svg', 'svg');`,
+        },
+        {
+            name: "activeDocument.createDocumentFragment() is not reported with Obsidian's own types",
+            code: `${MOCK_ACTIVE_WINDOW_PLAIN}\nactiveDocument.createDocumentFragment();`,
+        },
+        {
+            name: "activeDocument without any types is not reported",
+            code: "activeDocument.createElement('span');",
+        },
+        {
+            name: "activeDocument.createElement('div') is not reported when Window declares only createEl()",
+            code: `${MOCK_ACTIVE_WINDOW_CREATE_EL_ONLY}\nactiveDocument.createElement('div');`,
+        },
+        {
+            name: "activeDocument.createElementNS(SVG_NS, tag) is not reported when Window declares only createEl()",
+            code: `${MOCK_ACTIVE_WINDOW_CREATE_EL_ONLY}\nactiveDocument.createElementNS('http://www.w3.org/2000/svg', 'svg');`,
+        },
+        {
+            name: "activeDocument.createDocumentFragment() is not reported when Window declares only createEl()",
+            code: `${MOCK_ACTIVE_WINDOW_CREATE_EL_ONLY}\nactiveDocument.createDocumentFragment();`,
+        },
+        {
+            name: "doc.createElement is not reported when the document's win does not declare the helpers",
+            code: `declare const doc: Document;\ndoc.createElement('p');`,
+        },
+        {
+            name: "a nullable document whose win does not declare the helpers is not reported",
+            code: `declare const doc: Document | null;\ndoc?.createElement('p');`,
+        },
+        {
+            name: "a node's ownerDocument is not reported with Obsidian's own types, where Window has no DOM helpers",
+            code: `import "obsidian";\ndeclare const node: Node;\nnode.ownerDocument?.createElement('p');`,
+        },
         {
             name: "createEl is allowed",
             code: "createEl('p');",
@@ -266,12 +356,6 @@ ruleTester.run("prefer-create-el", preferCreateEl, {
         // The bare replacement would call the local binding, e.g. recurse into the
         // enclosing function (TS7023).
         {
-            name: "inside a function named createDiv, createElement('div') is reported without a fix",
-            code: `${MOCK_OBSIDIAN_DOM}\nfunction createDiv(): HTMLDivElement { return document.createElement('div'); }`,
-            output: null,
-            errors: [{ messageId: "preferCreateEl", suggestions: [] }],
-        },
-        {
             name: "a const named createEl in scope leaves createElement(tag) without a fix",
             code: `${MOCK_OBSIDIAN_DOM}\nconst createEl = (tag: string) => tag;\ndocument.createElement('p');`,
             output: null,
@@ -284,29 +368,10 @@ ruleTester.run("prefer-create-el", preferCreateEl, {
             errors: [{ messageId: "preferCreateEl", suggestions: [] }],
         },
         {
-            name: "a named function expression createFragment leaves createDocumentFragment() without a fix",
-            code: `${MOCK_OBSIDIAN_DOM}\nconst make = function createFragment() { return document.createDocumentFragment(); };`,
-            output: null,
-            errors: [{ messageId: "preferCreateEl", suggestions: [] }],
-        },
-        {
             name: "an imported createSvg leaves createElementNS() without a fix",
             code: `import { createSvg } from './svg';\n${MOCK_OBSIDIAN_DOM}\ndocument.createElementNS('http://www.w3.org/2000/svg', 'path');`,
             output: null,
             errors: [{ messageId: "preferCreateEl", suggestions: [] }],
-        },
-        // A method is not a binding: the bare call inside it reaches the global.
-        {
-            name: "inside a class method named createDiv, createElement('div') is still fixed",
-            code: `${MOCK_OBSIDIAN_DOM}\nclass View { createDiv() { return document.createElement('div'); } }`,
-            output: `${MOCK_OBSIDIAN_DOM}\nclass View { createDiv() { return createDiv(); } }`,
-            errors: [{ messageId: "preferCreateEl" }],
-        },
-        {
-            name: "inside an object method named createDiv, createElement('div') is still fixed",
-            code: `${MOCK_OBSIDIAN_DOM}\nconst dom = { createDiv() { return document.createElement('div'); } };`,
-            output: `${MOCK_OBSIDIAN_DOM}\nconst dom = { createDiv() { return createDiv(); } };`,
-            errors: [{ messageId: "preferCreateEl" }],
         },
         // An ambient declaration has no body: the call still reaches the global.
         {
@@ -328,9 +393,15 @@ ruleTester.run("prefer-create-el", preferCreateEl, {
             errors: [{ messageId: "preferCreateEl", data: { replacement: "createDiv?.()", original: "createEl?.('div')" }, suggestions: [] }],
         },
         {
+            name: "a function named otherwise than a helper is still fixed",
+            code: `${MOCK_OBSIDIAN_DOM}\nclass View { makeDiv() { return document.createElement('div'); } }\nconst o = { createDivider: () => document.createElement('hr') };`,
+            output: `${MOCK_OBSIDIAN_DOM}\nclass View { makeDiv() { return createDiv(); } }\nconst o = { createDivider: () => createEl('hr') };`,
+            errors: [{ messageId: "preferCreateEl" }, { messageId: "preferCreateEl" }],
+        },
+        {
             name: "a prefixed replacement is fixed even when the bare name is bound locally",
-            code: `${MOCK_ACTIVE_WINDOW_WITH_HELPERS}\nfunction createDiv() { return activeDocument.createElement('div'); }`,
-            output: `${MOCK_ACTIVE_WINDOW_WITH_HELPERS}\nfunction createDiv() { return activeWindow.createDiv(); }`,
+            code: `${MOCK_ACTIVE_WINDOW_WITH_HELPERS}\nfunction make(createDiv: unknown) { return activeDocument.createElement('div'); }`,
+            output: `${MOCK_ACTIVE_WINDOW_WITH_HELPERS}\nfunction make(createDiv: unknown) { return activeWindow.createDiv(); }`,
             errors: [{ messageId: "preferCreateEl" }],
         },
 
@@ -420,151 +491,12 @@ ruleTester.run("prefer-create-el", preferCreateEl, {
             output: `${MOCK_ACTIVE_WINDOW_WITH_HELPERS}\nactiveWindow.createFragment();`,
             errors: [{ messageId: "preferCreateEl" }],
         },
-        // obsidian.d.ts types activeWindow as a plain Window, so the fix would not compile.
-        {
-            name: "activeDocument.createElement(tag) with Obsidian's own types offers activeWindow.createEl('p') as a suggestion",
-            code: `${MOCK_ACTIVE_WINDOW_PLAIN}\nactiveDocument.createElement('p');`,
-            errors: [
-                {
-                    messageId: "preferCreateEl",
-                    suggestions: [
-                        {
-                            messageId: "preferCreateElSuggestion",
-                            output: `${MOCK_ACTIVE_WINDOW_PLAIN}\nactiveWindow.createEl('p');`,
-                        },
-                    ],
-                },
-            ],
-        },
-        {
-            name: "activeDocument.createElement('div') with Obsidian's own types offers activeWindow.createDiv() as a suggestion",
-            code: `${MOCK_ACTIVE_WINDOW_PLAIN}\nactiveDocument.createElement('div');`,
-            errors: [
-                {
-                    messageId: "preferCreateEl",
-                    suggestions: [
-                        {
-                            messageId: "preferCreateElSuggestion",
-                            output: `${MOCK_ACTIVE_WINDOW_PLAIN}\nactiveWindow.createDiv();`,
-                        },
-                    ],
-                },
-            ],
-        },
-        {
-            name: "activeDocument.createElement('span') with Obsidian's own types offers activeWindow.createSpan() as a suggestion",
-            code: `${MOCK_ACTIVE_WINDOW_PLAIN}\nactiveDocument.createElement('span');`,
-            errors: [
-                {
-                    messageId: "preferCreateEl",
-                    suggestions: [
-                        {
-                            messageId: "preferCreateElSuggestion",
-                            output: `${MOCK_ACTIVE_WINDOW_PLAIN}\nactiveWindow.createSpan();`,
-                        },
-                    ],
-                },
-            ],
-        },
-        {
-            name: "activeDocument.createElementNS(SVG_NS, tag) with Obsidian's own types offers activeWindow.createSvg('svg') as a suggestion",
-            code: `${MOCK_ACTIVE_WINDOW_PLAIN}\nactiveDocument.createElementNS('http://www.w3.org/2000/svg', 'svg');`,
-            errors: [
-                {
-                    messageId: "preferCreateEl",
-                    suggestions: [
-                        {
-                            messageId: "preferCreateElSuggestion",
-                            output: `${MOCK_ACTIVE_WINDOW_PLAIN}\nactiveWindow.createSvg('svg');`,
-                        },
-                    ],
-                },
-            ],
-        },
-        {
-            name: "activeDocument.createDocumentFragment() with Obsidian's own types offers activeWindow.createFragment() as a suggestion",
-            code: `${MOCK_ACTIVE_WINDOW_PLAIN}\nactiveDocument.createDocumentFragment();`,
-            errors: [
-                {
-                    messageId: "preferCreateEl",
-                    suggestions: [
-                        {
-                            messageId: "preferCreateElSuggestion",
-                            output: `${MOCK_ACTIVE_WINDOW_PLAIN}\nactiveWindow.createFragment();`,
-                        },
-                    ],
-                },
-            ],
-        },
-        {
-            name: "activeDocument without any types offers a suggestion",
-            code: "activeDocument.createElement('span');",
-            errors: [
-                {
-                    messageId: "preferCreateEl",
-                    suggestions: [
-                        {
-                            messageId: "preferCreateElSuggestion",
-                            output: "activeWindow.createSpan();",
-                        },
-                    ],
-                },
-            ],
-        },
         // Window declares createEl() only.
         {
             name: "activeDocument.createElement('p') is fixed when Window declares createEl()",
             code: `${MOCK_ACTIVE_WINDOW_CREATE_EL_ONLY}\nactiveDocument.createElement('p');`,
             output: `${MOCK_ACTIVE_WINDOW_CREATE_EL_ONLY}\nactiveWindow.createEl('p');`,
             errors: [{ messageId: "preferCreateEl" }],
-        },
-        {
-            name: "activeDocument.createElement('div') offers activeWindow.createDiv() as a suggestion when Window declares only createEl()",
-            code: `${MOCK_ACTIVE_WINDOW_CREATE_EL_ONLY}\nactiveDocument.createElement('div');`,
-            output: null,
-            errors: [
-                {
-                    messageId: "preferCreateEl",
-                    suggestions: [
-                        {
-                            messageId: "preferCreateElSuggestion",
-                            output: `${MOCK_ACTIVE_WINDOW_CREATE_EL_ONLY}\nactiveWindow.createDiv();`,
-                        },
-                    ],
-                },
-            ],
-        },
-        {
-            name: "activeDocument.createElementNS(SVG_NS, tag) offers activeWindow.createSvg() as a suggestion when Window declares only createEl()",
-            code: `${MOCK_ACTIVE_WINDOW_CREATE_EL_ONLY}\nactiveDocument.createElementNS('http://www.w3.org/2000/svg', 'svg');`,
-            output: null,
-            errors: [
-                {
-                    messageId: "preferCreateEl",
-                    suggestions: [
-                        {
-                            messageId: "preferCreateElSuggestion",
-                            output: `${MOCK_ACTIVE_WINDOW_CREATE_EL_ONLY}\nactiveWindow.createSvg('svg');`,
-                        },
-                    ],
-                },
-            ],
-        },
-        {
-            name: "activeDocument.createDocumentFragment() offers activeWindow.createFragment() as a suggestion when Window declares only createEl()",
-            code: `${MOCK_ACTIVE_WINDOW_CREATE_EL_ONLY}\nactiveDocument.createDocumentFragment();`,
-            output: null,
-            errors: [
-                {
-                    messageId: "preferCreateEl",
-                    suggestions: [
-                        {
-                            messageId: "preferCreateElSuggestion",
-                            output: `${MOCK_ACTIVE_WINDOW_CREATE_EL_ONLY}\nactiveWindow.createFragment();`,
-                        },
-                    ],
-                },
-            ],
         },
 
         // --- Document-typed variable: use `doc.win.<helper>()` ---
@@ -591,21 +523,6 @@ ruleTester.run("prefer-create-el", preferCreateEl, {
             code: `${MOCK_OBSIDIAN_DOM}\ndeclare const doc: Document & { win: typeof globalThis };\ndoc.createDocumentFragment();`,
             output: `${MOCK_OBSIDIAN_DOM}\ndeclare const doc: Document & { win: typeof globalThis };\ndoc.win.createFragment();`,
             errors: [{ messageId: "preferCreateEl" }],
-        },
-        {
-            name: "doc.createElement without Obsidian types offers suggestion for a Document variable",
-            code: `declare const doc: Document;\ndoc.createElement('p');`,
-            errors: [
-                {
-                    messageId: "preferCreateEl",
-                    suggestions: [
-                        {
-                            messageId: "preferCreateElSuggestion",
-                            output: `declare const doc: Document;\ndoc.win.createEl('p');`,
-                        },
-                    ],
-                },
-            ],
         },
 
         {
@@ -842,38 +759,6 @@ ruleTester.run("prefer-create-el", preferCreateEl, {
             errors: [{ messageId: "preferCreateEl" }],
         },
         {
-            name: "a nullable document without Obsidian types gets a suggestion that keeps ?.",
-            code: `declare const doc: Document | null;\ndoc?.createElement('p');`,
-            output: null,
-            errors: [
-                {
-                    messageId: "preferCreateEl",
-                    suggestions: [
-                        {
-                            messageId: "preferCreateElSuggestion",
-                            output: `declare const doc: Document | null;\ndoc?.win.createEl('p');`,
-                        },
-                    ],
-                },
-            ],
-        },
-        {
-            name: "a node's ownerDocument, which may be null, gets a suggestion with Obsidian's types",
-            code: `import "obsidian";\ndeclare const node: Node;\nnode.ownerDocument?.createElement('p');`,
-            output: null,
-            errors: [
-                {
-                    messageId: "preferCreateEl",
-                    suggestions: [
-                        {
-                            messageId: "preferCreateElSuggestion",
-                            output: `import "obsidian";\ndeclare const node: Node;\nnode.ownerDocument?.win.createEl('p');`,
-                        },
-                    ],
-                },
-            ],
-        },
-        {
             name: "a string tag on a nullable document gets neither a fix nor a suggestion",
             code: `${MOCK_OBSIDIAN_DOM}\ndeclare const doc: (Document & { win: typeof globalThis }) | null;\ndeclare const tag: string;\ndoc?.createElement(tag);`,
             output: null,
@@ -916,7 +801,12 @@ const MOCK_CLASS_NAME_HELPERS = `
 `;
 
 ruleTester.run("prefer-create-el: createEl() shorthands", preferCreateEl, {
-    valid: [],
+    valid: [
+        {
+            name: "a polyfill's createDiv() calling createEl('div') is not reported",
+            code: "declare const proto: { createDiv?: (o?: object) => Element };\nproto.createDiv = function (this: Element, o?: object) {\n    return (this as unknown as { createEl: (t: string, o?: unknown) => Element }).createEl('div', o);\n};",
+        },
+    ],
     invalid: [
         // --- With Obsidian's types: fixed ---
         {
@@ -995,12 +885,6 @@ ruleTester.run("prefer-create-el: createEl() shorthands", preferCreateEl, {
         {
             name: "a value cast to a type with only createEl() is reported without a fix",
             code: `${OBSIDIAN}const frag = createFragment() as unknown as { createEl: (t: string, o?: { text?: string }) => HTMLElement };\nfrag.createEl('div', { text: 'Stashpad tabs cleaned up:' });`,
-            output: null,
-            errors: [{ messageId: "preferCreateEl", suggestions: [] }],
-        },
-        {
-            name: "a polyfill's createDiv() calling createEl('div') is reported without a fix",
-            code: "declare const proto: { createDiv?: (o?: object) => Element };\nproto.createDiv = function (this: Element, o?: object) {\n    return (this as unknown as { createEl: (t: string, o?: unknown) => Element }).createEl('div', o);\n};",
             output: null,
             errors: [{ messageId: "preferCreateEl", suggestions: [] }],
         },
@@ -1160,9 +1044,9 @@ ruleTester.run("prefer-create-el: createEl() shorthands", preferCreateEl, {
 
 // Without strictNullChecks an unknown receiver stays unknown, which the types
 // cannot tell anything about: fixed, like an any receiver.
-const nonStrictRuleTester = new RuleTester({
+const nonStrictRuleTester = atMinAppVersion(new RuleTester({
     languageOptions: { parserOptions: { project: "./tests/fixtures/tsconfig.non-strict.json" } },
-});
+}), "1.5.0");
 
 nonStrictRuleTester.run("prefer-create-el without strictNullChecks", preferCreateEl, {
     valid: [],
@@ -1178,7 +1062,7 @@ nonStrictRuleTester.run("prefer-create-el without strictNullChecks", preferCreat
 
 // The recommended config declares the browser's and Obsidian's globals. They
 // are variables without a declaration in the file: still the globals.
-const globalsRuleTester = new RuleTester({
+const globalsRuleTester = atMinAppVersion(new RuleTester({
     languageOptions: {
         globals: {
             ...globals.browser,
@@ -1191,7 +1075,7 @@ const globalsRuleTester = new RuleTester({
             createSvg: "readonly",
         },
     },
-});
+}), "1.5.0");
 
 globalsRuleTester.run("prefer-create-el with the recommended config's globals", preferCreateEl, {
     valid: [],
@@ -1206,6 +1090,172 @@ globalsRuleTester.run("prefer-create-el with the recommended config's globals", 
             name: "createEl('span') → createSpan()",
             code: `${MOCK_OBSIDIAN_DOM}\ncreateEl('span');`,
             output: `${MOCK_OBSIDIAN_DOM}\ncreateSpan();`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+    ],
+});
+
+// Replacements that need a newer Obsidian than the plugin's minAppVersion are
+// not offered: createDiv() and createSpan() 0.10.0, createFragment() 0.9.11, createSvg() 1.1.0, activeWindow 0.15.0, `doc.win` 0.15.3. The
+// native call is right on older versions, so it is not reported either.
+const versionRuleTester = new RuleTester();
+const at = (minAppVersion: string): [{ minAppVersion: string }] => [{ minAppVersion }];
+const SVG = `${MOCK_OBSIDIAN_DOM}\ndocument.createElementNS('http://www.w3.org/2000/svg', 'path');`;
+const ACTIVE = `${MOCK_ACTIVE_WINDOW_WITH_HELPERS}\nactiveDocument.createElement('div');`;
+const DOC_WIN = `${MOCK_OBSIDIAN_DOM}\ndeclare const doc: Document & { win: typeof globalThis };\ndoc.createElement('div');`;
+
+versionRuleTester.run("prefer-create-el and minAppVersion", preferCreateEl, {
+    valid: [
+        { name: "createSvg() below 1.1.0 is not reported", code: SVG, options: at("1.0.9") },
+        { name: "createDiv() below 0.10.0 is not reported", code: `${MOCK_OBSIDIAN_DOM}\ndocument.createElement('div');`, options: at("0.9.21") },
+        { name: "el.createDiv() below 0.10.0 is not reported", code: `${MOCK_OBSIDIAN_DOM}\ndeclare const el: HTMLElement;\nel.createEl('div');`, options: at("0.9.21") },
+        { name: "createFragment() below 0.9.11 is not reported", code: `${MOCK_OBSIDIAN_DOM}\ndocument.createDocumentFragment();`, options: at("0.9.8") },
+        { name: "activeWindow below 0.15.0 is not reported", code: ACTIVE, options: at("0.14.9") },
+        { name: "doc.win below 0.15.3 is not reported", code: DOC_WIN, options: at("0.15.2") },
+        { name: "doc.win at 0.15.0, from the repository's manifest.json, is not reported", code: DOC_WIN },
+    ],
+    invalid: [
+        {
+            name: "createSvg() at 1.1.0 is fixed",
+            code: SVG,
+            options: at("1.1.0"),
+            output: `${MOCK_OBSIDIAN_DOM}\ncreateSvg('path');`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        {
+            name: "createSvg() with an unknown version is fixed as before",
+            code: SVG,
+            options: at("latest"),
+            output: `${MOCK_OBSIDIAN_DOM}\ncreateSvg('path');`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        {
+            name: "activeWindow at 0.15.0 is fixed",
+            code: ACTIVE,
+            options: at("0.15.0"),
+            output: `${MOCK_ACTIVE_WINDOW_WITH_HELPERS}\nactiveWindow.createDiv();`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        {
+            name: "doc.win at 0.15.3 is fixed",
+            code: DOC_WIN,
+            options: at("0.15.3"),
+            output: `${MOCK_OBSIDIAN_DOM}\ndeclare const doc: Document & { win: typeof globalThis };\ndoc.win.createDiv();`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        {
+            name: "document.createElement('div') → createDiv() at 0.10.0 is fixed",
+            code: `${MOCK_OBSIDIAN_DOM}\ndocument.createElement('div');`,
+            options: at("0.10.0"),
+            output: `${MOCK_OBSIDIAN_DOM}\ncreateDiv();`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        {
+            name: "a suggested createSvg() says which version it needs when none is known",
+            code: "document.createElementNS('http://www.w3.org/2000/svg', 'path');",
+            options: at("latest"),
+            output: null,
+            errors: [
+                {
+                    messageId: "preferCreateEl",
+                    suggestions: [{ messageId: "preferCreateElSuggestionSince", data: { since: "1.1.0", original: "document.createElementNS('http://www.w3.org/2000/svg', 'path')", replacement: "createSvg('path')" }, output: "createSvg('path');" }],
+                },
+            ],
+        },
+        {
+            name: "a suggested createSvg() at 1.1.0 does not mention a version",
+            code: "document.createElementNS('http://www.w3.org/2000/svg', 'path');",
+            options: at("1.1.0"),
+            output: null,
+            errors: [
+                {
+                    messageId: "preferCreateEl",
+                    suggestions: [{ messageId: "preferCreateElSuggestion", output: "createSvg('path');" }],
+                },
+            ],
+        },
+    ],
+});
+
+// A fallback for where Obsidian's helpers are missing, as in a browser or under
+// jsdom: the native call is the one that works there.
+ruleTester.run("prefer-create-el in a fallback for where the helpers are missing", preferCreateEl, {
+    valid: [
+        {
+            name: "the other branch of a typeof check of a helper is not reported",
+            code: `${MOCK_OBSIDIAN_DOM}\nexport function make(): HTMLDivElement { return typeof createDiv === 'function' ? createDiv() : document.createElement('div'); }`,
+        },
+        {
+            name: "a call after a typeof check of a helper that returns is not reported",
+            code: `${MOCK_OBSIDIAN_DOM}\nexport function make(): HTMLElement { if (typeof createEl === 'function') { return createEl('p'); } return document.createElement('p'); }`,
+        },
+        {
+            name: "a branch for where activeDocument is missing is not reported",
+            code: `${MOCK_OBSIDIAN_DOM}\nexport function make(): HTMLElement { if (typeof activeDocument === 'undefined') { return document.createElement('p'); } return createEl('p'); }`,
+        },
+        {
+            name: "the catch of a try that calls a helper is not reported",
+            code: `${MOCK_OBSIDIAN_DOM}\nexport function make(): HTMLElement { try { return createEl('p'); } catch { return document.createElement('p'); } }`,
+        },
+        {
+            name: "a branch that checks for a helper on window is not reported",
+            code: `${MOCK_OBSIDIAN_DOM}\nexport function make(): DocumentFragment { return 'createFragment' in window ? createFragment() : document.createDocumentFragment(); }`,
+        },
+    ],
+    invalid: [
+        {
+            name: "a try that calls a helper does not stop a report in its own block",
+            code: `${MOCK_OBSIDIAN_DOM}\nexport function make(): HTMLElement { try { createEl('p'); return document.createElement('p'); } catch (e) { console.error(e); throw e; } }`,
+            output: `${MOCK_OBSIDIAN_DOM}\nexport function make(): HTMLElement { try { createEl('p'); return createEl('p'); } catch (e) { console.error(e); throw e; } }`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+        {
+            name: "a helper called inside a function in the try is not a guard",
+            code: `${MOCK_OBSIDIAN_DOM}\nexport function make(): HTMLElement { try { [1].map(() => createEl('p')); } catch { return document.createElement('p'); } return createEl('p'); }`,
+            output: `${MOCK_OBSIDIAN_DOM}\nexport function make(): HTMLElement { try { [1].map(() => createEl('p')); } catch { return createEl('p'); } return createEl('p'); }`,
+            errors: [{ messageId: "preferCreateEl" }],
+        },
+    ],
+});
+
+// The replacement is built from the arguments it keeps, so a comment between or
+// around them would be lost: a suggestion instead of a fix.
+ruleTester.run("prefer-create-el and comments", preferCreateEl, {
+    valid: [],
+    invalid: [
+        {
+            name: "a comment after the tag gets a suggestion",
+            code: `${MOCK_OBSIDIAN_DOM}\nexport function f(el: HTMLElement) { el.createEl(\n  'div', // container for the chart\n  { cls: 'a' },\n); }`,
+            output: null,
+            errors: [
+                {
+                    messageId: "preferCreateEl",
+                    suggestions: [
+                        {
+                            messageId: "preferCreateElSuggestion",
+                            output: `${MOCK_OBSIDIAN_DOM}\nexport function f(el: HTMLElement) { el.createDiv({ cls: 'a' }); }`,
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "a comment before the tag gets a suggestion",
+            code: `${MOCK_OBSIDIAN_DOM}\nexport const a = document.createElement(/* TODO: switch to section */ 'p');`,
+            output: null,
+            errors: [
+                {
+                    messageId: "preferCreateEl",
+                    suggestions: [
+                        { messageId: "preferCreateElSuggestion", output: `${MOCK_OBSIDIAN_DOM}\nexport const a = createEl('p');` },
+                    ],
+                },
+            ],
+        },
+        {
+            name: "a comment inside a kept argument is kept, so the call is fixed",
+            code: `${MOCK_OBSIDIAN_DOM}\nexport function f(el: HTMLElement) { el.createEl('div', { cls: 'a' /* the chart */ }); }`,
+            output: `${MOCK_OBSIDIAN_DOM}\nexport function f(el: HTMLElement) { el.createDiv({ cls: 'a' /* the chart */ }); }`,
             errors: [{ messageId: "preferCreateEl" }],
         },
     ],

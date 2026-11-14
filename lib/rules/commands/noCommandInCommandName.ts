@@ -1,10 +1,7 @@
 import { TSESTree } from "@typescript-eslint/utils";
 import { docsUrl, ruleCreator } from "../../ruleCreator.js";
-import { removePhrase } from "./nameRemoval.js";
+import { redundantCommandInName } from "./commandWord.js";
 import { isCommandProperty } from "./property.js";
-import { phrasePattern } from "./words.js";
-
-const COMMAND = phrasePattern("command")!;
 
 export default ruleCreator({
     meta: {
@@ -39,20 +36,21 @@ export default ruleCreator({
                     if (
                         isCommandProperty(property, "name") &&
                         property.value.type === TSESTree.AST_NODE_TYPES.Literal &&
-                        typeof property.value.value === "string" &&
-                        COMMAND.test(property.value.value)
+                        typeof property.value.value === "string"
                     ) {
                         const value = property.value;
-                        // "Command: run" and "Run command", but not "Command palette"
-                        const edit = removePhrase(value.value, COMMAND, {
-                            prefixAfterSpace: false,
-                            suffixAfterSpace: true,
-                        });
-                        const source = edit?.toSource(value.raw);
+                        // "Command: open note" and "Open settings command",
+                        // but not "Command palette", "Run command" or
+                        // "Copy URI for command"
+                        const edit = redundantCommandInName(value.value);
+                        if (!edit) {
+                            continue;
+                        }
+                        const source = edit.toSource(value.raw);
                         context.report({
                             node: property,
                             messageId: "commandInName",
-                            suggest: edit && source
+                            suggest: source
                                 ? [{
                                     messageId: "removeCommand",
                                     data: { name: edit.text },

@@ -13,6 +13,11 @@ const tester = new RuleTester({
 tester.run("ui-sentence-case-json", rule as unknown as Rule.RuleModule, {
     valid: [
         {
+            name: "words that keep a capital in English are not reported",
+            filename: "en.json",
+            code: '{"sortAZ":"Name (A-Z)","uri":"Copy Obsidian URI","pronoun":"Ask before I delete","day":"Week starts on Monday"}',
+        },
+        {
             name: "sentence case values in en.json are allowed",
             filename: "en.json",
             code: '{"label":"Enable auto-reveal","save":"Save to Google Drive","pdf":"Export as PDF"}',

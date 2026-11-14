@@ -16,7 +16,7 @@ export function loadManifest(path: string): PluginManifest | null {
         // mark, which JSON.parse rejects. ESLint drops it before linting the
         // file, so validate-manifest checks such a manifest as usual, and so
         // do Node's require() of JSON, npm and TypeScript.
-        const text = fs.readFileSync(path, "utf8").replace(/^﻿/, "");
+        const text = fs.readFileSync(path, "utf8").replace(/^\uFEFF/, "");
         return JSON.parse(text) as PluginManifest;
     } catch (err) {
         // A library, a tooling repo or a standalone CLI legitimately has no

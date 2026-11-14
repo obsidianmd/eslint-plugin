@@ -3,6 +3,7 @@ import {
     evaluateSentenceCase,
     isSkippableString,
     leadingLabelEnd,
+    timeFormatRanges,
     urlRanges,
 } from "../../lib/rules/ui/sentenceCaseUtil.js";
 
@@ -29,6 +30,8 @@ describe("sentence case on long text", () => {
         "many URLs": "see a://b ".repeat(15_000),
         "an opening bracket that is never closed": "(" + "a".repeat(45_000),
         "many date format tokens that are not a format": "Do ".repeat(20_000) + "a",
+        "a long time format with no AM/PM token": "h:".repeat(50_000) + "x",
+        "a long run of shortcut modifiers": "Ctrl-".repeat(20_000) + "click",
     };
     for (const [name, text] of Object.entries(inputs)) {
         it(`${name}: linear time`, () => {
@@ -83,6 +86,24 @@ describe("the linear checks decide as the regexes they replace", () => {
         const reference = (text: string) => LABEL.exec(text)?.[0].length ?? -1;
         for (const text of strings(["(", ")", "[", "]", "a", "1", " ", "\t", "-", "é", "😀"], 6)) {
             assert.strictEqual(leadingLabelEnd(text), reference(text), JSON.stringify(text));
+        }
+    });
+
+    it("timeFormatRanges()", () => {
+        const TIME = /(?<![A-Za-z0-9])(?:HH|H|hh|h)(?:[:.](?:YYYY|YY|MMMM|MMM|MM|M|Do|DD|D|dddd|ddd|HH|H|hh|h|mm|ss|SSS|A|a))+ ?[Aa](?![A-Za-z0-9])/g;
+        const reference = (text: string): number[][] => [...text.matchAll(TIME)].map((m) => [m.index, m.index + m[0].length]);
+        for (const text of strings(["h", "H", "m", "a", "A", ":", ".", " ", "x"], 6)) {
+            assert.deepStrictEqual(timeFormatRanges(text), reference(text), JSON.stringify(text));
+        }
+        let seed = 7;
+        const random = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+        const pieces = ["h", "hh", "HH", "H", ":", ".", "mm", "ss", "a", "A", " ", " A", "x", "Do", "MM", "YYYY", ":mm", "1"];
+        for (let n = 0; n < 20_000; n++) {
+            let text = "";
+            for (let i = 0, length = 5 + Math.floor(random() * 25); i < length; i++) {
+                text += pieces[Math.floor(random() * pieces.length)];
+            }
+            assert.deepStrictEqual(timeFormatRanges(text), reference(text), JSON.stringify(text));
         }
     });
 

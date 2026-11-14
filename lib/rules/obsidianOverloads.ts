@@ -54,6 +54,11 @@ export function getOverloadKey(declaration: ts.SignatureDeclaration): string {
     return `(${types.join(", ")})`;
 }
 
+// An overload's return type, written the same way: `Promise<WorkspaceLeaf>`.
+export function getReturnTypeText(declaration: ts.SignatureDeclaration): string {
+    return declaration.type ? getTypeText(declaration.type, declaration.getSourceFile()) : "any";
+}
+
 // A type as its tokens, so whitespace, line breaks, comments and the quotes
 // around a string literal do not count.
 function getTypeText(node: ts.TypeNode, sourceFile: ts.SourceFile): string {

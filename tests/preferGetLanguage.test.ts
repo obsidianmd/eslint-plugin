@@ -3,46 +3,61 @@ import preferGetLanguageRule from "../lib/rules/preferGetLanguage.js";
 
 const ruleTester = new RuleTester();
 
+// getLanguage() came with Obsidian 1.8.7. This repo's manifest.json says
+// 0.15.0, below which nothing is reported, so the version is given as an
+// option.
+const since = [{ minAppVersion: "1.8.7" }] as const;
+
 ruleTester.run("prefer-get-language", preferGetLanguageRule, {
     valid: [
         {
             name: "getLanguage() is allowed",
+            options: since,
             code: "const lang = getLanguage();",
         },
         {
             name: "localStorage.getItem with other key is allowed",
+            options: since,
             code: "localStorage.getItem('theme');",
         },
         {
             name: "other object getItem('language') is allowed",
+            options: since,
             code: "storage.getItem('language');",
         },
         {
             name: "importing other i18n packages is allowed",
+            options: since,
             code: "import i18next from 'i18next';",
         },
         {
             name: "a variable holding the storage is not followed",
+            options: since,
             code: "const store = localStorage; store.getItem('language');",
         },
         {
             name: "a dynamic import of the detector is not reported",
+            options: since,
             code: "const detector = await import('i18next-browser-languagedetector');",
         },
         {
             name: "another storage method, or getItem without a key, is not reported",
+            options: since,
             code: "localStorage.setItem('language', 'en'); localStorage.getItem();",
         },
         {
             name: "another storage on window is not reported",
+            options: since,
             code: "const lang = window.sessionStorage.getItem('language');",
         },
         {
             name: "require() of another module, or without an argument, is not reported",
+            options: since,
             code: "const i18next = require('i18next'); require();",
         },
         {
             name: "a computed access by a variable is not reported",
+            options: since,
             code: `
                 const getItem = "key";
                 localStorage[getItem]("language");
@@ -51,30 +66,46 @@ ruleTester.run("prefer-get-language", preferGetLanguageRule, {
                 }
             `,
         },
+        {
+            // obsidian-kanban, style-settings, periodic-notes: below 1.8.7,
+            // reading localStorage is the only way to get the language.
+            name: "below 1.8.7, as this repo's manifest.json (0.15.0) is, nothing is reported",
+            code: "const lang = localStorage.getItem('language'); import LanguageDetector from 'i18next-browser-languagedetector';",
+        },
+        {
+            name: "below 1.8.7 by the option",
+            code: "const lang = window.localStorage.getItem('language');",
+            options: [{ minAppVersion: "1.8.6" }],
+        },
     ],
     invalid: [
         {
             name: "localStorage.getItem('language') is forbidden",
+            options: since,
             code: "const lang = localStorage.getItem('language');",
             errors: [{ messageId: "localStorageLanguage", line: 1, column: 14, endColumn: 46 }],
         },
         {
             name: "window.localStorage.getItem('language') is forbidden",
+            options: since,
             code: "const lang = window.localStorage.getItem('language');",
             errors: [{ messageId: "localStorageLanguage" }],
         },
         {
             name: "importing i18next-browser-languagedetector is forbidden",
+            options: since,
             code: "import LanguageDetector from 'i18next-browser-languagedetector';",
             errors: [{ messageId: "i18nextDetector" }],
         },
         {
             name: "require i18next-browser-languagedetector is forbidden",
+            options: since,
             code: "const LanguageDetector = require('i18next-browser-languagedetector');",
             errors: [{ messageId: "i18nextDetector" }],
         },
         {
             name: "a computed access with the name spelled out is reported",
+            options: since,
             code: `
                 localStorage["getItem"]("language");
                 localStorage[\`getItem\`]("language");
@@ -88,15 +119,14 @@ ruleTester.run("prefer-get-language", preferGetLanguageRule, {
         },
         {
             name: "another window's localStorage is reported",
+            options: since,
             code: "const lang = activeWindow.localStorage.getItem('language');",
             errors: [{ messageId: "localStorageLanguage" }],
         },
     ],
 });
 
-// The suggestion. getLanguage() came with Obsidian 1.8.7; this repo's
-// manifest.json says 0.15.0, so the version is given as an option.
-const since = [{ minAppVersion: "1.8.7" }] as const;
+// The suggestion.
 const offered = (output: string) => [{ messageId: "useGetLanguage" as const, output }];
 
 ruleTester.run("prefer-get-language suggestions", preferGetLanguageRule, {
@@ -179,17 +209,6 @@ ruleTester.run("prefer-get-language suggestions", preferGetLanguageRule, {
             }],
         },
         // Nothing is offered:
-        {
-            name: "below 1.8.7, as this repo's manifest.json (0.15.0) is",
-            code: 'import { Plugin } from "obsidian";\nexport const lang = localStorage.getItem("language");\n',
-            errors: [{ messageId: "localStorageLanguage", suggestions: [] }],
-        },
-        {
-            name: "with a minAppVersion option below 1.8.7",
-            code: 'import { Plugin } from "obsidian";\nexport const lang = localStorage.getItem("language");\n',
-            options: [{ minAppVersion: "1.8.6" }],
-            errors: [{ messageId: "localStorageLanguage", suggestions: [] }],
-        },
         {
             name: "where getLanguage is imported under another name",
             code: 'import { getLanguage as obsidianLanguage } from "obsidian";\nexport const lang = localStorage.getItem("language") ?? obsidianLanguage();\n',

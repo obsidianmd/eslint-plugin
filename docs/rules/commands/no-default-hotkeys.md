@@ -10,8 +10,9 @@
 
 ## What is reported
 
-A `hotkeys` property, whatever its value (an empty array too), in a command passed to `addCommand()`
-as an object literal. The key may be quoted (`"hotkeys": …`):
+A `hotkeys` property in a command passed to `addCommand()` as an object literal, unless its value is
+an empty array (`hotkeys: []`, also `[] as Hotkey[]`), which sets no hotkey. The key may be quoted
+(`"hotkeys": …`):
 
 ```ts
 this.addCommand({ id: "open-note", name: "Open note", hotkeys: [{ modifiers: ["Mod"], key: "O" }], callback }); // reported
@@ -40,7 +41,7 @@ this.addCommand({
 
 Comments next to the property stay where they are, on their own line or after the property before
 it. Not offered where a comment is inside the property or between it and its comma, as in
-`hotkeys: [/* Mod+O */]`, since it would go with the property.
+`hotkeys: [/* Mod+O */ OPEN_HOTKEY]`, since it would go with the property.
 
 ## Further reading
 

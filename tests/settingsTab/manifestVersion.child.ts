@@ -16,7 +16,7 @@ const rules = {
     "no-problematic-settings-headings": noProblematicSettingsHeadings,
 } as unknown as Record<string, Rule.RuleModule>;
 
-const CODE: Record<keyof typeof rules & string, string> = {
+const CODE: Record<keyof typeof rules, string> = {
     // No display(): only rendered on 1.13+.
     "require-display": "class MyTab extends PluginSettingTab { getSettingDefinitions() { return [{ name: 'Mode' }]; } }",
     // display() next to definitions: bypassed on 1.13+.

@@ -29,7 +29,7 @@ const START_NAMES = [
     "Word Tally > count words",
     "[Word Tally] count words",
     "(Word Tally): count words",
-    "Word Tally count words",
+    "Word Tally Count words",
 ];
 const END_NAMES = [
     "Count words: Word Tally",
@@ -64,6 +64,13 @@ const SENTENCE_NAMES = [
 
 ruleTester.run("no-plugin-name-in-command-name", noPluginNameRule, {
     valid: [
+        {
+            // obsidian-zoom: the plugin name is the verb of the sentence, not
+            // a label, and "In" would mean nothing.
+            name: "the plugin name that starts the name as a word, before a lower-case one, is allowed",
+            code: commands(["Zoom in", "Zoom out the entire document", "Zoom  into heading"]),
+            options: [{ pluginName: "Zoom" }],
+        },
         {
             name: "name without plugin name is allowed",
             code: "this.addCommand({ name: 'Open a new note' });",
@@ -229,6 +236,20 @@ ruleTester.run("no-plugin-name-in-command-name", noPluginNameRule, {
             code: commands(START_NAMES),
             options: [{ pluginName: "Word Tally" }],
             errors: renamedLines(START_NAMES, START_NAMES.map(() => "Count words")),
+        },
+        {
+            // The plugin name starts the name as the verb, and removing the
+            // label would take the verb too: "In" would mean nothing.
+            name: "no suggestion where the plugin name starts the name as a word and is a label elsewhere",
+            code: commands(["Zoom in (Zoom)", "Zoom out - zoom"]),
+            options: [{ pluginName: "Zoom" }],
+            errors: renamedLines([], [null, null]),
+        },
+        {
+            name: "a capitalised word after the plugin name and a space keeps the suggestion",
+            code: command("Fit Sync"),
+            options: [{ pluginName: "Fit" }],
+            errors: renamedLines(["Fit Sync"], ["Sync"]),
         },
         {
             name: "the suggestion removes the plugin name and the separator before it at the end",
