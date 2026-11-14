@@ -1011,6 +1011,85 @@ export function followsProbeOfGlobal(sourceCode: Context["sourceCode"], node: TS
     return decidingConditions(node).some(visit);
 }
 
+/**
+ * Whether TypeScript may have narrowed the global `window` where `node` runs,
+ * to a type without the members `window.x` reads: in the `else` of
+ * `if ("requestIdleCallback" in window)` it is `never`, as Window declares the
+ * property, so `window.setTimeout` there is TS2339. The checks that narrow it
+ * are `"x" in window`, `typeof window` and `window instanceof X`, in the
+ * conditions that decide whether `node` runs (see decidingConditions) in the
+ * same function: TypeScript does not carry the narrowing of a global into a
+ * callback. A check that leaves `window` a Window, as `"x" in window` where
+ * it is true, or `typeof window !== "undefined"`, does not count.
+ */
+export function windowIsNarrowedAt(
+    sourceCode: Context["sourceCode"],
+    node: TSESTree.Node,
+    types: TypeInfo | null,
+): boolean {
+    const fn = enclosingFunction(node);
+    const isGlobalWindow = (candidate: TSESTree.Node): candidate is TSESTree.Identifier =>
+        candidate.type === TSESTree.AST_NODE_TYPES.Identifier &&
+        candidate.name === "window" &&
+        !hasLocalBinding(sourceCode.getScope(candidate), "window");
+    const narrows = (check: TSESTree.Node): boolean => {
+        const parent = check.parent;
+        if (!parent) {
+            return false;
+        }
+        // "x" in window
+        if (parent.type === TSESTree.AST_NODE_TYPES.BinaryExpression && parent.operator === "in" && parent.right === check) {
+            const value = conditionValueAt(parent, node);
+            if (value === true) {
+                return false;
+            }
+            // False where `node` runs: `never` only if Window declares the key.
+            const key = parent.left.type === TSESTree.AST_NODE_TYPES.PrivateIdentifier ? undefined : staticString(parent.left);
+            if (value === false && key !== undefined && types) {
+                const windowType = getGlobalWindowType(types, check);
+                return !windowType || windowType.getProperty(key) !== undefined;
+            }
+            return true;
+        }
+        // window instanceof X
+        if (parent.type === TSESTree.AST_NODE_TYPES.BinaryExpression && parent.operator === "instanceof" && parent.left === check) {
+            return true;
+        }
+        // typeof window === "undefined", typeof window !== "object"
+        if (parent.type === TSESTree.AST_NODE_TYPES.UnaryExpression && parent.operator === "typeof") {
+            const comparison = parent.parent;
+            if (
+                comparison.type !== TSESTree.AST_NODE_TYPES.BinaryExpression ||
+                !["===", "==", "!==", "!="].includes(comparison.operator)
+            ) {
+                return true;
+            }
+            const other = comparison.left === parent ? comparison.right : comparison.left;
+            const typeName = staticString(other);
+            const value = conditionValueAt(comparison, node);
+            if (typeName === undefined || value === undefined) {
+                return true;
+            }
+            const isTypeName = comparison.operator === "===" || comparison.operator === "==" ? value : !value;
+            return isTypeName ? typeName !== "object" : typeName === "object";
+        }
+        return false;
+    };
+    const visit = (current: TSESTree.Node): boolean => {
+        if (isFunction(current)) {
+            return false;
+        }
+        if (isGlobalWindow(current) && narrows(current)) {
+            return true;
+        }
+        return (sourceCode.visitorKeys[current.type] ?? []).some((key) => {
+            const child: unknown = (current as unknown as Record<string, unknown>)[key];
+            return Array.isArray(child) ? child.some((item) => isNode(item) && visit(item)) : isNode(child) && visit(child);
+        });
+    };
+    return decidingConditions(node).some((condition) => enclosingFunction(condition) === fn && visit(condition));
+}
+
 // The window or worker name that `node` checks for, if it is a window check.
 function checkedName(node: TSESTree.Node): string | undefined {
     if (node.type === TSESTree.AST_NODE_TYPES.UnaryExpression && node.operator === "typeof") {

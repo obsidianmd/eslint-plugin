@@ -6,6 +6,7 @@ import {
     isResultDiscarded,
     isTimerCallTypeSafe,
     mayLackWindowAt,
+    windowIsNarrowedAt,
 } from "../globalWindow.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
@@ -64,7 +65,9 @@ export default ruleCreator({
                     // `window` would be a local of that name, such as a
                     // Playwright page, or would not exist: no DOM lib, or a
                     // `typeof window` check says the code runs without one.
-                    if (!isGlobalWindowAt(context, callee)) {
+                    // In the `else` of `if ("requestIdleCallback" in window)`,
+                    // `window` is `never`, and `window.setTimeout` does not compile.
+                    if (!isGlobalWindowAt(context, callee) || windowIsNarrowedAt(context.sourceCode, callee, types)) {
                         context.report({ node: callee, messageId: "preferWindowTimer", data: { name } });
                         return;
                     }
@@ -109,7 +112,7 @@ export default ruleCreator({
                     }
                     const object = callee.object;
                     const fix = (fixer: TSESLint.RuleFixer) => fixer.replaceText(object, "window");
-                    if (!isGlobalWindowAt(context, object)) {
+                    if (!isGlobalWindowAt(context, object) || windowIsNarrowedAt(context.sourceCode, object, types)) {
                         context.report({ node: callee, messageId: "noActiveWindowTimer", data: { name } });
                     } else if (
                         mayLackWindowAt(context, object) ||

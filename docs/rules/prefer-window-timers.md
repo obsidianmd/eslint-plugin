@@ -70,6 +70,13 @@ on `activeWindow` are not fixed there either:
 - a local binding named `window` is in scope, such as a Playwright page in
   `const window = await app.firstWindow()`, so `window.setTimeout` would call that binding
 - with type information, the project declares no `window` because it has no DOM lib
+- TypeScript has narrowed `window` there to a type without the property, so `window.setTimeout`
+  would not compile (TS2339). In the `else` of `if ("requestIdleCallback" in window)`, or after
+  `if ("requestIdleCallback" in window) return;`, `window` is `never`, because `Window` declares
+  `requestIdleCallback`. The same goes for `typeof window` and `window instanceof X` checks that
+  rule the window out where the code runs. Where `window` is still a `Window`, as where such a check
+  is true, after a check for a key `Window` does not declare (with type information), or in a
+  callback, which TypeScript does not narrow, the rules above apply
 - an earlier [window check](#window-checks) shows that the code also runs without a window, as in
   `typeof window === "undefined" ? setTimeout(fn, ms) : window.setTimeout(fn, ms)`.
   Where the check proves that the window exists, such as inside
