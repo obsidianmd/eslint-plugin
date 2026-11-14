@@ -1,6 +1,6 @@
 import { ASTUtils, type TSESLint, TSESTree } from "@typescript-eslint/utils";
 import ts from "typescript";
-import { getTypeInfo, isResultDiscarded } from "../globalWindow.js";
+import { getTypeInfo, isDiscardedArrowBody, isResultDiscarded } from "../globalWindow.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 // Properties whose name contains "default" but that are not a set of
@@ -109,6 +109,7 @@ export default ruleCreator({
             if (
                 isResultDiscarded(node) ||
                 isDiscardedChain(node) ||
+                isDiscardedArrowBody(node, types) ||
                 node.typeArguments ||
                 isClassInstance(node.arguments[0])
             ) {

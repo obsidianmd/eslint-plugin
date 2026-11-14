@@ -24,6 +24,11 @@ this.addCommand({ id: "count", name: "Count words", callback });
 
 Whole words means no letter or digit, in any script, right before or after the plugin name, so a
 plugin named "Git" gets "Commit with Git" and "Git: pull" reported but not "Open digital garden".
+
+Not reported where the plugin name starts the command name as a word of the sentence, with only
+spaces and a word in lower case after it, and is nowhere else in it, as in "Zoom in" of the plugin
+"Zoom" or "Git commit" of the plugin "Git": the plugin name is then the verb, or the noun the command
+acts on, rather than a label.
 The words of a plugin name of several words may be separated by any whitespace; the name is
 otherwise matched as written, punctuation included.
 
@@ -60,9 +65,9 @@ is, for ui/sentence-case to report. The string keeps its quotes and its escapes.
 Not offered where:
 
 - nothing would be left, as for "Word Tally" or "Word Tally:";
-- only spaces separate the plugin name at the start from a word in lower case, as in "Zoom in" of
-  the plugin "Zoom" or "Git commit": the plugin name is then a word of the sentence, and "In" would
-  mean nothing;
+- only spaces separate the plugin name at the start from a word in lower case, and it is a label
+  elsewhere, as in "Zoom in (Zoom)": removing the label would take the verb too, and "In" would mean
+  nothing;
 - the plugin name is part of the sentence, where the rest would not read or would mean something
   else: "Open Word Tally settings", "Count with Word Tally", "Word Tally-based count",
   "Word Tally's settings", "Count words (for Word Tally)";

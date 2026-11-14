@@ -45,6 +45,13 @@ Not reported:
 - `activeDocument` or another document when its window's type does not declare the helper, as with
   Obsidian's own types; see [Popout window documents](#popout-window-documents)
 - code inside an implementation of the helpers; see [Helper implementations](#helper-implementations)
+- a call on a document in a fallback for where Obsidian's helpers are missing, as in a browser or
+  under jsdom, where the native call is the one that works. That is code a check decides, or a check
+  before it in the same function, of a helper (`typeof createDiv === "function" ? createDiv() :
+  document.createElement("div")`, `"createEl" in window`), of `activeDocument` or `activeWindow`
+  (`if (typeof activeDocument === "undefined") { … }`), or of the window; and code that runs once a
+  `try` that calls a helper by its bare name, or reads the document, has failed, such as its `catch`.
+  These are the checks [`prefer-active-doc`](prefer-active-doc.md) follows
 
 The rule needs type information, so the recommended config runs it on TypeScript files only. It
 switches the rule off for worker files, test files and tool configs, which have no Obsidian DOM helpers; see
@@ -58,6 +65,10 @@ declares them, and `activeWindow.createEl()` when `Window` declares them. For th
 without the global helpers declared, the replacement is offered as a suggestion; for
 `activeDocument` and other documents, the call is not reported (see
 [Popout window documents](#popout-window-documents)).
+
+The replacement is written from the arguments it keeps. Where a comment sits outside them, as in
+`createEl("div", // the chart` or `createElement(/* TODO */ "p")`, it would be lost, so the
+replacement is offered as a suggestion instead, for you to move the comment.
 
 `createEl()` and `createSvg()` take only tag names the DOM types know (`keyof HTMLElementTagNameMap`
 and `keyof SVGElementTagNameMap`). A tag literal, or a variable typed as a union of known tags, is

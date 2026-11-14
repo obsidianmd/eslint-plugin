@@ -50,6 +50,15 @@ const WINDOW_ELEMENT_MUTATORS = new Set([
     "appendChild", "append", "prepend", "insertBefore", "removeChild", "replaceChild", "replaceChildren",
     "insertAdjacentElement", "insertAdjacentHTML", "insertAdjacentText",
 ]);
+// The calls that put an element in `body`, with the index of the argument that
+// is the element, and the call that takes one out. An element the code both
+// puts there and removes again, such as a download link or a textarea for
+// copying text, is no state of the window: it belongs in the active window's
+// body like any other use of `document`.
+const CHILD_ADDERS: Record<string, number> = {
+    appendChild: 0, append: 0, prepend: 0, insertBefore: 0, insertAdjacentElement: 1,
+};
+const CHILD_REMOVERS = new Set(["removeChild"]);
 // Obsidian's helpers that create an element in `<head>`, such as a `<style>`.
 const CREATE_METHODS = new Set(["createEl", "createDiv", "createSpan", "createSvg"]);
 const CLASS_LIST_MUTATORS = new Set(["add", "remove", "toggle", "replace"]);
@@ -72,7 +81,7 @@ const GLOBAL_HOSTS = new Set(["window", "globalThis", "self"]);
 // The document properties that hold a document, for `[document, win.document]`.
 const DOCUMENT_PROPERTIES = new Set(["doc", "document", "ownerDocument", "activeDocument"]);
 
-type MessageIds = "preferActive" | "perWindowState" | "useActiveDocument" | "useActiveDocumentSince" | "useIsConnected";
+type MessageIds = "preferActive" | "preferActiveBody" | "perWindowState" | "useActiveDocument" | "useActiveDocumentSince" | "useIsConnected";
 
 // Each scope's references by the identifier that makes them.
 const referencesByScope = new WeakMap<object, Map<TSESTree.Node, TSESLint.Scope.Reference>>();
@@ -93,6 +102,8 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
         messages: {
             preferActive:
                 "Use '{{replacement}}' instead of '{{original}}' for popout window compatibility.",
+            preferActiveBody:
+                "Use 'activeDocument.body' instead of 'document.body', so the element is put in the window that has focus, for popout window compatibility.",
             perWindowState:
                 "'document.{{element}}' is the main window's, so this change does not reach popout windows. Make it, and undo it, in each window's document, for example from `workspace.on(\"window-open\")`.",
             useActiveDocument: "Replace with `activeDocument`, the document of the window that has focus.",
@@ -244,7 +255,10 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
                     node.parent.object === node &&
                     node.parent.parent.type === TSESTree.AST_NODE_TYPES.CallExpression &&
                     node.parent.parent.callee === node.parent &&
-                    isReportedOnGlobalDocument(node.parent.parent) &&
+                    // Below 0.15.0, which has no activeDocument, the call is
+                    // left alone even where prefer-create-el's helper is too
+                    // new: neither replacement can be used there.
+                    isReportedOnGlobalDocument(node.parent.parent, supported === false ? null : context.options[0]?.minAppVersion) &&
                     !createElDisabledAt(node.parent.parent)
                 ) {
                     return;
@@ -257,6 +271,11 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
                 const windowElement = mutatedWindowElement(node);
                 if (windowElement !== null) {
                     context.report({ node, messageId: "perWindowState", data: { element: windowElement }, suggest: [] });
+                    return;
+                }
+
+                if (node.name === "document" && isTransientBodyUse(node)) {
+                    context.report({ node, messageId: "preferActiveBody", suggest: transientBodySuggestions(node) });
                     return;
                 }
 
@@ -371,6 +390,9 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
                 return null;
             }
             let mutates = false;
+            if (movesTransientElementIn(element.name, inner.member, inner.name)) {
+                return null;
+            }
             if (isCalled(inner.member)) {
                 mutates =
                     WINDOW_ELEMENT_MUTATORS.has(inner.name) || (element.name === "head" && CREATE_METHODS.has(inner.name));
@@ -395,6 +417,156 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
                 }
             }
             return mutates ? element.name : null;
+        }
+
+        // Whether `call`, `body.<method>(…)`, puts in or takes out an element
+        // that the code both puts somewhere and removes again, as in
+        // `document.body.appendChild(a); a.click(); a.remove();`.
+        // Whether `node` is the `document` of `document.body.<method>(…)` that
+        // puts in or takes out an element only there for a moment.
+        function isTransientBodyUse(node: TSESTree.Identifier): boolean {
+            const element = propertyOf(outerValue(node));
+            const inner = element?.name === "body" ? propertyOf(element.member) : undefined;
+            return !!inner?.name && movesTransientElementIn("body", inner.member, inner.name);
+        }
+
+        function movesTransientElementIn(element: string, member: TSESTree.MemberExpression, method: string): boolean {
+            return element === "body" && isCalled(member) && movesTransientElement(member.parent, method);
+        }
+
+        // `document.body.contains(a)` counts too: it checks the body the
+        // element was put in, so it has to move with the rest (see
+        // transientBodySuggestions).
+        function movesTransientElement(call: TSESTree.CallExpression, method: string): boolean {
+            const variable = movedElementVariable(call, method);
+            if (!variable) {
+                return false;
+            }
+            let added = false;
+            let removed = false;
+            for (const reference of variable.references) {
+                const id = reference.identifier;
+                const parent = id.parent;
+                if (!parent) {
+                    continue;
+                }
+                // `a.remove()`, `a.detach()`
+                if (
+                    parent.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
+                    parent.object === id &&
+                    !parent.computed &&
+                    parent.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
+                    REMOVE_METHODS.has(parent.property.name) &&
+                    isCalled(parent)
+                ) {
+                    removed = true;
+                    continue;
+                }
+                // `x.appendChild(a)`, `x.removeChild(a)`
+                if (
+                    parent.type === TSESTree.AST_NODE_TYPES.CallExpression &&
+                    parent.callee.type === TSESTree.AST_NODE_TYPES.MemberExpression &&
+                    !parent.callee.computed &&
+                    parent.callee.property.type === TSESTree.AST_NODE_TYPES.Identifier
+                ) {
+                    const name = parent.callee.property.name;
+                    if (Object.hasOwn(CHILD_ADDERS, name) && parent.arguments[CHILD_ADDERS[name]] === id) {
+                        added = true;
+                    } else if (CHILD_REMOVERS.has(name) && parent.arguments[0] === id) {
+                        removed = true;
+                    }
+                }
+            }
+            return added && removed;
+        }
+
+        // The variable of the element `call`, `body.<method>(element)`, puts
+        // in, takes out or looks for.
+        function movedElementVariable(call: TSESTree.CallExpression, method: string): TSESLint.Scope.Variable | undefined {
+            const index = Object.hasOwn(CHILD_ADDERS, method)
+                ? CHILD_ADDERS[method]
+                : CHILD_REMOVERS.has(method) || method === "contains"
+                  ? 0
+                  : undefined;
+            const arg = index === undefined ? undefined : call.arguments[index];
+            if (arg?.type !== TSESTree.AST_NODE_TYPES.Identifier) {
+                return undefined;
+            }
+            let scope: TSESLint.Scope.Scope | null = context.sourceCode.getScope(arg);
+            let variable: TSESLint.Scope.Variable | undefined;
+            for (; scope && !variable; scope = scope.upper) {
+                variable = scope.set.get(arg.name);
+            }
+            return variable;
+        }
+
+        // The suggestion for an element only put in `document.body` for a
+        // moment. The code that puts it there, takes it out and checks for it
+        // has to use the same body: with `activeDocument.body` for the
+        // `appendChild()` alone, `document.body.removeChild(el)` would throw
+        // in a popout window, and `document.body.contains(el)` would be false.
+        // So one suggestion rewrites the `document` of every
+        // `document.body.<method>(el)` for the element, and is offered on each
+        // of them, or on none where one of them cannot be rewritten.
+        function transientBodySuggestions(node: TSESTree.Identifier): TSESLint.SuggestionReportDescriptor<MessageIds>[] {
+            const element = propertyOf(outerValue(node));
+            const inner = element ? propertyOf(element.member) : undefined;
+            const variable =
+                inner?.name && isCalled(inner.member) ? movedElementVariable(inner.member.parent, inner.name) : undefined;
+            if (!variable || !offerable) {
+                return [];
+            }
+            const documents = new Set<TSESTree.Identifier>([node]);
+            for (const reference of variable.references) {
+                const id = reference.identifier;
+                const call = id.parent;
+                if (
+                    id.type !== TSESTree.AST_NODE_TYPES.Identifier ||
+                    call?.type !== TSESTree.AST_NODE_TYPES.CallExpression ||
+                    !call.arguments.includes(id)
+                ) {
+                    continue;
+                }
+                const method = call.callee.type === TSESTree.AST_NODE_TYPES.MemberExpression ? call.callee : null;
+                const body = method && !method.computed ? skipCasts(method.object) : null;
+                if (
+                    body?.type !== TSESTree.AST_NODE_TYPES.MemberExpression ||
+                    body.computed ||
+                    body.property.type !== TSESTree.AST_NODE_TYPES.Identifier ||
+                    body.property.name !== "body"
+                ) {
+                    continue;
+                }
+                const doc = skipCasts(body.object);
+                if (
+                    doc.type === TSESTree.AST_NODE_TYPES.Identifier &&
+                    doc.name === "document" &&
+                    !findVariable(context.sourceCode.getScope(doc), "document")?.defs.length &&
+                    method?.property.type === TSESTree.AST_NODE_TYPES.Identifier &&
+                    movedElementVariable(call, method.property.name) === variable
+                ) {
+                    documents.add(doc);
+                }
+            }
+            const all = [...documents];
+            if (all.some((doc) => !canSuggestAt(doc) || isHandedOn(doc) || isInFunctionComparingDocument(doc))) {
+                return [];
+            }
+            return [suggestion(node, all)];
+        }
+
+        // `node` without the casts and `!` around it, as it is written inside them.
+        function skipCasts(node: TSESTree.Node): TSESTree.Node {
+            let current = node;
+            while (
+                current.type === TSESTree.AST_NODE_TYPES.TSAsExpression ||
+                current.type === TSESTree.AST_NODE_TYPES.TSNonNullExpression ||
+                current.type === TSESTree.AST_NODE_TYPES.TSSatisfiesExpression ||
+                current.type === TSESTree.AST_NODE_TYPES.TSTypeAssertion
+            ) {
+                current = current.expression;
+            }
+            return current;
         }
 
         // Whether `document` finds an element there to remove it, as in
@@ -641,9 +813,12 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
             };
         }
 
-        function suggestion(node: TSESTree.Identifier): TSESLint.SuggestionReportDescriptor<MessageIds> {
+        function suggestion(
+            node: TSESTree.Identifier,
+            nodes: readonly TSESTree.Identifier[] = [node],
+        ): TSESLint.SuggestionReportDescriptor<MessageIds> {
             // `{ document }` is handed on (isHandedOn), so it is never offered.
-            const fix = (fixer: TSESLint.RuleFixer) => fixer.replaceText(node, "activeDocument");
+            const fix = (fixer: TSESLint.RuleFixer) => nodes.map((each) => fixer.replaceText(each, "activeDocument"));
             return supported === undefined
                 ? { messageId: "useActiveDocumentSince", data: { since: ACTIVE_DOCUMENT_SINCE }, fix }
                 : { messageId: "useActiveDocument", fix };

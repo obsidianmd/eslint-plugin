@@ -51,7 +51,7 @@ function reportingRule(predictions: Prediction[], hideGetDisableDirectives: bool
                             (ruleId) => ruleId === null || ruleId === context.id,
                         ),
                     });
-                    context.report(descriptor as Rule.ReportDescriptor);
+                    context.report(descriptor);
                 },
             };
         },

@@ -22,6 +22,12 @@ const pluginEntry = pathToFileURL(path.join(repoRoot, "lib/index.ts")).href;
 const tsxLoader = pathToFileURL(createRequire(import.meta.url).resolve("tsx")).href;
 const eslintBin = path.join(repoRoot, "node_modules/eslint/bin/eslint.js");
 
+// A linted file's path relative to the fixture, with "/" separators on every
+// platform, so the expected lists below can be written once.
+function toPosixRelative(dir: string, filePath: string): string {
+	return path.relative(dir, filePath).split(path.sep).join("/");
+}
+
 // The first `// eslint.config.mjs` example in the section under `heading`, up to
 // the next heading of the same or a higher level, so an example that loses its
 // header comment fails here instead of the next section's being tested.
@@ -130,7 +136,7 @@ for (const [file, heading, linted] of [
 		});
 
 		it("lints the plugin source, but not the build output or scripts", () => {
-			const lintedFiles = results.map((result) => path.relative(dir, result.filePath)).sort();
+			const lintedFiles = results.map((result) => toPosixRelative(dir, result.filePath)).sort();
 			assert.deepStrictEqual(lintedFiles, [...linted]);
 		});
 	});
@@ -217,12 +223,12 @@ describe("docs/configuration.md ## Plugins written in JavaScript examples on a J
 			});
 
 			it("lints the plugin source, but not the build output or scripts", () => {
-				const lintedFiles = results.map((result) => path.relative(dir, result.filePath)).sort();
+				const lintedFiles = results.map((result) => toPosixRelative(dir, result.filePath)).sort();
 				assert.deepStrictEqual(lintedFiles, ["eslint.config.mjs", "manifest.json", "package.json", "src/main.js"]);
 			});
 
 			it(typed ? "runs the type-aware rules on the source" : "does not run the type-aware rules", () => {
-				const source = results.find((result) => path.relative(dir, result.filePath) === "src/main.js");
+				const source = results.find((result) => toPosixRelative(dir, result.filePath) === "src/main.js");
 				const ruleIds = (source?.messages ?? []).map((message) => (message as { ruleId?: string }).ruleId);
 				assert.strictEqual(ruleIds.includes("obsidianmd/prefer-file-manager-trash-file"), typed);
 			});

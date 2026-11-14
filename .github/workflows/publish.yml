@@ -20,10 +20,10 @@ jobs:
         permissions:
             contents: read
         steps:
-            - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
                   persist-credentials: false
-            - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+            - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
               with:
                   node-version: "24"
             # The tag names the version the release promises; npm publishes
@@ -43,7 +43,7 @@ jobs:
             - run: npm test
             - run: npm run check:eslint-docs
             - run: npm pack
-            - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+            - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
               with:
                   name: package
                   path: "*.tgz"
@@ -56,11 +56,11 @@ jobs:
             contents: read
             id-token: write # npm trusted publishing and provenance
         steps:
-            - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+            - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
               with:
                   node-version: "24"
                   registry-url: "https://registry.npmjs.org"
-            - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+            - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
               with:
                   name: package
             # A GitHub prerelease goes to `next`, so `latest` keeps the last

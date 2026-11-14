@@ -9,16 +9,16 @@ import tseslint from "typescript-eslint";
 import plugin from "../lib/index.js";
 import { PlainTextLanguage } from "../lib/plainTextLanguage.js";
 
-async function rulesFor(configName: keyof typeof plugin.configs, filename: string): Promise<Record<string, any>> {
+async function rulesFor(configName: keyof typeof plugin.configs, filename: string): Promise<Record<string, unknown>> {
 	const eslint = new ESLint({
 		overrideConfigFile: true,
 		overrideConfig: plugin.configs[configName],
 	});
-	const cfg = await eslint.calculateConfigForFile(filename);
+	const cfg = (await eslint.calculateConfigForFile(filename)) as Linter.Config;
 	return cfg.rules ?? {};
 }
 
-function getSeverity(ruleValue: any): string {
+function getSeverity(ruleValue: unknown): string {
 	if (typeof ruleValue === "string") return ruleValue;
 	if (Array.isArray(ruleValue)) {
 		if (typeof ruleValue[0] === "string") return ruleValue[0];
@@ -39,6 +39,7 @@ const VALID_SEVERITIES = new Set(["off", "warn", "error"]);
 // These rules MUST be in recommendedPluginRulesConfigTypeChecked (TS only),
 // NOT in recommendedPluginRulesConfigBase (which also applies to JS).
 const TYPE_CHECKED_RULES = [
+	"obsidianmd/no-await-chainable",
 	"obsidianmd/no-plugin-as-component",
 	"obsidianmd/no-view-references-in-plugin",
 	"obsidianmd/no-unsupported-api",
@@ -60,8 +61,8 @@ describe("recommended config", () => {
 	});
 
 	describe("structure", () => {
-		let tsRules: Record<string, any>;
-		let jsRules: Record<string, any>;
+		let tsRules: Record<string, unknown>;
+		let jsRules: Record<string, unknown>;
 
 		before(async () => {
 			tsRules = await rulesFor("recommended", "src/main.ts");
@@ -156,10 +157,10 @@ describe("recommendedWithLocalesEn config", () => {
 	});
 
 	describe("structure", () => {
-		let tsRules: Record<string, any>;
-		let jsRules: Record<string, any>;
-		let enJsonRules: Record<string, any>;
-		let enTsRules: Record<string, any>;
+		let tsRules: Record<string, unknown>;
+		let jsRules: Record<string, unknown>;
+		let enJsonRules: Record<string, unknown>;
+		let enTsRules: Record<string, unknown>;
 
 		before(async () => {
 			tsRules = await rulesFor("recommendedWithLocalesEn", "src/main.ts");
@@ -217,8 +218,8 @@ describe("recommendedWithLocalesEn config", () => {
 describe("file-scoped rules", () => {
 	for (const configName of ["recommended", "recommendedWithLocalesEn"] as const) {
 		describe(configName, () => {
-			let manifestRules: Record<string, any>;
-			let tsRules: Record<string, any>;
+			let manifestRules: Record<string, unknown>;
+			let tsRules: Record<string, unknown>;
 
 			before(async () => {
 				manifestRules = await rulesFor(configName, "manifest.json");
@@ -251,7 +252,7 @@ describe("file-scoped rules", () => {
 describe("file-scoped rules (LICENSE)", () => {
 	for (const configName of ["recommended", "recommendedWithLocalesEn"] as const) {
 		describe(configName, () => {
-			let tsRules: Record<string, any>;
+			let tsRules: Record<string, unknown>;
 
 			before(async () => {
 				tsRules = await rulesFor(configName, "src/main.ts");
@@ -287,7 +288,7 @@ describe("file-scoped rules (LICENSE)", () => {
 // non-standard" -- a fatal error on a file the user never asked to lint.
 describe("LICENSE survives a global parser override", () => {
 	const withGlobalParser: Linter.Config[] = [
-		...(plugin.configs.recommended as Linter.Config[]),
+		...(plugin.configs.recommended),
 		{
 			languageOptions: {
 				parser: tseslint.parser,
@@ -338,7 +339,7 @@ describe("LICENSE survives rules applied to every file", () => {
 		const eslint = new ESLint({
 			overrideConfigFile: true,
 			overrideConfig: [
-				...(plugin.configs.recommended as Linter.Config[]),
+				...(plugin.configs.recommended),
 				readmeParserOptions,
 				extra,
 			],
@@ -352,7 +353,7 @@ describe("LICENSE survives rules applied to every file", () => {
 
 	for (const [name, extra] of [
 		// eslint-comments' own flat config, which carries no `files`.
-		["eslint-comments recommended", comments.recommended as Linter.Config],
+		["eslint-comments recommended", comments.recommended],
 		// Re-applies the core JS rules to every file; the recommended config
 		// scopes them to JS and TS.
 		["js recommended re-applied", js.configs.recommended],
@@ -382,6 +383,7 @@ describe("validate-license on a user-configured filename", () => {
 		);
 		const match = /```js\n(\{\n {2}files: \["COPYING"\],\n[\s\S]*?\n\})\n```/.exec(section);
 		assert.ok(match, "no COPYING block under ### Files linted beyond your source");
+		// eslint-disable-next-line @typescript-eslint/no-implied-eval, @typescript-eslint/no-unsafe-call, obsidianmd/rule-custom-message -- runs the example in this repo's own docs, to test it
 		return new Function(`return (${match[1]});`)() as Linter.Config;
 	}
 
@@ -389,7 +391,7 @@ describe("validate-license on a user-configured filename", () => {
 		const eslint = new ESLint({
 			overrideConfigFile: true,
 			overrideConfig: [
-				...(plugin.configs.recommended as Linter.Config[]),
+				...(plugin.configs.recommended),
 				docsBlock(),
 			],
 		});
@@ -417,11 +419,13 @@ const ESCALATED_RULES = [
 	"obsidianmd/regex-lookbehind",
 ];
 const ESCALATED_TYPE_CHECKED_RULES = [
+	"obsidianmd/no-await-chainable",
 	"obsidianmd/no-plugin-as-component",
 	"obsidianmd/no-view-references-in-plugin",
 	"obsidianmd/no-unsupported-api",
 ];
 const WARN_RULES = [
+	"obsidianmd/commands/check-callback-uses-checking",
 	"obsidianmd/commands/no-command-in-command-id",
 	"obsidianmd/commands/no-command-in-command-name",
 	"obsidianmd/commands/no-default-hotkeys",
@@ -456,8 +460,8 @@ const OTHER_SEVERITY_RULES = [
 ];
 
 describe("scanner-aligned severities", () => {
-	let tsRules: Record<string, any>;
-	let jsRules: Record<string, any>;
+	let tsRules: Record<string, unknown>;
+	let jsRules: Record<string, unknown>;
 
 	before(async () => {
 		tsRules = await rulesFor("recommended", "src/main.ts");
@@ -586,8 +590,8 @@ describe("scanner-aligned severities", () => {
 });
 
 describe("type-checked rule guard", () => {
-	let jsRules: Record<string, any>;
-	let tsRules: Record<string, any>;
+	let jsRules: Record<string, unknown>;
+	let tsRules: Record<string, unknown>;
 
 	before(async () => {
 		jsRules = await rulesFor("recommended", "src/main.js");
@@ -680,10 +684,10 @@ describe("English JSON locale files", () => {
 				overrideConfigFile: true,
 				overrideConfig: plugin.configs.recommendedWithLocalesEn,
 			});
-			const config = await eslint.calculateConfigForFile(filePath);
+			const config = (await eslint.calculateConfigForFile(filePath)) as Linter.Config;
 			assert.strictEqual(config.language, json.languages.json);
 			assert.strictEqual(
-				getSeverity(config.rules["obsidianmd/ui/sentence-case-json"]),
+				getSeverity(config.rules?.["obsidianmd/ui/sentence-case-json"]),
 				"warn"
 			);
 		});
@@ -693,7 +697,7 @@ describe("English JSON locale files", () => {
 		const eslint = new ESLint({
 			overrideConfigFile: true,
 			overrideConfig: [
-				...(plugin.configs.recommendedWithLocalesEn as Linter.Config[]),
+				...(plugin.configs.recommendedWithLocalesEn),
 				...extra,
 			],
 			fix,
@@ -799,6 +803,7 @@ describe("core JS rules are the installed ESLint's recommended set", () => {
 			});
 
 			it("holds every rule this ESLint recommends, at error", () => {
+				// eslint-disable-next-line @typescript-eslint/no-deprecated -- ESLint has no other way to reach its core rules
 				const recommended = [...builtinRules]
 					.filter(([, rule]) => !rule.meta?.deprecated && rule.meta?.docs?.recommended === true)
 					.map(([ruleId]) => ruleId);
@@ -809,6 +814,7 @@ describe("core JS rules are the installed ESLint's recommended set", () => {
 			it("names only rules this ESLint has, none of them deprecated", () => {
 				assert.deepStrictEqual(
 					Object.keys(coreRules).filter(ruleId => {
+						// eslint-disable-next-line @typescript-eslint/no-deprecated -- ESLint has no other way to reach its core rules
 						const rule = builtinRules.get(ruleId);
 						return !rule || rule.meta?.deprecated || rule.meta?.docs?.recommended !== true;
 					}),
@@ -848,7 +854,7 @@ describe("a user's own JSON block", () => {
 			const eslint = new ESLint({
 				overrideConfigFile: true,
 				overrideConfig: [
-					...(plugin.configs[configName] as Linter.Config[]),
+					...(plugin.configs[configName]),
 					{ files: ["**/*.json"], plugins: { json }, language: "json/json" },
 				],
 			});
@@ -898,7 +904,9 @@ describe("require() in plugin code", () => {
 		describe(filePath, () => {
 			it("no-require-imports is off and require is a readonly global", async () => {
 				const eslint = new ESLint({ overrideConfigFile: true, overrideConfig: plugin.configs.recommended });
-				const config = await eslint.calculateConfigForFile(filePath);
+				const config = (await eslint.calculateConfigForFile(filePath)) as Linter.Config & {
+					languageOptions?: Linter.LanguageOptions;
+				};
 				assert.strictEqual(getSeverity(config.rules?.["@typescript-eslint/no-require-imports"]), "off");
 				assert.strictEqual(config.languageOptions?.globals?.require, "readonly");
 			});
@@ -986,7 +994,7 @@ describe("no-prototype-builtins", () => {
 // recommended config swaps in obsidianmd/no-misused-promises, which ignores
 // that declaration only.
 describe("no-misused-promises swap", () => {
-	let tsRules: Record<string, any>;
+	let tsRules: Record<string, unknown>;
 
 	before(async () => {
 		tsRules = await rulesFor("recommended", "src/main.ts");
@@ -1157,7 +1165,7 @@ describe("plugin object", () => {
 					},
 				],
 			});
-			const rules = (await eslint.calculateConfigForFile(filename)).rules ?? {};
+			const rules = ((await eslint.calculateConfigForFile(filename)) as Linter.Config).rules ?? {};
 			assert.deepStrictEqual(
 				["depend/ban-dependencies", "noUnsanitizedPlugin/method"].map(rule => getSeverity(rules[rule])),
 				["warn", "warn"]
@@ -1175,7 +1183,7 @@ describe("plugin object", () => {
 	it("registers every rule under the name of its documentation page", () => {
 		for (const [name, rule] of Object.entries(plugin.rules)) {
 			assert.strictEqual(
-				(rule.meta?.docs as { url?: string } | undefined)?.url,
+				(rule.meta?.docs)?.url,
 				`https://github.com/obsidianmd/eslint-plugin/blob/master/docs/rules/${name}.md`,
 				name
 			);

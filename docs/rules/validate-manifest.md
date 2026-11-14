@@ -26,6 +26,9 @@ check only to newer submissions, this rule applies the current policy.
 - **`description`:** must be 10 to 250 characters and end with `.`, `!` or `?`. It must
   not include "Obsidian", refer to itself ("this plugin", "this tool", "a plugin that",
   "the plugin …"), or repeat or start with the name.
+- The word checks above read the text without invisible characters (Unicode control and format
+  characters, such as a zero-width space, a soft hyphen or a bidi control), so `"Obs\u200Bidian"`
+  counts as "Obsidian".
 - **`fundingUrl`:** a string, or an object whose values are strings, its keys not repeated.
   An empty string, an empty object and an empty entry are accepted, as the review accepts
   them. Whether the values are valid URLs is not checked.

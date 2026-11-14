@@ -5,12 +5,16 @@
 // The overloads of an Obsidian method, in the 1.14.4 typings, that were published
 // before the version their @since names, as `Class.member` and the overload's key
 // (see getOverloadKey), with the first typings that have them.
-// no-unsupported-api requires the lower of the two versions.
+// no-unsupported-api requires the lower of the two versions. Where older typings
+// returned something else, resultFirstPublished is the first typings with
+// today's return type, which a call that uses the result needs instead.
 
 export const OVERLOAD_HISTORY_SOURCE = "1.14.4";
 
-export const OVERLOAD_HISTORY: Readonly<Record<string, { since: string; firstPublished: string }>> = {
-    "Workspace.duplicateLeaf(WorkspaceLeaf, SplitDirection?)": { since: "0.13.8", firstPublished: "0.9.7" },
+export const OVERLOAD_HISTORY: Readonly<
+    Record<string, { since: string; firstPublished: string; resultFirstPublished?: string }>
+> = {
+    "Workspace.duplicateLeaf(WorkspaceLeaf, SplitDirection?)": { since: "0.13.8", firstPublished: "0.9.7", resultFirstPublished: "0.13.8" },
     "Workspace.on(0: \"file-open\")": { since: "0.10.9", firstPublished: "0.9.7" },
     "Workspace.on(0: \"editor-menu\")": { since: "1.1.0", firstPublished: "0.12.6" },
     "Workspace.on(0: \"editor-change\")": { since: "1.1.1", firstPublished: "0.12.17" },

@@ -253,7 +253,9 @@ export default defineConfig([
 
 Declaring the two globals is enough. With `sourceType: "commonjs"` instead, `no-redeclare` checks
 the module's top level against the built-in globals, and `const { Plugin } = require("obsidian")`
-is reported, because `Plugin` is also a browser global.
+is reported, because `Plugin` is also a browser global. The recommended config declares `module`
+and `exports` for every `.cjs` file in the same way, so only a CommonJS file named `.js` needs this
+block.
 
 ## Plugins written in JavaScript
 
@@ -409,9 +411,10 @@ the severity alone; `"obsidianmd/no-nodejs-modules": "error"` still reports noth
 
 A web worker has no `window`: `window`, `activeWindow`, `activeDocument` and Obsidian's DOM helpers
 do not exist there, and `globalThis` is the right way to reach the worker's own scope. The
-recommended config therefore treats files matching `**/*.worker.*`, `**/*-worker.*` or `**/*_worker.*`
-(such as `search.worker.ts`, `bergamot-translator-worker.js` or `index_worker.ts`) and anything under
-a `workers/` directory as worker code. It switches off the rules whose fix needs a window — `no-global-this`,
+recommended config therefore treats files matching `**/worker.*`, `**/*.worker.*`, `**/*-worker.*` or
+`**/*_worker.*` (such as `src/worker.ts`, `search.worker.ts`, `bergamot-translator-worker.js` or
+`index_worker.ts`) and anything under a `workers/` directory as worker code. Not a `worker/`
+directory, which may also hold the code that starts the worker in the window. It switches off the rules whose fix needs a window — `no-global-this`,
 `prefer-active-doc`, `prefer-create-el`, `prefer-instanceof` and `prefer-window-timers` — and
 `platform`, since a worker cannot import Obsidian's `Platform` API, and gives
 these files the worker globals (`self`, `importScripts`, `postMessage`, …) in place of the browser
@@ -478,7 +481,10 @@ For all of these files it switches off `no-global-this`, `prefer-active-doc`, `p
 `hardcoded-config-path`, `no-forbidden-elements`, `no-static-styles-assignment`,
 `prefer-file-manager-trash-file`, `prefer-get-language`, `no-unsupported-api` and `regex-lookbehind`,
 and `rule-custom-message` runs `no-new-func` without `no-console`, so they may log to the console.
-Every other rule, including the security rules and `no-new-func`, still applies. The community
+They also get the Node globals (`process`, `module`, `exports`, `__dirname`, `Buffer`, …), which the
+rest of a plugin that is not desktop-only does not, so `module.exports` in `jest.config.js` and
+`process` in a script are not reported by `no-undef`. Every other rule, including the security
+rules and `no-new-func`, still applies. The community
 scanner does not lint most of these files at all; see its
 [ignored files](#community-plugin-scanner-configuration).
 

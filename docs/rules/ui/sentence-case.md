@@ -56,6 +56,17 @@ Which words take a capital:
   such as "1st", "3D", "4K" or "10x", keeps its letters as written, wherever it is: "Open 3D view"
   passes.
 - emoji before the first word are not text, so "✅ Open settings" and "⚠️ Open settings" pass.
+- the pronoun "I" and its contractions keep their capital anywhere: "Ask me before I delete a note"
+  and "Done. I'm syncing now" pass.
+- weekdays, months and languages keep a capital they are written with: "Week starts on Monday" and
+  "Translate to Japanese" pass. Several of them are ordinary words too ("May", "March", "Polish"),
+  so in lower case they are left alone: "You may continue" passes.
+- the names of keys keep their capital: "Press Enter to confirm", "Hold Shift to select", "Press Esc"
+  and "Press F2 to rename" pass, and so does "Shift" in "Shift-click to select". A key whose name is
+  also a word, such as Tab, Home, End, Space, Delete, Insert, Option, Return or the arrow keys, keeps
+  its capital only where the words around it make it a key: after "press", "hit", "hold", "tap",
+  "use" or "with", before "key" or "keys", or next to a `+`. So "Use Tab to indent" and "Use the
+  Home key" pass, and "Open in new Tab" is reported, expecting "Open in new tab".
 
 Some text keeps its casing, because it is data rather than prose:
 
@@ -63,6 +74,11 @@ Some text keeps its casing, because it is data rather than prose:
   reported, expecting "GitHub"). An acronym listed in mixed case, such as "OAuth", keeps that
   casing; any other is written in capitals. In the default `loose` mode a camelCase or PascalCase
   word keeps its casing too, unless `enforceCamelCaseLower` is set.
+- in the default `loose` mode, any word in capitals with at least two letters, such as "URI", "UTC",
+  "NFC" or "MP3", which in UI text is almost always an acronym, listed or not: "Copy Obsidian URI"
+  passes. Not where the whole text is in capitals, which is then lowercased: "OPEN SETTINGS" is
+  reported, expecting "Open settings". In `strict` mode only the listed acronyms keep their
+  capitals. A single capital, as in "Create A note" or "Use V2 sync", is not an acronym.
 - a brand whose name is also an ordinary word: "Windows", "Cursor", "Slack", "X", "Notion" and
   "React". In lower case it is that word and is left alone ("Close all windows", "Move the cursor",
   "Views react to changes"); written as the brand it keeps that casing ("Install on Windows").
@@ -73,14 +89,16 @@ Some text keeps its casing, because it is data rather than prose:
   `HH:mm`, `hh:mm A`, `MMM D, YYYY`, `DD MMM YYYY` or `dddd, MMMM Do`. Tokens joined by spaces or
   commas are a format only when one of them is never a word, such as `MMM`, `YYYY` or `DD`, so "Do
   A barrel roll" is text. A lone "A" is a word, so "Create A new note" is reported.
-- "REST" written in capitals. It is also an ordinary word, so both "Use the REST API" and "Take a
-  rest" pass.
+- "REST" and "TODO" written in capitals. They are also ordinary words, so "Use the REST API",
+  "Take a rest", "Highlight TODO items" and "Add a todo" all pass.
+- a range of letters, as in a sort order: "Name (A-Z)", "Title (A–Z)" and "Sort A to Z" pass.
 - a placeholder that shows an example value: a single token with no spaces (`sk-123…`,
   `YYYY-MM-DD`), or text starting with "e.g." or "ex." (`e.g. My Vault`)
 
 Not checked at all: text with inline code (`` `npm install` ``) or HTML tags, text with placeholders
 (`{count}`, `%s`), file paths and file names (`config.json`, `docs/readme.md`, `.obsidian/plugins`,
-`https://x.com/a.b`), keyboard shortcuts (`Ctrl+S`), a version number on its own (`v1.2.3`) and
+`https://x.com/a.b`), keyboard shortcuts written with `+` or with hyphens (`Ctrl+S`, `Ctrl-S`,
+`Cmd-Shift-P`, `Alt-F4`, but not "Shift-click", which is a word), a version number on its own (`v1.2.3`) and
 all-caps identifiers (`API_KEY`). A number such as "1.2", or a brand with a dot such as "Node.js",
 does not make text a file name, so "Version 1.2 Released" and "Install Node.js First" are checked.
 
@@ -98,22 +116,26 @@ it, turn it on yourself:
 
 ## Options
 
-`brands` and `acronyms` replace the built-in lists ([brands](../../../lib/rules/ui/brands.ts),
-[acronyms](../../../lib/rules/ui/acronyms.ts)) rather than add to them, so list the built-in names
-you still want. `ignoreWords` keeps the casing of a word written exactly as listed, except the
-first word of a sentence. `ignoreRegex` skips a whole string that one of its patterns matches.
-`mode: "strict"` lowercases camelCase and PascalCase words, as `enforceCamelCaseLower` does.
+`acronyms` adds to the built-in [acronyms](../../../lib/rules/ui/acronyms.ts); with
+`replaceDefaultAcronyms: true` it replaces them, so list the built-in ones you still want. `brands`
+replaces the built-in [brands](../../../lib/rules/ui/brands.ts) rather than adding to them.
+`ignoreWords` keeps the casing of a word written exactly as listed, also as a part of a hyphenated
+word ("Dataview-powered"), except the first word of a sentence. `ignoreRegex` skips a whole string
+that one of its patterns matches; a pattern that is not a valid regular expression is a
+configuration error, which names it. `mode: "strict"` lowercases camelCase and PascalCase words, as
+`enforceCamelCaseLower` does, and words in capitals that are not listed acronyms.
 
 <!-- begin auto-generated rule options list -->
 
-| Name                    | Description                                                                                       | Type     | Choices           |
-| :---------------------- | :------------------------------------------------------------------------------------------------ | :------- | :---------------- |
-| `acronyms`              | Acronyms that should remain uppercase.                                                            | String[] |                   |
-| `allowAutoFix`          | Whether to enable auto-fixes for sentence case violations.                                        | Boolean  |                   |
-| `brands`                | Brand names to preserve with their canonical casing.                                              | String[] |                   |
-| `enforceCamelCaseLower` | Whether to force CamelCase/PascalCase tokens to lowercase.                                        | Boolean  |                   |
-| `ignoreRegex`           | Regex patterns for strings to ignore entirely.                                                    | String[] |                   |
-| `ignoreWords`           | Words to skip when applying sentence case.                                                        | String[] |                   |
-| `mode`                  | Controls sentence case strictness; loose preserves CamelCase tokens while strict lowercases them. | String   | `loose`, `strict` |
+| Name                     | Description                                                                                       | Type     | Choices           |
+| :----------------------- | :------------------------------------------------------------------------------------------------ | :------- | :---------------- |
+| `acronyms`               | Acronyms that should remain uppercase, in addition to the built-in ones.                          | String[] |                   |
+| `allowAutoFix`           | Whether to enable auto-fixes for sentence case violations.                                        | Boolean  |                   |
+| `brands`                 | Brand names to preserve with their canonical casing.                                              | String[] |                   |
+| `enforceCamelCaseLower`  | Whether to force CamelCase/PascalCase tokens to lowercase.                                        | Boolean  |                   |
+| `ignoreRegex`            | Regex patterns for strings to ignore entirely.                                                    | String[] |                   |
+| `ignoreWords`            | Words to skip when applying sentence case.                                                        | String[] |                   |
+| `mode`                   | Controls sentence case strictness; loose preserves CamelCase tokens while strict lowercases them. | String   | `loose`, `strict` |
+| `replaceDefaultAcronyms` | Whether `acronyms` replaces the built-in acronyms instead of adding to them.                      | Boolean  |                   |
 
 <!-- end auto-generated rule options list -->

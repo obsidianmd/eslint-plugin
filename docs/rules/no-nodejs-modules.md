@@ -29,7 +29,9 @@ works the other way: in the `else` of `if (Platform.isMobile)` or `if (!Platform
 second branch of `Platform.isMobileApp ? … : …`, and to the right of `Platform.isMobile || …`. It
 also counts as guarded after an early exit in the same block or an enclosing one, at any position
 before it: an `if` without an `else` whose test is such a negated check, also on one side of `||`,
-and whose branch is a `return` or `throw` or reaches one:
+and whose branch is a `return` or `throw` or reaches one. The statements of a `switch` case count as
+a block: an early exit guards the rest of its own case, but not the cases after it, which `switch`
+can enter directly:
 
 ```ts
 if (Platform.isDesktopApp) {
@@ -55,9 +57,13 @@ Also guarded, since they cannot fail on mobile:
 - a `require()` inside the block of a `try` that has a `catch`, outside any function defined in that
   block, and an `import()` there that is awaited, as in `try { fs = await import("fs"); } catch { … }`:
   where Node.js is missing, the `catch` runs. An `import()` that is not awaited rejects after the
-  `try` has finished, so it is still reported;
-- an optional call, `require?.("fs")` or `window.require?.("fs")`, which calls `require()` only
-  where it exists.
+  `try` has finished, so it is still reported, and so is one in a `try` whose `catch` always throws,
+  as in `catch (e) { throw e; }` or `catch (e) { console.error(e); throw new Error(…); }`, which
+  hands the failure on. A `catch` that may return, `break` or `continue` before it throws, as in
+  `if (!strict) return null; throw e;`, still guards;
+- an optional call on the global object, `window.require?.("fs")`, which calls `require()` only
+  where the global object has it, as only the desktop app does. A bare `require?.("fs")` is still
+  reported: the bundle's own `require` exists on mobile too, and throws there for a Node.js module.
 
 Not reported: imports in a declaration file (`.d.ts`, `.d.mts`, `.d.cts`), which only describe
 types and never run; modules that are not built into Node.js, such as `window.require("electron")`; a

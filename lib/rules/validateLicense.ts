@@ -1,4 +1,4 @@
-import type { CustomRuleDefinitionType, CustomRuleTypeDefinitions } from "@eslint/core";
+import type { CustomRuleDefinitionType, CustomRuleTypeDefinitions } from "@eslint/plugin-kit";
 import type {
     PlainTextLanguageOptions,
     PlainTextNode,

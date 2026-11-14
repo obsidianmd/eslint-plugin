@@ -163,8 +163,118 @@ ruleTester.run("no-unsupported-api: the first typings that declare a member", ru
             `,
             options: [{ minAppVersion: "0.12.17" }],
         },
+        {
+            // duplicateLeaf(leaf) is in the 0.9.7 typings, returning
+            // Promise<void> until 0.13.8: a call that discards the result, and
+            // the method as a value, work on those versions too.
+            name: "duplicateLeaf() with its result unused",
+            code: `
+                import { Workspace, WorkspaceLeaf } from 'obsidian';
+                declare const workspace: Workspace;
+                declare const leaf: WorkspaceLeaf;
+                async function split() {
+                    await workspace.duplicateLeaf(leaf);
+                    void workspace.duplicateLeaf(leaf, "vertical");
+                    workspace.duplicateLeaf(leaf);
+                    const later = workspace.duplicateLeaf;
+                }
+            `,
+            options: [{ minAppVersion: "0.12.0" }],
+        },
+        {
+            // Editor is first in the 0.11.7 typings (see COMMIT_VERSIONS in
+            // scripts/obsidian-overload-history.ts).
+            name: "Editor at 0.11.7",
+            code: `
+                import { Editor } from 'obsidian';
+                declare const editor: Editor;
+                editor.getValue();
+                editor.replaceSelection("x");
+            `,
+            options: [{ minAppVersion: "0.11.7" }],
+        },
+        {
+            // View.icon was `string` until 1.1.0 typed it `IconName`, which is
+            // `type IconName = string`: the same type, so the member is as old
+            // as the 0.9.7 typings.
+            name: "a member whose type only became an alias of the same type",
+            code: `
+                import { ItemView, View, WorkspaceLeaf } from 'obsidian';
+                class MyView extends ItemView {
+                    constructor(leaf: WorkspaceLeaf) {
+                        super(leaf);
+                        this.icon = "dice";
+                    }
+                    getViewType() { return "my-view"; }
+                    getDisplayText() { return "My view"; }
+                }
+                declare const view: View;
+                const icon: string = view.icon;
+                const shown: string = view.getIcon();
+            `,
+            options: [{ minAppVersion: "0.15.0" }],
+        },
+        {
+            // requestSaveLayout was a `() => void` until 0.16.0 typed it a
+            // Debouncer: a call that passes nothing and ignores the result does
+            // the same on both, back to the 0.9.7 typings.
+            name: "requestSaveLayout() called for its effect",
+            code: `
+                import { Workspace } from 'obsidian';
+                declare const workspace: Workspace;
+                workspace.requestSaveLayout();
+                void workspace.requestSaveLayout();
+            `,
+            options: [{ minAppVersion: "0.15.0" }],
+        },
     ],
     invalid: [
+        {
+            // The Debouncer it returns, and its cancel(), are new in 0.16.0.
+            name: "requestSaveLayout() with its result used, or cancel(), below 0.16.0",
+            code: `
+                import { Workspace } from 'obsidian';
+                declare const workspace: Workspace;
+                const debouncer = workspace.requestSaveLayout();
+                workspace.requestSaveLayout.cancel();
+            `,
+            options: [{ minAppVersion: "0.15.0" }],
+            errors: [
+                { messageId: "apiNotAvailable", line: 4, data: { qualifiedName: "Workspace.requestSaveLayout", sinceVersion: "0.16.0", minAppVersion: "0.15.0" } },
+                { messageId: "apiNotAvailable", line: 5, data: { qualifiedName: "Workspace.requestSaveLayout", sinceVersion: "0.16.0", minAppVersion: "0.15.0" } },
+            ],
+        },
+        {
+            name: "duplicateLeaf() with its result used, below 0.13.8",
+            code: `
+                import { Workspace, WorkspaceLeaf } from 'obsidian';
+                declare const workspace: Workspace;
+                declare const leaf: WorkspaceLeaf;
+                async function split() {
+                    const copy = await workspace.duplicateLeaf(leaf);
+                    (await workspace.duplicateLeaf(leaf, "vertical")).detach();
+                    return workspace.duplicateLeaf(leaf);
+                }
+            `,
+            options: [{ minAppVersion: "0.12.0" }],
+            errors: [
+                { messageId: "apiNotAvailableRaise", line: 6, data: { qualifiedName: "Workspace.duplicateLeaf", sinceVersion: "0.13.8", minAppVersion: "0.12.0" } },
+                { messageId: "apiNotAvailableRaise", line: 7, data: { qualifiedName: "Workspace.duplicateLeaf", sinceVersion: "0.13.8", minAppVersion: "0.12.0" } },
+                { messageId: "apiNotAvailableRaise", line: 8, data: { qualifiedName: "Workspace.duplicateLeaf", sinceVersion: "0.13.8", minAppVersion: "0.12.0" } },
+            ],
+        },
+        {
+            name: "Editor below 0.11.7",
+            code: `
+                import { Editor } from 'obsidian';
+                declare const editor: Editor;
+                editor.getValue();
+            `,
+            options: [{ minAppVersion: "0.11.0" }],
+            errors: [
+                { messageId: "apiNotAvailableCheck", line: 4, data: { qualifiedName: "Editor.getValue", sinceVersion: "0.11.7", minAppVersion: "0.11.0" } },
+            ],
+        },
         {
             // Older than their @since, and newer than the 0.9.7 typings: each
             // needs the first typings in the obsidian-api history that have it.
@@ -178,9 +288,9 @@ ruleTester.run("no-unsupported-api: the first typings that declare a member", ru
             `,
             options: [{ minAppVersion: "0.9.11" }],
             errors: [
-                { messageId: "apiNotAvailable", line: 5, data: { qualifiedName: "BaseComponent.setDisabled", sinceVersion: "0.10.3", minAppVersion: "0.9.11" } },
-                { messageId: "apiNotAvailable", line: 6, data: { qualifiedName: "Menu.addItem", sinceVersion: "0.9.12", minAppVersion: "0.9.11" } },
-                { messageId: "apiNotAvailable", line: 6, data: { qualifiedName: "MenuItem.setIcon", sinceVersion: "0.9.12", minAppVersion: "0.9.11" } },
+                { messageId: "apiNotAvailableCheck", line: 5, data: { qualifiedName: "BaseComponent.setDisabled", sinceVersion: "0.10.3", minAppVersion: "0.9.11" } },
+                { messageId: "apiNotAvailableCheck", line: 6, data: { qualifiedName: "Menu.addItem", sinceVersion: "0.9.12", minAppVersion: "0.9.11" } },
+                { messageId: "apiNotAvailableCheck", line: 6, data: { qualifiedName: "MenuItem.setIcon", sinceVersion: "0.9.12", minAppVersion: "0.9.11" } },
             ],
         },
         {
@@ -366,6 +476,20 @@ ruleTester.run("no-unsupported-api: feature checks, overrides and Plugin.setting
             options: [{ minAppVersion: "0.15.0" }],
         },
         {
+            // onUserEnable() is first in the 1.7.2 typings, and only Obsidian
+            // calls it: its body runs on 1.7.2 or later.
+            name: "an onUserEnable() override, which only 1.7.2 calls",
+            code: `
+                import { Plugin } from 'obsidian';
+                export default class MyPlugin extends Plugin {
+                    onUserEnable() {
+                        this.app.workspace.ensureSideLeaf("my-view", "right");
+                    }
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
             // pdf-plus: `this.hoverEditorPlugin?.settings`.
             name: "Plugin.settings, which plugins assign themselves",
             code: `
@@ -380,8 +504,133 @@ ruleTester.run("no-unsupported-api: feature checks, overrides and Plugin.setting
             `,
             options: [{ minAppVersion: "1.0.0" }],
         },
+        {
+            // Reading a missing member gives undefined, which `?.`, `??` and
+            // `||` all handle, and the rest of the chain runs only where the
+            // member exists, so on a release that has it.
+            name: "an optional access or a fallback off a newer member",
+            code: `
+                import { App } from 'obsidian';
+                declare const app: App;
+                const secret = app.secretStorage?.getSecret("token");
+                const context = app.renderContext ?? null;
+                const other = app.renderContext || null;
+                const document2 = window.activeDocument ?? document;
+                app.isDarkMode?.call(app);
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "requireApiVersion() imported under another name, or from a namespace import",
+            code: `
+                import * as obsidian from 'obsidian';
+                import { App, requireApiVersion as rav } from 'obsidian';
+                declare const app: App;
+                if (obsidian.requireApiVersion("1.10.0")) {
+                    app.isDarkMode();
+                }
+                if (rav("1.10.0")) {
+                    app.isDarkMode();
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            name: "a check compared with true, a feature check in a const, and a readonly field holding a check",
+            code: `
+                import { App, requireApiVersion } from 'obsidian';
+                declare const app: App;
+                if (requireApiVersion("1.10.0") === true) {
+                    app.isDarkMode();
+                }
+                if (requireApiVersion("1.10.0") !== false) {
+                    app.isDarkMode();
+                }
+                const canTell = typeof app.isDarkMode === "function";
+                if (canTell) {
+                    app.isDarkMode();
+                }
+                class Theme {
+                    private readonly hasDarkMode = requireApiVersion("1.10.0");
+                    constructor(private app: App) {}
+                    isDark() {
+                        return this.hasDarkMode && this.app.isDarkMode();
+                    }
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+        },
+        {
+            // typeof is the one test of a global that cannot throw.
+            name: "typeof tests a global the app declares",
+            code: `
+                import 'obsidian';
+                const doc = typeof activeDocument !== "undefined" ? activeDocument : document;
+            `,
+            options: [{ minAppVersion: "0.14.0" }],
+        },
     ],
     invalid: [
+        {
+            // Reading a global the app does not declare throws a
+            // ReferenceError, so only typeof tests it.
+            name: "a global the app declares, tested other than with typeof",
+            code: `
+                import 'obsidian';
+                const a = activeDocument || document;
+                if (activeDocument) {
+                    console.log("popout");
+                }
+                const b = activeDocument != null ? activeDocument : document;
+                const c = activeDocument?.body;
+            `,
+            options: [{ minAppVersion: "0.14.0" }],
+            errors: [
+                { messageId: "apiNotAvailable", line: 3, data: { qualifiedName: "activeDocument", sinceVersion: "0.15.0", minAppVersion: "0.14.0" } },
+                { messageId: "apiNotAvailable", line: 4, data: { qualifiedName: "activeDocument", sinceVersion: "0.15.0", minAppVersion: "0.14.0" } },
+                { messageId: "apiNotAvailable", line: 7, column: 27, data: { qualifiedName: "activeDocument", sinceVersion: "0.15.0", minAppVersion: "0.14.0" } },
+                { messageId: "apiNotAvailable", line: 7, column: 52, data: { qualifiedName: "activeDocument", sinceVersion: "0.15.0", minAppVersion: "0.14.0" } },
+                { messageId: "apiNotAvailable", line: 8, data: { qualifiedName: "activeDocument", sinceVersion: "0.15.0", minAppVersion: "0.14.0" } },
+            ],
+        },
+        {
+            name: "an optional call of a global function the app declares",
+            code: `
+                import 'obsidian';
+                const icon = createSvg?.("svg");
+                const checked = typeof createSvg === "function" ? createSvg("svg") : null;
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [
+                { messageId: "apiNotAvailable", line: 3, data: { qualifiedName: "createSvg", sinceVersion: "1.1.0", minAppVersion: "1.0.0" } },
+            ],
+        },
+        {
+            // A field the class may assign again, or one that is not
+            // readonly, may no longer hold the check's result.
+            name: "a field holding a check that may change",
+            code: `
+                import { App, requireApiVersion } from 'obsidian';
+                class Theme {
+                    private hasDarkMode = requireApiVersion("1.10.0");
+                    private readonly canDark = requireApiVersion("1.10.0");
+                    constructor(private app: App) {
+                        this.canDark = true;
+                    }
+                    isDark() {
+                        return this.hasDarkMode && this.app.isDarkMode();
+                    }
+                    canBeDark() {
+                        return this.canDark && this.app.isDarkMode();
+                    }
+                }
+            `,
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [
+                { messageId: "apiNotAvailable", line: 10, data: { qualifiedName: "App.isDarkMode", sinceVersion: "1.10.0", minAppVersion: "1.0.0" } },
+                { messageId: "apiNotAvailable", line: 13, data: { qualifiedName: "App.isDarkMode", sinceVersion: "1.10.0", minAppVersion: "1.0.0" } },
+            ],
+        },
         {
             name: "a feature check of another member, or of the member in a branch that runs without it",
             code: `

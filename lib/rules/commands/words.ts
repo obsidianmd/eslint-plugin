@@ -25,6 +25,27 @@ export function phrasePattern(phrase: string): RegExp | null {
     return new RegExp(`(?<!${WORD_CHAR})${pattern}(?!${WORD_CHAR})`, "iu");
 }
 
+/**
+ * Whether the phrase that `pattern` finds starts the command name with only
+ * whitespace and a lower-case word after it, as the plugin name does in
+ * "Zoom in" of the plugin "Zoom" or "Git commit" of "Git": a word of the
+ * sentence there, the verb or the noun the command acts on, rather than a
+ * label.
+ */
+export function startsWithPhraseAsWord(name: string, pattern: RegExp): boolean {
+    const match = pattern.exec(name);
+    return match !== null && match.index === 0 && /^\s+\p{Ll}/u.test(name.slice(match[0].length));
+}
+
+/**
+ * Whether the phrase that `pattern` finds is in the command name only as its
+ * first word, as startsWithPhraseAsWord() has it, and nowhere else.
+ */
+export function hasPhraseOnlyAsWord(name: string, pattern: RegExp): boolean {
+    const all = new RegExp(pattern.source, `${pattern.flags.replace(/[gy]/gu, "")}g`);
+    return startsWithPhraseAsWord(name, pattern) && Array.from(name.matchAll(all)).length === 1;
+}
+
 // A word of an ID: an acronym that a capitalized word follows ("PDF" in
 // "PDFExport"), capitals and then other letters or digits ("Export", "my",
 // "base64"), or capitals alone ("PDF"). Anything else separates words.

@@ -1,5 +1,5 @@
 import assert from "node:assert";
-import { ESLint } from "eslint";
+import { ESLint, type Linter } from "eslint";
 import plugin from "../lib/index.js";
 
 // Tests run in Node or a DOM emulation, not inside Obsidian, so the recommended
@@ -141,7 +141,7 @@ const NOT_TEST_FILES = [
 ];
 
 function getSeverity(ruleValue: unknown): string {
-	const value = Array.isArray(ruleValue) ? ruleValue[0] : ruleValue;
+	const value: unknown = Array.isArray(ruleValue) ? (ruleValue as unknown[])[0] : ruleValue;
 	return ({ 0: "off", 1: "warn", 2: "error" } as Record<string, string>)[String(value)] ?? String(value);
 }
 
@@ -154,14 +154,14 @@ for (const configName of ["recommended", "recommendedWithLocalesEn"] as const) {
 
 		for (const filename of [...TEST_FILES, ...TOOLING_FILES]) {
 			it(`switches off the Obsidian-runtime rules for ${filename}`, async () => {
-				const { rules = {} } = await eslint.calculateConfigForFile(filename);
+				const { rules = {} } = (await eslint.calculateConfigForFile(filename)) as Linter.Config;
 				for (const rule of Object.keys(OBSIDIAN_RUNTIME_RULES)) {
 					assert.strictEqual(getSeverity(rules[rule] ?? "off"), "off", rule);
 				}
 			});
 
 			it(`keeps the security rules, and no-new-func without no-console, for ${filename}`, async () => {
-				const { rules = {} } = await eslint.calculateConfigForFile(filename);
+				const { rules = {} } = (await eslint.calculateConfigForFile(filename)) as Linter.Config;
 				for (const [rule, severity] of Object.entries(STILL_ENFORCED)) {
 					assert.strictEqual(getSeverity(rules[rule]), severity, rule);
 				}
@@ -175,14 +175,14 @@ for (const configName of ["recommended", "recommendedWithLocalesEn"] as const) {
 		// same options.
 		for (const extension of ["ts", "cts", "mts", "tsx", "js", "cjs", "mjs", "jsx"]) {
 			it(`leaves out exactly the Obsidian-runtime rules for .${extension} test and tooling files`, async () => {
-				const { rules: plain = {} } = await eslint.calculateConfigForFile(`src/main.${extension}`);
+				const { rules: plain = {} } = (await eslint.calculateConfigForFile(`src/main.${extension}`)) as Linter.Config;
 				const [severity, customMessages] = plain[CUSTOM_MESSAGE] as [unknown, Record<string, unknown>];
 				const expected = {
 					...Object.fromEntries(Object.entries(plain).filter(([rule]) => !(rule in OBSIDIAN_RUNTIME_RULES))),
 					[CUSTOM_MESSAGE]: [severity, { "no-new-func": customMessages["no-new-func"] }],
 				};
 				for (const filename of [`src/main.test.${extension}`, `tests/helpers.${extension}`, `scripts/build.${extension}`]) {
-					const { rules = {} } = await eslint.calculateConfigForFile(filename);
+					const { rules = {} } = (await eslint.calculateConfigForFile(filename)) as Linter.Config;
 					assert.deepStrictEqual(rules, expected, filename);
 				}
 			});
@@ -190,14 +190,14 @@ for (const configName of ["recommended", "recommendedWithLocalesEn"] as const) {
 
 		it("gives other files rule-custom-message with no-console and no-new-func", async () => {
 			for (const filename of [...NOT_TEST_FILES, "src/indexer.worker.ts"]) {
-				const { rules = {} } = await eslint.calculateConfigForFile(filename);
+				const { rules = {} } = (await eslint.calculateConfigForFile(filename)) as Linter.Config;
 				assert.deepStrictEqual(Object.keys((rules[CUSTOM_MESSAGE] as unknown[])[1] as object).sort(), ["no-console", "no-new-func"], filename);
 			}
 		});
 
 		it("leaves the Obsidian-runtime rules on for other files", async () => {
 			for (const filename of NOT_TEST_FILES) {
-				const { rules = {} } = await eslint.calculateConfigForFile(filename);
+				const { rules = {} } = (await eslint.calculateConfigForFile(filename)) as Linter.Config;
 				for (const [rule, severity] of Object.entries(OBSIDIAN_RUNTIME_RULES)) {
 					// no-tfile-tfolder-cast, no-unsupported-api, prefer-create-el and
 					// prefer-instanceof need type information.
@@ -208,7 +208,7 @@ for (const configName of ["recommended", "recommendedWithLocalesEn"] as const) {
 		});
 
 		it("keeps the rules that are not window-only for worker files", async () => {
-			const { rules = {} } = await eslint.calculateConfigForFile("src/indexer.worker.ts");
+			const { rules = {} } = (await eslint.calculateConfigForFile("src/indexer.worker.ts")) as Linter.Config;
 			assert.strictEqual(getSeverity(rules["obsidianmd/no-nodejs-modules"]), "warn");
 			assert.strictEqual(getSeverity(rules["obsidianmd/no-unsupported-api"]), "error");
 			assert.strictEqual(getSeverity(rules["obsidianmd/regex-lookbehind"]), "error");

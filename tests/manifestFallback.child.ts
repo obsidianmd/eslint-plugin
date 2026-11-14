@@ -23,7 +23,8 @@ async function recommendedFor(filename: string): Promise<Linter.Config> {
         overrideConfigFile: true,
         overrideConfig: plugin.configs.recommended,
     });
-    return eslint.calculateConfigForFile(filename);
+    // calculateConfigForFile() is typed any.
+    return (await eslint.calculateConfigForFile(filename)) as Linter.Config;
 }
 
 function declaresGlobal(config: Linter.Config, name: string): boolean {
@@ -32,6 +33,14 @@ function declaresGlobal(config: Linter.Config, name: string): boolean {
 }
 
 const nodeImport = "import fs from 'node:fs';";
+const pluginNameHeading = `
+import { PluginSettingTab, Setting } from "obsidian";
+class Tab extends PluginSettingTab {
+    display() {
+        new Setting(this.containerEl).setName("Sample Plugin").setHeading();
+    }
+}
+`;
 const ts = await recommendedFor("src/main.ts");
 const js = await recommendedFor("src/main.js");
 
@@ -56,4 +65,5 @@ console.log(JSON.stringify({
     noDeprecated: {
         tsEntry: ts.rules?.["@typescript-eslint/no-deprecated"],
     },
+    settingsHeadingPluginName: reports("settings-tab/no-problematic-settings-headings", "error", pluginNameHeading),
 }));

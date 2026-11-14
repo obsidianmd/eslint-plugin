@@ -1,5 +1,13 @@
 import { type TSESLint, TSESTree } from "@typescript-eslint/utils";
-import { getTypeInfo, isGlobalWindowAt, isTimerCallTypeSafe, mayLackWindowAt } from "../globalWindow.js";
+import {
+    getTypeInfo,
+    isDiscardedArrowBody,
+    isGlobalWindowAt,
+    isResultDiscarded,
+    isTimerCallTypeSafe,
+    mayLackWindowAt,
+    windowIsNarrowedAt,
+} from "../globalWindow.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
 
 const TIMER_FUNCTIONS = new Set([
@@ -57,7 +65,9 @@ export default ruleCreator({
                     // `window` would be a local of that name, such as a
                     // Playwright page, or would not exist: no DOM lib, or a
                     // `typeof window` check says the code runs without one.
-                    if (!isGlobalWindowAt(context, callee)) {
+                    // In the `else` of `if ("requestIdleCallback" in window)`,
+                    // `window` is `never`, and `window.setTimeout` does not compile.
+                    if (!isGlobalWindowAt(context, callee) || windowIsNarrowedAt(context.sourceCode, callee, types)) {
                         context.report({ node: callee, messageId: "preferWindowTimer", data: { name } });
                         return;
                     }
@@ -102,9 +112,21 @@ export default ruleCreator({
                     }
                     const object = callee.object;
                     const fix = (fixer: TSESLint.RuleFixer) => fixer.replaceText(object, "window");
-                    if (!isGlobalWindowAt(context, object)) {
+                    if (!isGlobalWindowAt(context, object) || windowIsNarrowedAt(context.sourceCode, object, types)) {
                         context.report({ node: callee, messageId: "noActiveWindowTimer", data: { name } });
-                    } else if (mayLackWindowAt(context, object)) {
+                    } else if (
+                        mayLackWindowAt(context, object) ||
+                        name.startsWith("clear") ||
+                        !(isResultDiscarded(node) || isDiscardedArrowBody(node, types))
+                    ) {
+                        // A timer ID belongs to the window that set it:
+                        // `window.clearTimeout(id)` clears only a timer
+                        // `window` set, and the one `activeWindow` set may
+                        // still be pending. Only a suggestion, for the code
+                        // that sets the timer and the code that clears it to
+                        // change together: a setter whose ID is kept, as in
+                        // `this.id = activeWindow.setInterval(…)`, may be
+                        // cleared by `activeWindow.clearInterval(this.id)`.
                         context.report({
                             node: callee,
                             messageId: "noActiveWindowTimer",

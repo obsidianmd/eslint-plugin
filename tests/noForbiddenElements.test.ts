@@ -8,6 +8,18 @@ ruleTester.run("no-forbidden-elements", noForbiddenElements, {
     valid: [
         // --- A shadow root, which styles.css does not reach ---
         {
+            name: "a shadow root from getRootNode(), or a let only ever set to one, is allowed",
+            code: "declare const el: HTMLElement;\nconst shadowRoot = el.getRootNode();\nshadowRoot.appendChild(document.createElement('style'));\nconst root = el.getRootNode() as ShadowRoot;\nroot.createEl('style');\nlet shadow;\nshadow = el.attachShadow({ mode: 'open' });\nshadow.createEl('style');",
+        },
+        {
+            name: "an untyped shadowRoot parameter is allowed",
+            code: "function style(shadowRoot) { shadowRoot.createEl('style'); }",
+        },
+        {
+            name: "a <style> created in a shadow root and moved within it is allowed",
+            code: "declare const host: HTMLElement;\nconst root = host.attachShadow({ mode: 'open' });\nconst style = root.createEl('style');\nroot.insertAdjacentElement('afterbegin', style);",
+        },
+        {
             name: "a <style> in a shadow root's head is allowed (callout-manager)",
             code: "class P { shadowRoot: ShadowRoot; shadowHead: HTMLElement; customStyleEl: HTMLStyleElement;\n  constructor(frag: DocumentFragment) {\n    const shadowHostEl = frag.createDiv();\n    const shadowRoot = (this.shadowRoot = shadowHostEl.attachShadow({ delegatesFocus: false, mode: 'closed' }));\n    const shadowHead = (this.shadowHead = shadowRoot.createEl('head'));\n    shadowHead.createEl('style', { text: CSS });\n    this.customStyleEl = shadowHead.createEl('style', { attr: { 'data-custom-styles': 'true' } });\n  } }",
         },
@@ -54,6 +66,18 @@ ruleTester.run("no-forbidden-elements", noForbiddenElements, {
         {
             name: "an iframe's contentDocument is not the plugin's document",
             code: "const style = iframe.contentDocument.createElement('style');",
+        },
+        {
+            name: "an iframe's contentWindow.document is not the plugin's document",
+            code: "declare const iframe: HTMLIFrameElement;\nconst style = iframe.contentWindow!.document.createElement('style');\niframe.contentDocument!.head.appendChild(style);",
+        },
+        {
+            name: "a <style> created on the document and appended into an iframe's document is allowed",
+            code: "declare const iframe: HTMLIFrameElement;\nconst style = document.createElement('style');\nstyle.textContent = css;\niframe.contentDocument!.head.appendChild(style);\niframe.contentWindow?.document.body.append(document.createElement('link'));",
+        },
+        {
+            name: "createEl('style') on an element of an iframe's document, also through a const, is allowed",
+            code: "declare const iframe: HTMLIFrameElement;\nconst frameDoc = iframe.contentDocument!;\nframeDoc.head.createEl('style', { text: css });\nconst head = frameDoc.querySelector('head')!;\nhead.appendChild(activeDocument.createElement('style'));",
         },
         {
             name: "createElement on an object that is not a document is not reported",
@@ -115,6 +139,11 @@ ruleTester.run("no-forbidden-elements", noForbiddenElements, {
     invalid: [
         // --- Not in a shadow root ---
         {
+            name: "a <style> moved from an iframe's document into the plugin's, or into a window reached from the iframe, is reported",
+            code: "declare const iframe: HTMLIFrameElement;\nconst style = iframe.contentDocument!.head.createEl('style');\ndocument.head.appendChild(style);\nconst other = document.createElement('style');\niframe.contentDocument!.defaultView!.parent.document.head.appendChild(other);",
+            errors: [{ messageId: "doNotAttachForbiddenStyleElements" }, { messageId: "doNotAttachForbiddenStyleElements" }],
+        },
+        {
             name: "a created <style> appended to a shadow root and to the document head is reported",
             code: "const shadow = host.attachShadow({ mode: 'open' });\nconst style = document.createElement('style');\nshadow.appendChild(style);\ndocument.head.appendChild(style.cloneNode());\ndocument.head.appendChild(style);",
             errors: [{ messageId: "doNotAttachForbiddenStyleElements" }],
@@ -123,6 +152,28 @@ ruleTester.run("no-forbidden-elements", noForbiddenElements, {
             name: "a created <style> never inserted in the file is reported",
             code: "const style = document.createElement('style'); export { style };",
             errors: [{ messageId: "doNotAttachForbiddenStyleElements" }],
+        },
+        {
+            name: "a variable named shadowRoot that holds the document's head is not a shadow root",
+            code: "const shadowRoot = document.head;\nshadowRoot.createEl('style');\nshadowRoot.appendChild(document.createElement('link'));\nfunction style(shadowRoot: HTMLElement) { shadowRoot.createEl('style'); }",
+            errors: [
+                { messageId: "doNotAttachForbiddenStyleElements", line: 2 },
+                { messageId: "doNotAttachForbiddenStyleElements", line: 3 },
+                { messageId: "doNotAttachForbiddenStyleElements", line: 4 },
+            ],
+        },
+        {
+            name: "a typed variable named shadowRoot that is an element is not a shadow root",
+            code: "declare const el: HTMLElement;\nconst shadowRoot = el.querySelector('div')!;\nshadowRoot.appendChild(document.createElement('style'));",
+            errors: [{ messageId: "doNotAttachForbiddenStyleElements", line: 3 }],
+        },
+        {
+            name: "a <style> created in a shadow root and moved to the document is reported",
+            code: "declare const host: HTMLElement;\nconst root = host.attachShadow({ mode: 'open' });\nconst style = root.createEl('style');\ndocument.head.insertAdjacentElement('beforeend', style);\nconst link = root.createEl('link');\ndocument.head.appendChild(link);",
+            errors: [
+                { messageId: "doNotAttachForbiddenStyleElements", line: 3 },
+                { messageId: "doNotAttachForbiddenStyleElements", line: 5 },
+            ],
         },
         {
             name: "a host element or a let that may change is not a shadow root",
@@ -305,6 +356,25 @@ globalsRuleTester.run("no-forbidden-elements with the recommended config's globa
                 { messageId: "doNotAttachForbiddenStyleElements", data: { element: "link" } },
                 { messageId: "doNotAttachForbiddenStyleElements", data: { element: "style" } },
             ],
+        },
+    ],
+});
+
+// Without type information, a variable is followed through its declaration.
+const untypedRuleTester = new RuleTester({ languageOptions: { parserOptions: { project: false } } });
+
+untypedRuleTester.run("no-forbidden-elements without type information", noForbiddenElements, {
+    valid: [
+        {
+            name: "a shadow root by its declaration or its name, with nothing else to tell",
+            code: "const shadowRoot = el.getRootNode(); shadowRoot.createEl('style');\nfunction style(shadowRoot) { shadowRoot.createEl('style'); }\nconst root = host.attachShadow({ mode: 'open' }); root.createEl('style');",
+        },
+    ],
+    invalid: [
+        {
+            name: "a variable named shadowRoot that holds the document's head is reported",
+            code: "const shadowRoot = document.head; shadowRoot.createEl('style');\nlet other = activeDocument.body; const shadowRoot2 = other; shadowRoot2.createEl('style');",
+            errors: [{ messageId: "doNotAttachForbiddenStyleElements", line: 1 }, { messageId: "doNotAttachForbiddenStyleElements", line: 2 }],
         },
     ],
 });

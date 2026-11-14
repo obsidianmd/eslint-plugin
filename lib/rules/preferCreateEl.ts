@@ -1,8 +1,11 @@
-import { ASTUtils, ESLintUtils, TSESTree } from "@typescript-eslint/utils";
+import { ASTUtils, ESLintUtils, TSESLint, TSESTree } from "@typescript-eslint/utils";
 import ts from "typescript";
+import { mayRunOutsideObsidianAt } from "../globalWindow.js";
 import { type MinAppVersionOptions, minAppVersionSchema, supportsVersion } from "../minAppVersion.js";
 import { API_SINCE, laterVersion } from "../obsidianApiVersions.js";
 import { docsUrl, ruleCreator } from "../ruleCreator.js";
+
+const { DefinitionType } = TSESLint.Scope;
 
 const TAG_SHORTHANDS: Record<string, string> = {
     div: "createDiv",
@@ -61,13 +64,23 @@ function isReplacedMethodCall(
  * The replacement calls a global helper (`createEl(tag)`, `createDiv()`, …),
  * which leaves no `document` for prefer-active-doc to report. Inside an
  * implementation of the helpers themselves, such as a polyfill, this rule
- * reports nothing, so prefer-active-doc reports `document` there.
+ * reports nothing, so prefer-active-doc reports `document` there. Nor where
+ * `minAppVersion` is known to be older than the helper, as `createSvg()`
+ * (1.1.0) is for a plugin that supports 1.0.0; `null` skips that check.
  */
-export function isReportedOnGlobalDocument(call: TSESTree.CallExpression): boolean {
-    return (
-        !isInHelperImplementation(call) &&
-        Object.keys(REPLACED_METHODS).some((method) => isReplacedMethodCall(call, method))
-    );
+export function isReportedOnGlobalDocument(call: TSESTree.CallExpression, minAppVersion?: string | null): boolean {
+    const method = Object.keys(REPLACED_METHODS).find((name) => isReplacedMethodCall(call, name));
+    if (method === undefined || isInHelperImplementation(call)) {
+        return false;
+    }
+    const helper =
+        method === "createElementNS"
+            ? "createSvg"
+            : method === "createDocumentFragment"
+              ? "createFragment"
+              : getTagShorthand(call.arguments[0]);
+    const since = helper === undefined ? undefined : HELPER_SINCE[helper];
+    return since === undefined || minAppVersion === null || supportsVersion(minAppVersion, since) !== false;
 }
 
 // Whether `node` is inside a function named after one of Obsidian's DOM
@@ -279,6 +292,14 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
         ): { prefix: string; since?: string; canAutofix: (helper: string) => boolean | undefined } | null {
             const obj = callee.object;
             if (isIframeDocument(obj)) {
+                return null;
+            }
+            // A fallback for where Obsidian's helpers are missing, as in a
+            // browser or under jsdom: `typeof createDiv === "function" ?
+            // createDiv() : document.createElement("div")`, the `catch` of
+            // `try { createEl("p"); }`, or code after a window check. The
+            // native call is the one that works there.
+            if (mayRunOutsideObsidianAt(context, callee)) {
                 return null;
             }
 
@@ -595,6 +616,12 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
                 context.report({ node, messageId: "preferCreateEl", data: { replacement, original } });
                 return;
             }
+            // The replacement is built from the text of the arguments it
+            // keeps, so a comment between or around them would be lost: a
+            // suggestion then, for the author to move it.
+            if (canAutofix && dropsComments(node, replacement)) {
+                canAutofix = false;
+            }
             context.report({
                 node,
                 messageId: "preferCreateEl",
@@ -619,6 +646,13 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
                         ],
                     }),
             });
+        }
+
+        // Whether a comment in `node` is missing from `replacement`.
+        function dropsComments(node: TSESTree.CallExpression, replacement: string): boolean {
+            return context.sourceCode
+                .getCommentsInside(node)
+                .some((comment) => !replacement.includes(context.sourceCode.getText(comment)));
         }
 
         // An iframe's document belongs to the iframe's own window, which Obsidian
@@ -650,7 +684,7 @@ export default ruleCreator<MinAppVersionOptions, MessageIds>({
             }
             const def = variable.defs[0];
             if (
-                def.type !== "Variable" ||
+                def.type !== DefinitionType.Variable ||
                 def.parent.kind !== "const" ||
                 def.node.init === null
             ) {

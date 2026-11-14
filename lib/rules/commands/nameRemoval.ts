@@ -7,8 +7,8 @@ import { StringEdit } from "./stringEdit.js";
 // What separates a label from the rest of a command name, as in
 // "Word Tally: Count words" or "Count words - Word Tally". A hyphen needs
 // whitespace on both sides, since "Git-based" is one word. It reads the same
-// backwards, so the separator at the end of a text is the one at the start of
-// the text reversed, which an anchored pattern finds in linear time.
+// backwards, so suffixSeparator() finds the one at the end of a text by
+// reading it from the end back.
 const LABEL_SEPARATOR = /^(?:\s*[:|/>»›→<«‹←·•–—]\s*|\s+-+\s+)/u;
 // What a name may not start or end with once a label is gone
 const BAD_START = /^[\s\-–—:|/>»›→<«‹←·•,.;!?)\]}]/u;
@@ -38,53 +38,60 @@ export interface PhraseRemovalOptions {
  * a label at the start goes and it began with a capital, the name that is
  * left begins with one too. Null where the phrase is anywhere else, such as
  * in "Commit with Git", or nothing would be left.
+ *
+ * What is left is always one piece of the name, from `lo` up to `hi`, so the
+ * labels are taken off its ends by moving those, and the name is only cut
+ * once at the end: a name made of many labels takes linear time, not
+ * quadratic.
  */
 export function removePhrase(name: string, pattern: RegExp, options: PhraseRemovalOptions): StringEdit | null {
-    const edit = new StringEdit(name);
+    const search = new RegExp(pattern.source, `${pattern.flags.replace(/[gy]/gu, "")}g`);
+    let lo = 0;
+    let hi = name.length;
     let capitalize = false;
     for (;;) {
-        const text = edit.text;
-        const match = pattern.exec(text);
+        const match = firstMatchWithin(search, name, lo, hi);
         if (!match) {
             break;
         }
         const start = match.index;
         const end = start + match[0].length;
-        let before = text.slice(0, start);
-        let after = text.slice(end);
+        // What is left of the name before the phrase is name[lo, beforeEnd),
+        // and after it name[afterStart, hi).
+        let beforeEnd = start;
+        let afterStart = end;
         let bracketed = false;
-        const closing = CLOSING_BRACKET[before.slice(-1)];
-        if (closing !== undefined && after.startsWith(closing)) {
-            before = before.slice(0, -1);
-            after = after.slice(1);
+        const closing = beforeEnd > lo ? CLOSING_BRACKET[name[beforeEnd - 1]] : undefined;
+        if (closing !== undefined && afterStart < hi && name[afterStart] === closing) {
+            beforeEnd--;
+            afterStart++;
             bracketed = true;
         }
-        let removeStart: number;
-        let removeEnd: number;
-        if (before === "") {
-            const separator = prefixSeparator(after, bracketed || options.prefixAfterSpace, bracketed);
+        if (beforeEnd === lo) {
+            const separator = prefixSeparator(name, afterStart, hi, bracketed || options.prefixAfterSpace, bracketed);
             if (separator === null) {
                 return null;
             }
-            removeStart = 0;
-            removeEnd = text.length - after.length + separator.length;
+            lo = afterStart + separator;
             capitalize ||= /^[\p{Lu}\p{Lt}]/u.test(match[0]);
-        } else if (after === "") {
-            const separator = suffixSeparator(before, bracketed || options.suffixAfterSpace, bracketed);
+        } else if (afterStart === hi) {
+            const separator = suffixSeparator(name, lo, beforeEnd, bracketed || options.suffixAfterSpace, bracketed);
             if (separator === null) {
                 return null;
             }
-            removeStart = before.length - separator.length;
-            removeEnd = text.length;
+            hi = beforeEnd - separator;
         } else {
             return null;
         }
-        edit.remove(removeStart, removeEnd);
-        const left = edit.text;
-        if (left.trim() === "" || BAD_START.test(left) || BAD_END.test(left)) {
+        // Nothing left, or what is left starts or ends with a separator; a
+        // name of only whitespace starts with whitespace.
+        if (lo >= hi || BAD_START.test(name[lo]) || BAD_END.test(name[hi - 1])) {
             return null;
         }
     }
+    const edit = new StringEdit(name);
+    edit.remove(hi, name.length);
+    edit.remove(0, lo);
     if (capitalize) {
         capitalizeStart(edit);
     }
@@ -92,33 +99,106 @@ export function removePhrase(name: string, pattern: RegExp, options: PhraseRemov
 }
 
 /**
- * The separator after a label at the start of a name, which `after` follows:
- * a punctuation mark, or whitespace where `space` allows it. With `bracketed`
- * the label was in brackets, which separate it already. Null for none.
+ * The first match of `search`, a global pattern, that is wholly in
+ * name[lo, hi). What comes before `lo` and from `hi` on is always a separator
+ * or a bracket, which the phrase's own word boundaries treat like the ends of
+ * the text.
  */
-function prefixSeparator(after: string, space: boolean, bracketed: boolean): string | null {
-    const label = LABEL_SEPARATOR.exec(after)?.[0];
-    if (label !== undefined) {
-        return label;
+function firstMatchWithin(search: RegExp, name: string, lo: number, hi: number): RegExpExecArray | null {
+    search.lastIndex = lo;
+    for (;;) {
+        const match = search.exec(name);
+        if (!match || match.index >= hi) {
+            return null;
+        }
+        if (match.index + match[0].length <= hi) {
+            return match;
+        }
+        search.lastIndex = match.index + 1;
     }
-    const whitespace = after.slice(0, after.length - after.trimStart().length);
-    if (bracketed) {
-        return whitespace;
-    }
-    return space && whitespace !== "" && WORD_START.test(after.slice(whitespace.length)) ? whitespace : null;
 }
 
-/** The separator before a label at the end of a name, which `before` precedes. */
-function suffixSeparator(before: string, space: boolean, bracketed: boolean): string | null {
-    const label = LABEL_SEPARATOR.exec(Array.from(before).reverse().join(""))?.[0];
-    if (label !== undefined) {
-        return before.slice(before.length - label.length);
+const LABEL_SEPARATOR_AT = new RegExp(LABEL_SEPARATOR.source.replace(/^\^/u, ""), "uy");
+const SEPARATOR_MARK = /^[:|/>»›→<«‹←·•–—]$/u;
+const WHITESPACE = /^\s$/u;
+const WORD_START_AT = new RegExp(WORD_START.source.replace(/^\^/u, ""), "uy");
+
+/**
+ * The length of the separator after a label at the start of a name, which
+ * name[at, hi) follows: a punctuation mark, or whitespace where `space`
+ * allows it. With `bracketed` the label was in brackets, which separate it
+ * already. Null for none.
+ */
+function prefixSeparator(name: string, at: number, hi: number, space: boolean, bracketed: boolean): number | null {
+    LABEL_SEPARATOR_AT.lastIndex = at;
+    let label = LABEL_SEPARATOR_AT.exec(name)?.[0];
+    if (label !== undefined && at + label.length > hi) {
+        // It runs into what was cut off the end: match the rest alone
+        label = LABEL_SEPARATOR.exec(name.slice(at, hi))?.[0];
     }
-    const whitespace = before.slice(before.trimEnd().length);
+    if (label !== undefined) {
+        return label.length;
+    }
+    let wordAt = at;
+    while (wordAt < hi && WHITESPACE.test(name[wordAt])) {
+        wordAt++;
+    }
+    const whitespace = wordAt - at;
     if (bracketed) {
         return whitespace;
     }
-    return space && whitespace !== "" && WORD_END.test(before.slice(0, before.length - whitespace.length)) ? whitespace : null;
+    if (!space || whitespace === 0 || wordAt >= hi) {
+        return null;
+    }
+    WORD_START_AT.lastIndex = wordAt;
+    const word = WORD_START_AT.exec(name);
+    return word !== null && wordAt + word[0].length <= hi ? whitespace : null;
+}
+
+/**
+ * The length of the separator before a label at the end of a name, which
+ * name[lo, at) precedes. LABEL_SEPARATOR reads the same backwards, so this
+ * reads it from `at` back.
+ */
+function suffixSeparator(name: string, lo: number, at: number, space: boolean, bracketed: boolean): number | null {
+    const skipWhitespace = (from: number): number => {
+        let i = from;
+        while (i > lo && WHITESPACE.test(name[i - 1])) {
+            i--;
+        }
+        return i;
+    };
+    const afterWhitespace = skipWhitespace(at);
+    // Whitespace, a mark, whitespace
+    if (afterWhitespace > lo && SEPARATOR_MARK.test(name[afterWhitespace - 1])) {
+        return at - skipWhitespace(afterWhitespace - 1);
+    }
+    // Whitespace, hyphens, whitespace
+    if (afterWhitespace < at) {
+        let i = afterWhitespace;
+        while (i > lo && name[i - 1] === "-") {
+            i--;
+        }
+        if (i < afterWhitespace) {
+            const start = skipWhitespace(i);
+            if (start < i) {
+                return at - start;
+            }
+        }
+    }
+    const whitespace = at - afterWhitespace;
+    if (bracketed) {
+        return whitespace;
+    }
+    if (!space || whitespace === 0 || afterWhitespace === lo) {
+        return null;
+    }
+    // The character before the whitespace, both halves of a surrogate pair
+    let charStart = afterWhitespace - 1;
+    if (charStart > lo && /[\uDC00-\uDFFF]/u.test(name[charStart]) && /[\uD800-\uDBFF]/u.test(name[charStart - 1])) {
+        charStart--;
+    }
+    return WORD_END.test(name.slice(charStart, afterWhitespace)) ? whitespace : null;
 }
 
 /**

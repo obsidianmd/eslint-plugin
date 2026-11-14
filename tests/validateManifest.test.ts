@@ -571,6 +571,26 @@ ruleTester.run("validate-manifest", manifestRule as unknown as Rule.RuleModule, 
             ],
         },
         {
+            // A zero-width space, a soft hyphen and a bidi control, written
+            // as JSON escapes and as the characters themselves.
+            name: "'Obsidian' and 'plugin' split by an invisible character are reported",
+            filename: "manifest.json",
+            code: `{
+                    "id": "word-tally",
+                    "name": "Obs\\u200Bidian Notes Plug\u00ADin",
+                    "author": "Me",
+                    "version": "1.0.0",
+                    "minAppVersion": "1.0.0",
+                    "description": "Counts words in the active note for \u202Eobsidian.",
+                    "isDesktopOnly": false
+                }`,
+            errors: [
+                { messageId: "nameObsidian" },
+                { messageId: "namePlugin" },
+                { messageId: "descriptionObsidian" },
+            ],
+        },
+        {
             name: "a name containing a fragment of 'Obsidian' is reported",
             filename: "manifest.json",
             code: `{

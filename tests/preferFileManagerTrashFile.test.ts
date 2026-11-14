@@ -86,15 +86,14 @@ ruleTester.run("prefer-file-manager-trash-file", preferFileManagerTrashRule, {
         },
         {
             // obsidian-local-images-plus, obsidian-full-calendar, links.
-            name: "a second argument that is not a literal: the caller chooses where the file goes",
+            name: "a second argument to trash() that is not a literal: the caller chooses where the file goes",
             code: `
-                declare class Vault { trash(file: unknown, system: boolean): void; delete(file: unknown, force?: boolean): void; }
+                declare class Vault { trash(file: unknown, system: boolean): void; }
                 declare const vault: Vault;
                 declare function useSystem(): boolean;
                 vault.trash(someFile, useSysTrash);
                 vault.trash(someFile, this.settings.systemTrash);
                 vault.trash(someFile, useSystem());
-                vault.delete(someFile, force);
             `,
             options: since,
         },
@@ -144,6 +143,41 @@ ruleTester.run("prefer-file-manager-trash-file", preferFileManagerTrashRule, {
         },
     ],
     invalid: [
+        {
+            // force only lets delete() remove a folder that is not empty: the
+            // file is gone for good either way, and no destination is chosen.
+            name: "vault.delete() with a force that is not a literal is forbidden",
+            options: since,
+            code: `
+                declare class Vault { delete(file: unknown, force?: boolean): void; }
+                declare const vault: Vault;
+                declare const force: boolean;
+                vault.delete(someFile, force);
+            `,
+            errors: [{ messageId: "preferTrashFile", data: { methodName: "delete" }, line: 5, suggestions: [] }],
+        },
+        {
+            name: "branches that differ only in delete()'s force are not a deletion setting",
+            options: since,
+            code: `
+                declare class Vault { delete(file: unknown, force?: boolean): Promise<void>; }
+                declare const vault: Vault;
+                async function remove(file: unknown, isFolder: boolean) {
+                    if (isFolder) {
+                        await vault.delete(file, true);
+                    } else {
+                        await vault.delete(file);
+                    }
+                    await (isFolder ? vault.delete(file, true) : vault.delete(file, false));
+                }
+            `,
+            errors: [
+                { messageId: "preferTrashFile", data: { methodName: "delete" }, line: 6, suggestions: [] },
+                { messageId: "preferTrashFile", data: { methodName: "delete" }, line: 8, suggestions: [] },
+                { messageId: "preferTrashFile", data: { methodName: "delete" }, line: 10, suggestions: [] },
+                { messageId: "preferTrashFile", data: { methodName: "delete" }, line: 10, suggestions: [] },
+            ],
+        },
         {
             name: "vault.trash is forbidden",
             options: since,

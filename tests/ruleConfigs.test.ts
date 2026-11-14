@@ -16,7 +16,8 @@ async function rulesFor(filename: string, extra: Linter.Config[] = []): Promise<
 		overrideConfigFile: true,
 		overrideConfig: [...plugin.configs.recommended, ...extra],
 	});
-	const config = await eslint.calculateConfigForFile(filename);
+	// calculateConfigForFile() is typed any; it lists only the rules configured.
+	const config = (await eslint.calculateConfigForFile(filename)) as { rules?: Record<string, Linter.RuleEntry> };
 	return config.rules ?? {};
 }
 
@@ -26,7 +27,7 @@ function obsidianmdRules(rules: Record<string, Linter.RuleEntry>): Record<string
 
 // [severity, ...options], with the severity as a number, as calculateConfigForFile reports it.
 function normalize(entry: Linter.RuleEntry): unknown[] {
-	const [severity, ...options] = Array.isArray(entry) ? entry : [entry];
+	const [severity, ...options]: unknown[] = Array.isArray(entry) ? (entry as unknown[]) : [entry];
 	const level = { off: 0, warn: 1, error: 2 }[severity as string] ?? severity;
 	return [level, ...options];
 }
@@ -45,6 +46,7 @@ function docsTurnEverythingOff(): Linter.Config {
 	const section = text.slice(text.indexOf("use `ruleConfigs` to generate the overrides programmatically"));
 	const match = /```js\n(\{[\s\S]*?\})\n```/.exec(section);
 	assert.ok(match, "no ruleConfigs snippet in docs/configuration.md");
+	// eslint-disable-next-line @typescript-eslint/no-implied-eval, @typescript-eslint/no-unsafe-call, obsidianmd/rule-custom-message -- runs the example in this repo's own docs, to test it
 	return new Function("obsidianmd", `return (${match[1]});`)(plugin) as Linter.Config;
 }
 

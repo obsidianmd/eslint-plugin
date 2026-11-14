@@ -3,19 +3,9 @@ import { getManifest } from "../../manifest.js";
 import { docsUrl, ruleCreator } from "../../ruleCreator.js";
 import { removePhrase } from "./nameRemoval.js";
 import { isCommandProperty } from "./property.js";
-import { phrasePattern } from "./words.js";
+import { hasPhraseOnlyAsWord, phrasePattern, startsWithPhraseAsWord } from "./words.js";
 
 type Options = [{ pluginName?: string }?];
-
-/**
- * Whether the plugin name starts the command name with only whitespace and a
- * lower-case word after it, as in "Zoom in" or "Git commit": a word of the
- * sentence then, rather than a label.
- */
-function startsWithNameAsWord(name: string, pattern: RegExp): boolean {
-    const match = pattern.exec(name);
-    return match !== null && match.index === 0 && /^\s+\p{Ll}/u.test(name.slice(match[0].length));
-}
 
 export default ruleCreator<Options, "pluginName" | "removePluginName">({
     meta: {
@@ -67,12 +57,16 @@ export default ruleCreator<Options, "pluginName" | "removePluginName">({
                         isCommandProperty(property, "name") &&
                         property.value.type === TSESTree.AST_NODE_TYPES.Literal &&
                         typeof property.value.value === "string" &&
-                        pluginNamePattern.test(property.value.value)
+                        pluginNamePattern.test(property.value.value) &&
+                        // "Zoom in" of the plugin "Zoom": the plugin name is
+                        // the verb of the sentence, not a label
+                        !hasPhraseOnlyAsWord(property.value.value, pluginNamePattern)
                     ) {
                         const value = property.value;
-                        // "Zoom in" of the plugin "Zoom": the name is the
-                        // verb, and "In" would mean nothing
-                        const edit = startsWithNameAsWord(value.value, pluginNamePattern)
+                        // The plugin name starts the name as a word and is a
+                        // label elsewhere, as in "Zoom in (Zoom)": removing
+                        // the label would take the verb too
+                        const edit = startsWithPhraseAsWord(value.value, pluginNamePattern)
                             ? null
                             : removePhrase(value.value, pluginNamePattern, {
                                 prefixAfterSpace: true,

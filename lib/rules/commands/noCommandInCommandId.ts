@@ -3,18 +3,20 @@ import { docsUrl, ruleCreator } from "../../ruleCreator.js";
 import { COMMAND, isRedundantCommandInId, redundantCommandInName } from "./commandWord.js";
 import { removeIdWords } from "./idRemoval.js";
 import { commandIds, idRewrite } from "./idSuggestion.js";
-import { isCommandProperty, staticString } from "./property.js";
+import { commandName, isCommandProperty } from "./property.js";
 
 // Whether the command's name uses "command" as a word it needs, as
 // "Copy URI for command" does: then the ID's "command" is that word too.
-function nameNeedsCommand(command: TSESTree.ObjectExpression): boolean {
-    return command.properties.some((property) => {
-        if (!isCommandProperty(property, "name")) {
-            return false;
-        }
-        const name = staticString(property.value);
-        return name !== null && COMMAND.test(name) && redundantCommandInName(name) === null;
-    });
+function nameNeedsCommand(name: string | null): boolean {
+    return name !== null && COMMAND.test(name) && redundantCommandInName(name) === null;
+}
+
+// Whether the command has a name written out that does without the word
+// "command": it does not have it, as `{ id: "open-note-command", name: "Open
+// note" }` does not, or only as a label, as in "Command: open note".
+function nameWithoutCommand(command: TSESTree.ObjectExpression): boolean {
+    const name = commandName(command);
+    return name !== null && (!COMMAND.test(name) || redundantCommandInName(name) !== null);
 }
 
 export default ruleCreator({
@@ -56,8 +58,8 @@ export default ruleCreator({
                         isCommandProperty(property, "id") &&
                         property.value.type === TSESTree.AST_NODE_TYPES.Literal &&
                         typeof property.value.value === "string" &&
-                        isRedundantCommandInId(property.value.value) &&
-                        !nameNeedsCommand(commandObject)
+                        isRedundantCommandInId(property.value.value, nameWithoutCommand(commandObject)) &&
+                        !nameNeedsCommand(commandName(commandObject))
                     ) {
                         reported.push({ property, value: property.value });
                     }

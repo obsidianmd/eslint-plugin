@@ -65,6 +65,13 @@ const SENTENCE_NAMES = [
 ruleTester.run("no-plugin-name-in-command-name", noPluginNameRule, {
     valid: [
         {
+            // obsidian-zoom: the plugin name is the verb of the sentence, not
+            // a label, and "In" would mean nothing.
+            name: "the plugin name that starts the name as a word, before a lower-case one, is allowed",
+            code: commands(["Zoom in", "Zoom out the entire document", "Zoom  into heading"]),
+            options: [{ pluginName: "Zoom" }],
+        },
+        {
             name: "name without plugin name is allowed",
             code: "this.addCommand({ name: 'Open a new note' });",
             options: [{ pluginName: "My Awesome Plugin" }],
@@ -231,12 +238,12 @@ ruleTester.run("no-plugin-name-in-command-name", noPluginNameRule, {
             errors: renamedLines(START_NAMES, START_NAMES.map(() => "Count words")),
         },
         {
-            // obsidian-zoom: the plugin name is the verb, and "In" would
-            // mean nothing.
-            name: "no suggestion where a lower-case word follows the plugin name after a space",
-            code: commands(["Zoom in", "Zoom out the entire document", "Zoom  into heading"]),
+            // The plugin name starts the name as the verb, and removing the
+            // label would take the verb too: "In" would mean nothing.
+            name: "no suggestion where the plugin name starts the name as a word and is a label elsewhere",
+            code: commands(["Zoom in (Zoom)", "Zoom out - zoom"]),
             options: [{ pluginName: "Zoom" }],
-            errors: renamedLines([], [null, null, null]),
+            errors: renamedLines([], [null, null]),
         },
         {
             name: "a capitalised word after the plugin name and a space keeps the suggestion",

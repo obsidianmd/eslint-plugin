@@ -203,6 +203,11 @@ ruleTester.run("object-assign suggestions", objectAssignRule, {
     valid: [],
     invalid: [
         {
+            name: "where an arrow function's caller uses its result",
+            code: "declare const overrides: object[]; export const all = overrides.map((o) => Object.assign(DEFAULT_SETTINGS, o));",
+            errors: [{ messageId: "twoArgumentsDefault", suggestions: copied("DEFAULT_SETTINGS", "declare const overrides: object[]; export const all = overrides.map((o) => Object.assign({}, DEFAULT_SETTINGS, o));") }],
+        },
+        {
             name: "?. is kept",
             code: "export const s = Object.assign?.(DEFAULT_SETTINGS, data);",
             errors: [{ messageId: "twoArgumentsDefault", suggestions: copied("DEFAULT_SETTINGS", "export const s = Object.assign?.({}, DEFAULT_SETTINGS, data);") }],
@@ -243,6 +248,14 @@ ruleTester.run("object-assign suggestions", objectAssignRule, {
             ],
         },
         {
+            name: "where an arrow function's caller throws its result away, as forEach() does",
+            code: "declare const overrides: object[]; declare function each(f: (o: object) => void): void; overrides.forEach((o) => Object.assign(DEFAULT_SETTINGS, o)); each((o) => (Object.assign(DEFAULT_SETTINGS, o)));",
+            errors: [
+                { messageId: "twoArgumentsDefault", suggestions: [] },
+                { messageId: "twoArgumentsDefault", suggestions: [] },
+            ],
+        },
+        {
             name: "with type arguments, which are for two arguments",
             code: "interface Settings { a: number } export const s = Object.assign<Settings, Partial<Settings>>(DEFAULT_SETTINGS, data);",
             errors: [{ messageId: "twoArgumentsDefault", suggestions: [] }],
@@ -262,6 +275,12 @@ untypedRuleTester.run("object-assign in a JavaScript file", objectAssignRule, {
             filename: "main.js",
             code: "module.exports.load = (data) => Object.assign(DEFAULT_SETTINGS, data);\n",
             errors: [{ messageId: "twoArgumentsDefault", suggestions: copied("DEFAULT_SETTINGS", "module.exports.load = (data) => Object.assign({}, DEFAULT_SETTINGS, data);\n") }],
+        },
+        {
+            name: "nothing is offered for an arrow function passed to forEach()",
+            filename: "main.js",
+            code: "overrides.forEach((o) => Object.assign(DEFAULT_SETTINGS, o));\n",
+            errors: [{ messageId: "twoArgumentsDefault", suggestions: [] }],
         },
     ],
 });

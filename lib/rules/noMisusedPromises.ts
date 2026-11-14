@@ -1,7 +1,8 @@
-import { ESLintUtils, type TSESLint, type TSESTree } from "@typescript-eslint/utils";
+import { ESLintUtils, type TSESLint, TSESTree } from "@typescript-eslint/utils";
 import type ts from "typescript";
 import tseslint from "typescript-eslint";
 import { type DisableDirectives, disableDirectives, isDisabled, problemStart } from "../disableDirectives.js";
+import { declaredInObsidian, declaredOnlyInObsidian, isObsidianChainingThen } from "../obsidianChaining.js";
 import { docsUrl, isJsProgram, type PluginDocs } from "../ruleCreator.js";
 
 type RuleModule = TSESLint.RuleModule<string, readonly unknown[]>;
@@ -32,9 +33,15 @@ const upstream = (tseslint.plugin as unknown as { rules: Record<string, RuleModu
 // "obsidian"` augmentation) keeps its declaration outside obsidian.d.ts, so those
 // types are reported exactly as before.
 const rule: TSESLint.RuleModule<string, readonly unknown[], PluginDocs> = {
+    // eslint-disable-next-line @typescript-eslint/no-deprecated -- the upstream rule's, which typescript-eslint 8.35.1 reads only here (see PluginRule)
     defaultOptions: upstream.defaultOptions,
     meta: {
         ...upstream.meta,
+        // The upstream rule's, named here as well for eslint-plugin's checks,
+        // which cannot see through the spread.
+        type: upstream.meta.type,
+        schema: upstream.meta.schema,
+        messages: upstream.meta.messages,
         docs: {
             description:
                 "Disallow Promises in places not designed to handle them, without treating Obsidian's chaining `then` as a Promise",
@@ -119,11 +126,12 @@ function isAsyncPluginOnload(context: RuleContext, descriptor: ReportDescriptor)
     }
     const member = descriptor.node as TSESTree.Node;
     if (
-        (member.type !== "MethodDefinition" && member.type !== "PropertyDefinition") ||
+        (member.type !== TSESTree.AST_NODE_TYPES.MethodDefinition && member.type !== TSESTree.AST_NODE_TYPES.PropertyDefinition) ||
         member.computed ||
-        member.key.type !== "Identifier" ||
+        member.key.type !== TSESTree.AST_NODE_TYPES.Identifier ||
         member.key.name !== "onload" ||
-        (member.parent.parent.type !== "ClassDeclaration" && member.parent.parent.type !== "ClassExpression")
+        (member.parent.parent.type !== TSESTree.AST_NODE_TYPES.ClassDeclaration &&
+            member.parent.parent.type !== TSESTree.AST_NODE_TYPES.ClassExpression)
     ) {
         return false;
     }
@@ -204,33 +212,6 @@ function checkerIgnoringObsidianChaining(checker: ts.TypeChecker): ts.TypeChecke
     const typeChecker = copy as unknown as ts.TypeChecker;
     checkersIgnoringObsidianChaining.set(checker, typeChecker);
     return typeChecker;
-}
-
-// A `then` whose every declaration is in the obsidian package's obsidian.d.ts.
-// Merged or overriding declarations elsewhere disqualify it.
-function isObsidianChainingThen(symbol: ts.Symbol): boolean {
-    if (symbol.getName() !== "then") {
-        return false;
-    }
-    return declaredOnlyInObsidian(symbol);
-}
-
-// Every declaration of `symbol` is in the obsidian package's obsidian.d.ts.
-function declaredOnlyInObsidian(symbol: ts.Symbol): boolean {
-    const declarations = symbol.getDeclarations();
-    return declarations !== undefined && declarations.length > 0 && declarations.every(isInObsidian);
-}
-
-// The obsidian package's obsidian.d.ts declares `symbol`, which a
-// `declare module "obsidian"` augmentation may merge into.
-function declaredInObsidian(symbol: ts.Symbol): boolean {
-    return symbol.getDeclarations()?.some(isInObsidian) ?? false;
-}
-
-function isInObsidian(declaration: ts.Declaration): boolean {
-    return /(^|\/)node_modules\/obsidian\/obsidian\.d\.ts$/.test(
-        declaration.getSourceFile().fileName.replace(/\\/g, "/"),
-    );
 }
 
 // A stand-in for `target` with some members replaced. Every other member is read

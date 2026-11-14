@@ -30,13 +30,15 @@ Not reported:
 - with a `minAppVersion` below 1.6.6, which has no `trashFile()`: there the vault's methods are the
   only way to delete a file. The version is the rule's `minAppVersion` option, else the
   `minAppVersion` in `manifest.json`; where neither is a version, the call is reported;
-- a call whose second argument is not a literal, such as
-  `vault.trash(file, this.settings.useSystemTrash)` or `vault.delete(file, force)`: the caller
-  chooses where the file goes;
+- a `trash()` call whose second argument is not a literal, such as
+  `vault.trash(file, this.settings.useSystemTrash)`: the caller chooses where the file goes.
+  `delete()`'s second argument, `force`, only lets it remove a folder that is not empty, so
+  `vault.delete(file, force)` is reported;
 - a call in a branch of an `if`/`else if` chain, a `switch` or a `?:` whose branches delete in two
   or more different ways, such as `vault.delete(file)`, `vault.trash(file, true)`,
   `vault.trash(file, false)` and `fileManager.trashFile(file)`: that is the plugin's own setting for
-  where deleted files go;
+  where deleted files go. `vault.delete(file, true)` and `vault.delete(file)` are one way, so branches
+  that differ only in `force` are reported;
 - other `Vault` methods, a computed call by a variable, such as `vault[method](file)`, `delete()`
   on anything that is not a `Vault`, such as a `Map` or a `Set`, and the lower-level adapter, such
   as `this.app.vault.adapter.remove()`.

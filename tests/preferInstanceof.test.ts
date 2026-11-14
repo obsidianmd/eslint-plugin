@@ -1310,21 +1310,30 @@ nonStrictRuleTester.run("prefer-instanceof without strictNullChecks", preferInst
             };
         }),
 
-        // --- Declared without null or undefined: still fixed ---
+        // --- A cast that leaves out null: the value may still be null ---
         {
-            name: "a value cast to a type without null is fixed",
+            name: "a value cast from one declared nullable to a type without null gets the ?. suggestion",
             code: `${OBSIDIAN_INSTANCEOF}
                 declare const el: HTMLElement;
                 const child = el.firstElementChild as Element;
                 if (child instanceof HTMLElement) {}
             `,
-            output: `${OBSIDIAN_INSTANCEOF}
+            errors: [{
+                messageId: "preferInstanceof",
+                data: { className: "HTMLElement" },
+                suggestions: [{
+                    messageId: "preferInstanceofOptionalSuggestion",
+                    data: { className: "HTMLElement" },
+                    output: `${OBSIDIAN_INSTANCEOF}
                 declare const el: HTMLElement;
                 const child = el.firstElementChild as Element;
-                if (child.instanceOf(HTMLElement)) {}
+                if (child?.instanceOf(HTMLElement)) {}
             `,
-            errors: [{ messageId: "preferInstanceof", data: { className: "HTMLElement" } }],
+                }],
+            }],
         },
+
+        // --- Declared without null or undefined: still fixed ---
         {
             name: "a value declared as a Node is fixed",
             code: `${OBSIDIAN_INSTANCEOF}
@@ -1923,6 +1932,229 @@ versionObsidianRuleTester.run("prefer-instanceof on event targets and minAppVers
                         },
                     ],
                 },
+            ],
+        },
+    ],
+});
+
+const optional = (className: string, output: string) => [{
+    messageId: "preferInstanceofOptionalSuggestion" as const,
+    data: { className },
+    output,
+}];
+
+// `e.relatedTarget as HTMLElement` leaves `null` out of the type but not out
+// of the value: `next.instanceOf()` threw where `instanceof` was false.
+ruleTester.run("prefer-instanceof with a type assertion that leaves out null", preferInstanceofRule, {
+    valid: [],
+    invalid: [
+        {
+            name: "a const set to a cast of a nullable value",
+            code: `${OBSIDIAN_INSTANCEOF}
+                export function onBlur(e: FocusEvent, box: HTMLElement) {
+                    const next = e.relatedTarget as HTMLElement;
+                    if (next instanceof HTMLElement && box.contains(next)) return;
+                }`,
+            output: null,
+            errors: [{
+                messageId: "preferInstanceof",
+                suggestions: optional("HTMLElement", `${OBSIDIAN_INSTANCEOF}
+                export function onBlur(e: FocusEvent, box: HTMLElement) {
+                    const next = e.relatedTarget as HTMLElement;
+                    if (next?.instanceOf(HTMLElement) && box.contains(next)) return;
+                }`),
+            }],
+        },
+        {
+            name: "a cast in the check, with <T> and through unknown",
+            code: `${OBSIDIAN_INSTANCEOF}
+                export function onBlur(e: FocusEvent) {
+                    if ((e.relatedTarget as Node) instanceof HTMLElement) {}
+                    if ((e.relatedTarget as unknown as Node) instanceof HTMLElement) {}
+                }`,
+            output: null,
+            errors: [
+                {
+                    messageId: "preferInstanceof",
+                    suggestions: optional("HTMLElement", `${OBSIDIAN_INSTANCEOF}
+                export function onBlur(e: FocusEvent) {
+                    if ((e.relatedTarget as Node)?.instanceOf(HTMLElement)) {}
+                    if ((e.relatedTarget as unknown as Node) instanceof HTMLElement) {}
+                }`),
+                },
+                {
+                    messageId: "preferInstanceof",
+                    suggestions: optional("HTMLElement", `${OBSIDIAN_INSTANCEOF}
+                export function onBlur(e: FocusEvent) {
+                    if ((e.relatedTarget as Node) instanceof HTMLElement) {}
+                    if ((e.relatedTarget as unknown as Node)?.instanceOf(HTMLElement)) {}
+                }`),
+                },
+            ],
+        },
+        {
+            name: "a cast of a value that is never null, and a non-null assertion, are still fixed",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare const target: EventTarget;
+                declare const el: HTMLElement;
+                const node = target as Node;
+                if (node instanceof HTMLElement) {}
+                if (el.parentElement! instanceof HTMLElement) {}`,
+            output: `${OBSIDIAN_INSTANCEOF}
+                declare const target: EventTarget;
+                declare const el: HTMLElement;
+                const node = target as Node;
+                if (node.instanceOf(HTMLElement)) {}
+                if (el.parentElement!.instanceOf(HTMLElement)) {}`,
+            errors: [{ messageId: "preferInstanceof" }, { messageId: "preferInstanceof" }],
+        },
+    ],
+});
+
+nonStrictRuleTester.run("prefer-instanceof without strictNullChecks, past an annotation or a field", preferInstanceofRule, {
+    valid: [],
+    invalid: [
+        {
+            name: "an annotated variable set from a nullable call",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare const root: HTMLElement;
+                const input: Element = root.querySelector("input");
+                if (input instanceof HTMLInputElement) {}`,
+            output: null,
+            errors: [{
+                messageId: "preferInstanceof",
+                suggestions: optional("HTMLInputElement", `${OBSIDIAN_INSTANCEOF}
+                declare const root: HTMLElement;
+                const input: Element = root.querySelector("input");
+                if (input?.instanceOf(HTMLInputElement)) {}`),
+            }],
+        },
+        {
+            name: "a cast of a nullable value",
+            code: `${OBSIDIAN_INSTANCEOF}
+                export function onBlur(e: FocusEvent) {
+                    if ((e.relatedTarget as Node) instanceof HTMLElement) {}
+                }`,
+            output: null,
+            errors: [{
+                messageId: "preferInstanceof",
+                suggestions: optional("HTMLElement", `${OBSIDIAN_INSTANCEOF}
+                export function onBlur(e: FocusEvent) {
+                    if ((e.relatedTarget as Node)?.instanceOf(HTMLElement)) {}
+                }`),
+            }],
+        },
+        {
+            name: "a class field without an initializer, set later",
+            code: `${OBSIDIAN_INSTANCEOF}
+                export class V {
+                    inputEl: Element;
+                    check() { if (this.inputEl instanceof HTMLInputElement) {} }
+                }`,
+            output: null,
+            errors: [{
+                messageId: "preferInstanceof",
+                suggestions: optional("HTMLInputElement", `${OBSIDIAN_INSTANCEOF}
+                export class V {
+                    inputEl: Element;
+                    check() { if (this.inputEl?.instanceOf(HTMLInputElement)) {} }
+                }`),
+            }],
+        },
+        {
+            name: "a field with an initializer, a !, or set in the constructor is still fixed",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare function make(): Element;
+                export class V {
+                    a: Element = make();
+                    b!: Element;
+                    c: Element;
+                    constructor() { this.c = make(); }
+                    check() { return [this.a instanceof HTMLElement, this.b instanceof HTMLElement, this.c instanceof HTMLElement]; }
+                }`,
+            output: `${OBSIDIAN_INSTANCEOF}
+                declare function make(): Element;
+                export class V {
+                    a: Element = make();
+                    b!: Element;
+                    c: Element;
+                    constructor() { this.c = make(); }
+                    check() { return [this.a.instanceOf(HTMLElement), this.b.instanceOf(HTMLElement), this.c.instanceOf(HTMLElement)]; }
+                }`,
+            errors: [{ messageId: "preferInstanceof" }, { messageId: "preferInstanceof" }, { messageId: "preferInstanceof" }],
+        },
+    ],
+});
+
+// Node.instanceOf() takes a `new () => T`: `el.instanceOf(Base)` did not
+// compile for an abstract class or one whose constructor needs arguments.
+// Such a class is the plugin's own, which `instanceof` finds in every window.
+ruleTester.run("prefer-instanceof against a class instanceOf() cannot take", preferInstanceofRule, {
+    valid: [
+        {
+            name: "an abstract class, and a constructor with a required parameter",
+            code: `${OBSIDIAN_INSTANCEOF}
+                abstract class Base extends HTMLElement {}
+                class Widget extends HTMLElement { constructor(public id2: string) { super(); } }
+                declare const el: Node;
+                declare const evt: UIEvent;
+                abstract class BaseEvent extends MouseEvent {}
+                if (el instanceof Base || el instanceof Widget || evt instanceof BaseEvent) {}`,
+        },
+    ],
+    invalid: [
+        {
+            name: "an optional parameter, an inherited constructor, and an event class with arguments",
+            code: `${OBSIDIAN_INSTANCEOF}
+                class Widget extends HTMLElement { constructor(public id2?: string) { super(); } }
+                class Plain extends HTMLElement {}
+                declare const el: Node;
+                declare const evt: UIEvent;
+                if (el instanceof Widget || el instanceof Plain || evt instanceof MouseEvent) {}`,
+            output: `${OBSIDIAN_INSTANCEOF}
+                class Widget extends HTMLElement { constructor(public id2?: string) { super(); } }
+                class Plain extends HTMLElement {}
+                declare const el: Node;
+                declare const evt: UIEvent;
+                if (el.instanceOf(Widget) || el.instanceOf(Plain) || evt.instanceOf(MouseEvent)) {}`,
+            errors: [{ messageId: "preferInstanceof" }, { messageId: "preferInstanceof" }, { messageId: "preferInstanceof" }],
+        },
+    ],
+});
+
+ruleTester.run("prefer-instanceof with a comment outside the operands", preferInstanceofRule, {
+    valid: [],
+    invalid: [
+        {
+            name: "is offered as a suggestion only, and a comment inside an operand is kept by the fix",
+            code: `${OBSIDIAN_INSTANCEOF}
+                declare const el: Node;
+                if (el /* popout-safe? */ instanceof HTMLElement) {}
+                if (el instanceof /* the class */ HTMLElement) {}
+                if ((el /* kept */ as Node) instanceof HTMLElement) {}`,
+            output: `${OBSIDIAN_INSTANCEOF}
+                declare const el: Node;
+                if (el /* popout-safe? */ instanceof HTMLElement) {}
+                if (el instanceof /* the class */ HTMLElement) {}
+                if ((el /* kept */ as Node).instanceOf(HTMLElement)) {}`,
+            errors: [
+                {
+                    messageId: "preferInstanceof",
+                    suggestions: [{ messageId: "preferInstanceofSuggestion", data: { className: "HTMLElement" }, output: `${OBSIDIAN_INSTANCEOF}
+                declare const el: Node;
+                if (el.instanceOf(HTMLElement)) {}
+                if (el instanceof /* the class */ HTMLElement) {}
+                if ((el /* kept */ as Node) instanceof HTMLElement) {}` }],
+                },
+                {
+                    messageId: "preferInstanceof",
+                    suggestions: [{ messageId: "preferInstanceofSuggestion", data: { className: "HTMLElement" }, output: `${OBSIDIAN_INSTANCEOF}
+                declare const el: Node;
+                if (el /* popout-safe? */ instanceof HTMLElement) {}
+                if (el.instanceOf(HTMLElement)) {}
+                if ((el /* kept */ as Node) instanceof HTMLElement) {}` }],
+                },
+                { messageId: "preferInstanceof" },
             ],
         },
     ],

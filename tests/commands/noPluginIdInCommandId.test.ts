@@ -10,6 +10,13 @@ const rename = (id: string, output: string) => ({ messageId: "removePluginId" as
 ruleTester.run("no-plugin-id-in-command-id", noPluginIdRule, {
     valid: [
         {
+            // obsidian-zoom: the name has the plugin ID's word as its verb,
+            // and the ID follows the name.
+            name: "an ID whose name starts with the plugin ID's words as a word of the sentence is allowed",
+            code: "this.addCommand({ id: 'zoom-in', name: 'Zoom in', callback }); this.addCommand({ id: 'zoom-out-all', name: 'Zoom out of everything', callback });",
+            options: [{ pluginId: "zoom" }],
+        },
+        {
             name: "id without plugin id is allowed",
             code: "this.addCommand({ id: 'open-new-note' });",
             options: [{ pluginId: "my-plugin" }],
@@ -127,6 +134,16 @@ ruleTester.run("no-plugin-id-in-command-id", noPluginIdRule, {
             errors: [
                 { messageId: "pluginId", suggestions: [rename("commit", "this.addCommand({ id: 'commit' }); this.addCommand({ id: 'gitPull' });")] },
                 { messageId: "pluginId", suggestions: [rename("pull", "this.addCommand({ id: 'git-commit' }); this.addCommand({ id: 'pull' });")] },
+            ],
+        },
+        {
+            name: "no suggestion that would leave only a word such as `in`, which names no command",
+            code: "this.addCommand({ id: 'zoom-in', name: 'Enlarge' }); this.addCommand({ id: 'zoom-out', name: t('out') }); this.addCommand({ id: 'zoom-in', name: 'Zoom: zoom in' });",
+            options: [{ pluginId: "zoom" }],
+            errors: [
+                { messageId: "pluginId", suggestions: [] },
+                { messageId: "pluginId", suggestions: [] },
+                { messageId: "pluginId", suggestions: [] },
             ],
         },
         {

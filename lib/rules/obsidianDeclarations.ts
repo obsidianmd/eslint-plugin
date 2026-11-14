@@ -79,31 +79,36 @@ export function collectDeclarationShapes(sourceFile: ts.SourceFile): Declaration
     return shapes;
 }
 
+// Writes a type reference its own way, as no-unsupported-api does to write a
+// type alias as the type it stands for, or returns undefined to write it as it
+// is. The functions below take one where the rule needs that.
+export type InlineReference = (reference: ts.TypeReferenceNode) => string | undefined;
+
 // The shape of a member of a class or interface, or undefined for one without
 // a version, such as an index signature or a constructor.
-export function memberShape(member: ts.Node): string | undefined {
+export function memberShape(member: ts.Node, inline?: InlineReference): string | undefined {
     if (ts.isMethodDeclaration(member) || ts.isMethodSignature(member)) {
-        return signatureShape(member);
+        return signatureShape(member, inline);
     }
     if (ts.isPropertyDeclaration(member) || ts.isPropertySignature(member)) {
-        return `${member.questionToken ? "?" : ""}:${typeText(member.type)}`;
+        return `${member.questionToken ? "?" : ""}:${typeText(member.type, inline)}`;
     }
     if (ts.isGetAccessorDeclaration(member)) {
-        return `:${typeText(member.type)}`;
+        return `:${typeText(member.type, inline)}`;
     }
     if (ts.isSetAccessorDeclaration(member)) {
-        return `:${typeText(member.parameters[0]?.type)}`;
+        return `:${typeText(member.parameters[0]?.type, inline)}`;
     }
     return undefined;
 }
 
 // A method or function as a function type, without a `this` parameter, which
 // callers do not pass.
-export function signatureShape(declaration: ts.SignatureDeclaration): string {
+export function signatureShape(declaration: ts.SignatureDeclaration, inline?: InlineReference): string {
     const parameters = declaration.parameters
         .filter((parameter) => !(ts.isIdentifier(parameter.name) && parameter.name.text === "this"))
-        .map((parameter, index) => parameterText(parameter, index));
-    return `${typeParametersText(declaration.typeParameters)}(${parameters.join(",")})=>${typeText(declaration.type)}`;
+        .map((parameter, index) => parameterText(parameter, index, inline));
+    return `${typeParametersText(declaration.typeParameters, inline)}(${parameters.join(",")})=>${typeText(declaration.type, inline)}`;
 }
 
 export function classShape(declaration: ts.ClassDeclaration): string {
@@ -115,25 +120,28 @@ export function classShape(declaration: ts.ClassDeclaration): string {
     return `${abstract ? "abstract " : ""}class _${typeParametersText(declaration.typeParameters)}${heritage ? ` ${heritage}` : ""}{${constructors.join("")}}`;
 }
 
-function parameterText(parameter: ts.ParameterDeclaration, index: number): string {
+function parameterText(parameter: ts.ParameterDeclaration, index: number, inline?: InlineReference): string {
     const name = ts.isIdentifier(parameter.name) && parameter.name.text === "this" ? "this" : `_${index}`;
     const optional = parameter.questionToken || parameter.initializer ? "?" : "";
-    return `${parameter.dotDotDotToken ? "..." : ""}${name}${optional}:${typeText(parameter.type)}`;
+    return `${parameter.dotDotDotToken ? "..." : ""}${name}${optional}:${typeText(parameter.type, inline)}`;
 }
 
-function typeParametersText(parameters: ts.NodeArray<ts.TypeParameterDeclaration> | undefined): string {
-    return parameters?.length ? `<${parameters.map(normalize).join(",")}>` : "";
+function typeParametersText(
+    parameters: ts.NodeArray<ts.TypeParameterDeclaration> | undefined,
+    inline?: InlineReference,
+): string {
+    return parameters?.length ? `<${parameters.map((parameter) => normalize(parameter, inline)).join(",")}>` : "";
 }
 
-function typeText(type: ts.TypeNode | undefined): string {
-    return type ? normalize(type) : "any";
+function typeText(type: ts.TypeNode | undefined, inline?: InlineReference): string {
+    return type ? normalize(type, inline) : "any";
 }
 
 // A node as its tokens, without comments and `export` or `declare`, with each
 // parameter named by its position and each string literal in double quotes. A
 // space separates two tokens only where they would otherwise run together, as
 // in `keyof T`.
-export function normalize(node: ts.Node): string {
+export function normalize(node: ts.Node, inline?: InlineReference): string {
     const sourceFile = node.getSourceFile();
     let text = "";
     const append = (token: string) => {
@@ -144,7 +152,12 @@ export function normalize(node: ts.Node): string {
     };
     const visit = (current: ts.Node): void => {
         if (ts.isParameter(current) && ts.isFunctionLike(current.parent)) {
-            append(parameterText(current, current.parent.parameters.indexOf(current)));
+            append(parameterText(current, current.parent.parameters.indexOf(current), inline));
+            return;
+        }
+        const inlined = inline && ts.isTypeReferenceNode(current) ? inline(current) : undefined;
+        if (inlined !== undefined) {
+            append(inlined);
             return;
         }
         if (ts.isStringLiteral(current) || ts.isNoSubstitutionTemplateLiteral(current)) {
@@ -235,7 +248,7 @@ export function typeHashes(index: Map<string, ts.Node[]>): (name: string) => str
         let text = texts.get(name);
         if (text === undefined) {
             const declarations = index.get(name) ?? [];
-            text = declarations.map(normalize).join("\n");
+            text = declarations.map((declaration) => normalize(declaration)).join("\n");
             texts.set(name, text);
             const referenced = new Set<string>();
             for (const declaration of declarations) {

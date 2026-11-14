@@ -27,15 +27,22 @@ nowhere else in the ID has "command", and not where it is what the command acts 
 
 - a leading "command" before a word it describes, as in `command-palette-open` or
   `command-id-copy` (`palette`, `id`, `name`, `list`, `selector`, `history`, `line` and the like);
+- a trailing "command" where the command has no `name` written out as a string, or one that has
+  "command" as a word (see
+  [no-command-in-command-name](no-command-in-command-name.md#what-is-reported)), as
+  `{ id: "create-slash-command", name: "Create slash command" }` has: the ID then names a slash
+  command, and with no name to read, the words of the ID cannot tell a label from the noun the
+  command acts on. With a name that does without the word, as
+  `{ id: "open-note-command", name: "Open note" }` has, it is reported;
 - a trailing "command" after a word that makes it the object, as in `open-note-for-command`, or in
   an ID that starts with a verb that takes a command, as in `copy-uri-command` or
   `run-shell-command` (`run`, `execute`, `copy`, `select`, `insert`, `search` and the like);
-- where the command's `name`, a string literal, has "command" as a word it needs (see
-  [no-command-in-command-name](no-command-in-command-name.md#what-is-reported)), as
+- where the command's `name`, a string literal, has "command" as a word it needs, as
   `{ id: "insert-snippet-command", name: "Insert snippet for command" }` has.
 
-Not reported, therefore: `raw-command`, `run-command`, `copy-command-id`, `open-command-selector`
-and `commandPalette`. Nor are "command" inside a longer word, as in `open-commander` or
+Not reported, therefore: `raw-command`, `run-command`, `copy-command-id`, `open-command-selector`,
+`commandPalette`, and `open-note-command` with no name or a name such as `t("open")`. A leading
+"command", as in `command-open-note`, is reported whatever the name. Nor are "command" inside a longer word, as in `open-commander` or
 `recommend-notes`, the plural, as in `list-commands`, an ID built from a template literal or a
 variable, and a command object defined elsewhere and passed to `addCommand()` by name.
 

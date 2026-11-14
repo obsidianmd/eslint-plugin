@@ -201,6 +201,14 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
         {
             name: "document.createElementNS() for SVG is left to prefer-create-el",
             code: "document.createElementNS('http://www.w3.org/2000/svg', 'path');",
+            // createSvg() is 1.1.0; this repository's manifest says 0.15.0.
+            options: [{ minAppVersion: "1.1.0" }],
+        },
+        {
+            // Below 0.15.0 neither activeDocument nor createSvg() can be used.
+            name: "document.createElementNS() for SVG below 0.15.0 is left alone",
+            code: "document.createElementNS('http://www.w3.org/2000/svg', 'path'); document.createElement('div');",
+            options: [{ minAppVersion: "0.9.12" }],
         },
         {
             name: "document.createDocumentFragment() is left to prefer-create-el",
@@ -260,6 +268,20 @@ ruleTester.run("prefer-active-doc", preferActiveDocRule, {
                     messageId: "preferActive",
                     data: { original: "document", replacement: "activeDocument" },
                     suggestions: [{ messageId: "useActiveDocument", output: "activeDocument.createElement('div', { is: 'my-div' });" }],
+                },
+            ],
+        },
+        {
+            // createSvg() is 1.1.0, so prefer-create-el leaves the call alone
+            // below that, and this rule reports it.
+            name: "document.createElementNS() for SVG below the version that has createSvg() is flagged",
+            code: "document.createElementNS('http://www.w3.org/2000/svg', 'path');",
+            options: [{ minAppVersion: "1.0.0" }],
+            errors: [
+                {
+                    messageId: "preferActive",
+                    data: { original: "document", replacement: "activeDocument" },
+                    suggestions: [{ messageId: "useActiveDocument", output: "activeDocument.createElementNS('http://www.w3.org/2000/svg', 'path');" }],
                 },
             ],
         },
@@ -1234,6 +1256,69 @@ ruleTester.run("prefer-active-doc and code that handles popout windows", preferA
             ],
         },
         {
+            name: "a download link put in the body and removed again gets the suggestion",
+            code: "export function download(a: HTMLAnchorElement) { document.body.appendChild(a); a.click(); a.remove(); }",
+            errors: [{ messageId: "preferActiveBody", suggestions: offered("export function download(a: HTMLAnchorElement) { activeDocument.body.appendChild(a); a.click(); a.remove(); }") }],
+        },
+        {
+            name: "a textarea put in the body to copy its text gets the suggestion",
+            code: "export function copy(t: HTMLTextAreaElement) { document.body.append(t); t.select(); t.remove(); }",
+            errors: [{ messageId: "preferActiveBody", suggestions: offered("export function copy(t: HTMLTextAreaElement) { activeDocument.body.append(t); t.select(); t.remove(); }") }],
+        },
+        {
+            name: "an element put in the body and taken out with removeChild gets the suggestion on both",
+            code: "export function copy(t: HTMLTextAreaElement) { document.body.appendChild(t); t.select(); document.body.removeChild(t); }",
+            errors: [
+                { messageId: "preferActiveBody", suggestions: offered("export function copy(t: HTMLTextAreaElement) { activeDocument.body.appendChild(t); t.select(); activeDocument.body.removeChild(t); }") },
+                { messageId: "preferActiveBody", suggestions: offered("export function copy(t: HTMLTextAreaElement) { activeDocument.body.appendChild(t); t.select(); activeDocument.body.removeChild(t); }") },
+            ],
+        },
+        {
+            name: "a removeChild in a finally moves with the appendChild, in one suggestion on each",
+            code: "export async function shot(c: HTMLDivElement, render: () => Promise<void>) { document.body.appendChild(c); try { await render(); } finally { document.body.removeChild(c); } }",
+            errors: [
+                { messageId: "preferActiveBody", suggestions: offered("export async function shot(c: HTMLDivElement, render: () => Promise<void>) { activeDocument.body.appendChild(c); try { await render(); } finally { activeDocument.body.removeChild(c); } }") },
+                { messageId: "preferActiveBody", suggestions: offered("export async function shot(c: HTMLDivElement, render: () => Promise<void>) { activeDocument.body.appendChild(c); try { await render(); } finally { activeDocument.body.removeChild(c); } }") },
+            ],
+        },
+        {
+            name: "a contains check on the body moves with the appendChild and removeChild",
+            code: "export function pick(input: HTMLInputElement) { document.body.appendChild(input); const cleanup = () => { if (document.body.contains(input)) document.body.removeChild(input); }; input.addEventListener('blur', cleanup); }",
+            errors: [
+                { messageId: "preferActiveBody", suggestions: offered("export function pick(input: HTMLInputElement) { activeDocument.body.appendChild(input); const cleanup = () => { if (activeDocument.body.contains(input)) activeDocument.body.removeChild(input); }; input.addEventListener('blur', cleanup); }") },
+                { messageId: "preferActiveBody", suggestions: offered("export function pick(input: HTMLInputElement) { activeDocument.body.appendChild(input); const cleanup = () => { if (activeDocument.body.contains(input)) activeDocument.body.removeChild(input); }; input.addEventListener('blur', cleanup); }") },
+                { messageId: "preferActiveBody", suggestions: offered("export function pick(input: HTMLInputElement) { activeDocument.body.appendChild(input); const cleanup = () => { if (activeDocument.body.contains(input)) activeDocument.body.removeChild(input); }; input.addEventListener('blur', cleanup); }") },
+            ],
+        },
+        {
+            name: "where one use of the element's body cannot be rewritten, none of them gets the suggestion",
+            code: "export function show(el: HTMLElement, done: (f: (activeDocument: unknown) => void) => void) { document.body.appendChild(el); done((activeDocument) => { document.body.removeChild(el); }); }",
+            errors: [
+                { messageId: "preferActiveBody", suggestions: [] },
+                { messageId: "preferActiveBody", suggestions: [] },
+            ],
+        },
+        {
+            name: "an element removed later in a callback gets the suggestion",
+            code: "export function flash(el: HTMLElement) { document.body.insertBefore(el, null); window.setTimeout(() => el.detach(), 1000); }",
+            errors: [{ messageId: "preferActiveBody", suggestions: offered("export function flash(el: HTMLElement) { activeDocument.body.insertBefore(el, null); window.setTimeout(() => el.detach(), 1000); }") }],
+        },
+        {
+            name: "an element put in the body and never removed is the window's state",
+            code: "declare const panel: HTMLElement;\nexport function onload() { document.body.appendChild(panel); }",
+            errors: [{ messageId: "perWindowState", data: { element: "body" }, suggestions: [] }],
+        },
+        {
+            name: "an element removed but put in the body through a call that is not followed is the window's state",
+            code: "declare const el: HTMLElement;\nexport function f() { document.body.appendChild(el.cloneNode()); el.remove(); }",
+            errors: [{ messageId: "perWindowState", data: { element: "body" }, suggestions: [] }],
+        },
+        {
+            name: "a transient element in the head is still the window's state",
+            code: "export function f(s: HTMLStyleElement) { document.head.appendChild(s); s.remove(); }",
+            errors: [{ messageId: "perWindowState", data: { element: "head" }, suggestions: [] }],
+        },
+        {
             name: "a div created in the body keeps the suggestion",
             code: "export const f = () => document.body.createDiv('my-tooltip');",
             errors: [{ messageId: "preferActive", suggestions: offered("export const f = () => activeDocument.body.createDiv('my-tooltip');") }],
@@ -1247,6 +1332,16 @@ ruleTester.run("prefer-active-doc and code that handles popout windows", preferA
         {
             name: "document.body after a check of activeDocument is reported, without a suggestion",
             code: "export const f = () => typeof activeDocument !== 'undefined' ? activeDocument.body : document.body;",
+            errors: [{ messageId: "preferActive", suggestions: [] }],
+        },
+        {
+            name: "document.body after a check of one of Obsidian's DOM helpers is reported, without a suggestion",
+            code: "export const f = () => typeof createDiv === 'function' ? createDiv() : document.body;",
+            errors: [{ messageId: "preferActive", suggestions: [] }],
+        },
+        {
+            name: "document.body in the catch of a try that calls a helper is reported, without a suggestion",
+            code: "export function f() { try { return createDiv(); } catch (e) { console.error(e); return document.body; } }",
             errors: [{ messageId: "preferActive", suggestions: [] }],
         },
         {

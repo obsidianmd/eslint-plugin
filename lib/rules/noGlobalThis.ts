@@ -2,6 +2,7 @@ import { type TSESLint, TSESTree } from "@typescript-eslint/utils";
 import ts from "typescript";
 import {
     followsProbeOfGlobal,
+    windowIsNarrowedAt,
     getGlobalWindowType,
     getTypeInfo,
     isGlobalWindowAt,
@@ -140,6 +141,11 @@ export default ruleCreator({
         // be wrong, and nothing is offered.
         function classify(node: TSESTree.Identifier): Rewrite {
             if (!isGlobalWindowAt(context, node)) {
+                return "none";
+            }
+            // In the `else` of `if ("requestIdleCallback" in window)`, `window`
+            // is `never`, and `window.setTimeout` does not compile.
+            if (windowIsNarrowedAt(context.sourceCode, node, types)) {
                 return "none";
             }
             // `"window" in globalThis`, `typeof globalThis["document"]`,

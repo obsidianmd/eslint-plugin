@@ -31,6 +31,10 @@ Not reported:
   `el.setCssStyles({ height: "" })`, and `el.style.removeProperty()`;
 - CSS custom properties (`--name`) in `setCssProps()`, `setCssStyles()` and `el.style.setProperty()`,
   whatever their value: a custom property is how code passes a value to a CSS class;
+- with type information, a `style` object that is not an element's inline style, such as a plugin's
+  own `settings.style.theme = "compact"`: one whose type is neither a `CSSStyleDeclaration` nor has
+  its `cssText` or `setProperty()`. Without type information, as in a JavaScript file, and where the
+  type cannot tell, such as `any`, every `style` object is taken for an element's;
 - computed keys that are not written out, such as `[key]`, a spread (`{ ...styles }`), `setCssProps()`
   and `setCssStyles()` called with a variable or with no argument, other attributes, and reading a
   style.
