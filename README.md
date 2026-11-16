@@ -67,10 +67,12 @@ The `parserOptions` block is required because the recommended config includes ty
 
 > **Note:** You do not need to separately add `eslint.configs.recommended` or `tseslint.configs.recommended` — both are already included in the recommended config.
 
-The recommended config also lints files that are not source, matching `package.json`,
+The recommended config also lints files that are not source, matching
 `manifest.json` and `LICENSE` by name. **Run ESLint from the project root**: a lint script scoped to your sources —
 `eslint src` — never visits them, and their checks silently do nothing. See
 [Files linted beyond your source](docs/configuration.md#files-linted-beyond-your-source).
+
+To also lint `package.json` (`depend/ban-dependencies`), add `...obsidianmd.configs.packageJson` as the last entry. See [Linting `package.json`](docs/configuration.md#linting-packagejson) for why it is separate and must come last.
 
 For advanced usage, see the [configuration guide](docs/configuration.md):
 
@@ -89,6 +91,7 @@ To give another plugin's rule a message of your own, wrap it with [`obsidianmd.w
 
 |      | Name                       |
 | :--- | :------------------------- |
+|      | `packageJson`              |
 | ✅    | `recommended`              |
 | 🇬🇧 | `recommendedWithLocalesEn` |
 

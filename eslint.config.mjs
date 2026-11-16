@@ -49,6 +49,7 @@ export default [
             "eslint-comments/no-restricted-disable": "off",
         },
     },
+    ...obsidianmd.configs.packageJson,
     // eslint-plugin-import is what the recommended config's import rules come
     // from, so it is a dependency of the plugin, not one to replace.
     {

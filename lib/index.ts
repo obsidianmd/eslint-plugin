@@ -70,7 +70,7 @@ interface ObsidianmdPlugin {
     meta: { name: string; version: string };
     languages: { "plain-text": typeof PlainTextLanguage };
     rules: NonNullable<ESLint.Plugin["rules"]>;
-    configs: { recommended: Linter.Config[]; recommendedWithLocalesEn: Linter.Config[] };
+    configs: { recommended: Linter.Config[]; recommendedWithLocalesEn: Linter.Config[]; packageJson: Linter.Config[] };
     ruleConfigs: { recommended: RulesConfig; recommendedTypeChecked: RulesConfig };
     // ESLint ignores the keys of a plugin object it does not use, and names the
     // plugin by `meta` in --print-config and --cache.
@@ -143,7 +143,8 @@ const plugin: ObsidianmdPlugin = {
     } as unknown as ObsidianmdPlugin["rules"],
     configs: {
         recommended: [],
-        recommendedWithLocalesEn: []
+        recommendedWithLocalesEn: [],
+        packageJson: []
     },
     ruleConfigs: {
         recommended: {},
@@ -527,22 +528,6 @@ const flatRecommendedConfig: Config[] = defineConfig([
             ...pickRules(recommendedPluginRulesConfig, (rule) => rule === CUSTOM_MESSAGE_RULE),
         },
     },
-    {
-        files: ['package.json'],
-        language: 'json/json',
-        extends: [tseslint.configs.disableTypeChecked],
-        plugins: {
-            depend,
-            json
-        },
-        rules: {
-            "depend/ban-dependencies": [
-                "error", {
-                    "presets": ["native", "microutilities", "preferred"]
-                }
-            ]
-        }
-    },
     // manifest.json is strict JSON, so it needs the JSON language to be parsed
     // at all — under the JS/TS globs above it was never linted.
     {
@@ -698,9 +683,33 @@ const recommendedWithLocalesEn: Config[] = defineConfig([
     }
 ]);
 
+// Kept out of `recommended`: once any config object matches package.json,
+// ESLint lints it, and every user config object without `files` applies to it
+// too, so JS/TS-only settings there throw on package.json.
+const packageJsonConfig: Config[] = defineConfig([
+    {
+        files: ['package.json'],
+        language: 'json/json',
+        extends: [tseslint.configs.disableTypeChecked],
+        plugins: {
+            depend,
+            json
+        },
+        rules: {
+            "no-irregular-whitespace": "off",
+            "depend/ban-dependencies": [
+                "error", {
+                    "presets": ["native", "microutilities", "preferred"]
+                }
+            ]
+        }
+    },
+]);
+
 plugin.configs = {
     recommended: flatRecommendedConfig,
-    recommendedWithLocalesEn
+    recommendedWithLocalesEn,
+    packageJson: packageJsonConfig
 };
 
 plugin.ruleConfigs = {
